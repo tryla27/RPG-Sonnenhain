@@ -336,7 +336,7 @@ const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
 func _ready() -> void:
-	dedicated_server = "--dedicated-server" in OS.get_cmdline_args()
+	dedicated_server = OS.has_feature("dedicated_server") or "--dedicated-server" in OS.get_cmdline_args()
 	font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	environment_tiles = load("res://art/sonnenhain_tiles.png")
