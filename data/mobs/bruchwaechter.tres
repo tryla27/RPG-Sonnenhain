@@ -20,3 +20,4 @@ attack_frame = 3
 animation_fps = 7.0
 ranged = false
 boss = false
+heavy_melee = true
