@@ -1,6 +1,8 @@
 extends Node2D
 
 const NetworkManager = preload("res://scripts/network/network_manager.gd")
+const MobCatalog = preload("res://scripts/enemies/mob_catalog.gd")
+const MobAnimation = preload("res://scripts/enemies/mob_animation.gd")
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
 const VIEW := Vector2(1152, 648)
@@ -30,35 +32,7 @@ const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", 
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
 const CUSTOM_MUSIC_THEMES := ["dorf", "blumen", "kueste", "pilzwald", "ruinen", "kristall", "asche", "sternen"]
 const MUSIC_FADE_SECONDS := 1.35
-const ENEMY_TYPES := [
-	{"name":"Waldschleim", "region":1, "hp":42, "damage":8, "speed":78, "xp":12, "color":Color("73cb88")},
-	{"name":"Blütenkäfer", "region":1, "hp":32, "damage":6, "speed":113, "xp":11, "color":Color("e998b6")},
-	{"name":"Pilzling", "region":2, "hp":65, "damage":11, "speed":65, "xp":19, "color":Color("e3ad77")},
-	{"name":"Mooswolf", "region":2, "hp":72, "damage":14, "speed":132, "xp":24, "color":Color("789983")},
-	{"name":"Steingolem", "region":3, "hp":118, "damage":19, "speed":72, "xp":36, "color":Color("bea78c")},
-	{"name":"Ruinenbeholder", "region":3, "hp":82, "damage":22, "speed":105, "xp":38, "color":Color("a8b9e9")},
-	{"name":"Kristallkrabbe", "region":4, "hp":125, "damage":22, "speed":75, "xp":44, "color":Color("8de0eb")},
-	{"name":"Kristallgolem", "region":4, "hp":165, "damage":29, "speed":66, "xp":58, "color":Color("92ddea")},
-	{"name":"Ascheläufer", "region":5, "hp":145, "damage":29, "speed":138, "xp":57, "color":Color("dc835e")},
-	{"name":"Lavagolem", "region":5, "hp":260, "damage":38, "speed":52, "xp":82, "color":Color("a75c52")},
-	{"name":"Strandkrabbe", "region":6, "hp":57, "damage":9, "speed":93, "xp":15, "color":Color("e9a67e")},
-	{"name":"Wassergeist", "region":6, "hp":90, "damage":16, "speed":117, "xp":26, "color":Color("76bfd2")},
-	{"name":"Turmwächter", "region":3, "hp":680, "damage":31, "speed":78, "xp":310, "color":Color("8c9b9e")},
-	{"name":"Kristallhüter", "region":4, "hp":850, "damage":38, "speed":87, "xp":410, "color":Color("9bc6dd")},
-	{"name":"Aschefürst", "region":7, "hp":1150, "damage":47, "speed":105, "xp":540, "color":Color("d28467")},
-	{"name":"Sternenschatten", "region":7, "hp":320, "damage":48, "speed":128, "xp":230, "color":Color("b5a3d9")},
-	{"name":"Bruchwächter", "region":7, "hp":470, "damage":55, "speed":72, "xp":280, "color":Color("dfac91")},
-	{"name":"Nebelhirsch", "region":8, "hp":91, "damage":17, "speed":123, "xp":28, "color":Color("b9cfcc")},
-	{"name":"Irrlicht", "region":8, "hp":73, "damage":20, "speed":109, "xp":31, "color":Color("a6d8da")},
-	{"name":"Harzbestie", "region":9, "hp":142, "damage":26, "speed":91, "xp":47, "color":Color("caac5a")},
-	{"name":"Wurzelhexe", "region":9, "hp":111, "damage":30, "speed":117, "xp":52, "color":Color("a0b379")},
-	{"name":"Quellkriecher", "region":10, "hp":190, "damage":35, "speed":112, "xp":68, "color":Color("8fbfc6")},
-	{"name":"Perlengeist", "region":10, "hp":155, "damage":39, "speed":134, "xp":75, "color":Color("c5e0e4")},
-	{"name":"Gratgreif", "region":11, "hp":250, "damage":45, "speed":150, "xp":96, "color":Color("a7a0b8")},
-	{"name":"Schattenritter", "region":11, "hp":340, "damage":53, "speed":90, "xp":108, "color":Color("77748f")},
-	{"name":"Himmelsfalter", "region":12, "hp":390, "damage":60, "speed":148, "xp":145, "color":Color("d9c6e8")},
-	{"name":"Sternenwächterin", "region":12, "hp":560, "damage":69, "speed":85, "xp":180, "color":Color("e4d4b5")}
-]
+var ENEMY_TYPES: Array = []
 const ABILITIES := [
 	{"name":"Wirbelhieb", "desc":"Kreisender Nahkampfschlag", "cost":28, "cd":6.0, "req":3, "kind":0},
 	{"name":"Schildwall", "desc":"Schutz für wenige Sekunden", "cost":24, "cd":12.0, "req":8, "kind":1},
@@ -340,6 +314,9 @@ const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
 func _ready() -> void:
 	dedicated_server = OS.has_feature("dedicated_server") or "--dedicated-server" in OS.get_cmdline_args()
+	ENEMY_TYPES = MobCatalog.legacy_types()
+	if ENEMY_TYPES.size() != 27:
+		push_error("Mob-Katalog unvollständig: %d/27 Gegnerdaten geladen." % ENEMY_TYPES.size())
 	font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	environment_tiles = load("res://art/sonnenhain_tiles.png")
@@ -1713,7 +1690,7 @@ func open_dungeon_chest() -> void:
 func make_enemy(type: int, pos: Vector2, elite_kind: int = 0) -> Dictionary:
 	var info: Dictionary = ENEMY_TYPES[type]
 	var health: float = float(info["hp"]) * (1.2 + 0.11 * region_level(int(info["region"]))) * [1.0, 2.1, 4.2][elite_kind]
-	return {"uid":randi(), "type":type, "pos":pos, "hp":health, "max_hp":health, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":randf_range(0.7, 1.7), "seed":randf() * TAU, "elite":elite_kind}
+	return {"uid":randi(), "type":type, "pos":pos, "hp":health, "max_hp":health, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":randf_range(0.7, 1.7), "seed":randf() * TAU, "elite":elite_kind, "facing":Vector2.DOWN, "walking":false, "anim_time":0.0, "attack_anim":0.0}
 
 func spawn_position_allowed(p: Vector2, target_region: int) -> bool:
 	if region_at(p) != target_region: return false
@@ -1823,6 +1800,8 @@ func update_enemies(delta: float) -> void:
 		enemy["stun"] = maxf(0.0, float(enemy["stun"]) - delta)
 		enemy["slow"] = maxf(0.0, float(enemy["slow"]) - delta)
 		enemy["marked"] = maxf(0.0, float(enemy.get("marked", 0.0)) - delta)
+		enemy["attack_anim"] = maxf(0.0, float(enemy.get("attack_anim", 0.0)) - delta)
+		enemy["walking"] = false
 		if enemy["poison"] > 0:
 			enemy["poison"] = maxf(0.0, float(enemy["poison"]) - delta)
 			enemy["poison_tick"] = float(enemy["poison_tick"]) - delta
@@ -1846,13 +1825,20 @@ func update_enemies(delta: float) -> void:
 			for angle in [0.0, 0.75, -0.75, 1.4, -1.4]:
 				var next_pos: Vector2 = enemy["pos"] + offset.normalized().rotated(angle) * speed
 				if (arena_mode != "" and next_pos.distance_to(ARENA_CENTER) < ARENA_RADIUS - 16.0) or (dungeon_id >= 0 and not dungeon_blocked(next_pos)) or (arena_mode == "" and dungeon_id < 0 and region_at(next_pos) == region_at(enemy["pos"]) and not terrain_blocked(next_pos)):
+					var movement: Vector2 = next_pos - enemy["pos"]
 					enemy["pos"] = next_pos
+					if movement.length_squared() > 0.001:
+						enemy["facing"] = movement.normalized()
+						enemy["walking"] = true
+						enemy["anim_time"] = float(enemy.get("anim_time", 0.0)) + delta
 					break
 		if int(enemy["type"]) in [5, 7, 11, 12, 13, 14, 18, 20, 22, 24, 26] and distance > 95 and distance < 420 and enemy["stun"] <= 0 and enemy["shot"] <= 0 and (arena_mode != "" or region_at(player_pos) != 0):
 			enemy["shot"] = randf_range(2.4, 3.1)
+			enemy["attack_anim"] = 0.28
 			enemy_projectiles.append({"pos":enemy["pos"], "dir":offset.normalized(), "speed":310.0 if int(enemy["type"]) in [12, 13, 14] else 265.0, "life":2.0, "damage":int(enemy_damage(int(enemy["type"])) * [1.0, 1.25, 1.6][int(enemy.get("elite", 0))] * float(enemy.get("arena_power", 1.0))), "type":int(enemy["type"])})
 		if distance < (61 if int(enemy["type"]) in [12, 13, 14] else 43) and enemy["hit"] <= 0 and (arena_mode != "" or region_at(player_pos) != 0):
 			enemy["hit"] = 1.0
+			enemy["attack_anim"] = 0.24
 			if invulnerable <= 0:
 				apply_player_damage(int(enemy_damage(int(enemy["type"])) * [1.0, 1.25, 1.6][int(enemy.get("elite", 0))] * float(enemy.get("arena_power", 1.0))))
 				if panel == "arena_reward" or (arena_mode == "" and enemies.is_empty()): return
@@ -4436,6 +4422,22 @@ func quest_marker_state(npc_name: String) -> int:
 	if has_available: return 1
 	return 0
 
+func draw_directional_mob_sprite(enemy: Dictionary, p: Vector2, scale_factor: float = 1.0) -> bool:
+	var type: int = int(enemy["type"])
+	if type < 0 or type >= ENEMY_TYPES.size():
+		return false
+	var info: Dictionary = ENEMY_TYPES[type]
+	var data := info.get("mob_data", null) as MobData
+	if data == null or not data.supports_directions or data.directional_sprite == null:
+		return false
+	var direction := MobAnimation.direction_index(enemy.get("facing", Vector2.DOWN))
+	var frame := MobAnimation.frame_for(data, enemy)
+	var frame_size := Vector2(data.frame_size)
+	var source := Rect2(Vector2(frame * data.frame_size.x, direction * data.frame_size.y), frame_size)
+	var size := Vector2(70, 70) * scale_factor
+	draw_texture_rect_region(data.directional_sprite, Rect2(p - size * 0.5 + Vector2(0, -14 * scale_factor), size), source)
+	return true
+
 func draw_enemy(enemy: Dictionary) -> void:
 	var p: Vector2 = enemy["pos"]
 	var type: int = int(enemy["type"])
@@ -4458,10 +4460,12 @@ func draw_enemy(enemy: Dictionary) -> void:
 	var enemy_color: Color = ENEMY_TYPES[type]["color"]
 	var model_pos := p + Vector2(0.0, bob)
 	var stride := sin(world_time * 7.0 + float(enemy.get("seed", 0.0))) * 3.0
-	if boss:
-		draw_boss_model(type, model_pos, enemy_color, stride)
-	else:
-		draw_enemy_model(type, model_pos, enemy_color, stride)
+	var drew_directional := draw_directional_mob_sprite(enemy, model_pos, scale_factor)
+	if not drew_directional:
+		if boss:
+			draw_boss_model(type, model_pos, enemy_color, stride)
+		else:
+			draw_enemy_model(type, model_pos, enemy_color, stride)
 	if float(enemy.get("flash", 0.0)) > 0.0:
 		draw_arc(model_pos, 37.0 * scale_factor, 0.0, TAU, 18, Color("fff7df", 0.72), 3.0)
 	draw_enemy_level(p, type, boss, elite_kind)
