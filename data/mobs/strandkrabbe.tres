@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MobData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/mob_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 10
+display_name = "Strandkrabbe"
+region = 6
+base_hp = 57.0
+base_damage = 9
+speed = 93.0
+xp = 15
+color_hex = "e9a67e"
+sprite_row = 10
+supports_directions = false
+idle_frame = 0
+walk_frames = PackedInt32Array(1, 2)
+attack_frame = 3
+animation_fps = 7.0
+ranged = false
+boss = false
