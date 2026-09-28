@@ -1,5 +1,7 @@
 extends Node2D
 
+const NetworkManager = preload("res://scripts/network/network_manager.gd")
+
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
 const VIEW := Vector2(1152, 648)
 const WORLD := Vector2(16000, 9600)
@@ -332,6 +334,7 @@ var join_code := ""
 var remote_players: Dictionary = {}
 var local_peer_id := 1
 var sync_timer := 0.0
+var network_manager: Node
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -350,7 +353,7 @@ func _ready() -> void:
 	vfx_sprites = load("res://art/vfx_16.png")
 	structure_tiles = load("res://art/structures_16.png")
 	house_tiles = load("res://art/houses_192.png")
-	setup_multiplayer_signals()
+	setup_network_manager()
 	load_bindings()
 	refresh_save_slot_labels()
 	refresh_shop_stock()
@@ -401,160 +404,60 @@ func class_weapon_icon() -> String:
 func class_ultimate() -> int:
 	return CLASS_ULTIMATES[class_id]
 
-func setup_multiplayer_signals() -> void:
-	if not multiplayer.peer_connected.is_connected(_on_peer_connected): multiplayer.peer_connected.connect(_on_peer_connected)
-	if not multiplayer.peer_disconnected.is_connected(_on_peer_disconnected): multiplayer.peer_disconnected.connect(_on_peer_disconnected)
-	if not multiplayer.connected_to_server.is_connected(_on_connected_to_server): multiplayer.connected_to_server.connect(_on_connected_to_server)
-	if not multiplayer.connection_failed.is_connected(_on_connection_failed): multiplayer.connection_failed.connect(_on_connection_failed)
-	if not multiplayer.server_disconnected.is_connected(_on_server_disconnected): multiplayer.server_disconnected.connect(_on_server_disconnected)
+func setup_network_manager() -> void:
+	network_manager = NetworkManager.new()
+	network_manager.network_port = network_port
+	network_manager.server_url = network_server_url
+	network_manager.state_changed.connect(_on_network_state_changed)
+	network_manager.peer_joined.connect(_on_network_peer_joined)
+	network_manager.peer_left.connect(_on_network_peer_left)
+	network_manager.connected_to_server.connect(_on_network_connected_to_server)
+	network_manager.connection_failed.connect(_on_network_connection_failed)
+	network_manager.server_disconnected.connect(_on_network_server_disconnected)
+	add_child(network_manager)
 
-func _on_peer_connected(id: int) -> void:
-	network_status = "Spieler %d verbunden" % id
-	add_chat_line("SYSTEM", network_status)
-	if network_mode == "host": push_world_snapshot()
+func _on_network_state_changed(mode: String, status: String, code: String, peer_id: int) -> void:
+	network_mode = mode
+	network_status = status
+	invite_code = code
+	local_peer_id = peer_id
 
-func _on_peer_disconnected(id: int) -> void:
+func _on_network_peer_joined(id: int) -> void:
+	add_chat_line("SYSTEM", "Spieler %d verbunden" % id)
+	if network_mode == "host":
+		push_world_snapshot()
+
+func _on_network_peer_left(id: int) -> void:
 	remote_players.erase(id)
 	add_chat_line("SYSTEM", "Spieler %d hat die Gruppe verlassen." % id)
 
-func _on_connected_to_server() -> void:
-	local_peer_id = multiplayer.get_unique_id()
-	network_status = "Verbunden · Peer %d" % local_peer_id
+func _on_network_connected_to_server() -> void:
 	add_chat_line("SYSTEM", "Koop-Verbindung hergestellt.")
 	push_player_state()
 
-func _on_connection_failed() -> void:
-	network_status = "Verbindung zum Sonnenhain-Server fehlgeschlagen."
-	disconnect_multiplayer(false)
-
-func _on_server_disconnected() -> void:
-	network_status = "Host-Verbindung beendet."
+func _on_network_connection_failed() -> void:
 	remote_players.clear()
-	network_mode = "offline"
-	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 
-func to_base36(value: int) -> String:
-	var chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	var n := maxi(0, value)
-	if n == 0: return "0"
-	var out := ""
-	while n > 0:
-		out = chars.substr(n % 36, 1) + out
-		n = int(n / 36)
-	return out
-
-func from_base36(value: String) -> int:
-	var chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	var out := 0
-	for i in value.length():
-		var ch := value.to_upper().substr(i, 1)
-		var idx := chars.find(ch)
-		if idx < 0: return -1
-		out = out * 36 + idx
-	return out
-
-func ipv4_to_int(address: String) -> int:
-	var parts := address.split(".")
-	if parts.size() != 4: return -1
-	var result := 0
-	for part in parts:
-		var octet := int(part)
-		if octet < 0 or octet > 255: return -1
-		result = (result << 8) | octet
-	return result
-
-func int_to_ipv4(value: int) -> String:
-	return "%d.%d.%d.%d" % [(value >> 24) & 255, (value >> 16) & 255, (value >> 8) & 255, value & 255]
-
-func make_invite_code(address: String, port: int) -> String:
-	var packed := ipv4_to_int(address)
-	if packed < 0: return ""
-	return "SH-%s-%s" % [to_base36(packed), to_base36(port)]
-
-func decode_invite_code(code: String) -> Dictionary:
-	var cleaned := code.strip_edges().to_upper()
-	var parts := cleaned.split("-")
-	if parts.size() != 3 or parts[0] != "SH": return {}
-	var packed := from_base36(parts[1])
-	var port := from_base36(parts[2])
-	if packed < 0 or port <= 0 or port > 65535: return {}
-	return {"address":int_to_ipv4(packed), "port":port}
-
-func preferred_host_address() -> String:
-	# UPnP liefert bei unterstützten Routern direkt die öffentliche IPv4-Adresse und richtet UDP-Portweiterleitung ein.
-	var upnp := UPNP.new()
-	var discover_result := upnp.discover(1600, 2, "InternetGatewayDevice")
-	if discover_result == UPNP.UPNP_RESULT_SUCCESS and upnp.get_gateway() != null and upnp.get_gateway().is_valid_gateway():
-		upnp.add_port_mapping(network_port, network_port, "Sonnenhain Koop", "UDP", 0)
-		var public_ip := upnp.query_external_address()
-		if public_ip != "": return public_ip
-	for address in IP.get_local_addresses():
-		if "." in address and not address.begins_with("127.") and not address.begins_with("169.254."):
-			return address
-	return "127.0.0.1"
+func _on_network_server_disconnected() -> void:
+	remote_players.clear()
 
 func start_dedicated_server() -> void:
-	disconnect_multiplayer(false)
-	var peer := WebSocketMultiplayerPeer.new()
-	var err := peer.create_server(network_port, "0.0.0.0")
-	if err != OK:
-		network_status = "Dedicated Server konnte nicht gestartet werden · Fehler %d" % err
-		push_error(network_status)
-		return
-	multiplayer.multiplayer_peer = peer
-	network_mode = "host"
-	local_peer_id = 1
-	network_status = "Dedicated Server aktiv · WebSocket-Port %d" % network_port
-	print("[Sonnenhain] ", network_status)
+	network_manager.start_dedicated_server()
 
 func join_dedicated_server() -> void:
-	disconnect_multiplayer(false)
-	var peer := WebSocketMultiplayerPeer.new()
-	var err := peer.create_client(network_server_url)
-	if err != OK:
-		network_status = "Online-Verbindung konnte nicht gestartet werden · Fehler %d" % err
-		return
-	multiplayer.multiplayer_peer = peer
-	network_mode = "client"
-	network_status = "Verbinde mit Sonnenhain-Server …"
+	network_manager.join_dedicated_server()
 
 func host_multiplayer() -> void:
-	disconnect_multiplayer(false)
-	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_server(network_port, 4)
-	if err != OK:
-		network_status = "Host konnte nicht gestartet werden · Fehler %d" % err
-		return
-	multiplayer.multiplayer_peer = peer
-	network_mode = "host"
-	local_peer_id = 1
-	var address := preferred_host_address()
-	invite_code = make_invite_code(address, network_port)
-	network_status = "Host aktiv · Einladungscode %s" % invite_code
-	add_chat_line("SYSTEM", "Koop-Host gestartet.")
+	network_manager.host_lan()
+	if network_mode == "host":
+		add_chat_line("SYSTEM", "Koop-Host gestartet.")
 
 func join_multiplayer_from_code(code: String) -> void:
-	var endpoint := decode_invite_code(code)
-	if endpoint.is_empty():
-		network_status = "Ungültiger Einladungscode."
-		return
-	disconnect_multiplayer(false)
-	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_client(str(endpoint["address"]), int(endpoint["port"]))
-	if err != OK:
-		network_status = "Verbindung konnte nicht gestartet werden · Fehler %d" % err
-		return
-	multiplayer.multiplayer_peer = peer
-	network_mode = "client"
-	network_status = "Verbinde mit %s …" % str(endpoint["address"])
+	network_manager.join_lan_code(code)
 
 func disconnect_multiplayer(show_message: bool = true) -> void:
-	if network_mode != "offline" and multiplayer.multiplayer_peer != null: multiplayer.multiplayer_peer.close()
-	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	remote_players.clear()
-	network_mode = "offline"
-	invite_code = ""
-	if show_message: network_status = "Offline"
+	network_manager.disconnect(show_message)
 
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null: return
