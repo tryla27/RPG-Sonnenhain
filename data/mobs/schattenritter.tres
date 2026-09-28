@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MobData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/mob_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 24
+display_name = "Schattenritter"
+region = 11
+base_hp = 340.0
+base_damage = 53
+speed = 90.0
+xp = 108
+color_hex = "77748f"
+sprite_row = 24
+supports_directions = false
+idle_frame = 0
+walk_frames = PackedInt32Array(1, 2)
+attack_frame = 3
+animation_fps = 7.0
+ranged = true
+boss = false
