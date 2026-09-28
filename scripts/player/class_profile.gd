@@ -15,3 +15,7 @@ extends Resource
 @export var physical_damage_multiplier: float = 1.0
 @export var magic_damage_multiplier: float = 1.0
 @export var ranged_damage_multiplier: float = 1.0
+
+
+@export_group("Ausrüstung")
+@export var ring_slots: int = 1
