@@ -434,7 +434,7 @@ func join_multiplayer_from_code(code: String) -> void:
 
 func disconnect_multiplayer(show_message: bool = true) -> void:
 	remote_players.clear()
-	network_manager.disconnect(show_message)
+	network_manager.disconnect_network(show_message)
 
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null: return
