@@ -179,6 +179,7 @@ var inventory: Array = []
 var equipped_uid := -1
 var equipped_armor_uid := -1
 var equipped_ring_uid := -1
+var equipped_ring2_uid := -1
 var next_uid := 1
 var selected_item := -1
 var inventory_page := 0
@@ -316,6 +317,11 @@ const RACE_PROFILE_PATHS := [
 	"res://data/races/mensch.tres",
 	"res://data/races/ork.tres",
 	"res://data/races/roboter.tres"
+]
+const CLASS_PROFILE_PATHS := [
+	"res://data/classes/krieger.tres",
+	"res://data/classes/magier.tres",
+	"res://data/classes/bogenschuetze.tres"
 ]
 
 func _ready() -> void:
@@ -631,7 +637,9 @@ func update_music(delta: float = 0.0) -> void:
 		music_player.volume_db = move_toward(music_player.volume_db, base_volume, delta * 22.0)
 
 func max_hp() -> float:
-	return 100.0 + float(level - 1) * 8.0 + float(skill_levels[10]) * 25.0 + equipment_power(equipped_ring_uid) + item_attribute("str") * (2 if class_id == 0 else 1)
+	var base_hp := 100.0 + float(level - 1) * 8.0 + float(skill_levels[10]) * 25.0 + equipment_power(equipped_ring_uid) + equipment_power(equipped_ring2_uid) + item_attribute("str") * (2 if class_id == 0 else 1)
+	var race := current_race_profile()
+	return base_hp * (1.0 if race == null else race.max_hp_multiplier)
 
 func max_energy() -> float:
 	return 100.0 + float(skill_levels[11]) * 25.0
@@ -645,7 +653,7 @@ func equipment_power(uid: int) -> int:
 func item_attribute(key: String) -> int:
 	var total := 0
 	for item in inventory:
-		if int(item.get("uid", -1)) in [equipped_uid, equipped_armor_uid, equipped_ring_uid]:
+		if int(item.get("uid", -1)) in equipped_item_uids():
 			total += int(item.get(key, 0))
 	return total
 
@@ -1157,6 +1165,18 @@ func current_race_profile() -> RaceProfile:
 	if hero_race < 0 or hero_race >= RACE_PROFILE_PATHS.size():
 		return null
 	return load(RACE_PROFILE_PATHS[hero_race]) as RaceProfile
+
+func current_class_profile() -> ClassProfile:
+	if class_id < 0 or class_id >= CLASS_PROFILE_PATHS.size():
+		return null
+	return load(CLASS_PROFILE_PATHS[class_id]) as ClassProfile
+
+func equipped_item_uids() -> Array:
+	var ids: Array = [equipped_uid, equipped_armor_uid, equipped_ring_uid]
+	if equipped_ring2_uid >= 0:
+		ids.append(equipped_ring2_uid)
+	return ids
+
 
 func race_melee_multiplier() -> float:
 	var profile := current_race_profile()
@@ -2358,7 +2378,7 @@ func refresh_save_slot_labels() -> void:
 func save_game() -> void:
 	var safe_pos := arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos))
 	var safe_hp := max_hp() if arena_mode != "" else hp
-	var data := {"world_version":5, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":5, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	var file: FileAccess = FileAccess.open(slot_save_path(active_save_slot, creative_mode), FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify(data))
@@ -2460,6 +2480,9 @@ func load_game() -> void:
 	equipped_uid = int(data.get("equipped_uid", -1))
 	equipped_armor_uid = int(data.get("equipped_armor_uid", -1))
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
+	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1))
+	if class_id != 1:
+		equipped_ring2_uid = -1
 	last_waystone = clampi(int(data.get("last_waystone", 1)), 1, WAYSTONES.size() - 1)
 	var stored_stones: Array = data.get("waystone_unlocked", [])
 	for i in mini(stored_stones.size(), WAYSTONES.size()): waystone_unlocked[i] = bool(stored_stones[i])
@@ -2746,6 +2769,7 @@ func start_new_game() -> void:
 	equipped_uid = -1
 	equipped_armor_uid = -1
 	equipped_ring_uid = -1
+	equipped_ring2_uid = -1
 	next_uid = 1
 	selected_item = -1
 	quests.clear()
@@ -2971,7 +2995,7 @@ func sell_all_unequipped() -> void:
 	var count := 0
 	for i in range(inventory.size() - 1, -1, -1):
 		var item: Dictionary = inventory[i]
-		if int(item["uid"]) in [equipped_uid, equipped_armor_uid, equipped_ring_uid]: continue
+		if int(item["uid"]) in equipped_item_uids(): continue
 		if ItemProtection.is_protected(item): continue
 		total += item_sale_value(item)
 		count += int(item.get("count", 1))
@@ -3007,7 +3031,16 @@ func use_item(index: int) -> void:
 		equipped_armor_uid = int(item["uid"])
 		message("Ausgerüstet: %s (%d weniger Schaden)" % [name, item["power"]])
 	elif item["icon"] == "ring":
-		equipped_ring_uid = int(item["uid"])
+		var profile := current_class_profile()
+		var max_rings := 1 if profile == null else maxi(1, profile.ring_slots)
+		if equipped_ring_uid < 0 or int(item["uid"]) == equipped_ring_uid:
+			equipped_ring_uid = int(item["uid"])
+		elif max_rings >= 2 and (equipped_ring2_uid < 0 or int(item["uid"]) == equipped_ring2_uid):
+			equipped_ring2_uid = int(item["uid"])
+		elif max_rings >= 2:
+			equipped_ring2_uid = int(item["uid"])
+		else:
+			equipped_ring_uid = int(item["uid"])
 		hp = minf(max_hp(), hp + int(item["power"]))
 		message("Ausgerüstet: %s (+%d maximales Leben)" % [name, item["power"]])
 	else:
@@ -3061,6 +3094,9 @@ func sell_item(index: int) -> void:
 	if int(item["uid"]) == equipped_armor_uid: equipped_armor_uid = -1
 	if int(item["uid"]) == equipped_ring_uid:
 		equipped_ring_uid = -1
+		hp = minf(hp, max_hp())
+	if int(item["uid"]) == equipped_ring2_uid:
+		equipped_ring2_uid = -1
 		hp = minf(hp, max_hp())
 	var gain := int(round(float(item_sale_value(item)) / maxi(1, int(item.get("count", 1)))))
 	gold += gain
@@ -5723,7 +5759,9 @@ func draw_inventory_panel() -> void:
 	draw_hero(Vector2(395, 370), 2.0, false, Vector2.DOWN)
 	draw_equipment_slot(Vector2(180, 275), "WAFFE", equipped_uid, class_weapon_icon())
 	draw_equipment_slot(Vector2(501, 235), "RÜSTUNG", equipped_armor_uid, "armor")
-	draw_equipment_slot(Vector2(501, 347), "RING", equipped_ring_uid, "ring")
+	draw_equipment_slot(Vector2(501, 347), "RING 1", equipped_ring_uid, "ring")
+	if class_id == 1:
+		draw_equipment_slot(Vector2(501, 437), "RING 2", equipped_ring2_uid, "ring")
 	text_at(Vector2(186, 534), "HP %d  ·  ANGRIFF %d  ·  SCHUTZ %d" % [int(max_hp()), normal_attack_power(), equipment_power(equipped_armor_uid)], 15, Color("e6efdd"))
 	ui_box(Rect2(625, 153, 352, 426), Color("365b5d"))
 	text_at(Vector2(644, 179), "TASCHE", 19, Color("ffeda9"))
@@ -5735,7 +5773,7 @@ func draw_inventory_panel() -> void:
 		var col := cell % 5
 		var row := cell / 5
 		var pos := Vector2(641 + col * 65, 200 + row * 55)
-		var is_equipped := i < inventory.size() and int(inventory[i]["uid"]) in [equipped_uid, equipped_armor_uid, equipped_ring_uid]
+		var is_equipped := i < inventory.size() and int(inventory[i]["uid"]) in equipped_item_uids()
 		draw_rect(Rect2(pos, Vector2(54, 48)), Color("ffdda0") if is_equipped else (Color("e3c78c") if i == selected_item else Color("263f43")))
 		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("496b62"))
 		if i < inventory.size():
