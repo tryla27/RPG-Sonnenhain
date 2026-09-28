@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MobData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/mob_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 14
+display_name = "Aschefürst"
+region = 7
+base_hp = 1150.0
+base_damage = 47
+speed = 105.0
+xp = 540
+color_hex = "d28467"
+sprite_row = 14
+supports_directions = false
+idle_frame = 0
+walk_frames = PackedInt32Array(1, 2)
+attack_frame = 3
+animation_fps = 7.0
+ranged = true
+boss = true
