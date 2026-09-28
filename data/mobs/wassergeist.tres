@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MobData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/mob_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 11
+display_name = "Wassergeist"
+region = 6
+base_hp = 90.0
+base_damage = 16
+speed = 117.0
+xp = 26
+color_hex = "76bfd2"
+sprite_row = 11
+supports_directions = false
+idle_frame = 0
+walk_frames = PackedInt32Array(1, 2)
+attack_frame = 3
+animation_fps = 7.0
+ranged = true
+boss = false
