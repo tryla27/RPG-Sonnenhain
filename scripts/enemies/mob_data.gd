@@ -25,6 +25,13 @@ extends Resource
 @export_group("Verhalten")
 @export var ranged: bool = false
 @export var boss: bool = false
+@export var heavy_melee: bool = false
+@export var melee_range: float = 43.0
+@export var ranged_min_distance: float = 95.0
+@export var ranged_max_distance: float = 420.0
+@export var projectile_speed: float = 265.0
+@export var ranged_cooldown_min: float = 2.4
+@export var ranged_cooldown_max: float = 3.1
 
 func to_legacy_dict() -> Dictionary:
 	return {
