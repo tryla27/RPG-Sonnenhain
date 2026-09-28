@@ -317,6 +317,9 @@ func _ready() -> void:
 	ENEMY_TYPES = MobCatalog.legacy_types()
 	if ENEMY_TYPES.size() != 27:
 		push_error("Mob-Katalog unvollständig: %d/27 Gegnerdaten geladen." % ENEMY_TYPES.size())
+	if OS.is_debug_build():
+		for mob_error in MobCatalog.validate():
+			push_error(mob_error)
 	font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	environment_tiles = load("res://art/sonnenhain_tiles.png")
@@ -458,7 +461,8 @@ func push_world_snapshot() -> void:
 	if network_mode != "host": return
 	var enemy_rows: Array = []
 	for enemy in enemies:
-		enemy_rows.append({"uid":enemy.get("uid",0), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0), "facing":[enemy.get("facing",Vector2.DOWN).x,enemy.get("facing",Vector2.DOWN).y], "walking":enemy.get("walking",false), "anim_time":enemy.get("anim_time",0.0), "attack_anim":enemy.get("attack_anim",0.0)})
+		var enemy_facing: Vector2 = enemy.get("facing", Vector2.DOWN)
+		enemy_rows.append({"uid":enemy.get("uid",0), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0), "facing":[enemy_facing.x,enemy_facing.y], "walking":enemy.get("walking",false), "anim_time":enemy.get("anim_time",0.0), "attack_anim":enemy.get("attack_anim",0.0)})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
 		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0)})
@@ -4435,7 +4439,7 @@ func draw_directional_mob_sprite(enemy: Dictionary, p: Vector2, scale_factor: fl
 		return false
 	var direction := MobAnimation.direction_index(enemy.get("facing", Vector2.DOWN))
 	var frame := MobAnimation.frame_for(data, enemy)
-	var frame_size := Vector2(data.frame_size)
+	var frame_size := Vector2(float(data.frame_size.x), float(data.frame_size.y))
 	var source := Rect2(Vector2(frame * data.frame_size.x, direction * data.frame_size.y), frame_size)
 	var size := Vector2(70, 70) * scale_factor
 	draw_texture_rect_region(data.directional_sprite, Rect2(p - size * 0.5 + Vector2(0, -14 * scale_factor), size), source)
