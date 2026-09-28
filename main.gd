@@ -458,7 +458,7 @@ func push_world_snapshot() -> void:
 	if network_mode != "host": return
 	var enemy_rows: Array = []
 	for enemy in enemies:
-		enemy_rows.append({"uid":enemy.get("uid",0), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0)})
+		enemy_rows.append({"uid":enemy.get("uid",0), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0), "facing":[enemy.get("facing",Vector2.DOWN).x,enemy.get("facing",Vector2.DOWN).y], "walking":enemy.get("walking",false), "anim_time":enemy.get("anim_time",0.0), "attack_anim":enemy.get("attack_anim",0.0)})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
 		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0)})
@@ -473,6 +473,8 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 		var copy: Dictionary = raw.duplicate()
 		var coords: Array = raw.get("pos", [0.0,0.0])
 		copy["pos"] = Vector2(float(coords[0]),float(coords[1]))
+		var face: Array = raw.get("facing", [0.0,1.0])
+		copy["facing"] = Vector2(float(face[0]), float(face[1]))
 		rebuilt.append(copy)
 	enemies = rebuilt
 	var rebuilt_shots: Array = []
@@ -1814,6 +1816,7 @@ func update_enemies(delta: float) -> void:
 					continue
 		enemy["shot"] = maxf(0.0, float(enemy["shot"]) - delta)
 		var info: Dictionary = ENEMY_TYPES[int(enemy["type"])]
+		var mob_data := info.get("mob_data", null) as MobData
 		if flee_from_safe_zone(enemy, delta):
 			if enemy["pos"].distance_to(player_pos) > 880.0:
 				enemies.remove_at(i)
@@ -1832,11 +1835,11 @@ func update_enemies(delta: float) -> void:
 						enemy["walking"] = true
 						enemy["anim_time"] = float(enemy.get("anim_time", 0.0)) + delta
 					break
-		if int(enemy["type"]) in [5, 7, 11, 12, 13, 14, 18, 20, 22, 24, 26] and distance > 95 and distance < 420 and enemy["stun"] <= 0 and enemy["shot"] <= 0 and (arena_mode != "" or region_at(player_pos) != 0):
-			enemy["shot"] = randf_range(2.4, 3.1)
+		if mob_data != null and mob_data.ranged and distance > mob_data.ranged_min_distance and distance < mob_data.ranged_max_distance and enemy["stun"] <= 0 and enemy["shot"] <= 0 and (arena_mode != "" or region_at(player_pos) != 0):
+			enemy["shot"] = randf_range(mob_data.ranged_cooldown_min, mob_data.ranged_cooldown_max)
 			enemy["attack_anim"] = 0.28
-			enemy_projectiles.append({"pos":enemy["pos"], "dir":offset.normalized(), "speed":310.0 if int(enemy["type"]) in [12, 13, 14] else 265.0, "life":2.0, "damage":int(enemy_damage(int(enemy["type"])) * [1.0, 1.25, 1.6][int(enemy.get("elite", 0))] * float(enemy.get("arena_power", 1.0))), "type":int(enemy["type"])})
-		if distance < (61 if int(enemy["type"]) in [12, 13, 14] else 43) and enemy["hit"] <= 0 and (arena_mode != "" or region_at(player_pos) != 0):
+			enemy_projectiles.append({"pos":enemy["pos"], "dir":offset.normalized(), "speed":mob_data.projectile_speed, "life":2.0, "damage":int(enemy_damage(int(enemy["type"])) * [1.0, 1.25, 1.6][int(enemy.get("elite", 0))] * float(enemy.get("arena_power", 1.0))), "type":int(enemy["type"])})
+		if distance < (mob_data.melee_range if mob_data != null else 43.0) and enemy["hit"] <= 0 and (arena_mode != "" or region_at(player_pos) != 0):
 			enemy["hit"] = 1.0
 			enemy["attack_anim"] = 0.24
 			if invulnerable <= 0:
@@ -4442,7 +4445,8 @@ func draw_enemy(enemy: Dictionary) -> void:
 	var p: Vector2 = enemy["pos"]
 	var type: int = int(enemy["type"])
 	var elite_kind: int = int(enemy.get("elite", 0))
-	var boss := type in [12,13,14]
+	var mob_data := ENEMY_TYPES[type].get("mob_data", null) as MobData
+	var boss := mob_data != null and mob_data.boss
 	var bob := sin(world_time * (3.1 if type != 0 else 5.4) + float(enemy.get("seed",0.0))) * (4.0 if type in [0,5,7,11,18,22,25] else 2.0)
 	var scale_factor := 1.38 if boss else (1.42 if elite_kind == 2 else (1.22 if elite_kind == 1 else 1.0))
 	# Keine schwarzen Balken unter Gegnern: die Silhouette endet mit ihren eigenen Füßen.
@@ -4451,11 +4455,11 @@ func draw_enemy(enemy: Dictionary) -> void:
 		draw_arc(p + Vector2(0,4), 32*scale_factor, 0, TAU, 24, aura, 3)
 	# Fernangriffe und schwere Nahkampfangriffe werden vor dem Treffer sichtbar angekündigt.
 	var shot_left := float(enemy.get("shot", 9.0))
-	if type in [5,7,11,12,13,14,18,20,22,24,26] and shot_left < 0.55:
+	if mob_data != null and mob_data.ranged and shot_left < 0.55:
 		var aim_color := Color('c9a5f1',0.7) if type not in [11,13,22] else Color('a6e9f4',0.75)
 		draw_arc(p, 38*scale_factor, 0, TAU, 28, aim_color, 4)
 		draw_line(p, player_pos, Color(aim_color,0.22), 2)
-	elif type in [4,9,13,14,16] and float(enemy.get("hit",0.0)) < 0.22:
+	elif mob_data != null and mob_data.heavy_melee and float(enemy.get("hit",0.0)) < 0.22:
 		draw_arc(p + Vector2(0,8), 42*scale_factor, 0, TAU, 24, Color('f2b07b',0.45), 4)
 	var enemy_color: Color = ENEMY_TYPES[type]["color"]
 	var model_pos := p + Vector2(0.0, bob)
