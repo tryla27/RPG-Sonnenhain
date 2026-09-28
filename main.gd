@@ -3,6 +3,7 @@ extends Node2D
 const NetworkManager = preload("res://scripts/network/network_manager.gd")
 const MobCatalog = preload("res://scripts/enemies/mob_catalog.gd")
 const MobAnimation = preload("res://scripts/enemies/mob_animation.gd")
+const ItemProtection = preload("res://scripts/inventory/item_protection.gd")
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
 const VIEW := Vector2(1152, 648)
@@ -1072,7 +1073,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton: triggered = event.pressed
 	if not triggered: return
 	if event is InputEventMouseButton and panel != "":
-		if event.button_index == MOUSE_BUTTON_LEFT: handle_panel_click(event.position)
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.double_click and panel in ["inventory", "shop"] and try_toggle_item_protection_at(event.position):
+				return
+			handle_panel_click(event.position)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "journal"]:
 			menu_scroll = mini(maxi(0, QUESTS.size() - 6) if panel == "journal" else 2, menu_scroll + 1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and panel in ["skills", "journal"]:
@@ -1986,7 +1990,7 @@ func make_item(name: String, icon: String, rarity: int, power: int, value: int, 
 	var agility: int = bonus if icon == "bow" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
 	var intellect: int = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
 	var fair_value := value if icon == "potion" else 10 + ilvl * 4 + maxi(0, power) * (3 if icon in ["sword", "staff", "bow"] else 2) + rarity * rarity * 32 + (25 if element != "" else 0) + (strength + agility + intellect) * 5
-	var item := {"uid":next_uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4}
+	var item := {"uid":next_uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4, "protected":false}
 	next_uid += 1
 	return item
 
@@ -1997,7 +2001,7 @@ func stack_limit(item: Dictionary) -> int:
 	return 1
 
 func stack_matches(a: Dictionary, b: Dictionary) -> bool:
-	return a.get("icon") == b.get("icon") and a.get("name") == b.get("name") and a.get("rarity") == b.get("rarity") and a.get("element", "") == b.get("element", "")
+	return a.get("icon") == b.get("icon") and a.get("name") == b.get("name") and a.get("rarity") == b.get("rarity") and a.get("element", "") == b.get("element", "") and ItemProtection.is_protected(a) == ItemProtection.is_protected(b)
 
 func item_sale_value(item: Dictionary) -> int:
 	return int(item.get("stack_value", int(item.get("value", 0)) * int(item.get("count", 1))))
@@ -2844,6 +2848,37 @@ func upgrade_skill(index: int) -> void:
 	message("%s auf Rang %d verbessert" % [ABILITIES[index]["name"], skill_levels[index]])
 	save_game()
 
+func toggle_item_protection(index: int) -> void:
+	if index < 0 or index >= inventory.size():
+		return
+	var item: Dictionary = inventory[index]
+	var protected_now := ItemProtection.toggle(item)
+	selected_item = index
+	message(("%s ist jetzt geschützt." if protected_now else "%s ist wieder verkaufbar.") % item["name"])
+	save_game()
+	queue_redraw()
+
+func try_toggle_item_protection_at(mouse: Vector2) -> bool:
+	if panel == "inventory":
+		for cell in 25:
+			var col := cell % 5
+			var row := int(cell / 5.0)
+			if Rect2(641 + col * 65, 200 + row * 55, 54, 48).has_point(mouse):
+				var index := inventory_page * 25 + cell
+				if index < inventory.size():
+					toggle_item_protection(index)
+					return true
+				return false
+	elif panel == "shop":
+		for index in inventory.size():
+			var col := index % 11
+			var row := int(index / 11.0)
+			if Rect2(170 + col * 72, 397 + row * 40, 47, 37).has_point(mouse):
+				toggle_item_protection(index)
+				sell_all_confirm = false
+				return true
+	return false
+
 func click_inventory(mouse: Vector2) -> void:
 	if Rect2(850, 157, 32, 30).has_point(mouse):
 		inventory_page = maxi(0, inventory_page - 1)
@@ -2904,13 +2939,14 @@ func sell_all_unequipped() -> void:
 	for i in range(inventory.size() - 1, -1, -1):
 		var item: Dictionary = inventory[i]
 		if int(item["uid"]) in [equipped_uid, equipped_armor_uid, equipped_ring_uid]: continue
+		if ItemProtection.is_protected(item): continue
 		total += item_sale_value(item)
 		count += int(item.get("count", 1))
 		inventory.remove_at(i)
 	gold += total
 	selected_item = -1
 	sell_all_confirm = false
-	message("%d Items verkauft: +%d Gold. Ausrüstung behalten." % [count, total])
+	message("%d Items verkauft: +%d Gold. Ausrüstung und geschützte Items behalten." % [count, total])
 	save_game()
 
 func use_item(index: int) -> void:
@@ -2982,6 +3018,9 @@ func buy_item(stock_item: Dictionary) -> void:
 func sell_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
 	var item: Dictionary = inventory[index]
+	if ItemProtection.is_protected(item):
+		message("Geschützt: %s kann nicht verkauft werden. Doppelklick zum Entsperren." % item["name"])
+		return
 	if int(item["uid"]) == equipped_uid: equipped_uid = -1
 	if int(item["uid"]) == equipped_armor_uid: equipped_armor_uid = -1
 	if int(item["uid"]) == equipped_ring_uid:
@@ -5664,6 +5703,9 @@ func draw_inventory_panel() -> void:
 		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("496b62"))
 		if i < inventory.size():
 			var item: Dictionary = inventory[i]
+			if ItemProtection.is_protected(item):
+				var protect_glow := 0.72 + sin(world_time * 5.0) * 0.20
+				draw_rect(Rect2(pos - Vector2(2, 2), Vector2(58, 52)), Color(1.0, 0.12, 0.18, protect_glow), false, 3.0)
 			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 4)), RARITY_COLORS[int(item["rarity"])])
 			draw_item_icon(pos + Vector2(11, 9), String(item["icon"]), RARITY_COLORS[int(item["rarity"])], 0.88, weapon_visual_stage(item), item_design(item))
 			draw_item_signature(pos + Vector2(11, 9), item)
@@ -5676,7 +5718,8 @@ func draw_inventory_panel() -> void:
 		text_at(Vector2(643, 491), String(item["name"]), 17, RARITY_COLORS[int(item["rarity"])], HORIZONTAL_ALIGNMENT_LEFT, 310)
 		var detail := "%s · %s · %d Gold" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), item_sale_value(item)]
 		if item["icon"] in ["sword", "staff", "bow", "armor", "ring"]: detail += " · +%d" % int(item["power"])
-		text_at(Vector2(643, 518), detail, 13, Color("e5eddd"), HORIZONTAL_ALIGNMENT_LEFT, 320)
+		if ItemProtection.is_protected(item): detail += " · GESCHÜTZT"
+		text_at(Vector2(643, 518), detail, 13, Color("ff7c83") if ItemProtection.is_protected(item) else Color("e5eddd"), HORIZONTAL_ALIGNMENT_LEFT, 320)
 		ui_button(Rect2(643, 538, 320, 42), "BENUTZEN / AUSRÜSTEN", item["icon"] in ["potion", class_weapon_icon(), "armor", "ring"])
 	else:
 		text_at(Vector2(643, 508), "Wähle einen Gegenstand aus der Tasche.", 14, Color("dbe8d5"))
@@ -5801,6 +5844,9 @@ func draw_shop_panel() -> void:
 		var row := i / 11
 		var pos := Vector2(170 + col * 72, 397 + row * 40)
 		draw_rect(Rect2(pos, Vector2(47, 37)), Color("dfbf83") if selected_item == i else Color("2c4749"))
+		if ItemProtection.is_protected(inventory[i]):
+			var protect_glow := 0.72 + sin(world_time * 5.0) * 0.20
+			draw_rect(Rect2(pos - Vector2(2, 2), Vector2(51, 41)), Color(1.0, 0.12, 0.18, protect_glow), false, 3.0)
 		draw_item_icon(pos + Vector2(10, 3), String(inventory[i]["icon"]), RARITY_COLORS[int(inventory[i]["rarity"])], 0.85, weapon_visual_stage(inventory[i]), item_design(inventory[i]))
 		draw_item_signature(pos + Vector2(10, 3), inventory[i])
 		if int(inventory[i].get("count", 1)) > 1:
@@ -5808,9 +5854,12 @@ func draw_shop_panel() -> void:
 			text_at(pos + Vector2(17, 35), "×%d" % int(inventory[i]["count"]), 11, Color("fff1c8"))
 	if selected_item >= 0 and selected_item < inventory.size():
 		var chosen: Dictionary = inventory[selected_item]
-		text_at(Vector2(171, 592), "%s · %d Gold pro Stück" % [chosen["name"], int(chosen["value"])], 16, RARITY_COLORS[int(chosen["rarity"])])
+		var chosen_label := "%s · %d Gold pro Stück" % [chosen["name"], int(chosen["value"])]
+		if ItemProtection.is_protected(chosen): chosen_label += " · GESCHÜTZT"
+		text_at(Vector2(171, 592), chosen_label, 16, Color("ff7c83") if ItemProtection.is_protected(chosen) else RARITY_COLORS[int(chosen["rarity"])])
 	ui_button(Rect2(564, 562, 210, 39), "BESTÄTIGEN?" if sell_all_confirm else "ALLES VERKAUFEN")
-	ui_button(Rect2(786, 562, 183, 39), "VERKAUFEN", selected_item >= 0)
+	var can_sell_selected := selected_item >= 0 and selected_item < inventory.size() and not ItemProtection.is_protected(inventory[selected_item])
+	ui_button(Rect2(786, 562, 183, 39), "VERKAUFEN", can_sell_selected)
 	var mouse := get_viewport().get_mouse_position()
 	for i in stock.size():
 		if Rect2(168 + i * 258, 210, 245, 125).has_point(mouse):
