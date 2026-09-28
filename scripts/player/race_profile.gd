@@ -11,6 +11,8 @@ extends Resource
 @export_group("Kampf")
 @export var max_hp_multiplier: float = 1.0
 @export var physical_damage_multiplier: float = 1.0
+@export var melee_damage_multiplier: float = 1.0
+@export var hand_weapon_damage_multiplier: float = 1.0
 @export var defense_multiplier: float = 1.0
 
 @export_group("Darstellung")
