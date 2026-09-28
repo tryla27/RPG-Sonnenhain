@@ -5,6 +5,7 @@ const MobCatalog = preload("res://scripts/enemies/mob_catalog.gd")
 const MobAnimation = preload("res://scripts/enemies/mob_animation.gd")
 const ItemProtection = preload("res://scripts/inventory/item_protection.gd")
 const MaxLevelBalanceAudit = preload("res://scripts/balance/max_level_balance_audit.gd")
+const MinimapRenderer = preload("res://scripts/ui/minimap_renderer.gd")
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
 const VIEW := Vector2(1152, 648)
@@ -5344,51 +5345,7 @@ func draw_local_minimap(rect: Rect2) -> void:
 	if dungeon_id >= 0:
 		draw_dungeon_minimap(rect)
 		return
-	var circle_center := rect.get_center()
-	var circle_radius := minf(rect.size.x, rect.size.y) * 0.5 - 5.0
-	draw_circle(circle_center, circle_radius + 4.0, Color("c5a46e"))
-	draw_circle(circle_center, circle_radius, Color("1e343a"))
-	var inset := rect.grow(-4)
-	var radius := 1500.0
-	var scale_map := inset.size / (radius * 2.0)
-	var start := player_pos - Vector2(radius, radius)
-	for gx in 17:
-		for gy in 13:
-			var tile_center := inset.position + Vector2((gx + 0.5) * inset.size.x / 17.0, (gy + 0.5) * inset.size.y / 13.0)
-			if tile_center.distance_to(circle_center) > circle_radius - 6.0: continue
-			var point := start + Vector2((gx + 0.5) * radius * 2.0 / 17.0, (gy + 0.5) * radius * 2.0 / 13.0)
-			var area := visual_region_at(point)
-			var tint: Color = [Color("699b73"), Color("7da66b"), Color("365b50"), Color("535b61"), Color("355a68"), Color("755045"), Color("b7a578"), Color("48415c"), Color("52696a"), Color("a48a52"), Color("477579"), Color("575b73"), Color("6e6384")][area]
-			if distance_to_trail(point) < 110: tint = Color("d2ba86")
-			draw_rect(Rect2(inset.position + Vector2(gx * inset.size.x / 17.0, gy * inset.size.y / 13.0), inset.size / Vector2(17, 13) + Vector2.ONE), tint)
-	for stone in WAYSTONES:
-		var p: Vector2 = inset.position + (stone - start) * scale_map
-		if p.distance_to(circle_center) < circle_radius - 5.0: draw_circle(p, 3, Color("8af0e9"))
-	for portal in PORTALS:
-		for end in [portal[0], portal[1]]:
-			var p: Vector2 = inset.position + (end - start) * scale_map
-			if p.distance_to(circle_center) < circle_radius - 5.0 and region_available(int(portal[2])): draw_circle(p, 3, Color("efccfa"))
-	for index in DUNGEON_ENTRANCES.size():
-		var entrance: Vector2 = LANDMARKS[int(DUNGEON_ENTRANCES[index])]["pos"]
-		if not region_available(region_at(entrance)): continue
-		var mark: Vector2 = inset.position + (entrance - start) * scale_map
-		if mark.distance_to(circle_center) < circle_radius - 6.0:
-			draw_rect(Rect2(mark - Vector2(3, 3), Vector2(6, 6)), Color("f5d6aa"), false, 2)
-	if rescue_state < 3:
-		var rescue: Vector2 = inset.position + (RESCUE_POS - start) * scale_map
-		if rescue.distance_to(circle_center) < circle_radius - 7.0: draw_arc(rescue, 6, 0, TAU, 18, Color("ffae78"), 2)
-	for i in WORLD_EVENTS.size():
-		if int(event_states[i]) == 3: continue
-		var encounter: Vector2 = inset.position + (WORLD_EVENTS[i]["pos"] - start) * scale_map
-		if encounter.distance_to(circle_center) < circle_radius - 5.0 and region_available(int(WORLD_EVENTS[i]["region"])):
-			draw_circle(encounter, 4, Color("293e46"))
-			draw_circle(encounter, 2, Color("ffe399") if int(event_states[i]) in [0, 2] else Color("a7d2c3"))
-	for enemy in enemies:
-		var p: Vector2 = inset.position + (enemy["pos"] - start) * scale_map
-		if p.distance_to(circle_center) < circle_radius - 4.0: draw_circle(p, 2, Color("ef8584"))
-	draw_circle(rect.get_center(), 4, Color.WHITE)
-	draw_line(rect.get_center(), rect.get_center() + facing.normalized() * 10, Color("fff1ad"), 2)
-	draw_arc(circle_center, circle_radius + 3.0, 0.0, TAU, 64, Color("f0d393"), 3)
+	MinimapRenderer.draw_world(self, rect)
 
 func draw_dungeon_minimap(rect: Rect2) -> void:
 	var center := rect.get_center()
