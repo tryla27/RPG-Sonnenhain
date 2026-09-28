@@ -1,0 +1,12 @@
+Sonnenhain RPG v27.3.1 – Visuelles Update
+
+- Ruhiger, großflächiger Untergrund statt unruhiger 16×16-Kachelung.
+- Breitere, geschichtete Wege mit vier Materialstilen, abwechslungsreichen Oberflächendetails und einem sichtbaren Rand aus Steinen, Gras und Blüten.
+- Wegeunterbau verbindet Wegpunkte und Kurven, damit keine auffälligen Kachelenden entstehen.
+- Überarbeitete Charakterdetails mit klassenspezifischer Kleidung, bewegten Armen und sichtbarer Blickrichtung des Kopfes.
+- Waffenbewegungen passen zur Waffe: Schwert- und Axtschwünge, Stabgesten sowie gespannter Bogen und Armbrust-Rückstoß.
+- Mauergrafik deckt die gesamte sichtbare Mauerbreite ab; passende Kollision blockiert die Mauerfläche und lässt nur freigeschaltete Tore offen.
+
+Prüfung: tools/check_content.py erfolgreich; Generator und Python-Tools kompilieren. Ein Godot-Runtime-Test war in dieser Umgebung mangels Godot-Executable nicht möglich.
+
+Patch v27.3.1: Vergleich des Axttyps auf den tatsächlichen Stringwert „axe“ korrigiert; dadurch wird der GDScript-Parserfehler in der Krieger-Angriffsanimation behoben.

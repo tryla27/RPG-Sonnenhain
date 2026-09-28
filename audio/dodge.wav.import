@@ -2,7 +2,7 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://c2ohutj5d05kq"
+uid="uid://lwebdupwfppl"
 path="res://.godot/imported/dodge.wav-53c4de3ffb2201089993163706fbf8e6.sample"
 
 [deps]
@@ -21,4 +21,4 @@ edit/normalize=false
 edit/loop_mode=0
 edit/loop_begin=0
 edit/loop_end=-1
-compress/mode=2
+compress/mode=0

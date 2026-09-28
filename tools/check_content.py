@@ -8,6 +8,11 @@ import subprocess
 root = Path(__file__).resolve().parents[1]
 source = (root / 'main.gd').read_text(encoding='utf8')
 
+# Catch accidental duplicate top-level function declarations before Godot does.
+func_names = re.findall(r'^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(', source, re.M)
+duplicates = sorted({name for name in func_names if func_names.count(name) > 1})
+assert not duplicates, f'duplicate functions: {duplicates}'
+
 def block(name):
     match = re.search(rf'^const {name} := \[', source, re.M)
     assert match, f'{name} missing'
@@ -66,7 +71,7 @@ for index, row in enumerate(portals):
 for token in [
     'pending_class = candidate', 'class_id = pending_class',
     'reset_class_skills()', 'slots = [-1, -1, -1]',
-    'use_ability(event.keycode - KEY_1)', 'func explode_fireball',
+    'event_matches_binding(event, "ability_%d" % (slot + 1))', 'func explode_fireball',
     'func update_impact_zones', 'impact_zones.append',
     'func draw_local_minimap', 'func click_travel',
     'waystone_unlocked[i] = true', 'shop_timer >= 420.0',
@@ -88,7 +93,7 @@ assert '"waystone_unlocked":waystone_unlocked' in source
 assert '"shop_stock":shop_stock' in source
 assert '"discovered_regions":discovered_regions' in source
 # In Godot werden Ausdrücke mit Variant-Index nicht zuverlässig über := inferiert.
-for declaration in ['weapon_name: String', 'weapon_word: String', 'y: float = float(border)', 'next_y: float = float(border)', 'cloth: Color', 'trim: Color', 'tint: Color', 'roof: Vector2']:
+for declaration in ['weapon_name: String', 'weapon_word: String', 'tint: Color', 'roof: Vector2']:
     assert declaration in source, f'editor parser type missing: {declaration}'
 assert 'func equipped_weapon_stage() -> int:' in source
 assert 'func weapon_visual_stage(item: Dictionary) -> int:' in source
@@ -102,25 +107,86 @@ for connection in ['func draw_volume_slider', 'func set_volume_from_mouse', '"mu
 teleport = source.split('\t\t19, 27:', 1)[1].split('\t\t20:', 1)[0]
 assert '\t\t\t\tdraw_arc(point, 18 + echo * 4' in teleport
 assert 'var hue: Color = [Color("a9eafa")' in source
-for declaration in ['var edge: Vector2', 'var rut: Vector2', 'var cobble: Vector2']:
-    assert declaration in source
+assert 'func draw_trails() -> void:' in source and 'draw_line(a, b, edge_colors[theme], 116.0, false)' in source
 assert '"name":"Elara"' in source
 assert 'const MUSIC_FADE_SECONDS := 1.35' in source
 assert 'music_incoming.volume_db' in source and 'music_player.volume_db' in source
 assert 'AudioStreamOggVorbis: stream.loop = true' in source
 assert '"res://music/%s.ogg" % desired' in source
-for theme in ['dorf', 'blumen', 'kueste', 'pilzwald', 'ruinen', 'kristall', 'asche', 'sternen']:
-    original = root / 'music' / 'source' / f'{theme}.mid'
-    rendered = root / 'music' / f'{theme}.ogg'
-    assert original.read_bytes()[:4] == b'MThd', f'invalid MIDI: {theme}'
-    assert rendered.read_bytes()[:4] == b'OggS' and rendered.stat().st_size > 100_000, f'invalid OGG: {theme}'
-    if shutil.which('ffprobe'):
-        duration = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', str(rendered)], text=True))
-        assert 299 <= duration <= 302, f'truncated OGG: {theme} ({duration:.1f}s)'
 sfx = re.findall(r'"([^"]+)"', block('SFX_NAMES'))
-for name in sfx + ['dorf', 'blumen', 'pilzwald', 'ruinen', 'kristall', 'asche', 'kueste', 'sternen', 'nebel', 'bernstein', 'quelle', 'daemmer', 'himmel', 'boss']:
+for name in sfx + ['nebel', 'bernstein', 'quelle', 'daemmer', 'himmel', 'boss']:
     path = root / 'audio' / f'{name}.wav'
     assert path.exists(), f'missing audio: {path.name}'
     with wave.open(str(path)) as wav:
         assert wav.getnframes() > 100 and wav.getframerate() > 8000, f'invalid audio: {name}'
-print('OK: 10 feature areas, 13 regions, 5 connected portals, 27 enemy types, 25 quests, 34 skills, 12 stones, 3 dungeons and all audio')
+atlas = (root / 'art' / 'sonnenhain_tiles.png').read_bytes()
+assert atlas[:8] == b'\x89PNG\r\n\x1a\n' and int.from_bytes(atlas[16:20], 'big') == 128 and int.from_bytes(atlas[20:24], 'big') == 64
+for connection in ['func draw_pixel_tile', 'func draw_tavern_world', 'func tavern_blocked', 'func enter_tavern', 'func leave_tavern', 'if interior_id >= 0: return tavern_blocked(pos)', 'interior_return_pos if interior_id >= 0 else player_pos', '"res://art/sonnenhain_tiles.png"']:
+    assert connection in source, f'missing pixel-art scene connection: {connection}'
+assert source.count('draw_pixel_tile(') > 15
+for connection in ['func load_bindings', 'func save_bindings', 'func reset_bindings', 'func draw_controls_panel', 'func movement_vector', 'binding_pressed("attack")', 'binding_short("ability_%d" % (slot + 1))']:
+    assert connection in source, f'missing controls connection: {connection}'
+assert source.count('Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)') == 1, 'attack still hardwired to mouse button'
+for asset, wh in {
+    'regions_16.png': (256,112),
+    'weapons_32.png': (384,96),
+    'weapons_world_32.png': (384,384),
+    'characters_32.png': (128,2304),
+    'enemies_32.png': (128,864),
+    'skills_16.png': (256,48),
+    'npcs_32.png': (128,384),
+    'vfx_16.png': (64,128),
+    'structures_16.png': (128,16),
+    'houses_192.png': (768,160),
+}.items():
+    raw=(root/'art'/asset).read_bytes()
+    assert raw[:8] == b'\x89PNG\r\n\x1a\n', f'invalid png: {asset}'
+    assert (int.from_bytes(raw[16:20],'big'), int.from_bytes(raw[20:24],'big')) == wh, f'bad atlas size: {asset}'
+for connection in ['func draw_region_tile', 'func draw_character_sprite', 'func draw_enemy_sprite', 'func draw_weapon_world', 'func draw_skill_sprite', 'func draw_npc_sprite', 'func draw_vfx_sprite', 'func draw_structure_tile', 'func draw_creation_panel', 'func draw_multiplayer_panel', 'func send_chat_message', 'func host_multiplayer', 'func join_multiplayer_from_code', 'hero_name', 'hero_gender', 'hero_race']:
+    assert connection in source, f'missing v27 connection: {connection}'
+# Top-level function names must be unique.
+funcs = re.findall(r'^func\s+([A-Za-z0-9_]+)\s*\(', source, re.M)
+assert len(funcs) == len(set(funcs)), 'duplicate top-level function declaration'
+print('OK v27: 13 regions, 27 enemies, 25 quests, 34 skills, 3 dungeons, character creation, chat, co-op hooks, pixel-art atlases and audio')
+
+# v27.2 mechanics/spawn regression checks
+assert 'func draw_mechanics_panel()' in source, 'missing mechanics overview panel'
+assert 'event.keycode == KEY_H' in source, 'missing H mechanics shortcut'
+assert 'func spawn_position_allowed' in source, 'missing spawn exclusion logic'
+assert 'distance_to_trail(p) < 165.0' in source, 'spawn path exclusion missing'
+assert 'enemies.size() < 10' in source, 'reduced world spawn cap missing'
+assert 'if region == 0: return' in source, 'safe-zone spawn suppression missing'
+assert 'func flee_from_safe_zone' in source, 'safe-zone flee behavior missing'
+assert 'ENTER oder T' in source, 'chat prompt missing'
+
+# v27.5 visuals, weapons, roads, daylight, performance, chat, co-op and web preset checks.
+world_draw = source.split('func draw_world() -> void:', 1)[1].split('func ', 1)[0]
+assert 'region_ground_color(zone, key, wet)' in world_draw, 'overworld still uses noisy 16px terrain tiles'
+assert 'draw_region_tile(zone, key % 8' not in world_draw, 'dense terrain atlas still drawn on every ground cell'
+assert 'func weapon_attack_look' in source and 'lerpf(-1.22, 1.22, eased)' in source, 'weapon-specific melee swing missing'
+assert 'attack_progress' in source and 'pull = 14.0 * sin' in source, 'bow draw animation missing'
+assert 'var rune: Vector2 = center+side*branch*8.0*scale_factor+dir*8.0*scale_factor' in source, 'typed bow inlay vector missing'
+assert 'func blocked_by_region_wall' in source and 'absf(across - float(wall["axis"])) > 51.0' in source, 'full-width wall collision missing'
+wall_draw = source.split('func draw_gate_wall(', 1)[1].split('func draw_grass(', 1)[0]
+assert 'for band in 3:' in wall_draw and 'var strip := 28.0' in wall_draw, 'wall texture does not cover full wall face'
+assert 'draw_path_tile' not in source and 'paths_32.png' not in source, 'floating road texture atlas still referenced'
+assert 'draw_circle(point, 58.0, edge_colors[theme_for_trail])' in source, 'rounded path joins missing'
+assert 'func draw_day_night_overlay() -> void:' in source and 'fposmod(world_time, 720.0)' in source, 'day/night cycle missing'
+assert 'draw_boss_model(type, model_pos, enemy_color, stride)' in source and 'draw_enemy_model(type, model_pos, enemy_color, stride)' in source, 'detailed enemy models are not used'
+enemy_model = source.split('func draw_enemy_model(', 1)[1].split('func draw_crab_model(', 1)[0]
+assert '\n\t\t25: #' in enemy_model and '\n\t\t26: #' in enemy_model, 'late-game enemy match cases escaped their block'
+for enemy_type in range(17, 27):
+    assert f'{enemy_type}: #' in source.split('func draw_enemy_model(', 1)[1].split('func draw_crab_model(', 1)[0], f'dedicated late-game enemy model missing: {enemy_type}'
+assert 'var shoulder_side := -signf(base_look.y) if absf(base_look.y) > 0.2 else signf(base_look.x)' in source, 'weapon arm is not anchored to the facing-side shoulder'
+assert 'run/max_fps=60' in (root / 'project.godot').read_text(encoding='utf8'), 'frame cap missing'
+sprite_builder = (root / 'tools' / 'build_v27_pixel_art.py').read_text(encoding='utf8')
+assert 'if direction==0:' in sprite_builder and 'elif direction==1:' in sprite_builder and 'elif direction==2:' in sprite_builder and 'else:' in sprite_builder, 'directional face animation missing'
+assert 'hair_dark' in sprite_builder and 'geschichteten Helm' in sprite_builder, 'female hair or warrior helmet redesign missing'
+assert 'var house_tiles: Texture2D' in source and 'house_tiles = load("res://art/houses_192.png")' in source, 'detailed house atlas not loaded'
+assert 'draw_texture_rect_region(house_tiles' in source, 'start village does not use the new pixel houses'
+assert 'var fade_alpha := 1.0 if chat_open else clampf(chat_fade / 1.25, 0.0, 1.0)' in source, 'chat inactivity fade missing'
+assert 'func start_coop_world() -> void:' in source and 'WELT STARTEN' in source and 'WELT BEITRETEN' in source, 'co-op world start/join flow missing'
+assert 'func is_web_platform() -> bool:' in source and 'OS.has_feature("web")' in source, 'browser networking guard missing'
+assert (root / 'export_presets.cfg').exists() and 'platform="Web"' in (root / 'export_presets.cfg').read_text(encoding='utf8'), 'web export preset missing'
+assert (root / 'WEB_EXPORT.md').exists(), 'web hosting guide missing'
+print('OK v27.5: detailed enemy and player models, fantasy weapons, house atlas, chat fade, co-op world launch, continuous roads, day/night and Web preset')

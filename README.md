@@ -4,7 +4,7 @@ Ein lokales, farbiges Top-down-Action-RPG für Godot 4.7. Die Welt, Figuren, Geg
 
 ## Start
 
-1. Archiv in einen **neuen Ordner** entpacken. In Godot die `project.godot` aus `Sonnenhain-RPG-v22-2` importieren. In der Projektliste muss „Sonnenhain RPG - Weltenupdate v22.2“ stehen. Eine eventuell bereits importierte alte Kopie entfernen, damit nicht versehentlich diese gestartet wird.
+1. Archiv in einen **neuen Ordner** entpacken. In Godot die `project.godot` aus `Sonnenhain-RPG-v24` importieren. In der Projektliste muss „Sonnenhain RPG - Pixelwelt v24“ stehen. Eine eventuell bereits importierte alte Kopie entfernen, damit nicht versehentlich diese gestartet wird.
 2. Mit **F5** starten. Krieger, Magier oder Bogenschütze wählen und **Neues Spiel** drücken.
 3. Für eine Windows-EXE im Godot-Editor die Windows-Exportvorlage installieren und unter **Projekt → Exportieren** exportieren.
 
@@ -19,9 +19,12 @@ Ein neues Spiel beginnt in Sonnenhain auf Stufe 1 mit leerer Tasche und ohne Fä
 | 4 | Feste Klassenfähigkeit ab Stufe 20 |
 | K / I / J / M | Fähigkeiten / Inventar / Questbuch / Weltkarte |
 | E | NPC, Truhe oder alten Torbogen benutzen |
+| E am Haus „Zur Steinrose“ | Taverne betreten; drinnen mit Alma sprechen oder an der Tür hinausgehen |
 | F | Wegstein aktivieren; im Dorf Reiseziel wählen |
 | Q / R | Heil- / Energie- bzw. Manatrank |
 | Esc | Pause, speichern, Hauptmenü, Lautstärke für Musik/Effekte und Testmodus |
+
+Im Hauptmenü und unter **Esc → Tasten** kannst du alle 19 Aktionen neu belegen: Bewegung, Angriff, Ausweichen, Interaktion, Wegstein, Tränke, vier Fähigkeiten, Menüs und Pause. Klicke einen Eintrag an und drücke eine Taste oder eine der drei Maustasten. Bereits belegte Tasten tauschen ihre Aktionen; beim Wechsel der Pausentaste kann die andere Aktion vorübergehend unbelegt sein. **Standard wiederherstellen** setzt alles zurück. Esc bleibt als sichere Rückkehr ins Pausenmenü reserviert. Die Belegung gilt für alle drei Spielstände und liegt getrennt unter `user://sonnenhain_tasten.json`.
 
 ## Reise und Fortschritt
 
@@ -62,12 +65,72 @@ Deine acht MIDI-Kompositionen ersetzen die Musik von Sonnenhain, Blütenwiesen, 
 - **Arven** steht im Dorf und bietet eine getrennte endlose Arena. Die Wellen werden größer und stärker; Gegner hinterlassen dort weder Beute noch Erfahrung. Nach dem Tod wartet eine Truhe, deren Inhalt von Level und überstandener Welle abhängt. Die zehn besten Läufe bleiben pro Speicherplatz erhalten. Für die Truhe muss vor Betreten mindestens ein Taschenplatz frei sein.
 - Musik ist bei unverändertem Reglerwert hörbar lauter. Deine individuellen Schiebereglerwerte bleiben erhalten. Drei Spielstände verwalten Klasse, Reise und Arenafortschritt getrennt.
 
-## Licht, Nebel und Gewölbe (v22.2)
+## Licht, Nebel und Gewölbe (v22.4)
 
 Ruinen, Kristallmoor, Ascheberge, Sternenbruch und weitere düstere Regionen haben stärkere Schatten, schwebenden Nebel und Fackeln an Wegen und markanten Orten. Die Lichtkegel lassen die Wege und Orientierungspunkte lesbar, während entfernte Flächen dunkler werden. Das friedliche Dorf und die hellen Wiesen bleiben klar.
 
 An drei markierten Eingängen öffnet **E** ein eigenes Gewölbe: das Turmgewölbe am verfallenen Turm, die Kristallgruft am Altar und die versunkene Krypta am Brunnen. Darin siehst du den Boden um deine Figur sowie kleinere Lichtinseln an Fackeln; weiter entfernte Räume liegen im Sichtnebel. Gegner erscheinen nur im jeweiligen Raum. Links führt die Tür mit **E** hinaus, rechts öffnet sich nach dem Kampf eine einmalige Relikttruhe. Die Truhen werden pro Speicherplatz gespeichert. Beim Laden kehrst du sicher vor den Eingang zurück. Die runde Minimap zeigt im Gewölbe nur den sichtbaren Ausschnitt; die Weltkarte markiert deinen Eingang.
 
+Der Schatten in Gewölben fällt nun als weichere, dunkle Vignette mit einem leichten Schwerpunkt unter der Figur. Fackeln öffnen helle Inseln im Schatten. In dunklen Außengebieten verlaufen die Schatten ebenfalls weicher. Beide runden Kampfarenen haben einen Radius von 490 statt 270 Welteinheiten und entsprechend mehr Bodenmuster und Randfackeln. Die Kamera folgt in der Arena der Figur; Gegner einer Welle erscheinen ringsum in kampfbarer Entfernung und verfolgen dich auch über die vergrößerte Fläche.
+
+Der Gewölbeschatten lässt im oberen Blickfeld den Weg länger erkennbar, schließt sich unter der Figur aber dunkler wie auf der Bildvorlage. Fackeln bekommen mehrstufige warme oder kristallblaue Lichtscheine mit weichem Abfall. Dadurch treten Eingänge und Bedrohungen in Lichtinseln hervor, ohne die direkte Sicht um den Helden zu verdecken.
+
+## Pixelwelt v23
+
+Ein eigener handgezeichneter Atlas mit 32 Pixelkacheln (16 × 16 Pixel) liefert jetzt Rasen, Pflaster, Dächer, Wände, Fenster, Türen, Böden, Fackeln, Möbel und Details. Das Skript `tools/build_pixel_art.py` erzeugt den Atlas reproduzierbar; die mitgelieferte PNG-Datei funktioniert ohne Python im Spiel. Alle Kacheln werden mit nächstem Nachbarpixel ohne Weichzeichnung dargestellt. Die CraftPix-Beispiele sind eine gestalterische Referenz; ihre Bilder wurden nicht kopiert oder benötigt.
+
+Sonnenhains Boden und Häuser, der Ankunftsplatz und alle drei Gewölbe verwenden den neuen Atlas. Ein Haus südöstlich des Dorfplatzes ist nun die betretbare Taverne **Zur Steinrose**. Ein eigener Innenraum hat Holzboden, gemusterten Teppich, Theke, Kamin, Regale, Tische, Fackeln und blockierende Möbel. Wirtin Alma heilt dich bei Bedarf für 9 + 2 × Level Gold. Drücke **E** an der Tür zum Verlassen. Die lokale Minimap zeigt den Raum; Musik und Weltkarte bleiben auf Sonnenhain bezogen. Speichern in der Taverne bringt dich beim Laden sicher vor ihren Eingang zurück. Die übrigen Außengebiete und Figuren verwenden weiterhin ihre bisherigen Darstellungen. Dieser Abschnitt dient als durchgehende Vorlage für den späteren Umbau der weiteren Welt.
+
+## Steuerung und Reparatur v24
+
+Der beim Zeichnen des Dorfbodens falsch eingerückte Kachelaufruf wurde korrigiert. Alle spielrelevanten Eingaben lesen jetzt die frei belegbaren Aktionen; die untere Leiste und die Interaktionsanzeige zeigen die tatsächlich zugewiesenen Tasten.
+
 ## Prüfstand
 
 Die mitgelieferte Inhaltsprüfung unter `tools/check_content.py` kontrolliert Gebiete, Portale, Gegner, Quests, Fähigkeiten, Spielzustand und Audiodateien. Eine Ausführung in Godot war in der Erstellungsumgebung nicht möglich; bitte importiere das Projekt und prüfe Bewegung, Kauf, Skillvergabe, drei Spielstände, beide Arenen sowie Ein- und Ausgang und Sichtweite der drei Gewölbe im Editor. Wenn der Editor beim Import eine Fehlermeldung zeigt, bitte den genauen Text und die Zeilennummer schicken.
+
+
+## Pixelwelt v26 – vollständiger visueller Anschluss
+
+- Die Oberwelt nutzt weiterhin den eigenen 16-Pixel-Atlas, wurde aber über alle Regionen mit dichterer, gebietstypischer Vegetation, neuen Buschgruppen, stärker strukturierten Hindernissen und klareren Ruinen-, Kristall-, Küsten-, Asche- und Spätspielformen vereinheitlicht. Wege und Kollisionen bleiben an die bestehende Navigation gekoppelt.
+- Sonnenhains Häuser wurden erneut aufgebaut: kräftigere Sockel, gestufte Dächer, Traufen, Firste, Fachwerk, Fensterlicht, Vordächer, Türstufen und mehrere funktional lesbare Fassadenvarianten. Die Taverne bleibt betretbar und hebt sich sichtbar von Wohnhäusern ab.
+- Die vorhandenen Landmarken erhielten je Gebiet unterschiedliche Materialien und Details. Türme, Schreine, Tore, Docks und Pilzlichtungen wirken nicht mehr wie dieselbe neutrale Form in anderer Umgebung.
+- Gegnerrollen wurden geschärft: Staubwächter → Steingolem, Splittergeist → Kristallgolem und der bestehende Glutgolem wurde zum Lavagolem weiterentwickelt. Der Ruinenbeholder bleibt ein eigener schwebender Fernkämpfer. Schwere Golems und Fernkämpfer zeigen zusätzliche visuelle Angriffsvorbereitungen.
+- Bodenkontaktschatten wurden als dezente, mehrstufige Schatten statt harter eingebrannter Flächen umgesetzt. Trefferblitz, Elite-/Champion-Ringe und vorhandene Statusdarstellungen bleiben erhalten.
+- Die drei Klassen behalten ihre getrennten Silhouetten. Ausgerüstete Waffen bleiben im Stand, beim Laufen und Angreifen sichtbar; die bereits in v25 eingeführten Axt- und Armbrustformen bleiben an die existierenden Waffen-/Inventarsysteme gekoppelt.
+- Skill- und Projektilsysteme bleiben vollständig angeschlossen. Feuer, Eis, Blitz, Gift, arkane Effekte und Pfeilfähigkeiten verwenden weiterhin eigene Flug-, Einschlag- und Flächenformen statt einer einzigen umgefärbten Vorlage.
+
+### Prüfung v26
+
+`python3 tools/check_content.py` prüft weiterhin Regionen, Gegner, Quests, Fähigkeiten, Dungeons, Taverne, Eingaben, Musik, Audio und den Pixelatlas. Zusätzlich wurde vor dem Packen nach doppelten Top-Level-Funktionen und fehlenden Projektdateien gesucht. In der Erstellungsumgebung ist kein Godot-Executable installiert; deshalb konnte kein echter Godot-Laufzeit- oder Spieltest durchgeführt werden.
+
+## Pixelwelt v27 – Charaktere, Koop und Pixel-Art
+
+v27 führte gebietsspezifische Pixelatlanten ein. v27.5 beruhigt den großflächigen Untergrund wieder mit breiten Farbflächen; die detaillierten Pixeltexturen bleiben für Wege, Gebäude, Mauern und Objekte erhalten. Charaktere, NPCs, Gegner, Waffen, Skill-Icons und zusätzliche Effekte verwenden die Atlanten unter `art/`.
+
+Bei **Neues Spiel** wird der Charakter einmalig erstellt: Name, Mann/Frau, Mensch/Ork/Roboter und die Klasse werden im Speicherstand gesichert. Der Name erscheint auch im Koop-Chat.
+
+### Koop
+
+Im Hauptmenü öffnet **KOOP** die Mehrspielersteuerung. Ein Spieler wählt **HOSTEN** und teilt den angezeigten Einladungscode mit bis zu drei Freunden. Die Freunde geben den Code unter **BEITRETEN** ein. Das Spiel verwendet ENet über UDP-Port `27844`. Beim Hosten wird automatisch UPnP versucht. Wenn der Router keine UPnP-Portfreigabe erlaubt, muss UDP 27844 auf den Host-Rechner weitergeleitet werden. GitHub verteilt den Spielstand/Build, stellt aber keinen dauerhaften Relay-Server bereit.
+
+**ENTER** oder **T** öffnet im Spiel den Gruppenchat.
+
+Der Koop-Modus in v27 ist eine Host/P2P-Beta: Bewegung, Profile, Ausrüstung, Gegnerzustände, Chat und zentrale Kampfschäden werden synchronisiert. Einige entfernte Spezialeffekte sind noch nicht vollständig als identische VFX-Replikation umgesetzt.
+
+### Grafik und Animation v27.5
+
+- Großflächiger Untergrund wieder ruhiger und nahe am Kartenstil aus v24; weniger sichtbares 16×16-Kachelrauschen.
+- Charakter-Sprites mit vier Blickrichtungen und gezielteren Gesichtsdetails; classenspezifische Kleidung und animierte Arme ergänzt.
+- Schwerter und Äxte schwingen in unterschiedlichen Bögen; der Magier führt den Stab in einer eigenen Bewegung; Bogen und Armbrust zeigen Zug beziehungsweise Rückstoß.
+- Mauertexturen bedecken nun die gesamte sichtbare Mauerbreite. Kollision folgt der kompletten Wandstärke und lässt freigeschaltete Tore frei.
+- Wege sind deutlich breiter und besitzen jetzt mehrschichtige Ränder, regional unterschiedliche Beläge, Steinchen und sichtbare Wegranddetails.
+
+### Figuren, Wege und Tageszeit v27.5
+
+Gegner verwenden jetzt eigene größere Modelle mit individuellen Körperformen und Details; Champions und Bosse bleiben klar erkennbar. Der bewaffnete Arm sitzt am Schulterpunkt, Magierstabb und Bogen haben getrennte Formen und Animationsbewegungen. Die Startdorfhäuser bekommen zusätzliche Dach-, Fenster-, Schornstein- und Türdetails. Die breiten Wege werden als durchgehende Fahrspur gerendert, damit keine einzelnen Texturkacheln über der Karte schweben. Ein dezenter Tag-Nacht-Rhythmus färbt die Oberwelt um; die FOW-Zeichnung arbeitet mit einem gröberen Raster und die Bildrate ist auf 60 FPS gedeckelt.
+
+
+### Koop, Chat und Webexport v27.5
+
+Der Gruppenchat blendet ältere Nachrichten nach kurzer Ruhezeit weich aus. Im Koopfenster führt **WELT STARTEN** den Host in die gewählte Welt; verbundene Freunde erhalten **WELT BEITRETEN**. Ohne vorhandenen Spielstand geht es in die Charaktererstellung, mit Spielstand wird dieser geladen. Der Browserexport ist über `export_presets.cfg` vorbereitet; die Schritte und der Koop-Hinweis stehen in [WEB_EXPORT.md](WEB_EXPORT.md).

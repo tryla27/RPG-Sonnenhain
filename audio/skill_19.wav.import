@@ -2,7 +2,7 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://b58ngan84ha4m"
+uid="uid://bxjs5p7868ms7"
 path="res://.godot/imported/skill_19.wav-1d0cc92224e988c855bccb6239b4ddc9.sample"
 
 [deps]
@@ -21,4 +21,4 @@ edit/normalize=false
 edit/loop_mode=0
 edit/loop_begin=0
 edit/loop_end=-1
-compress/mode=2
+compress/mode=0

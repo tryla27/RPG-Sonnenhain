@@ -2,7 +2,7 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://br8mk8s37kcqs"
+uid="uid://clggh0gy73q00"
 path="res://.godot/imported/himmel.wav-183526d5e665b68c05a98307148703b4.sample"
 
 [deps]
@@ -21,4 +21,4 @@ edit/normalize=false
 edit/loop_mode=0
 edit/loop_begin=0
 edit/loop_end=-1
-compress/mode=2
+compress/mode=0
