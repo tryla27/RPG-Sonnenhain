@@ -4,6 +4,7 @@ const NetworkManager = preload("res://scripts/network/network_manager.gd")
 const MobCatalog = preload("res://scripts/enemies/mob_catalog.gd")
 const MobAnimation = preload("res://scripts/enemies/mob_animation.gd")
 const ItemProtection = preload("res://scripts/inventory/item_protection.gd")
+const MaxLevelBalanceAudit = preload("res://scripts/balance/max_level_balance_audit.gd")
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
 const VIEW := Vector2(1152, 648)
@@ -332,6 +333,7 @@ func _ready() -> void:
 	if OS.is_debug_build():
 		for mob_error in MobCatalog.validate():
 			push_error(mob_error)
+		MaxLevelBalanceAudit.print_report(ABILITIES, CLASS_SKILLS, CLASS_ULTIMATES)
 	font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	environment_tiles = load("res://art/sonnenhain_tiles.png")
