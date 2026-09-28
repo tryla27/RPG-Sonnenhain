@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ClassProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/class_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "mage"
+display_name = "Magier"
+move_speed_multiplier = 0.95
+can_roll = false
+roll_speed_multiplier = 0.0
+roll_distance_multiplier = 0.0
+roll_cooldown_multiplier = 1.0
+physical_damage_multiplier = 0.8
+magic_damage_multiplier = 1.25
+ranged_damage_multiplier = 0.95
