@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MobData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/mob_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 7
+display_name = "Kristallgolem"
+region = 4
+base_hp = 165.0
+base_damage = 29
+speed = 66.0
+xp = 58
+color_hex = "92ddea"
+sprite_row = 7
+supports_directions = false
+idle_frame = 0
+walk_frames = PackedInt32Array(1, 2)
+attack_frame = 3
+animation_fps = 7.0
+ranged = true
+boss = false
