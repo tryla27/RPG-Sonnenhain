@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="RaceProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/race_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "robot"
+display_name = "Roboter"
+move_speed_multiplier = 0.95
+acceleration_multiplier = 0.95
+max_hp_multiplier = 1.10
+physical_damage_multiplier = 1.02
+defense_multiplier = 1.18
+body_scale = 1.02
