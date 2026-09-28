@@ -566,6 +566,22 @@ func play_sound(name: String) -> void:
 	player.pitch_scale = 0.92 if name == "step" and next_sound_player % 2 == 0 else 1.0
 	player.play()
 
+func play_trade_sound(kind: String) -> void:
+	if sound_players.is_empty() or not sound_streams.has("pickup"):
+		return
+	var player: AudioStreamPlayer = sound_players[next_sound_player]
+	next_sound_player = (next_sound_player + 1) % sound_players.size()
+	player.stop()
+	player.stream = sound_streams["pickup"]
+	player.volume_db = -80.0 if effects_volume <= 0.0 else (-9.0 + linear_to_db(effects_volume))
+	if kind == "buy":
+		player.pitch_scale = 1.18
+	elif kind == "sell_all":
+		player.pitch_scale = 0.78
+	else:
+		player.pitch_scale = 0.90
+	player.play()
+
 func update_music(delta: float = 0.0) -> void:
 	if music_player == null or music_incoming == null: return
 	if not music_enabled:
@@ -2108,8 +2124,8 @@ func interact() -> void:
 			elif gold >= cost:
 				gold -= cost
 				hp = max_hp()
+				play_trade_sound("buy")
 				message("Alma stellt dir Eintopf hin. Du ruhst dich aus. Vollständig geheilt für %d Gold." % cost)
-				play_sound("pickup")
 				save_game()
 			else: message("Alma: Für eine warme Mahlzeit brauche ich %d Gold. Ruh dich am Feuer aus." % cost)
 		return
@@ -2222,7 +2238,7 @@ func visit_healer() -> void:
 		return
 	gold -= cost
 	hp = max_hp()
-	play_sound("level")
+	play_trade_sound("buy")
 	message("Elara hat deine Wunden geheilt. -%d Gold · HP vollständig." % cost)
 	save_game()
 
@@ -2961,6 +2977,8 @@ func sell_all_unequipped() -> void:
 		count += int(item.get("count", 1))
 		inventory.remove_at(i)
 	gold += total
+	if total > 0:
+		play_trade_sound("sell_all")
 	selected_item = -1
 	sell_all_confirm = false
 	message("%d Items verkauft: +%d Gold. Ausrüstung und geschützte Items behalten." % [count, total])
@@ -3029,6 +3047,7 @@ func buy_item(stock_item: Dictionary) -> void:
 		return
 	gold -= int(stock_item["price"])
 	add_item(purchased)
+	play_trade_sound("buy")
 	message("Gekauft: %s" % stock_item["name"])
 	save_game()
 
@@ -3045,6 +3064,7 @@ func sell_item(index: int) -> void:
 		hp = minf(hp, max_hp())
 	var gain := int(round(float(item_sale_value(item)) / maxi(1, int(item.get("count", 1)))))
 	gold += gain
+	play_trade_sound("sell")
 	message("Verkauft: %s für %d Gold" % [item["name"], gain])
 	if int(item.get("count", 1)) > 1:
 		item["count"] = int(item["count"]) - 1
