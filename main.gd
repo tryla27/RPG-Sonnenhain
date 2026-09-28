@@ -312,6 +312,11 @@ var sync_timer := 0.0
 var network_manager: Node
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
+const RACE_PROFILE_PATHS := [
+	"res://data/races/mensch.tres",
+	"res://data/races/ork.tres",
+	"res://data/races/roboter.tres"
+]
 
 func _ready() -> void:
 	dedicated_server = OS.has_feature("dedicated_server") or "--dedicated-server" in OS.get_cmdline_args()
@@ -1132,10 +1137,22 @@ func equipped_weapon_variant() -> String:
 	if class_id == 2 and design % 4 == 3: return "crossbow"
 	return class_weapon_icon()
 
+func current_race_profile() -> RaceProfile:
+	if hero_race < 0 or hero_race >= RACE_PROFILE_PATHS.size():
+		return null
+	return load(RACE_PROFILE_PATHS[hero_race]) as RaceProfile
+
+func race_melee_multiplier() -> float:
+	var profile := current_race_profile()
+	if profile == null:
+		return 1.0
+	return profile.physical_damage_multiplier * profile.melee_damage_multiplier * profile.hand_weapon_damage_multiplier
+
 func normal_attack_power() -> int:
 	# Grundtreffer bleiben schwächer als Fähigkeiten, brauchen aber keine zähen Serien.
 	var base := 7.0 + level * 1.6 + weapon_power() * 0.86 + int(skill_levels[9]) * 4.0
-	return maxi(1, int(base * (1.0 + primary_attribute() * (0.015 if class_id == 0 else 0.019))))
+	var race_multiplier := race_melee_multiplier()
+	return maxi(1, int(base * (1.0 + primary_attribute() * (0.015 if class_id == 0 else 0.019)) * race_multiplier))
 
 func weapon_element() -> String:
 	for item in inventory:
