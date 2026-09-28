@@ -34,7 +34,7 @@ func _setup_multiplayer_signals() -> void:
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 
 func start_dedicated_server() -> void:
-	disconnect(false)
+	disconnect_network(false)
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_server(network_port, "0.0.0.0")
 	if err != OK:
@@ -50,7 +50,7 @@ func start_dedicated_server() -> void:
 	print("[Sonnenhain] ", status)
 
 func join_dedicated_server() -> void:
-	disconnect(false)
+	disconnect_network(false)
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_client(server_url)
 	if err != OK:
@@ -63,7 +63,7 @@ func join_dedicated_server() -> void:
 	_emit_state()
 
 func host_lan() -> void:
-	disconnect(false)
+	disconnect_network(false)
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_server(network_port, 4)
 	if err != OK:
@@ -84,7 +84,7 @@ func join_lan_code(code: String) -> void:
 		status = "Ungültiger Einladungscode."
 		_emit_state()
 		return
-	disconnect(false)
+	disconnect_network(false)
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_client(str(endpoint["address"]), int(endpoint["port"]))
 	if err != OK:
@@ -96,7 +96,7 @@ func join_lan_code(code: String) -> void:
 	status = "Verbinde mit %s …" % str(endpoint["address"])
 	_emit_state()
 
-func disconnect(show_message: bool = true) -> void:
+func disconnect_network(show_message: bool = true) -> void:
 	if mode != "offline" and multiplayer.multiplayer_peer != null:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
