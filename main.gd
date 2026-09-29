@@ -427,7 +427,11 @@ func setup_multiplayer_signals() -> void:
 func _on_peer_connected(id: int) -> void:
 	network_status = "Spieler %d verbunden" % id
 	add_chat_line("SYSTEM", network_status)
-	if network_mode == "host": push_world_snapshot()
+	if network_mode == "host":
+		push_world_snapshot()
+		for peer_id in remote_players.keys():
+			if int(peer_id) != id:
+				rpc_receive_player_state.rpc_id(id, int(peer_id), remote_players[peer_id])
 
 func _on_peer_disconnected(id: int) -> void:
 	remote_players.erase(id)
@@ -588,9 +592,12 @@ func rpc_server_damage(amount: int) -> void:
 		apply_player_damage(clampi(amount, 1, 500))
 
 func push_player_state() -> void:
-	if network_mode == "offline" or multiplayer.multiplayer_peer == null: return
+	if network_mode == "offline" or multiplayer.multiplayer_peer == null or dedicated_server_mode: return
 	var state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "element":weapon_element(), "region":region_at(player_pos)}
-	rpc_player_state.rpc(state)
+	if network_mode == "client":
+		rpc_player_state.rpc_id(1, state)
+	else:
+		rpc_player_state(state)
 	if network_mode == "host" and int(world_time * 5.0) % 2 == 0: push_world_snapshot()
 
 @rpc("any_peer", "call_remote", "unreliable", 0)
@@ -625,12 +632,16 @@ func rpc_player_state(state: Dictionary) -> void:
 		"region":region_at(incoming_pos)
 	}
 	remote_players[sender] = clean
-	if network_mode == "host": rpc_relay_player_state.rpc(sender, clean)
+	if network_mode == "host":
+		for peer_id in multiplayer.get_peers():
+			if int(peer_id) != sender:
+				rpc_receive_player_state.rpc_id(int(peer_id), sender, clean)
 
 @rpc("authority", "call_remote", "unreliable", 0)
-func rpc_relay_player_state(peer_id: int, state: Dictionary) -> void:
+func rpc_receive_player_state(peer_id: int, state: Dictionary) -> void:
 	if peer_id == multiplayer.get_unique_id(): return
 	remote_players[peer_id] = state
+	queue_redraw()
 
 func push_world_snapshot() -> void:
 	if network_mode != "host": return
