@@ -195,7 +195,7 @@ var xp := 0
 var gold := 55
 var skill_points := 0
 var class_id := 0
-var pending_class := 0
+var pending_class := -1
 var learned: Array = []
 var skill_levels: Array = []
 var slots: Array = [-1, -1, -1]
@@ -325,7 +325,7 @@ var font: Font
 var hero_name := ""
 var hero_gender := 0 # 0 Mann, 1 Frau
 var hero_race := 0 # 0 Mensch, 1 Ork, 2 Roboter
-var pending_gender := 0
+var pending_gender := -1
 var pending_race := 0
 var creation_step: int = 1
 var creation_name := ""
@@ -390,11 +390,9 @@ func _ready() -> void:
 	for i in WORLD_EVENTS.size():
 		event_states.append(0)
 		event_progress.append(0)
-	if FileAccess.file_exists(slot_save_path(1)): load_game()
 	previous_region = region_at(player_pos)
 	for i in 4:
 		spawn_enemy()
-	panel = "start"
 	if dedicated_server:
 		panel = ""
 		music_enabled = false
@@ -414,6 +412,12 @@ func _ready() -> void:
 		add_child(player)
 		sound_players.append(player)
 	update_music()
+	if all_save_slots_empty():
+		selected_save_slot = 1
+		active_save_slot = 1
+		begin_character_creation()
+	else:
+		panel = "start"
 
 func reset_class_skills() -> void:
 	learned.resize(ABILITIES.size())
@@ -1115,7 +1119,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_BACKSPACE:
 			if creation_name.length() > 0: creation_name = creation_name.left(creation_name.length() - 1)
 		elif event.keycode == KEY_ENTER:
-			if creation_name.strip_edges().length() >= 2: start_new_game()
+			if creation_name.strip_edges().length() >= 2 and pending_class >= 0:
+				start_new_game()
+			elif pending_class < 0:
+				message("Bitte zuerst eine Klasse auswählen.")
 		elif event.keycode == KEY_ESCAPE:
 			creation_step = 1
 		elif event.unicode >= 32 and creation_name.length() < 16:
@@ -2591,6 +2598,15 @@ func slot_save_path(index: int, testing: bool = false) -> String:
 	if index == 1: return CREATIVE_SAVE_PATH if testing else SAVE_PATH
 	return "user://sonnenhain_slot%d%s.json" % [index, "_testmodus" if testing else ""]
 
+func all_save_slots_empty() -> bool:
+	for index in range(1, 4):
+		if FileAccess.file_exists(slot_save_path(index)):
+			return false
+	return true
+
+func selected_save_exists() -> bool:
+	return FileAccess.file_exists(slot_save_path(selected_save_slot))
+
 func refresh_save_slot_labels() -> void:
 	save_slot_labels.clear()
 	for index in range(1, 4):
@@ -2758,26 +2774,18 @@ func load_game() -> void:
 
 func handle_panel_click(mouse: Vector2) -> void:
 	if panel == "start":
-		if Rect2(855, 158, 130, 33).has_point(mouse):
+		if Rect2(855, 135, 130, 36).has_point(mouse):
 			controls_return_panel = "start"
 			panel = "controls"
 			return
 		for candidate in 3:
-			if Rect2(168 + candidate * 273, 530, 260, 57).has_point(mouse):
+			if Rect2(175 + candidate * 270, 215, 250, 180).has_point(mouse):
 				selected_save_slot = candidate + 1
 				play_sound("menu")
 				return
-			if Rect2(174 + candidate * 273, 330, 250, 38).has_point(mouse) or Rect2(168 + candidate * 273, 202, 260, 127).has_point(mouse):
-				pending_class = candidate
-				play_sound("menu")
-				return
-		if Rect2(300, 378, 550, 54).has_point(mouse):
-			play_sound("menu")
-			active_save_slot = selected_save_slot
-			begin_character_creation()
-		elif Rect2(300, 448, 550, 54).has_point(mouse):
-			if not FileAccess.file_exists(slot_save_path(selected_save_slot)):
-				message("Noch kein Spielstand vorhanden. Wähle eine Klasse und starte ein neues Spiel.")
+		if Rect2(235, 425, 330, 54).has_point(mouse):
+			if not selected_save_exists():
+				message("Dieser Speicherplatz ist leer.")
 				return
 			play_sound("menu")
 			active_save_slot = selected_save_slot
@@ -2792,9 +2800,16 @@ func handle_panel_click(mouse: Vector2) -> void:
 				player_pos = ARENA_CENTER
 				panel = "arena_reward"
 				arena_pending_loaded = false
-			else: panel = ""
+			else:
+				panel = ""
 			message("Spielstand %d geladen. Willkommen zurück!" % active_save_slot)
-		elif Rect2(860, 448, 125, 54).has_point(mouse):
+		elif Rect2(585, 425, 330, 54).has_point(mouse):
+			if selected_save_exists():
+				message("Dieser Speicherplatz ist belegt. Wähle einen leeren Platz.")
+				return
+			active_save_slot = selected_save_slot
+			begin_character_creation()
+		elif Rect2(405, 500, 340, 48).has_point(mouse):
 			panel = "multiplayer"
 			join_code = ""
 			network_status = "Online-Server · bereit zum Verbinden" if is_web_platform() else "Offline · Host erstellen oder Einladungscode eingeben"
@@ -2815,17 +2830,27 @@ func handle_panel_click(mouse: Vector2) -> void:
 				creation_step = 2
 				play_sound("menu")
 			elif Rect2(165, 520, 160, 52).has_point(mouse):
-				panel = "start"
+				panel = "start" if not all_save_slots_empty() else "creation"
 			return
 		for i in 3:
-			var race_card: Rect2 = Rect2(180 + i * 260, 245, 240, 180)
-			if race_card.has_point(mouse):
+			if Rect2(180 + i * 260, 235, 240, 145).has_point(mouse):
 				pending_race = i
 				play_sound("menu")
 				return
-		if Rect2(360, 520, 430, 52).has_point(mouse) and creation_name.strip_edges().length() >= 2:
+		for cls in 3:
+			if Rect2(180 + cls * 260, 412, 240, 38).has_point(mouse):
+				pending_class = cls
+				play_sound("menu")
+				return
+		if Rect2(360, 540, 430, 44).has_point(mouse):
+			if pending_class < 0:
+				message("Bitte zuerst eine Klasse auswählen.")
+				return
+			if creation_name.strip_edges().length() < 2:
+				message("Bitte einen Namen mit mindestens 2 Zeichen eingeben.")
+				return
 			start_new_game()
-		elif Rect2(165, 520, 160, 52).has_point(mouse):
+		elif Rect2(165, 540, 160, 44).has_point(mouse):
 			creation_step = 1
 			play_sound("menu")
 		return
@@ -2966,6 +2991,7 @@ func begin_character_creation() -> void:
 	creation_name = ""
 	pending_gender = -1
 	pending_race = 0
+	pending_class = -1
 	creation_step = 1
 	character_created = false
 	panel = "creation"
@@ -5806,27 +5832,26 @@ func draw_mechanics_panel() -> void:
 	ui_button(Rect2(820,548,160,38), "SCHLIESSEN")
 
 func draw_start_panel() -> void:
-	text_at(Vector2(291, 151), "SONNENHAIN", 39, Color("ffe2aa"))
-	text_at(Vector2(900, 148), GAME_VERSION, 16, Color("f4d7a3"))
-	ui_button(Rect2(855, 158, 130, 33), "TASTEN")
-	text_at(Vector2(295, 184), "Eine Reise durch die alten Reiche  ·  Wähle deinen Helden", 18, Color("dce7d8"))
-	for i in 3:
-		var card := Rect2(168 + i * 273, 202, 260, 170)
-		ui_box(card, Color("545e5d") if pending_class == i else Color("3a4c4f"))
-		draw_rect(Rect2(card.position + Vector2(10, 10), Vector2(240, 3)), [Color("d2a36e"), Color("9abce4"), Color("a5c88d")][i])
-		text_at(card.position + Vector2(14, 35), CLASS_ADVANTAGES[i], 10, Color("9fe6ae"), HORIZONTAL_ALIGNMENT_LEFT, 232)
-		text_at(card.position + Vector2(14, 52), CLASS_DISADVANTAGES[i], 10, Color("f0a09b"), HORIZONTAL_ALIGNMENT_LEFT, 232)
-		draw_hero(Vector2(298 + i * 273, 286), 0.9, false, Vector2.DOWN, false, i)
-		ui_button(Rect2(174 + i * 273, 330, 250, 38), CLASS_NAMES[i].to_upper(), true, pending_class == i)
-	ui_button(Rect2(300, 378, 550, 54), "NEUES SPIEL  ·  Im gewählten Speicherplatz")
-	ui_button(Rect2(300, 448, 550, 54), "GEWÄHLTEN SPIELSTAND LADEN", FileAccess.file_exists(slot_save_path(selected_save_slot)))
-	ui_button(Rect2(860, 448, 125, 54), "KOOP")
-	text_at(Vector2(168, 521), "SPEICHERPLATZ WÄHLEN", 14, Color("f6dfa9"))
+	text_at(Vector2(175, 118), "SONNENHAIN", 39, Color("ffe2aa"))
+	text_at(Vector2(900, 118), GAME_VERSION, 16, Color("f4d7a3"))
+	ui_button(Rect2(855, 135, 130, 36), "TASTEN")
+	text_at(Vector2(175, 163), "Wähle zuerst deinen Speicherstand.", 18, Color("dce7d8"))
+	text_at(Vector2(175, 193), "SPEICHERSTÄNDE", 14, Color("f6dfa9"))
 	for index in 3:
-		var card := Rect2(168 + index * 273, 530, 260, 57)
-		ui_box(card, Color("627565") if selected_save_slot == index + 1 else Color("3a5251"))
-		text_at(card.position + Vector2(11, 24), "SPIELSTAND %d" % (index + 1), 16, Color("fff0ce"))
-		text_at(card.position + Vector2(11, 46), str(save_slot_labels[index]) if index < save_slot_labels.size() else "LEER", 14, Color("e0eacb"))
+		var card: Rect2 = Rect2(175 + index * 270, 215, 250, 180)
+		var exists: bool = FileAccess.file_exists(slot_save_path(index + 1))
+		ui_box(card, Color("5a7165") if selected_save_slot == index + 1 else Color("344e4e"))
+		draw_rect(card, Color("e2c47f") if selected_save_slot == index + 1 else Color("718c84"), false, 3)
+		text_at(card.position + Vector2(14, 34), "SPIELSTAND %d" % (index + 1), 18, Color("fff0ce"))
+		text_at(card.position + Vector2(14, 70), str(save_slot_labels[index]) if index < save_slot_labels.size() else "LEER", 14, Color("e0eacb"), HORIZONTAL_ALIGNMENT_LEFT, 220)
+		text_at(card.position + Vector2(14, 142), "FORTSETZEN" if exists else "LEERER PLATZ", 12, Color("aee7ca") if exists else Color("b7c5c0"))
+		text_at(card.position + Vector2(14, 164), "AUSGEWÄHLT" if selected_save_slot == index + 1 else "KLICKEN ZUM WÄHLEN", 11, Color("ffe6a8") if selected_save_slot == index + 1 else Color("9fb4ac"))
+	var slot_exists: bool = selected_save_exists()
+	ui_button(Rect2(235, 425, 330, 54), "SPIELSTAND LADEN", slot_exists)
+	ui_button(Rect2(585, 425, 330, 54), "NEUEN CHARAKTER ERSTELLEN", not slot_exists)
+	ui_button(Rect2(405, 500, 340, 48), "KOOP / MULTIPLAYER")
+	text_at(Vector2(175, 583), "Belegte Plätze werden nicht überschrieben. Für ein neues Spiel einen leeren Platz wählen.", 13, Color("aebfb9"), HORIZONTAL_ALIGNMENT_CENTER, 790)
+
 
 func draw_creation_panel() -> void:
 	text_at(Vector2(165, 108), "CHARAKTER ERSTELLEN", 31, Color("ffe1a0"))
@@ -5842,38 +5867,40 @@ func draw_creation_panel() -> void:
 			ui_box(card, Color("527368") if pending_gender == i else Color("334d4d"))
 			draw_rect(card, Color("e2c47f") if pending_gender == i else Color("718c84"), false, 3)
 			var center: Vector2 = card.position + Vector2(card.size.x * 0.5, 112)
-			draw_character_sprite(center, pending_class, false, Vector2.DOWN, 1.55, false, 0, i)
-			draw_weapon_world(center + Vector2(0,-8), pending_class, pending_class * 4, Vector2.DOWN, 1.25)
+			draw_character_sprite(center, 0, false, Vector2.DOWN, 1.55, false, 0, i)
 			text_at(card.position + Vector2(0, 190), GENDER_NAMES[i].to_upper(), 22, Color("fff1c8"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x))
 			text_at(card.position + Vector2(0, 216), "AUSGEWÄHLT" if pending_gender == i else "AUSWÄHLEN", 12, Color("aee7ca") if pending_gender == i else Color("aebfba"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x))
 		ui_button(Rect2(165, 520, 160, 52), "ZURÜCK")
 		ui_button(Rect2(366, 520, 420, 52), "WEITER ZUR RASSE", pending_gender >= 0)
-		text_at(Vector2(165, 594), "Klasse: %s · Die Vorschau zeigt zunächst den Menschen." % CLASS_NAMES[pending_class], 12, Color("aebfb9"), HORIZONTAL_ALIGNMENT_CENTER, 820)
+		text_at(Vector2(165, 594), "Im nächsten Schritt wählst du Rasse, Klasse und Namen.", 12, Color("aebfb9"), HORIZONTAL_ALIGNMENT_CENTER, 820)
 		return
 
-	text_at(Vector2(165, 194), "WÄHLE DEINE RASSE", 22, Color("fff0c8"))
-	text_at(Vector2(165, 219), "Geschlecht: %s · Klasse: %s" % [GENDER_NAMES[pending_gender], CLASS_NAMES[pending_class]], 13, Color("c8d8d2"))
+	text_at(Vector2(165, 190), "RASSE, KLASSE & NAME", 22, Color("fff0c8"))
+	text_at(Vector2(165, 216), "Geschlecht: %s" % GENDER_NAMES[pending_gender], 13, Color("c8d8d2"))
+	var preview_class: int = pending_class if pending_class >= 0 else 0
 	for i in 3:
-		var card: Rect2 = Rect2(180 + i * 260, 245, 240, 180)
+		var card: Rect2 = Rect2(180 + i * 260, 235, 240, 145)
 		ui_box(card, Color("527368") if pending_race == i else Color("334d4d"))
 		draw_rect(card, Color("e2c47f") if pending_race == i else Color("718c84"), false, 3)
-		var center: Vector2 = card.position + Vector2(card.size.x * 0.5, 77)
-		draw_character_sprite(center, pending_class, false, Vector2.DOWN, 1.18, false, i, pending_gender)
-		draw_weapon_world(center + Vector2(0,-6), pending_class, pending_class * 4, Vector2.DOWN, 0.95)
-		text_at(card.position + Vector2(0, 133), RACE_NAMES[i].to_upper(), 17, Color("fff1c8"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x))
-		text_at(card.position + Vector2(10, 154), RACE_ADVANTAGES[i], 10, Color("a9e4b4"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x - 20))
-		text_at(card.position + Vector2(10, 172), RACE_DISADVANTAGES[i], 10, Color("efaaa4"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x - 20))
-	text_at(Vector2(270, 447), "NAME", 13, Color("e9cc90"))
-	var name_box: Rect2 = Rect2(300, 458, 550, 46)
+		var center: Vector2 = card.position + Vector2(card.size.x * 0.5, 62)
+		draw_character_sprite(center, preview_class, false, Vector2.DOWN, 1.05, false, i, pending_gender)
+		text_at(card.position + Vector2(0, 108), RACE_NAMES[i].to_upper(), 16, Color("fff1c8"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x))
+		text_at(card.position + Vector2(8, 128), RACE_ADVANTAGES[i], 9, Color("a9e4b4"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x - 16))
+	text_at(Vector2(180, 402), "KLASSE", 13, Color("e9cc90"))
+	for cls in 3:
+		ui_button(Rect2(180 + cls * 260, 412, 240, 38), CLASS_NAMES[cls].to_upper(), true, pending_class == cls)
+	text_at(Vector2(270, 470), "NAME", 13, Color("e9cc90"))
+	var name_box: Rect2 = Rect2(300, 480, 550, 42)
 	draw_rect(name_box, Color("22363c"))
 	draw_rect(name_box, Color("8ba49c"), false, 2)
 	var shown_name: String = creation_name if creation_name != "" else "Name eingeben …"
 	if int(world_time * 2.0) % 2 == 0:
 		shown_name += "_"
-	text_at(name_box.position + Vector2(14,30), shown_name, 19, Color("fff0cf") if creation_name != "" else Color("9fb4ac"))
-	ui_button(Rect2(165, 520, 160, 52), "ZURÜCK")
-	ui_button(Rect2(360, 520, 430, 52), "ABENTEUER STARTEN", creation_name.strip_edges().length() >= 2)
-	text_at(Vector2(165, 594), "Roboter sind bei Mann/Frau optisch identisch. Mensch und Ork unterscheiden sich dezent.", 12, Color("aebfb9"), HORIZONTAL_ALIGNMENT_CENTER, 820)
+	text_at(name_box.position + Vector2(14,28), shown_name, 18, Color("fff0cf") if creation_name != "" else Color("9fb4ac"))
+	ui_button(Rect2(165, 540, 160, 44), "ZURÜCK")
+	var can_start: bool = creation_name.strip_edges().length() >= 2 and pending_class >= 0
+	ui_button(Rect2(360, 540, 430, 44), "ABENTEUER STARTEN", can_start)
+	text_at(Vector2(165, 610), "Roboter bleiben geschlechtsneutral. Mensch und Ork unterscheiden sich dezent.", 11, Color("aebfb9"), HORIZONTAL_ALIGNMENT_CENTER, 820)
 
 func draw_multiplayer_panel() -> void:
 	text_at(Vector2(205, 150), "SONNENHAIN KOOP", 31, Color('ffe1a0'))
