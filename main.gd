@@ -1213,13 +1213,13 @@ func start_mobility_animation(kind: String, duration: float) -> void:
 func mobility_visual_offset(race_id: int) -> Vector2:
 	if mobility_anim_timer <= 0.0 or mobility_anim_duration <= 0.0:
 		return Vector2.ZERO
-	var progress := clampf(1.0 - mobility_anim_timer / mobility_anim_duration, 0.0, 1.0)
-	var height := [28.0, 19.0, 23.0][clampi(race_id, 0, 2)]
+	var progress: float = clampf(1.0 - mobility_anim_timer / mobility_anim_duration, 0.0, 1.0)
+	var height: float = float([28.0, 19.0, 23.0][clampi(race_id, 0, 2)])
 	if mobility_anim_kind == "arcane":
 		height += 8.0
 	elif mobility_anim_kind == "roll":
-		height *= [0.34, 0.20, 0.28][clampi(race_id, 0, 2)]
-	var lift := sin(progress * PI) * height
+		height *= float([0.34, 0.20, 0.28][clampi(race_id, 0, 2)])
+	var lift: float = sin(progress * PI) * height
 	# Orks landen kompakter und schwerer, Roboter etwas mechanischer.
 	if race_id == 1:
 		lift *= 0.92
@@ -1236,23 +1236,23 @@ func cast_arcane_step_from_space() -> void:
 		message("Arkaner Schritt ist noch nicht bereit.")
 		return
 	var ability: Dictionary = ABILITIES[arcane_step_id]
-	var cost := float(ability["cost"])
+	var cost: float = float(ability["cost"])
 	if energy < cost:
 		message("Nicht genug Mana für Arkaner Schritt.")
 		return
 	energy -= cost
-	var rank := maxi(1, int(skill_levels[arcane_step_id]))
+	var rank: int = maxi(1, int(skill_levels[arcane_step_id]))
 	cooldowns[arcane_step_id] = float(ability["cd"]) * (1.0 - 0.06 * float(rank - 1))
-	var direction := movement_vector()
+	var direction: Vector2 = movement_vector()
 	if direction.length_squared() < 0.01:
 		direction = facing
 	direction = direction.normalized()
-	var destination := player_pos + direction * (210.0 + float(rank - 1) * 15.0)
+	var destination: Vector2 = player_pos + direction * (210.0 + float(rank - 1) * 15.0)
 	if not is_blocked(destination):
-		var cast_pos := player_pos
+		var cast_pos: Vector2 = player_pos
 		player_pos = destination.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
 		if network_mode == "client":
-			var power := int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012))
+			var power: int = int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012))
 			rpc_client_ability.rpc_id(1, arcane_step_id, [cast_pos.x, cast_pos.y], [direction.x, direction.y], power, rank)
 	invulnerable = 0.5
 	dash_cooldown = 0.75
@@ -1273,11 +1273,11 @@ func secondary_action() -> void:
 
 func orc_shoulder_bash() -> void:
 	secondary_cooldown = 1.35
-	var hit_any := false
+	var hit_any: bool = false
 	for i in range(enemies.size() - 1, -1, -1):
 		var delta_pos: Vector2 = enemies[i]["pos"] - player_pos
 		if delta_pos.length() <= 92.0 and delta_pos.normalized().dot(facing.normalized()) > -0.15:
-			var push_dir := delta_pos.normalized() if delta_pos.length_squared() > 0.01 else facing.normalized()
+			var push_dir: Vector2 = delta_pos.normalized() if delta_pos.length_squared() > 0.01 else facing.normalized()
 			damage_enemy(i, maxi(2, int(normal_attack_power() * 0.45)), push_dir * 4.0, true)
 			hit_any = true
 	effect(player_pos + facing * 42.0, "SCHULTERSTOSS", Color("d7bd91"), 0.55)
@@ -1298,8 +1298,8 @@ func cast_arcane_focus() -> void:
 	attack_timer = maxf(attack_timer, 0.36)
 	swing_timer = 0.28
 	swing_duration = 0.28
-	var power := maxi(1, int(normal_attack_power() * 1.45))
-	var design := equipped_weapon_design()
+	var power: int = maxi(1, int(normal_attack_power() * 1.45))
+	var design: int = equipped_weapon_design()
 	if network_mode == "client":
 		rpc_client_normal_attack.rpc_id(1, [player_pos.x,player_pos.y], [facing.x,facing.y], class_id, design, power, weapon_element())
 		projectiles.append({"pos":player_pos, "dir":facing, "speed":680.0, "life":1.35, "damage":0, "kind":2, "element":weapon_element(), "hits":[], "network_visual":true})
@@ -1314,15 +1314,15 @@ func apply_orc_wuchtrolle_knockback() -> void:
 		push_dir = facing.normalized()
 	for i in enemies.size():
 		var enemy: Dictionary = enemies[i]
-		var uid := int(enemy.get("uid", i))
+		var uid: int = int(enemy.get("uid", i))
 		if wucht_roll_hits.has(uid):
 			continue
 		if player_pos.distance_to(enemy["pos"]) > 55.0:
 			continue
 		wucht_roll_hits[uid] = true
-		var elite := int(enemy.get("elite", 0))
-		var distance := 62.0 if elite >= 2 else (82.0 if elite == 1 else 112.0)
-		var target: Vector2 = enemy["pos"] + push_dir * distance
+		var elite: int = int(enemy.get("elite", 0))
+		var distance: float = 62.0 if elite >= 2 else (82.0 if elite == 1 else 112.0)
+		var target: Vector2 = Vector2(enemy["pos"]) + push_dir * distance
 		if arena_mode != "":
 			if target.distance_to(ARENA_CENTER) > ARENA_RADIUS - 24.0:
 				target = ARENA_CENTER + (target - ARENA_CENTER).normalized() * (ARENA_RADIUS - 24.0)
@@ -1359,7 +1359,7 @@ func weapon_power() -> int:
 	return equipment_power(equipped_uid)
 
 func equipped_weapon_variant() -> String:
-	var design := equipped_weapon_design()
+	var design: int = equipped_weapon_design()
 	if class_id == 0 and design % 3 == 2: return "axe"
 	if class_id == 2 and design % 4 == 3: return "crossbow"
 	return class_weapon_icon()
@@ -1413,7 +1413,7 @@ func normal_attack() -> void:
 		power = int(power * 1.18)
 	if rage_timer > 0: power = int(power * 1.45)
 	if class_id == 0 and standing_in_battle_zone(): power = int(power * 1.32)
-	var design := equipped_weapon_design()
+	var design: int = equipped_weapon_design()
 	if network_mode == "client":
 		rpc_client_normal_attack.rpc_id(1, [player_pos.x,player_pos.y], [facing.x,facing.y], class_id, design, power, weapon_element())
 		if class_id != 0:
@@ -1502,8 +1502,8 @@ func use_ability(slot: int) -> void:
 	energy -= float(ability["cost"])
 	var rank: int = int(skill_levels[id])
 	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1))
-	var power := int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012))
-	var cast_pos := player_pos
+	var power: int = int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012))
+	var cast_pos: Vector2 = player_pos
 	var cast_dir := facing
 	if network_mode == "client":
 		rpc_client_ability.rpc_id(1, id, [cast_pos.x,cast_pos.y], [cast_dir.x,cast_dir.y], power, rank)
@@ -5162,7 +5162,7 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	var attack_now := swing_timer > 0.0 and preview_class < 0
 	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender)
 	# Arm, Hand und Waffe folgen während des Angriffs derselben Bewegung.
-	var design := equipped_weapon_design() if preview_class < 0 else visual_class * 4
+	var design: int = equipped_weapon_design() if preview_class < 0 else visual_class * 4
 	var weapon_family := visual_class
 	var weapon_pos := p + Vector2(0, -5.0 * scale_factor)
 	var base_look: Vector2 = look.normalized() if look.length() > 0.01 else Vector2.DOWN
