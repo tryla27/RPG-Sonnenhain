@@ -325,8 +325,6 @@ var mechanics_page := 0
 var network_mode := "offline"
 var network_status := "Offline"
 var network_port := 27844
-var network_server_url := "wss://game.sonnenhainrpg.de"
-var dedicated_server := false
 var invite_code := ""
 var join_code := ""
 var remote_players: Dictionary = {}
@@ -336,7 +334,6 @@ const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
 func _ready() -> void:
-	dedicated_server = OS.has_feature("dedicated_server") or "--dedicated-server" in OS.get_cmdline_args()
 	font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	environment_tiles = load("res://art/sonnenhain_tiles.png")
@@ -365,11 +362,6 @@ func _ready() -> void:
 	for i in 4:
 		spawn_enemy()
 	panel = "start"
-	if dedicated_server:
-		panel = ""
-		music_enabled = false
-		start_dedicated_server()
-		return
 	music_player = AudioStreamPlayer.new()
 	music_player.volume_db = -80.0
 	add_child(music_player)
@@ -424,7 +416,7 @@ func _on_connected_to_server() -> void:
 	push_player_state()
 
 func _on_connection_failed() -> void:
-	network_status = "Verbindung zum Sonnenhain-Server fehlgeschlagen."
+	network_status = "Verbindung fehlgeschlagen. Code oder Port prüfen."
 	disconnect_multiplayer(false)
 
 func _on_server_disconnected() -> void:
@@ -492,31 +484,6 @@ func preferred_host_address() -> String:
 		if "." in address and not address.begins_with("127.") and not address.begins_with("169.254."):
 			return address
 	return "127.0.0.1"
-
-func start_dedicated_server() -> void:
-	disconnect_multiplayer(false)
-	var peer := WebSocketMultiplayerPeer.new()
-	var err := peer.create_server(network_port, "0.0.0.0")
-	if err != OK:
-		network_status = "Dedicated Server konnte nicht gestartet werden · Fehler %d" % err
-		push_error(network_status)
-		return
-	multiplayer.multiplayer_peer = peer
-	network_mode = "host"
-	local_peer_id = 1
-	network_status = "Dedicated Server aktiv · WebSocket-Port %d" % network_port
-	print("[Sonnenhain] ", network_status)
-
-func join_dedicated_server() -> void:
-	disconnect_multiplayer(false)
-	var peer := WebSocketMultiplayerPeer.new()
-	var err := peer.create_client(network_server_url)
-	if err != OK:
-		network_status = "Online-Verbindung konnte nicht gestartet werden · Fehler %d" % err
-		return
-	multiplayer.multiplayer_peer = peer
-	network_mode = "client"
-	network_status = "Verbinde mit Sonnenhain-Server …"
 
 func host_multiplayer() -> void:
 	disconnect_multiplayer(false)
@@ -783,7 +750,7 @@ func _process(delta: float) -> void:
 	world_time += delta
 	if chat_open: chat_fade = 7.0
 	else: chat_fade = maxf(0.0, chat_fade - delta)
-	if multiplayer.multiplayer_peer != null and network_mode != "offline" and not dedicated_server:
+	if multiplayer.multiplayer_peer != null and network_mode != "offline":
 		sync_timer -= delta
 		if sync_timer <= 0.0:
 			sync_timer = 0.05
@@ -814,8 +781,7 @@ func _process(delta: float) -> void:
 		boss_cooldowns[i] = maxf(0.0, float(boss_cooldowns[i]) - delta)
 	if panel == "":
 		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * delta)
-		if not dedicated_server:
-			update_player(delta)
+		update_player(delta)
 		if arena_mode == "" and dungeon_id < 0 and interior_id < 0: update_rescue()
 		update_battle_zones(delta)
 		update_impact_zones(delta)
@@ -856,7 +822,7 @@ func _process(delta: float) -> void:
 	var camera_focus: Vector2 = ARENA_CENTER + (player_pos - ARENA_CENTER) * 0.88 if arena_mode != "" else player_pos
 	camera_pos = camera_focus - VIEW * 0.5 if arena_mode != "" else (INTERIOR_CENTER - VIEW * 0.5 if interior_id >= 0 else (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW))
 	save_timer += delta
-	if save_timer > 15 and arena_mode == "" and panel != "start" and not dedicated_server:
+	if save_timer > 15 and arena_mode == "" and panel != "start":
 		save_game()
 		save_timer = 0.0
 	queue_redraw()
@@ -1116,11 +1082,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			panel = "start"
 		elif event.keycode == KEY_BACKSPACE:
 			if join_code.length() > 0: join_code = join_code.left(join_code.length()-1)
-		elif event.keycode == KEY_ENTER:
-			if is_web_platform():
-				join_dedicated_server()
-			elif join_code.length() > 4:
-				join_multiplayer_from_code(join_code)
+		elif event.keycode == KEY_ENTER and join_code.length() > 4 and not is_web_platform():
+			join_multiplayer_from_code(join_code)
 		elif event.unicode >= 32 and join_code.length() < 28:
 			var code_char := String.chr(event.unicode).to_upper()
 			if "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-".find(code_char) >= 0: join_code += code_char
@@ -2605,7 +2568,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(860, 448, 125, 54).has_point(mouse):
 			panel = "multiplayer"
 			join_code = ""
-			network_status = "Online-Server · bereit zum Verbinden" if is_web_platform() else "Offline · Host erstellen oder Einladungscode eingeben"
+			network_status = "Koop läuft in der Desktop-Version." if is_web_platform() else "Offline · Host erstellen oder Einladungscode eingeben"
 			play_sound("menu")
 		return
 	if panel == "creation":
@@ -2624,15 +2587,9 @@ func handle_panel_click(mouse: Vector2) -> void:
 		return
 	if panel == "multiplayer":
 		if Rect2(205, 282, 340, 52).has_point(mouse):
-			if is_web_platform():
-				join_dedicated_server()
-			else:
-				host_multiplayer()
+			if not is_web_platform(): host_multiplayer()
 		elif Rect2(605, 282, 340, 52).has_point(mouse):
-			if is_web_platform():
-				join_dedicated_server()
-			else:
-				join_multiplayer_from_code(join_code)
+			if not is_web_platform(): join_multiplayer_from_code(join_code)
 		elif Rect2(205, 454, 740, 46).has_point(mouse):
 			join_code = ""
 		elif Rect2(205, 520, 200, 46).has_point(mouse):
@@ -5551,24 +5508,16 @@ func draw_creation_panel() -> void:
 
 func draw_multiplayer_panel() -> void:
 	text_at(Vector2(205, 150), "SONNENHAIN KOOP", 31, Color('ffe1a0'))
-	var web_online := is_web_platform()
-	if web_online:
-		text_at(Vector2(205, 182), "Online-Multiplayer · Dedicated Server · Gruppenchat", 16, Color('d8e6dc'))
-		text_at(Vector2(205, 215), "Freunde öffnen sonnenhainrpg.de und verbinden sich mit demselben Sonnenhain-Server.", 13, Color('b9cbc3'))
-		ui_button(Rect2(205, 282, 740, 52), "MIT ONLINE-SERVER VERBINDEN", network_mode == "offline")
-		text_at(Vector2(205, 365), "SERVER", 14, Color('e9cc90'))
-		var server_box := Rect2(205, 378, 740, 56)
-		draw_rect(server_box, Color('20343a'))
-		draw_rect(server_box, Color('8ba49c'), false, 2)
-		text_at(server_box.position + Vector2(14,36), network_server_url, 18, Color('fff0cf'))
-		text_at(Vector2(205, 511), network_status, 13, Color('bfe7d4'), HORIZONTAL_ALIGNMENT_LEFT, 740)
+	if is_web_platform():
+		text_at(Vector2(205, 182), "Singleplayer im Browser · Koop in der Desktop-Version", 16, Color('d8e6dc'))
+		text_at(Vector2(205, 215), "Der Browser bleibt auf Singleplayer. Für Koop startet ihr beide die Desktop-Version.", 13, Color('b9cbc3'))
+		text_at(Vector2(205, 292), "Koop: 2–4 Spieler · Einladungscode · Gruppenchat", 18, Color('fff0cf'))
+		text_at(Vector2(205, 336), "Im Browser sind keine Ports, Serveradressen oder Online-Verbindungen nötig.", 13, Color('b9cbc3'))
 		ui_button(Rect2(205, 520, 200, 46), "ZURÜCK")
-		var can_join := network_mode == "client" and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
-		ui_button(Rect2(605, 520, 340, 46), "WELT BEITRETEN", can_join)
-		text_at(Vector2(205, 586), "Browser-Multiplayer läuft über WSS. Kein Spieler muss selbst hosten oder Ports freigeben.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
+		text_at(Vector2(205, 586), "Sicherer Webmodus: Das Spiel läuft lokal im Browser und speichert lokal.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
 		return
 	text_at(Vector2(205, 182), "2–4 Spieler · Peer-to-Peer · Einladungscode · Gruppenchat", 16, Color('d8e6dc'))
-	text_at(Vector2(205, 215), "Desktop-LAN/ENet bleibt für lokale Tests erhalten.", 13, Color('b9cbc3'))
+	text_at(Vector2(205, 215), "Desktop-Koop über ENet: Einer hostet, die anderen treten per Einladungscode bei.", 13, Color('b9cbc3'))
 	ui_button(Rect2(205, 282, 340, 52), "SPIEL HOSTEN")
 	ui_button(Rect2(605, 282, 340, 52), "MIT CODE BEITRETEN", join_code.length() > 4)
 	text_at(Vector2(205, 365), "EINLADUNGSCODE", 14, Color('e9cc90'))
@@ -5582,7 +5531,7 @@ func draw_multiplayer_panel() -> void:
 	ui_button(Rect2(205, 520, 200, 46), "ZURÜCK")
 	var can_start := network_mode == "host" or (network_mode == "client" and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED)
 	ui_button(Rect2(605, 520, 340, 46), "WELT STARTEN" if network_mode == "host" else "WELT BEITRETEN", can_start)
-	text_at(Vector2(205, 586), "LAN-Test: UDP %d. Online-Browser-Spieler nutzen den Dedicated Server.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
+	text_at(Vector2(205, 586), "Koop nutzt UDP %d. Falls UPnP nicht funktioniert, muss der Host den Port am Router freigeben." % network_port, 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
 
 func draw_pause_panel() -> void:
 	text_at(Vector2(300, 158), "PAUSE", 35, Color("ffeda9"))
