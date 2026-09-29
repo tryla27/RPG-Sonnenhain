@@ -6,11 +6,16 @@ const MobAnimation = preload("res://scripts/enemies/mob_animation.gd")
 const ItemProtection = preload("res://scripts/inventory/item_protection.gd")
 const MaxLevelBalanceAudit = preload("res://scripts/balance/max_level_balance_audit.gd")
 const MinimapRenderer = preload("res://scripts/ui/minimap_renderer.gd")
+const MovementRules = preload("res://scripts/player/movement_rules.gd")
+const SaveMigrator = preload("res://scripts/save/save_migrator.gd")
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
 const VIEW := Vector2(1152, 648)
 const WORLD := Vector2(16000, 9600)
 const GATE_HALF_WIDTH := 175.0
+const GAME_VERSION := "v28.0"
+const UFO_WRECK_POS := Vector2(1035, 8170)
+const UFO_CHEST_POS := Vector2(1235, 8010)
 const SAVE_PATH := "user://sonnenhain_save.json"
 const CREATIVE_SAVE_PATH := "user://sonnenhain_testmodus.json"
 const CONTROLS_PATH := "user://sonnenhain_tasten.json"
@@ -73,6 +78,26 @@ const ABILITIES := [
 	{"name":"Himmelshagel", "desc":"Klassenfähigkeit: großer Pfeilsturm", "cost":60, "cd":45.0, "req":20, "kind":33}
 ]
 const CLASS_NAMES := ["Krieger", "Magier", "Bogenschütze"]
+const CLASS_ADVANTAGES := [
+	"+ Nahkampf · robust · Schild · Rolle",
+	"+ Magie · Flächenzauber · 2 Ringe",
+	"+ schnell · Fernkampf · starke Rolle"
+]
+const CLASS_DISADVANTAGES := [
+	"- kurze Reichweite · weniger mobil",
+	"- keine Rolle · schwächer im Nahkampf",
+	"- weniger robust · Nahkampf schwächer"
+]
+const RACE_ADVANTAGES := [
+	"+ ausgeglichene Werte",
+	"+ 25% HP · starker Nahkampf/Handwaffen",
+	"+ hohe Verteidigung · stabil"
+]
+const RACE_DISADVANTAGES := [
+	"- keine extreme Spezialisierung",
+	"- deutlich langsamer",
+	"- etwas langsamer als Mensch"
+]
 const CLASS_SKILLS := [[0, 1, 2, 3, 5, 7, 12, 13, 14], [16, 17, 18, 19, 20, 21, 22, 23], [25, 26, 27, 28, 29, 30, 31, 32]]
 const CLASS_ULTIMATES := [15, 24, 33]
 const QUESTS := [
@@ -201,6 +226,7 @@ var shop_stock: Dictionary = {}
 var previous_region := 0
 var discovered_regions: Array = [true, false, false, false, false, false, false, false, false, false, false, false, false]
 var opened_chests: Array = [false, false, false, false, false, false, false, false, false, false, false]
+var ufo_chest_opened := false
 var obstacle_cache: Dictionary = {}
 var boss_cooldowns: Array = [0.0, 0.0, 0.0]
 var bosses_defeated: Array = [false, false, false]
@@ -785,7 +811,11 @@ func update_player(delta: float) -> void:
 	var move := movement_vector()
 	is_walking = move.length_squared() > 0.01 or dash_timer > 0
 	if is_walking: walk_phase += delta * (19.0 if dash_timer > 0 else 11.0)
-	var target_pos := player_pos + (dash_dir * 580.0 if dash_timer > 0 else move * 205.0) * delta
+	var class_profile := current_class_profile()
+	var race_profile := current_race_profile()
+	var move_speed := MovementRules.effective_move_speed(205.0, race_profile, class_profile)
+	var roll_speed := MovementRules.effective_roll_speed(580.0, class_profile)
+	var target_pos := player_pos + (dash_dir * roll_speed if dash_timer > 0 else move * move_speed) * delta
 	if not is_blocked(target_pos):
 		player_pos = target_pos.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
 	else:
@@ -830,7 +860,8 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 		return true
 	if pos.x < 11000 and pos.y > 8470: return true
 	if pos.x >= 11000 and (pos.x < 11140 or int(pos.y / 1920.0) != int(from_pos.y / 1920.0) and from_pos.x >= 11000): return true
-	if pos.x < 1780 and pos.y > 7700:
+	# Mondküste/untere Map: frühere 7700-Grenze erzeugte eine unsichtbare Wand.
+	if pos.x < 1780 and pos.y > 8440:
 		return true
 	if from_pos.x < 0: from_pos = player_pos
 	# Die Kollisionsfläche folgt der gesamten gezeichneten Mauer (82 px breit),
@@ -897,6 +928,8 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	var zone := region_at(p)
 	if zone == 0: return {}
 	var radius := 43.0 + float(key % 4) * 9.0
+	if p.distance_to(UFO_WRECK_POS) < radius + 250.0: return {}
+	if p.distance_to(UFO_CHEST_POS) < radius + 120.0: return {}
 	if distance_to_trail(p) < radius + 115.0: return {}
 	for landmark in LANDMARKS:
 		if p.distance_to(landmark["pos"]) < radius + 180.0: return {}
@@ -907,6 +940,7 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	return {"pos":p, "radius":radius, "zone":zone, "key":key}
 
 func terrain_blocked(p: Vector2) -> bool:
+	if p.distance_to(UFO_WRECK_POS) < 105.0: return true
 	if region_at(p) == 1:
 		for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			if Rect2(RESCUE_POS + offset - Vector2(73, 54), Vector2(146, 108)).grow(16).has_point(p): return true
@@ -1147,10 +1181,15 @@ func toggle_panel(which: String) -> void:
 	sell_all_confirm = false
 
 func dodge() -> void:
+	var profile := current_class_profile()
+	if not MovementRules.can_roll(profile):
+		message("Magier können nicht rollen — nutze Arkaner Schritt für Mobilität.")
+		return
 	var dir := movement_vector()
 	dash_dir = dir.normalized() if dir.length() > 0 else facing
-	dash_timer = 0.22
-	dash_cooldown = 1.25
+	var distance_mult := MovementRules.effective_roll_distance(1.0, profile)
+	dash_timer = 0.22 * distance_mult
+	dash_cooldown = 1.25 * (1.0 if profile == null else profile.roll_cooldown_multiplier)
 	invulnerable = 0.38
 	effect(player_pos, "ROLLE", Color("d8f3ff"), 0.65)
 	play_sound("dodge")
@@ -1891,7 +1930,10 @@ func update_enemies(delta: float) -> void:
 			var speed: float = float(info["speed"]) * (0.45 if enemy["slow"] > 0 else 1.0) * (1.08 if int(enemy.get("elite", 0)) > 0 else 1.0) * delta
 			for angle in [0.0, 0.75, -0.75, 1.4, -1.4]:
 				var next_pos: Vector2 = enemy["pos"] + offset.normalized().rotated(angle) * speed
-				if (arena_mode != "" and next_pos.distance_to(ARENA_CENTER) < ARENA_RADIUS - 16.0) or (dungeon_id >= 0 and not dungeon_blocked(next_pos)) or (arena_mode == "" and dungeon_id < 0 and region_at(next_pos) == region_at(enemy["pos"]) and not terrain_blocked(next_pos)):
+				var clear_world_path := not terrain_blocked(next_pos)
+				if mob_data != null and mob_data.flying:
+					clear_world_path = not blocked_by_region_wall(next_pos)
+				if (arena_mode != "" and next_pos.distance_to(ARENA_CENTER) < ARENA_RADIUS - 16.0) or (dungeon_id >= 0 and not dungeon_blocked(next_pos)) or (arena_mode == "" and dungeon_id < 0 and region_at(next_pos) == region_at(enemy["pos"]) and clear_world_path):
 					var movement: Vector2 = next_pos - enemy["pos"]
 					enemy["pos"] = next_pos
 					if movement.length_squared() > 0.001:
@@ -2197,6 +2239,9 @@ func interact() -> void:
 		else:
 			message("Nela: Hinter dem Turm in den Ruinen liegt die Quelle der Plage. Sei vorsichtig!")
 		return
+	if not ufo_chest_opened and player_pos.distance_to(UFO_CHEST_POS) < 90:
+		open_ufo_chest()
+		return
 	for i in LANDMARKS.size():
 		if not opened_chests[i] and player_pos.distance_to(chest_position(i)) < 85:
 			open_chest(i)
@@ -2381,7 +2426,7 @@ func refresh_save_slot_labels() -> void:
 func save_game() -> void:
 	var safe_pos := arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos))
 	var safe_hp := max_hp() if arena_mode != "" else hp
-	var data := {"world_version":5, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"save_version":SaveMigrator.CURRENT_VERSION, "world_version":5, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "ufo_chest_opened":ufo_chest_opened, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	var file: FileAccess = FileAccess.open(slot_save_path(active_save_slot, creative_mode), FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify(data))
@@ -2393,8 +2438,13 @@ func load_game() -> void:
 	if not FileAccess.file_exists(path): return
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null: return
-	var data: Variant = JSON.parse_string(file.get_as_text())
-	if not data is Dictionary: return
+	var raw_save := file.get_as_text()
+	file.close()
+	var parsed_save: Variant = JSON.parse_string(raw_save)
+	if not parsed_save is Dictionary:
+		return
+	SaveMigrator.backup_before_migration(path, parsed_save)
+	var data: Dictionary = SaveMigrator.migrate(parsed_save)
 	reset_class_skills()
 	inventory.clear()
 	quests.clear()
@@ -2404,6 +2454,7 @@ func load_game() -> void:
 		event_progress[i] = 0
 	for i in bosses_defeated.size(): bosses_defeated[i] = false
 	for i in opened_chests.size(): opened_chests[i] = false
+	ufo_chest_opened = false
 	dungeon_id = -1
 	interior_id = -1
 	for i in dungeon_chests_opened.size(): dungeon_chests_opened[i] = false
@@ -2495,6 +2546,7 @@ func load_game() -> void:
 	if stored_shop is Dictionary and stored_shop.has("smith"): shop_stock = stored_shop
 	var stored_chests: Array = data.get("opened_chests", [])
 	for i in mini(stored_chests.size(), LANDMARKS.size()): opened_chests[i] = bool(stored_chests[i])
+	ufo_chest_opened = bool(data.get("ufo_chest_opened", false))
 	var stored_dungeon_chests: Array = data.get("dungeon_chests_opened", [])
 	for i in mini(stored_dungeon_chests.size(), dungeon_chests_opened.size()): dungeon_chests_opened[i] = bool(stored_dungeon_chests[i])
 	var stored_bosses: Array = data.get("bosses_defeated", [])
@@ -3863,6 +3915,8 @@ func draw_world() -> void:
 		for cy in range(cell_min_y, cell_max_y):
 			var obstacle := obstacle_in_cell(cx, cy)
 			if not obstacle.is_empty() and visible_world(obstacle['pos'], 110): draw_obstacle(obstacle)
+	if visible_world(UFO_WRECK_POS, 240): draw_ufo_wreck(UFO_WRECK_POS)
+	if visible_world(UFO_CHEST_POS, 100): draw_chest(UFO_CHEST_POS, ufo_chest_opened)
 	draw_village()
 	draw_region_gates()
 	draw_rect(Rect2(Vector2.ZERO, WORLD), Color('45726d'), false, 7)
@@ -4621,16 +4675,48 @@ func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 			draw_rect(Rect2(p + Vector2(-3, 7), Vector2(8, 5)), Color('ffe5aa'))
 			draw_rect(Rect2(p + Vector2(-18, 14), Vector2(9, 4)), c.lightened(0.18))
 			draw_rect(Rect2(p + Vector2(10, 13), Vector2(8, 4)), c.lightened(0.18))
-		1: # Käfer mit Fühlern, sechs Beinen und zwei Flügeldecken.
+		1: # Blütenkäfer: fliegender Blütenpanzer mit geöffneten/geschlossenen Flügeln.
+			var wing_open := int(floor(world_time * 11.0)) % 2 == 0
+			var hover := sin(world_time * 6.0) * 2.5
+			var bp := p + Vector2(0, hover - 8.0)
+			# Sechs Beine und Fühler hängen unter dem fliegenden Körper.
 			for side in [-1.0, 1.0]:
 				for leg in 3:
-					draw_line(p + Vector2(side * 12, -12 + leg * 12), p + Vector2(side * 32, -18 + leg * 16 + stride * side), c.darkened(0.38), 4)
-				draw_line(p + Vector2(side * 6, -25), p + Vector2(side * 20, -46), Color('574951'), 3)
-				draw_circle(p + Vector2(side * 11, -6), 17, c.lightened(0.16))
-				draw_circle(p + Vector2(side * 11, -11), 4, Color('fff2d4'))
-			draw_circle(p + Vector2(0, -14), 12, Color('593f55'))
-			draw_circle(p + Vector2(-5, -17), 3, Color('fff1a7'))
-			draw_circle(p + Vector2(5, -17), 3, Color('fff1a7'))
+					draw_line(bp + Vector2(side * 10, 1 + leg * 7), bp + Vector2(side * (20 + leg * 2), 13 + leg * 7), Color("4e6545"), 3)
+				draw_line(bp + Vector2(side * 7, -18), bp + Vector2(side * 18, -31), Color("6d6b45"), 2)
+			# Flügelschlag: zwei klar getrennte Silhouetten.
+			if wing_open:
+				for side in [-1.0, 1.0]:
+					draw_colored_polygon(PackedVector2Array([
+						bp + Vector2(side * 7, -15), bp + Vector2(side * 31, -45),
+						bp + Vector2(side * 47, -30), bp + Vector2(side * 29, -6)
+					]), Color("ffe7c5", 0.78))
+					draw_colored_polygon(PackedVector2Array([
+						bp + Vector2(side * 6, -4), bp + Vector2(side * 42, -1),
+						bp + Vector2(side * 36, 19), bp + Vector2(side * 13, 11)
+					]), Color("f5bad0", 0.68))
+			else:
+				for side in [-1.0, 1.0]:
+					draw_colored_polygon(PackedVector2Array([
+						bp + Vector2(side * 5, -17), bp + Vector2(side * 18, -31),
+						bp + Vector2(side * 24, -8), bp + Vector2(side * 13, 7)
+					]), Color("ffe8cf", 0.74))
+			# Rosa Blütenpanzer mit Blattakzenten.
+			draw_circle(bp + Vector2(0, -5), 22, Color("d96b9a"))
+			draw_colored_polygon(PackedVector2Array([
+				bp + Vector2(-21, -8), bp + Vector2(-7, -28), bp + Vector2(1, -10), bp + Vector2(-3, 8)
+			]), Color("ef9fbd"))
+			draw_colored_polygon(PackedVector2Array([
+				bp + Vector2(20, -9), bp + Vector2(8, -27), bp + Vector2(0, -10), bp + Vector2(4, 8)
+			]), Color("f2b0c9"))
+			draw_colored_polygon(PackedVector2Array([
+				bp + Vector2(-10, -25), bp + Vector2(0, -37), bp + Vector2(11, -24), bp + Vector2(0, -18)
+			]), Color("fff0d0"))
+			draw_circle(bp + Vector2(0, 10), 13, Color("f6e4c7"))
+			draw_circle(bp + Vector2(-5, 9), 4, Color("24382d"))
+			draw_circle(bp + Vector2(6, 9), 4, Color("24382d"))
+			draw_circle(bp + Vector2(0, -31), 4, Color("f1c75e"))
+
 		2: # Pilzling mit Stiel, Hut und Sporenpunkten.
 			draw_rect(Rect2(p + Vector2(-15, -7), Vector2(30, 32)), Color('e5d8b3'))
 			draw_rect(Rect2(p + Vector2(-12, 20), Vector2(10, 10)), Color('9b755e'))
@@ -5492,14 +5578,16 @@ func draw_mechanics_panel() -> void:
 
 func draw_start_panel() -> void:
 	text_at(Vector2(291, 151), "SONNENHAIN", 39, Color("ffe2aa"))
-	text_at(Vector2(900, 148), "v27.5", 16, Color("f4d7a3"))
+	text_at(Vector2(900, 148), GAME_VERSION, 16, Color("f4d7a3"))
 	ui_button(Rect2(855, 158, 130, 33), "TASTEN")
 	text_at(Vector2(295, 184), "Eine Reise durch die alten Reiche  ·  Wähle deinen Helden", 18, Color("dce7d8"))
 	for i in 3:
 		var card := Rect2(168 + i * 273, 202, 260, 170)
 		ui_box(card, Color("545e5d") if pending_class == i else Color("3a4c4f"))
 		draw_rect(Rect2(card.position + Vector2(10, 10), Vector2(240, 3)), [Color("d2a36e"), Color("9abce4"), Color("a5c88d")][i])
-		draw_hero(Vector2(298 + i * 273, 277), 1.0, false, Vector2.DOWN, false, i)
+		text_at(card.position + Vector2(14, 35), CLASS_ADVANTAGES[i], 10, Color("9fe6ae"), HORIZONTAL_ALIGNMENT_LEFT, 232)
+		text_at(card.position + Vector2(14, 52), CLASS_DISADVANTAGES[i], 10, Color("f0a09b"), HORIZONTAL_ALIGNMENT_LEFT, 232)
+		draw_hero(Vector2(298 + i * 273, 286), 0.9, false, Vector2.DOWN, false, i)
 		ui_button(Rect2(174 + i * 273, 330, 250, 38), CLASS_NAMES[i].to_upper(), true, pending_class == i)
 	ui_button(Rect2(300, 378, 550, 54), "NEUES SPIEL  ·  Im gewählten Speicherplatz")
 	ui_button(Rect2(300, 448, 550, 54), "GEWÄHLTEN SPIELSTAND LADEN", FileAccess.file_exists(slot_save_path(selected_save_slot)))
@@ -5525,12 +5613,17 @@ func draw_creation_panel() -> void:
 	text_at(Vector2(270, 357), "RASSE", 14, Color('e9cc90'))
 	for i in 3:
 		ui_button(Rect2(245 + i*220, 365, 205, 44), RACE_NAMES[i].to_upper(), true, pending_race == i)
+	ui_box(Rect2(905, 215, 220, 194), Color("34494b"))
+	text_at(Vector2(918, 244), RACE_NAMES[pending_race].to_upper(), 16, Color("ffe1a0"))
+	text_at(Vector2(918, 278), RACE_ADVANTAGES[pending_race], 11, Color("9fe6ae"), HORIZONTAL_ALIGNMENT_LEFT, 190)
+	text_at(Vector2(918, 318), RACE_DISADVANTAGES[pending_race], 11, Color("f0a09b"), HORIZONTAL_ALIGNMENT_LEFT, 190)
+	text_at(Vector2(918, 356), "Klasse: %s" % CLASS_NAMES[pending_class], 12, Color("d8e6dc"), HORIZONTAL_ALIGNMENT_LEFT, 190)
 	# Vorschau der drei Klassen mit gewählter Rasse/Geschlecht.
 	for cls in 3:
 		var center := Vector2(350 + cls*225, 462)
 		draw_character_sprite(center, cls, false, Vector2.DOWN, 1.0, false, pending_race, pending_gender)
 		draw_weapon_world(center + Vector2(0,-5), cls, cls*4, Vector2.DOWN, 1.0)
-		text_at(center + Vector2(-65,55), CLASS_NAMES[cls], 14, Color('eaf2df'), HORIZONTAL_ALIGNMENT_CENTER, 130)
+		text_at(center + Vector2(-65,43), CLASS_NAMES[cls], 14, Color('eaf2df'), HORIZONTAL_ALIGNMENT_CENTER, 130)
 	ui_button(Rect2(165, 520, 110, 52), "ZURÜCK")
 	ui_button(Rect2(300, 520, 550, 52), "ABENTEUER STARTEN", creation_name.strip_edges().length() >= 2)
 	text_at(Vector2(305, 592), "Rasse und Geschlecht verändern das Pixelmodell. Klasse wurde im Hauptmenü gewählt.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_CENTER, 540)
@@ -6225,6 +6318,43 @@ func draw_hamlet(p: Vector2) -> void:
 	if safe:
 		draw_rect(Rect2(p + Vector2(-153, -45), Vector2(298, 9)), Color("f1c77b"))
 		text_at(p + Vector2(-91, -91), "BLÜTENWEILER", 18, Color("fff2bb"), HORIZONTAL_ALIGNMENT_CENTER, 182)
+
+func draw_ufo_wreck(p: Vector2) -> void:
+	# Schräg im seichten Wasser liegendes abgestürztes UFO.
+	var bob := sin(world_time * 1.7) * 2.0
+	var q := p + Vector2(0, bob)
+	draw_colored_polygon(PackedVector2Array([
+		q + Vector2(-112, 22), q + Vector2(-72, -22), q + Vector2(56, -45),
+		q + Vector2(111, -6), q + Vector2(72, 34), q + Vector2(-55, 49)
+	]), Color("63727a"))
+	draw_colored_polygon(PackedVector2Array([
+		q + Vector2(-84, 7), q + Vector2(-51, -18), q + Vector2(52, -34),
+		q + Vector2(82, -8), q + Vector2(54, 19), q + Vector2(-50, 32)
+	]), Color("aeb9bd"))
+	draw_colored_polygon(PackedVector2Array([
+		q + Vector2(-26, -18), q + Vector2(6, -43), q + Vector2(42, -32),
+		q + Vector2(49, -9), q + Vector2(7, -3)
+	]), Color("79b9c3", 0.78))
+	draw_line(q + Vector2(-70, 6), q + Vector2(71, -18), Color("d6e0df"), 4)
+	draw_line(q + Vector2(-38, 30), q + Vector2(62, 14), Color("45565f"), 5)
+	draw_circle(q + Vector2(-73, 17), 8, Color("8defff", 0.75))
+	draw_circle(q + Vector2(71, -4), 7, Color("ff9c73", 0.72))
+	for offset in [-125.0, -92.0, 91.0, 123.0]:
+		draw_arc(q + Vector2(offset, 42), 28, PI + 0.15, TAU - 0.15, 18, Color("8ad4dd", 0.46), 2)
+
+func open_ufo_chest() -> void:
+	if ufo_chest_opened:
+		return
+	if inventory.size() >= 42:
+		message("Inventar voll — die fremdartige Truhe bleibt geschlossen.")
+		return
+	ufo_chest_opened = true
+	var relic := make_item("Fremdartiger Sternenkern", "gem", 3, 0, 650, "blitz", maxi(level, 8))
+	inventory.append(relic)
+	gold += 120
+	play_sound("level")
+	message("UFO-Fund: Fremdartiger Sternenkern +120 Gold. Was ist hier abgestürzt?")
+	save_game()
 
 func draw_chest(p: Vector2, opened: bool) -> void:
 	var lid_y := -30 if opened else -22
