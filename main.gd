@@ -344,6 +344,18 @@ const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
 func _ready() -> void:
+	setup_multiplayer_signals()
+	dedicated_server_mode = OS.has_feature("dedicated_server") or "--dedicated-server" in OS.get_cmdline_user_args()
+	if dedicated_server_mode:
+		reset_class_skills()
+		for i in QUESTS.size():
+			quests.append({"state":0, "progress":0})
+		for i in WORLD_EVENTS.size():
+			event_states.append(0)
+			event_progress.append(0)
+		panel = ""
+		start_websocket_server()
+		return
 	font = ThemeDB.fallback_font
 	touch_enabled = DisplayServer.is_touchscreen_available()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -358,9 +370,6 @@ func _ready() -> void:
 	vfx_sprites = load("res://art/vfx_16.png")
 	structure_tiles = load("res://art/structures_16.png")
 	house_tiles = load("res://art/houses_192.png")
-	setup_multiplayer_signals()
-	if "--dedicated-server" in OS.get_cmdline_user_args():
-		dedicated_server_mode = true
 	load_bindings()
 	refresh_save_slot_labels()
 	refresh_shop_stock()
@@ -389,9 +398,6 @@ func _ready() -> void:
 		add_child(player)
 		sound_players.append(player)
 	update_music()
-	if dedicated_server_mode:
-		panel = ""
-		start_websocket_server()
 
 func reset_class_skills() -> void:
 	learned.resize(ABILITIES.size())
