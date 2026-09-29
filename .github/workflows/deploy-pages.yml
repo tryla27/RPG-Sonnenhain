@@ -1,4 +1,4 @@
-name: Build Sonnenhain website
+name: Build and deploy Sonnenhain website
 
 on:
   push:
