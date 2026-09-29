@@ -1,0 +1,21 @@
+[Unit]
+Description=Sonnenhain dedicated Godot server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sonnenhain
+Group=sonnenhain
+WorkingDirectory=/opt/sonnenhain
+ExecStart=/opt/sonnenhain/sonnenhain-server --headless -- --dedicated-server
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/sonnenhain/data
+
+[Install]
+WantedBy=multi-user.target
