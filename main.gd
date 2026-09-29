@@ -5008,6 +5008,11 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	draw_weapon_world(weapon_pos, weapon_family, design, base_look, scale_factor, progress)
 	if equipped_ring_uid >= 0 and preview_class < 0:
 		draw_rect(Rect2(p + Vector2(-23,-2) * scale_factor, Vector2(5,3) * scale_factor), Color('f8d982'))
+	if in_world and preview_class < 0:
+		var display_name := hero_name.strip_edges()
+		if display_name == "":
+			display_name = "Held"
+		text_at(p + Vector2(-75,-57), "%s · LV %d" % [display_name, level], 13, Color('fff2b8'), HORIZONTAL_ALIGNMENT_CENTER, 150)
 
 func weapon_attack_look(look: Vector2, family: int, design: int, progress: float) -> Vector2:
 	if progress < 0.0: return look.normalized()
