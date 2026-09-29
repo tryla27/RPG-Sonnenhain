@@ -1,0 +1,69 @@
+name: Diagnose Manitu website 403
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/manitu-diagnose.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      MANITU_SSH_KEY: ${{ secrets.MANITU_SSH_KEY }}
+    steps:
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 700 "$HOME/.ssh"
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          raw=os.environ["MANITU_SSH_KEY"].replace("\r","").strip()
+          if "BEGIN OPENSSH PRIVATE KEY" in raw:
+              key=raw.replace("\\n","\n")
+          else:
+              key=base64.b64decode("".join(raw.split()), validate=True).decode().replace("\r","").strip()
+          Path.home().joinpath(".ssh/manitu").write_text(key.strip()+"\n")
+          PY
+          chmod 600 "$HOME/.ssh/manitu"
+
+      - name: Diagnose and place health files
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH="ssh -4 -i $HOME/.ssh/manitu -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12"
+          $SSH ssh300011111@ngcobalt378.manitu.net '
+            set -eu
+            echo "=== identity ==="; id
+            echo "=== web tree ==="; find /home/sites/site100047525/web -maxdepth 2 -mindepth 1 -printf "%M %u %g %p\n" | head -200
+            echo "=== htaccess files ==="; find /home/sites/site100047525/web -maxdepth 3 -name .htaccess -print || true
+            echo "=== candidate indexes ==="; find /home/sites/site100047525/web -maxdepth 3 -type f -name "index.*" -printf "%M %u %g %p\n" | head -100
+            printf "SONNENHAIN_HEALTH_OK\n" > /home/sites/site100047525/web/sonnenhain-health.txt
+            mkdir -p /home/sites/site100047525/web/sonnenhainrpg.de
+            printf "SONNENHAIN_HEALTH_OK\n" > /home/sites/site100047525/web/sonnenhainrpg.de/sonnenhain-health.txt
+            chmod 644 /home/sites/site100047525/web/sonnenhain-health.txt /home/sites/site100047525/web/sonnenhainrpg.de/sonnenhain-health.txt
+          '
+
+      - name: Test public vhost
+        shell: bash
+        run: |
+          set -u
+          for url in \
+            https://sonnenhainrpg.de/ \
+            https://sonnenhainrpg.de/index.html \
+            https://sonnenhainrpg.de/sonnenhain-health.txt \
+            https://www.sonnenhainrpg.de/ \
+            http://sonnenhainrpg.de/; do
+            echo "=== $url ==="
+            curl -k -sS -D - -o /tmp/body --max-time 15 "$url" | head -30 || true
+            echo "--- body ---"
+            head -c 300 /tmp/body 2>/dev/null || true
+            echo
+          done
