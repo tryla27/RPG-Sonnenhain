@@ -25,9 +25,8 @@
       <p class="lead">Erkunde Sonnenhain, erschaffe deinen Helden und entdecke Regionen voller Quests, Gegner und Geheimnisse.</p>
       <div class="actions">
         <a class="button primary" href="/game/">ZUM SPIEL</a>
-        <a class="button ghost" href="#einladung">EINLADUNG NUTZEN</a>
       </div>
-      <p class="micro">Browser: Singleplayer · Desktop: Koop · privater Webzugang</p>
+      <p class="micro">Browser: Singleplayer · Desktop: Koop · Zugang über die Webadresse</p>
     </div>
     <div class="hero-art" aria-hidden="true">
       <div class="sun"></div><div class="hill hill-back"></div><div class="hill hill-front"></div><div class="tower"></div>
@@ -35,28 +34,12 @@
     </div>
   </section>
 
-  <section id="einladung" class="invite-panel">
-    <div>
-      <p class="eyebrow">PRIVATER ZUGANG</p>
-      <h2>Du hast eine Einladung?</h2>
-      <p>Gib deinen Einladungs-Code ein. Er wird nur verwendet, um die geschützte Spielseite zu öffnen.</p>
-    </div>
-    <form id="invite-form" class="invite-form">
-      <label for="invite-code">Einladungs-Code</label>
-      <div class="invite-row">
-        <input id="invite-code" type="text" autocomplete="off" spellcheck="false" placeholder="Code einfügen" required>
-        <button class="button primary" type="submit">EINLADUNG ÖFFNEN</button>
-      </div>
-      <p id="invite-message" class="form-message" aria-live="polite"></p>
-    </form>
-  </section>
-
   <section id="welt" class="section">
     <div class="section-heading"><p class="eyebrow">DIE WELT</p><h2>Dein Abenteuer in Sonnenhain</h2></div>
     <div class="cards">
       <article class="card"><span class="card-number">01</span><h3>Erkunde</h3><p>Reise durch unterschiedliche Regionen, entdecke Wegsteine, Dungeons und verborgene Orte.</p></article>
       <article class="card"><span class="card-number">02</span><h3>Wähle deinen Weg</h3><p>Spiele Krieger, Magier oder Bogenschütze und entwickle deinen Charakter mit Fähigkeiten und Ausrüstung.</p></article>
-      <article class="card"><span class="card-number">03</span><h3>Spiele privat</h3><p>Die Browser-Version ist als privater Singleplayer-Zugang ausgelegt. Koop bleibt in der Desktop-Version verfügbar.</p></article>
+      <article class="card"><span class="card-number">03</span><h3>Direkt starten</h3><p>Öffne Sonnenhain über die Webadresse und starte direkt im Browser. Koop bleibt zusätzlich in der Desktop-Version verfügbar.</p></article>
     </div>
   </section>
 
@@ -70,24 +53,4 @@
   <div class="footer-links"><a href="/impressum.html">Impressum</a><a href="/datenschutz.html">Datenschutz</a><a href="/sicherheit.html">Sicherheit</a></div>
   <p>Eine Reise durch die alten Reiche.</p>
 </footer>
-<script>
-(() => {
-  const form = document.getElementById('invite-form');
-  const input = document.getElementById('invite-code');
-  const message = document.getElementById('invite-message');
-  const params = new URLSearchParams(location.search);
-  const incoming = params.get('invite');
-  if (incoming) {
-    input.value = incoming;
-    message.textContent = 'Einladung erkannt. Du kannst sie jetzt öffnen.';
-    document.getElementById('einladung').scrollIntoView({block:'center'});
-  }
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const code = input.value.trim();
-    if (!code) { message.textContent = 'Bitte gib einen Einladungs-Code ein.'; input.focus(); return; }
-    location.assign('/game/?invite=' + encodeURIComponent(code));
-  });
-})();
-</script>
 </body></html>
