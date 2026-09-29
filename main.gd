@@ -3598,10 +3598,11 @@ func draw_npc_sprite(p: Vector2, kind: String, name: String) -> void:
 	draw_texture_rect_region(npc_sprites,Rect2(p-Vector2(32,44),Vector2(64,64)),src)
 
 func draw_weapon_world(p: Vector2, family: int, design: int, look: Vector2, scale_factor: float = 1.0, attack_progress: float = -1.0) -> void:
-	var dir: Vector2 = look.normalized() if look.length() > 0.01 else Vector2.DOWN
-	dir = weapon_attack_look(dir, family, design, attack_progress)
+	var base_dir: Vector2 = look.normalized() if look.length() > 0.01 else Vector2.DOWN
+	var dir: Vector2 = weapon_attack_look(base_dir, family, design, attack_progress)
 	var side: Vector2 = dir.rotated(PI * 0.5)
-	var hand: Vector2 = p + dir * 7.0 * scale_factor + side * 7.0 * scale_factor
+	var hand_side: Vector2 = base_dir.rotated(-PI * 0.5)
+	var hand: Vector2 = p + dir * 7.0 * scale_factor + hand_side * 7.0 * scale_factor
 	var variant: int = clampi(design, 0, 11) % 4
 	var tier: int = clampi(int(design / 4.0), 0, 2)
 	if family == 0:
@@ -4841,20 +4842,21 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	var design := equipped_weapon_design() if preview_class < 0 else visual_class * 4
 	var weapon_family := visual_class
 	var weapon_pos := p + Vector2(0, -5.0 * scale_factor)
-	var base_look: Vector2 = look.normalized() if look.length() > 0.01 else Vector2.DOWN
+	var raw_look: Vector2 = look.normalized() if look.length() > 0.01 else Vector2.DOWN
+	var direction_index := cardinal_direction_index(raw_look)
+	var base_look: Vector2 = [Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT, Vector2.UP][direction_index]
 	var progress := clampf(1.0 - swing_timer / maxf(0.01, swing_duration), 0.0, 1.0) if attack_now else -1.0
 	var weapon_look := weapon_attack_look(base_look, weapon_family, design, progress)
 	if attack_now and weapon_family == 0:
 		weapon_pos += base_look * (5.0 + 6.0 * sin(progress * PI)) * scale_factor
 	elif attack_now and weapon_family == 1:
 		weapon_pos += Vector2(0, -7.0 * sin(progress * PI)) * scale_factor
+	# Feste Waffenhand: Schulter und Griff bleiben während des gesamten Schlages
+	# auf derselben Körperseite. Nur Unterarm und Waffe schwingen.
+	var hand_side := base_look.rotated(-PI * 0.5)
+	var arm_start := p + (hand_side * 13.0 + Vector2(0, -17.0)) * scale_factor
+	var grip := weapon_pos + weapon_look * 7.0 * scale_factor + hand_side * 7.0 * scale_factor
 	var side := weapon_look.rotated(PI * 0.5)
-	# Schulter sitzt am seitlichen Ärmel des Sprites. Der Ärmel wird vom Körper
-	# bis zur Hand durchgezogen, damit kein freischwebender Arm entsteht.
-	var shoulder_side := -signf(base_look.y) if absf(base_look.y) > 0.2 else signf(base_look.x)
-	if is_zero_approx(shoulder_side): shoulder_side = 1.0
-	var arm_start := p + Vector2(shoulder_side * 14.0, -19.0) * scale_factor
-	var grip := weapon_pos + weapon_look * 7.0 * scale_factor + side * 7.0 * scale_factor
 	var arm_color: Color = [Color('6d8292'), Color('695b91'), Color('65775b')][clampi(visual_class, 0, 2)]
 	var cuff_color: Color = [Color('c0c8c4'), Color('d4c1e8'), Color('ae9b70')][clampi(visual_class, 0, 2)]
 	draw_line(arm_start, grip, Color('493d45'), 10.0 * scale_factor)
@@ -4872,10 +4874,10 @@ func weapon_attack_look(look: Vector2, family: int, design: int, progress: float
 	var eased := t * t * (3.0 - 2.0 * t)
 	if family == 0:
 		var is_axe := design % 3 == 2
-		var sweep := lerpf(-1.22, 1.22, eased) if is_axe else lerpf(-0.88, 0.88, eased)
+		var sweep := lerpf(-0.95, 0.82, eased) if is_axe else lerpf(-0.64, 0.72, eased)
 		return look.rotated(sweep).normalized()
 	if family == 1:
-		return look.rotated(lerpf(-0.50, 0.44, eased)).normalized()
+		return look.rotated(lerpf(-0.30, 0.34, eased)).normalized()
 	if design % 4 == 3:
 		return look.rotated(lerpf(-0.16, 0.10, eased)).normalized()
 	return look.rotated(-0.08 * sin(t * PI)).normalized()
