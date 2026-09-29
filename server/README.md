@@ -65,3 +65,6 @@ Einmalige Vorbereitung:
    - `VSERVER_PORT` = `22`, sofern SSH nicht abweichend konfiguriert ist
 
 Der Workflow soll absichtlich nicht als `root` deployen.
+
+
+Ein Push unter `server/**` oder an der Server-Workflow-Datei startet den Build und Deploy automatisch.
