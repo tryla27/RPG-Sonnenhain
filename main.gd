@@ -269,6 +269,13 @@ var attack_timer := 0.0
 var swing_timer := 0.0
 var dash_timer := 0.0
 var dash_cooldown := 0.0
+var secondary_cooldown := 0.0
+var warrior_guarding := false
+var archer_aiming := false
+var wucht_roll_hits: Dictionary = {}
+var mobility_anim_timer := 0.0
+var mobility_anim_duration := 0.0
+var mobility_anim_kind := ""
 var invulnerable := 0.0
 var shield_timer := 0.0
 var rage_timer := 0.0
@@ -740,6 +747,8 @@ func _process(delta: float) -> void:
 	swing_timer = maxf(0.0, swing_timer - delta)
 	dash_timer = maxf(0.0, dash_timer - delta)
 	dash_cooldown = maxf(0.0, dash_cooldown - delta)
+	secondary_cooldown = maxf(0.0, secondary_cooldown - delta)
+	mobility_anim_timer = maxf(0.0, mobility_anim_timer - delta)
 	invulnerable = maxf(0.0, invulnerable - delta)
 	shield_timer = maxf(0.0, shield_timer - delta)
 	rage_timer = maxf(0.0, rage_timer - delta)
@@ -812,6 +821,14 @@ func update_player(delta: float) -> void:
 	var class_profile := current_class_profile()
 	var race_profile := current_race_profile()
 	var move_speed := MovementRules.effective_move_speed(205.0, race_profile, class_profile)
+	warrior_guarding = class_id == 0 and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and energy > 0.0
+	archer_aiming = class_id == 2 and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	if warrior_guarding:
+		energy = maxf(0.0, energy - 12.0 * delta)
+		shield_timer = maxf(shield_timer, 0.14)
+		move_speed *= 0.58
+	elif archer_aiming:
+		move_speed *= 0.62
 	var roll_speed := MovementRules.effective_roll_speed(580.0, race_profile, class_profile)
 	var target_pos := player_pos + (dash_dir * roll_speed if dash_timer > 0 else move * move_speed) * delta
 	if not is_blocked(target_pos):
@@ -824,6 +841,8 @@ func update_player(delta: float) -> void:
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
 		play_sound("step")
 		step_timer = 0.43 if dash_timer <= 0 else 0.25
+	if dash_timer > 0.0 and race_profile != null and race_profile.id == "orc" and network_mode != "client":
+		apply_orc_wuchtrolle_knockback()
 	var aim: Vector2 = get_global_mouse_position() + camera_pos - player_pos
 	if aim.length() > 8: facing = aim.normalized()
 	if arena_mode != "":
@@ -1040,6 +1059,9 @@ func movement_vector() -> Vector2:
 	return direction.normalized()
 
 func set_binding(action: String, code: int) -> void:
+	if code == -MOUSE_BUTTON_RIGHT:
+		controls_status = "Rechtsklick ist für die Klassen-Sekundäraktion reserviert."
+		return
 	if code == KEY_ESCAPE and action != "pause":
 		controls_status = "ESC bleibt als sichere Rückkehr ins Pausenmenü reserviert."
 		return
@@ -1141,10 +1163,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			if event.double_click and panel in ["inventory", "shop"] and try_toggle_item_protection_at(event.position):
 				return
 			handle_panel_click(event.position)
+		elif event.button_index == MOUSE_BUTTON_RIGHT and panel == "inventory":
+			right_click_inventory(event.position)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "journal"]:
 			menu_scroll = mini(maxi(0, QUESTS.size() - 6) if panel == "journal" else 2, menu_scroll + 1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and panel in ["skills", "journal"]:
 			menu_scroll = maxi(0, menu_scroll - 1)
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		secondary_action()
 		return
 	if event is InputEventKey and event.keycode == KEY_ESCAPE or event_matches_binding(event, "pause"):
 		if panel in ["arena_reward", "victory", "start"]: return
@@ -1178,18 +1205,148 @@ func toggle_panel(which: String) -> void:
 	inventory_page = 0
 	sell_all_confirm = false
 
+func start_mobility_animation(kind: String, duration: float) -> void:
+	mobility_anim_kind = kind
+	mobility_anim_duration = maxf(0.01, duration)
+	mobility_anim_timer = mobility_anim_duration
+
+func mobility_visual_offset(race_id: int) -> Vector2:
+	if mobility_anim_timer <= 0.0 or mobility_anim_duration <= 0.0:
+		return Vector2.ZERO
+	var progress := clampf(1.0 - mobility_anim_timer / mobility_anim_duration, 0.0, 1.0)
+	var height := [28.0, 19.0, 23.0][clampi(race_id, 0, 2)]
+	if mobility_anim_kind == "arcane":
+		height += 8.0
+	var lift := sin(progress * PI) * height
+	# Orks landen kompakter und schwerer, Roboter etwas mechanischer.
+	if race_id == 1:
+		lift *= 0.92
+	elif race_id == 2:
+		lift = snappedf(lift, 2.0)
+	return Vector2(0.0, -lift)
+
+func cast_arcane_step_from_space() -> void:
+	const ARCANE_STEP_ID := 19
+	if ARCANE_STEP_ID >= learned.size() or not bool(learned[ARCANE_STEP_ID]):
+		message("Lerne Arkaner Schritt, dann liegt er auf der Leertaste.")
+		return
+	if float(cooldowns[ARCANE_STEP_ID]) > 0.0:
+		message("Arkaner Schritt ist noch nicht bereit.")
+		return
+	var ability: Dictionary = ABILITIES[ARCANE_STEP_ID]
+	var cost := float(ability["cost"])
+	if energy < cost:
+		message("Nicht genug Mana für Arkaner Schritt.")
+		return
+	energy -= cost
+	var rank := maxi(1, int(skill_levels[ARCANE_STEP_ID]))
+	cooldowns[ARCANE_STEP_ID] = float(ability["cd"]) * (1.0 - 0.06 * float(rank - 1))
+	var direction := movement_vector()
+	if direction.length_squared() < 0.01:
+		direction = facing
+	direction = direction.normalized()
+	var destination := player_pos + direction * (210.0 + float(rank - 1) * 15.0)
+	if not is_blocked(destination):
+		var cast_pos := player_pos
+		player_pos = destination.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
+		if network_mode == "client":
+			var power := int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012))
+			rpc_client_ability.rpc_id(1, ARCANE_STEP_ID, [cast_pos.x, cast_pos.y], [direction.x, direction.y], power, rank)
+	invulnerable = 0.5
+	dash_cooldown = 0.75
+	start_mobility_animation("arcane", 0.34)
+	effect(player_pos, "ARKANER SPRUNG", Color("c9b8ff"), 0.72)
+	play_sound("skill_19")
+
+func secondary_action() -> void:
+	if class_id == 0:
+		if hero_race == 1 and secondary_cooldown <= 0.0:
+			orc_shoulder_bash()
+		else:
+			effect(player_pos, "BLOCK", Color("b8d9e8"), 0.35)
+	elif class_id == 1:
+		cast_arcane_focus()
+	elif class_id == 2:
+		effect(player_pos, "ZIELMODUS", Color("c9efb1"), 0.35)
+
+func orc_shoulder_bash() -> void:
+	secondary_cooldown = 1.35
+	var hit_any := false
+	for i in range(enemies.size() - 1, -1, -1):
+		var delta_pos: Vector2 = enemies[i]["pos"] - player_pos
+		if delta_pos.length() <= 92.0 and delta_pos.normalized().dot(facing.normalized()) > -0.15:
+			var push_dir := delta_pos.normalized() if delta_pos.length_squared() > 0.01 else facing.normalized()
+			damage_enemy(i, maxi(2, int(normal_attack_power() * 0.45)), push_dir * 4.0, true)
+			hit_any = true
+	effect(player_pos + facing * 42.0, "SCHULTERSTOSS", Color("d7bd91"), 0.55)
+	if hit_any:
+		play_sound("hit")
+	else:
+		play_sound("dodge")
+
+func cast_arcane_focus() -> void:
+	if secondary_cooldown > 0.0:
+		return
+	var cost := 9.0
+	if energy < cost:
+		message("Nicht genug Mana für Arkanen Fokus.")
+		return
+	energy -= cost
+	secondary_cooldown = 0.82
+	attack_timer = maxf(attack_timer, 0.36)
+	swing_timer = 0.28
+	swing_duration = 0.28
+	var power := maxi(1, int(normal_attack_power() * 1.45))
+	var design := equipped_weapon_design()
+	if network_mode == "client":
+		rpc_client_normal_attack.rpc_id(1, [player_pos.x,player_pos.y], [facing.x,facing.y], class_id, design, power, weapon_element())
+		projectiles.append({"pos":player_pos, "dir":facing, "speed":680.0, "life":1.35, "damage":0, "kind":2, "element":weapon_element(), "hits":[], "network_visual":true})
+	else:
+		projectiles.append({"pos":player_pos, "dir":facing, "speed":680.0, "life":1.35, "damage":power, "kind":2, "element":weapon_element(), "hits":[]})
+	effect(player_pos + facing * 38.0, "ARKANER FOKUS", Color("d1c0ff"), 0.48)
+	play_sound("swing")
+
+func apply_orc_wuchtrolle_knockback() -> void:
+	var push_dir := dash_dir.normalized()
+	if push_dir.length_squared() < 0.001:
+		push_dir = facing.normalized()
+	for i in enemies.size():
+		var enemy: Dictionary = enemies[i]
+		var uid := int(enemy.get("uid", i))
+		if wucht_roll_hits.has(uid):
+			continue
+		if player_pos.distance_to(enemy["pos"]) > 55.0:
+			continue
+		wucht_roll_hits[uid] = true
+		var elite := int(enemy.get("elite", 0))
+		var distance := 62.0 if elite >= 2 else (82.0 if elite == 1 else 112.0)
+		var target: Vector2 = enemy["pos"] + push_dir * distance
+		if arena_mode != "":
+			if target.distance_to(ARENA_CENTER) > ARENA_RADIUS - 24.0:
+				target = ARENA_CENTER + (target - ARENA_CENTER).normalized() * (ARENA_RADIUS - 24.0)
+		elif region_at(target) != region_at(enemy["pos"]) or terrain_blocked(target):
+			target = enemy["pos"] + push_dir * (distance * 0.5)
+		enemy["pos"] = target
+		enemy["stun"] = maxf(float(enemy.get("stun", 0.0)), 0.35)
+		enemy["flash"] = 0.14
+		effect(target + Vector2(0, -30), "WUCHT", Color("e3c79b"), 0.45)
+
 func dodge() -> void:
 	var profile := current_class_profile()
 	var race_profile := current_race_profile()
+	if class_id == 1:
+		cast_arcane_step_from_space()
+		return
 	if not MovementRules.can_roll(profile):
-		message("Magier können nicht rollen — nutze Arkaner Schritt für Mobilität.")
 		return
 	var dir := movement_vector()
 	dash_dir = dir.normalized() if dir.length() > 0 else facing
+	wucht_roll_hits.clear()
 	var distance_mult := MovementRules.effective_roll_distance(1.0, race_profile, profile)
 	dash_timer = 0.22 * distance_mult
 	dash_cooldown = MovementRules.effective_roll_cooldown(1.25, race_profile, profile)
 	invulnerable = 0.38
+	start_mobility_animation("roll", maxf(0.24, dash_timer + 0.10))
 	if race_profile != null and race_profile.id == "orc":
 		effect(player_pos, "WUCHTROLLE", Color("c9b08a"), 0.52)
 	else:
@@ -1250,18 +1407,20 @@ func normal_attack() -> void:
 	var power := normal_attack_power()
 	if variant == "axe": power = int(power * 1.18)
 	elif variant == "crossbow": power = int(power * 1.25)
+	if class_id == 2 and archer_aiming:
+		power = int(power * 1.18)
 	if rage_timer > 0: power = int(power * 1.45)
 	if class_id == 0 and standing_in_battle_zone(): power = int(power * 1.32)
 	var design := equipped_weapon_design()
 	if network_mode == "client":
 		rpc_client_normal_attack.rpc_id(1, [player_pos.x,player_pos.y], [facing.x,facing.y], class_id, design, power, weapon_element())
 		if class_id != 0:
-			projectiles.append({"pos":player_pos,"dir":facing,"speed":790.0 if variant=="crossbow" else (650.0 if class_id==2 else 520.0),"life":1.2,"damage":0,"kind":3 if class_id==2 else 2,"element":weapon_element(),"hits":[],"network_visual":true})
+			projectiles.append({"pos":player_pos,"dir":facing,"speed":1030.0 if variant=="crossbow" and archer_aiming else (900.0 if class_id==2 and archer_aiming else (790.0 if variant=="crossbow" else (650.0 if class_id==2 else 520.0))),"life":1.2,"damage":0,"kind":3 if class_id==2 else 2,"element":weapon_element(),"hits":[],"network_visual":true})
 		return
 	if class_id == 0:
 		hit_arc(player_pos, facing, 116.0 if variant == "axe" else 100.0, 0.08 if variant == "axe" else 0.13, power, false, "gift" if poison_blade_timer > 0 else weapon_element())
 	else:
-		projectiles.append({"pos":player_pos, "dir":facing, "speed":790.0 if variant == "crossbow" else (650.0 if class_id == 2 else 520.0), "life":1.2, "damage":power, "kind":3 if class_id == 2 else 2, "element":weapon_element(), "hits":[]})
+		projectiles.append({"pos":player_pos, "dir":facing, "speed":1030.0 if variant == "crossbow" and archer_aiming else (900.0 if class_id == 2 and archer_aiming else (790.0 if variant == "crossbow" else (650.0 if class_id == 2 else 520.0))), "life":1.2, "damage":power, "kind":3 if class_id == 2 else 2, "element":weapon_element(), "hits":[]})
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class: int, design: int, power: int, element: String) -> void:
@@ -1360,7 +1519,9 @@ func use_ability(slot: int) -> void:
 			var destination := player_pos + facing * (215 + (rank - 1) * 25)
 			if not is_blocked(destination): player_pos = destination.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
 			invulnerable = 0.5
+			start_mobility_animation("jump", 0.46)
 			hit_arc(player_pos, facing, 100, -0.3, power + 12, true)
+			effect(player_pos, "LANDUNG", Color("e9d6a2"), 0.42)
 		3:
 			projectiles.append({"pos":player_pos, "dir":facing, "speed":650.0, "life":0.9, "damage":power + 15, "kind":0, "pierce":true, "hits":[]})
 		4:
@@ -1445,6 +1606,8 @@ func use_ability(slot: int) -> void:
 			var destination := player_pos + direction * (210 + (rank - 1) * 15)
 			if not is_blocked(destination): player_pos = destination
 			invulnerable = 0.5
+			start_mobility_animation("arcane" if id == 19 else "jump", 0.34 if id == 19 else 0.42)
+			effect(player_pos, "ARKAN" if id == 19 else "LANDUNG", Color("cbb9ff") if id == 19 else Color("d7e8b2"), 0.42)
 		21:
 			shield_timer = 4.0 + rank * 0.5
 		32:
@@ -1957,7 +2120,8 @@ func update_enemies(delta: float) -> void:
 func apply_player_damage(raw: int) -> void:
 	if creative_mode: return
 	var dealt := maxi(1, raw - equipment_power(equipped_armor_uid))
-	if shield_timer > 0: dealt = maxi(1, int(dealt * 0.35))
+	if warrior_guarding: dealt = maxi(1, int(dealt * 0.55))
+	elif shield_timer > 0: dealt = maxi(1, int(dealt * 0.35))
 	if class_id == 0 and standing_in_battle_zone(): dealt = maxi(1, int(dealt * 0.78))
 	if class_id == 1 and shield_timer > 0 and learned[21]:
 		for enemy in enemies:
@@ -2992,6 +3156,17 @@ func try_toggle_item_protection_at(mouse: Vector2) -> bool:
 				sell_all_confirm = false
 				return true
 	return false
+
+func right_click_inventory(mouse: Vector2) -> void:
+	for cell in 25:
+		var col := cell % 5
+		var row := int(cell / 5.0)
+		if Rect2(641 + col * 65, 200 + row * 55, 54, 48).has_point(mouse):
+			var index := inventory_page * 25 + cell
+			if index < inventory.size():
+				selected_item = index
+				use_item(index)
+			return
 
 func click_inventory(mouse: Vector2) -> void:
 	if Rect2(850, 157, 32, 30).has_point(mouse):
@@ -4970,6 +5145,8 @@ func draw_player() -> void:
 		var heavy_swing: bool = equipped_weapon_variant() == "axe"
 		draw_arc(player_pos + facing * 32, 56.0 if heavy_swing else 48.0, arc_angle - 0.34, arc_angle + 0.34, 10, Color("fff1cd", 0.7 * (1.0 - swing_progress)), 7 if heavy_swing else 5)
 	if shield_timer > 0: draw_arc(player_pos, 38, 0, TAU, 32, Color("a5e7f1", 0.55), 5)
+	if warrior_guarding: draw_arc(player_pos, 44, facing.angle() - 0.9, facing.angle() + 0.9, 18, Color("b9d9e8", 0.82), 7)
+	if archer_aiming: draw_line(player_pos + facing * 38, player_pos + facing * 95, Color("dff5c8", 0.66), 2)
 	if rage_timer > 0: draw_arc(player_pos, 45, 0, TAU, 28, Color("f5aa72", 0.55), 4)
 	if poison_blade_timer > 0: draw_arc(player_pos, 49, 0, TAU, 28, Color("addc78", 0.55), 4)
 
@@ -4978,6 +5155,8 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	var visual_class := class_id if preview_class < 0 else preview_class
 	var use_race := pending_race if panel == "creation" and preview_class >= 0 else hero_race
 	var use_gender := pending_gender if panel == "creation" and preview_class >= 0 else hero_gender
+	if in_world and preview_class < 0:
+		p += mobility_visual_offset(use_race)
 	var attack_now := swing_timer > 0.0 and preview_class < 0
 	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender)
 	# Arm, Hand und Waffe folgen während des Angriffs derselben Bewegung.
