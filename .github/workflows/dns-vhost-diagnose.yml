@@ -1,0 +1,39 @@
+name: Diagnose Sonnenhain DNS and Manitu vhost
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dns-vhost-diagnose.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve DNS and probe Manitu directly
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== DNS ==="
+          getent ahostsv4 sonnenhainrpg.de || true
+          getent ahostsv4 www.sonnenhainrpg.de || true
+          echo "=== HEAD public ==="
+          curl -k -sS -I --max-time 15 https://sonnenhainrpg.de/ || true
+          echo "=== DIRECT MANITU IPV4 WITH HOST/SNI ==="
+          curl -k -sS -D - -o /tmp/direct.html --max-time 15 \
+            --resolve sonnenhainrpg.de:443:89.238.73.78 \
+            https://sonnenhainrpg.de/ || true
+          echo "--- direct body ---"
+          head -c 500 /tmp/direct.html || true
+          echo
+          echo "=== DIRECT MANITU HEALTH ==="
+          curl -k -sS -D - -o /tmp/health.html --max-time 15 \
+            --resolve sonnenhainrpg.de:443:89.238.73.78 \
+            https://sonnenhainrpg.de/sonnenhain-health.txt || true
+          echo "--- health body ---"
+          head -c 500 /tmp/health.html || true
+          echo
