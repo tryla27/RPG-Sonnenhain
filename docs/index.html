@@ -13,7 +13,7 @@
 <header class="site-header">
   <a class="brand" href="/"><span class="brand-mark">✦</span><span>SONNENHAIN</span></a>
   <nav aria-label="Hauptnavigation">
-    <a href="#welt">Welt</a><a href="#spiel">Spiel</a>
+    <a href="#welt">Welt</a><a href="#spiel">Spielversionen</a>
     <a href="/sicherheit.html">Sicherheit</a><a href="/datenschutz.html">Datenschutz</a><a href="/impressum.html">Impressum</a>
   </nav>
 </header>
@@ -24,9 +24,9 @@
       <h1>Eine Reise durch<br>die alten Reiche.</h1>
       <p class="lead">Erkunde Sonnenhain, erschaffe deinen Helden und entdecke Regionen voller Quests, Gegner und Geheimnisse.</p>
       <div class="actions">
-        <a class="button primary" href="/game/">ZUM SPIEL</a>
+        <a class="button primary" href="#spiel">VERSION WÄHLEN</a>
       </div>
-      <p class="micro">Browser: Singleplayer · Desktop: Koop · Zugang über die Webadresse</p>
+      <p class="micro">PC/Browser und Mobile sind getrennte Steuerungsmodi · gleiche Welt · gleicher Live-Server</p>
     </div>
     <div class="hero-art" aria-hidden="true">
       <div class="sun"></div><div class="hill hill-back"></div><div class="hill hill-front"></div><div class="tower"></div>
@@ -39,13 +39,41 @@
     <div class="cards">
       <article class="card"><span class="card-number">01</span><h3>Erkunde</h3><p>Reise durch unterschiedliche Regionen, entdecke Wegsteine, Dungeons und verborgene Orte.</p></article>
       <article class="card"><span class="card-number">02</span><h3>Wähle deinen Weg</h3><p>Spiele Krieger, Magier oder Bogenschütze und entwickle deinen Charakter mit Fähigkeiten und Ausrüstung.</p></article>
-      <article class="card"><span class="card-number">03</span><h3>Direkt starten</h3><p>Öffne Sonnenhain über die Webadresse und starte direkt im Browser. Koop bleibt zusätzlich in der Desktop-Version verfügbar.</p></article>
+      <article class="card"><span class="card-number">03</span><h3>Gemeinsam online</h3><p>PC/Browser und Mobile nutzen dieselbe Welt und denselben Live-Server. Nur Bedienung und Steuerung unterscheiden sich.</p></article>
     </div>
   </section>
 
-  <section id="spiel" class="game-section">
-    <div><p class="eyebrow">SONNENHAIN RPG</p><h2>Bereit für deine Reise?</h2><p>Das Spiel läuft direkt im Browser. Spielstände und Einstellungen werden lokal auf deinem Gerät gespeichert.</p></div>
-    <a class="button primary large" href="/game/">SPIEL ÖFFNEN</a>
+  <section id="spiel" class="version-section">
+    <div class="section-heading">
+      <p class="eyebrow">SPIELVERSION WÄHLEN</p>
+      <h2>PC/Browser oder Mobile</h2>
+      <p class="version-intro">Beide Versionen spielen auf derselben Karte und demselben Live-Server. Wähle nur die Steuerung, die zu deinem Gerät passt.</p>
+    </div>
+    <div class="version-grid">
+      <article class="version-card">
+        <span class="version-badge">PC / BROWSER</span>
+        <h3>Tastatur & Maus</h3>
+        <p>Für Desktop-PCs, Notebooks und Browser mit Maus/Tastatur. Keine Touch-Steuerung im Bild.</p>
+        <ul>
+          <li>WASD / frei belegbare Tasten</li>
+          <li>Maus für Blick- und Angriffsrichtung</li>
+          <li>Desktop-UI und Tastatur-Shortcuts</li>
+        </ul>
+        <a class="button primary large" href="/game/?mode=desktop">PC/BROWSER STARTEN</a>
+      </article>
+      <article class="version-card">
+        <span class="version-badge">MOBILE / TOUCH</span>
+        <h3>Touch-Steuerung</h3>
+        <p>Für Smartphones und Tablets. Linker Bewegungsstick, rechter Aim-/Angriffsstick und große Touch-Buttons.</p>
+        <ul>
+          <li>Floating-Joystick links</li>
+          <li>Angriffsrichtung rechts steuerbar</li>
+          <li>Mobile Chat- und Online-Buttons</li>
+        </ul>
+        <a class="button primary large" href="/game/?mode=mobile">MOBILE VERSION STARTEN</a>
+      </article>
+    </div>
+    <p class="version-note">Falls dein Gerät falsch erkannt wurde, starte einfach über den anderen Button. Dein Spielstand bleibt auf diesem Gerät gespeichert.</p>
   </section>
 </main>
 <footer>
