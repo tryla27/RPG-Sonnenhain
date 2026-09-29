@@ -332,6 +332,9 @@ var mechanics_page := 0
 var network_mode := "offline"
 var network_status := "Offline"
 var network_port := 27844
+var websocket_port := 27845
+const LIVE_MULTIPLAYER_URL := "wss://sonnenhainrpg.de/multiplayer"
+var dedicated_server_mode := false
 var invite_code := ""
 var join_code := ""
 var remote_players: Dictionary = {}
@@ -356,6 +359,8 @@ func _ready() -> void:
 	structure_tiles = load("res://art/structures_16.png")
 	house_tiles = load("res://art/houses_192.png")
 	setup_multiplayer_signals()
+	if "--dedicated-server" in OS.get_cmdline_user_args():
+		dedicated_server_mode = true
 	load_bindings()
 	refresh_save_slot_labels()
 	refresh_shop_stock()
@@ -384,6 +389,9 @@ func _ready() -> void:
 		add_child(player)
 		sound_players.append(player)
 	update_music()
+	if dedicated_server_mode:
+		panel = ""
+		start_websocket_server()
 
 func reset_class_skills() -> void:
 	learned.resize(ABILITIES.size())
@@ -492,6 +500,31 @@ func preferred_host_address() -> String:
 		if "." in address and not address.begins_with("127.") and not address.begins_with("169.254."):
 			return address
 	return "127.0.0.1"
+
+func start_websocket_server() -> void:
+	disconnect_multiplayer(false)
+	var peer := WebSocketMultiplayerPeer.new()
+	var err := peer.create_server(websocket_port, "127.0.0.1")
+	if err != OK:
+		network_status = "Dedicated Server konnte nicht starten · Fehler %d" % err
+		push_error(network_status)
+		return
+	multiplayer.multiplayer_peer = peer
+	network_mode = "host"
+	local_peer_id = 1
+	network_status = "Dedicated WebSocket Server aktiv · Port %d" % websocket_port
+	print(network_status)
+
+func join_live_multiplayer() -> void:
+	disconnect_multiplayer(false)
+	var peer := WebSocketMultiplayerPeer.new()
+	var err := peer.create_client(LIVE_MULTIPLAYER_URL)
+	if err != OK:
+		network_status = "Online-Server konnte nicht kontaktiert werden · Fehler %d" % err
+		return
+	multiplayer.multiplayer_peer = peer
+	network_mode = "client"
+	network_status = "Verbinde mit Sonnenhain Online …"
 
 func host_multiplayer() -> void:
 	disconnect_multiplayer(false)
@@ -778,6 +811,9 @@ func enemy_level(type: int) -> int:
 	return region_level(region) + (2 if type in [12, 13, 14] else type % 3)
 
 func _process(delta: float) -> void:
+	if dedicated_server_mode:
+		process_dedicated_server(delta)
+		return
 	update_music(delta)
 	if panel == "pause":
 		queue_redraw()
@@ -864,6 +900,14 @@ func _process(delta: float) -> void:
 		save_game()
 		save_timer = 0.0
 	queue_redraw()
+
+func process_dedicated_server(delta: float) -> void:
+	world_time += delta
+	if network_mode != "host": return
+	sync_timer -= delta
+	if sync_timer <= 0.0:
+		sync_timer = 0.10
+		push_world_snapshot()
 
 func update_player(delta: float) -> void:
 	var old_pos := player_pos
