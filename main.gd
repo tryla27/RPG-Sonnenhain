@@ -307,6 +307,7 @@ var pause_status := "Das Spiel ist angehalten."
 var touch_enabled := false
 var touch_move_id := -1
 var touch_move_vector := Vector2.ZERO
+var touch_move_smoothed := Vector2.ZERO
 var touch_move_base := Vector2(118, 526)
 var touch_move_knob := Vector2(118, 526)
 var touch_attack_ids: Dictionary = {}
@@ -1076,6 +1077,9 @@ func process_dedicated_server(delta: float) -> void:
 
 func update_player(delta: float) -> void:
 	var old_pos := player_pos
+	if touch_enabled:
+		var accel := 10.5 if touch_move_vector.length_squared() > 0.001 else 14.0
+		touch_move_smoothed = touch_move_smoothed.move_toward(touch_move_vector, delta * accel)
 	var move := movement_vector()
 	is_walking = move.length_squared() > 0.01 or dash_timer > 0
 	if is_walking: walk_phase += delta * (19.0 if dash_timer > 0 else 11.0)
@@ -1098,11 +1102,11 @@ func update_player(delta: float) -> void:
 	if arena_mode != "":
 		if player_pos.distance_to(ARENA_CENTER) > ARENA_RADIUS - 26:
 			player_pos = ARENA_CENTER + (player_pos - ARENA_CENTER).normalized() * (ARENA_RADIUS - 26)
-		if panel == "" and (binding_pressed("attack") or touch_attack_held()) and attack_timer <= 0: normal_attack()
+		if panel == "" and attack_input_active() and attack_timer <= 0: normal_attack()
 		return
 	if interior_id >= 0: return
 	if dungeon_id >= 0:
-		if panel == "" and (binding_pressed("attack") or touch_attack_held()) and attack_timer <= 0: normal_attack()
+		if panel == "" and attack_input_active() and attack_timer <= 0: normal_attack()
 		return
 	var region: int = region_at(player_pos)
 	if region != previous_region:
@@ -1116,7 +1120,7 @@ func update_player(delta: float) -> void:
 		if region != 0:
 			for i in 5: spawn_enemy()
 	# Gedrückt halten löst nach jeder Abklingzeit den nächsten Hieb aus.
-	if panel == "" and (binding_pressed("attack") or touch_attack_held()) and attack_timer <= 0:
+	if panel == "" and attack_input_active() and attack_timer <= 0:
 		normal_attack()
 
 func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
@@ -1302,9 +1306,17 @@ func event_matches_binding(event: InputEvent, action: String) -> bool:
 
 func movement_vector() -> Vector2:
 	var direction := Vector2((1.0 if binding_pressed("move_right") else 0.0) - (1.0 if binding_pressed("move_left") else 0.0), (1.0 if binding_pressed("move_down") else 0.0) - (1.0 if binding_pressed("move_up") else 0.0))
-	if touch_enabled and touch_move_vector.length_squared() > direction.length_squared():
-		direction = touch_move_vector
+	if touch_enabled:
+		direction = touch_move_smoothed
 	return direction.normalized() if direction.length() > 1.0 else direction
+
+func attack_input_active() -> bool:
+	# Mobile Browser erzeugen aus Touches oft zusätzlich synthetische
+	# Mausklicks. Deshalb darf auf Touch-Geräten ausschließlich der echte
+	# Angriffsbutton einen Angriff halten/auslösen.
+	if touch_enabled:
+		return touch_attack_held()
+	return binding_pressed("attack")
 
 func touch_button_at(pos: Vector2) -> String:
 	if pos.y < 360.0: return ""
