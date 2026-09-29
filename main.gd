@@ -812,7 +812,7 @@ func update_player(delta: float) -> void:
 	var class_profile := current_class_profile()
 	var race_profile := current_race_profile()
 	var move_speed := MovementRules.effective_move_speed(205.0, race_profile, class_profile)
-	var roll_speed := MovementRules.effective_roll_speed(580.0, class_profile)
+	var roll_speed := MovementRules.effective_roll_speed(580.0, race_profile, class_profile)
 	var target_pos := player_pos + (dash_dir * roll_speed if dash_timer > 0 else move * move_speed) * delta
 	if not is_blocked(target_pos):
 		player_pos = target_pos.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
@@ -1180,16 +1180,20 @@ func toggle_panel(which: String) -> void:
 
 func dodge() -> void:
 	var profile := current_class_profile()
+	var race_profile := current_race_profile()
 	if not MovementRules.can_roll(profile):
 		message("Magier können nicht rollen — nutze Arkaner Schritt für Mobilität.")
 		return
 	var dir := movement_vector()
 	dash_dir = dir.normalized() if dir.length() > 0 else facing
-	var distance_mult := MovementRules.effective_roll_distance(1.0, profile)
+	var distance_mult := MovementRules.effective_roll_distance(1.0, race_profile, profile)
 	dash_timer = 0.22 * distance_mult
-	dash_cooldown = 1.25 * (1.0 if profile == null else profile.roll_cooldown_multiplier)
+	dash_cooldown = MovementRules.effective_roll_cooldown(1.25, race_profile, profile)
 	invulnerable = 0.38
-	effect(player_pos, "ROLLE", Color("d8f3ff"), 0.65)
+	if race_profile != null and race_profile.id == "orc":
+		effect(player_pos, "WUCHTROLLE", Color("c9b08a"), 0.52)
+	else:
+		effect(player_pos, "ROLLE", Color("d8f3ff"), 0.65)
 	play_sound("dodge")
 
 func weapon_power() -> int:
