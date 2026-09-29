@@ -2636,6 +2636,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 			play_sound("menu")
 			toggle_creative_mode()
 		elif Rect2(300, 563, 550, 35).has_point(mouse):
+			if is_web_platform():
+				save_game()
+				JavaScriptBridge.eval("window.location.href='/'")
+				return
 			if arena_mode != "":
 				arena_mode = ""
 				player_pos = arena_return_pos
@@ -5571,7 +5575,7 @@ func draw_pause_panel() -> void:
 			ui_button(Rect2(300 + index * 113, 510, 105, 38), ["-10", "-1", "+1", "+10"][index])
 		ui_button(Rect2(762, 510, 180, 38), "REISEN")
 	text_at(Vector2(302, 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
-	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUM HAUPTMENÜ")
+	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUR STARTSEITE" if is_web_platform() else "SPEICHERN & ZUM HAUPTMENÜ")
 
 func draw_invite_panel() -> void:
 	ui_button(Rect2(300, 135, 250, 42), "PAUSE")
