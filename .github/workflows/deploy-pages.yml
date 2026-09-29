@@ -92,10 +92,36 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs
 
-          if git diff --cached --quiet; then
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish generated Sonnenhain website"
+            git push origin HEAD:main
+          else
             echo "docs is already up to date"
-            exit 0
           fi
 
-          git commit -m "Publish generated Sonnenhain website"
-          git push origin HEAD:main
+      - name: Deploy to Manitu webspace
+        if: ${{ env.MANITU_SSH_KEY != '' }}
+        env:
+          MANITU_SSH_KEY: ${{ secrets.MANITU_SSH_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$MANITU_SSH_KEY" > "$HOME/.ssh/manitu_deploy"
+          chmod 600 "$HOME/.ssh/manitu_deploy"
+
+          ssh-keyscan -p 22 ngcobalt378.manitu.net >> "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+          rsync -az --delete \
+            -e "ssh -i $HOME/.ssh/manitu_deploy -p 22 -o IdentitiesOnly=yes" \
+            build/site/ \
+            ssh300011111@ngcobalt378.manitu.net:/home/sites/site100047525/web/
+
+          rm -f "$HOME/.ssh/manitu_deploy"
+
+      - name: Manitu deploy not configured
+        if: ${{ env.MANITU_SSH_KEY == '' }}
+        env:
+          MANITU_SSH_KEY: ${{ secrets.MANITU_SSH_KEY }}
+        run: echo "MANITU_SSH_KEY is not configured yet; build completed without server deployment."
