@@ -1300,6 +1300,7 @@ func touch_button_at(pos: Vector2) -> String:
 	if pos.distance_to(Vector2(1032, 526)) <= 67.0: return "attack"
 	if pos.distance_to(Vector2(916, 550)) <= 43.0: return "dodge"
 	if pos.distance_to(Vector2(967, 447)) <= 43.0: return "interact"
+	if Rect2(866, 365, 180, 54).has_point(pos): return "chat"
 	for slot in 4:
 		if Rect2(424 + slot * 76, 548, 68, 70).has_point(pos): return "ability_%d" % (slot + 1)
 	if Rect2(735, 557, 66, 54).has_point(pos): return "heal"
@@ -1333,6 +1334,7 @@ func handle_touch_event(event: InputEvent) -> bool:
 					"dodge":
 						if dash_cooldown <= 0.0: dodge()
 					"interact": interact()
+					"chat": open_mobile_chat()
 					"heal": quick_potion(false)
 					"resource": quick_potion(true)
 					_:
@@ -1382,6 +1384,28 @@ func reset_bindings() -> void:
 	awaiting_bind = ""
 	controls_status = "Standardbelegung wiederhergestellt."
 	save_bindings()
+
+func mobile_text_prompt(title: String, current: String, max_length: int) -> String:
+	if not is_web_platform():
+		DisplayServer.virtual_keyboard_show(current)
+		return current
+	var script := "window.prompt(%s,%s)" % [JSON.stringify(title), JSON.stringify(current)]
+	var result = JavaScriptBridge.eval(script)
+	if result == null:
+		return current
+	return str(result).strip_edges().substr(0, max_length)
+
+func open_mobile_chat() -> void:
+	if is_web_platform() and touch_enabled:
+		var entered := mobile_text_prompt("Nachricht an die Gruppe", chat_input, 120)
+		chat_open = false
+		chat_input = ""
+		if entered.strip_edges() != "":
+			send_chat_message(entered)
+	else:
+		chat_open = true
+		DisplayServer.virtual_keyboard_show(chat_input)
+	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if handle_touch_event(event): return
@@ -2918,6 +2942,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 			play_sound("menu")
 		return
 	if panel == "creation":
+		if Rect2(300, 228, 550, 48).has_point(mouse):
+			creation_name = mobile_text_prompt("Name deines Helden", creation_name, 16)
+			queue_redraw()
+			return
 		for i in 2:
 			if Rect2(300 + i * 210, 300, 195, 40).has_point(mouse):
 				pending_gender = i
@@ -5576,6 +5604,11 @@ func draw_touch_controls() -> void:
 		draw_arc(data["p"], data["r"], 0, TAU, 32, Color("f0daa3",0.82), 3)
 		text_at(data["p"] + Vector2(-45,5), data["label"], 11, Color("fff2cf"), HORIZONTAL_ALIGNMENT_CENTER, 90)
 
+	var chat_rect := Rect2(866, 365, 180, 54)
+	draw_rect(chat_rect, Color("223338",0.92))
+	draw_rect(chat_rect, Color("c7aa70",0.88), false, 2)
+	text_at(chat_rect.position + Vector2(8,34), "CHAT", 14, Color("fff0c8"), HORIZONTAL_ALIGNMENT_CENTER, int(chat_rect.size.x-16))
+
 	for pair in [[Rect2(735,557,66,54),"HP"],[Rect2(807,557,66,54),"MANA" if class_id == 1 else "ENERGIE"]]:
 		draw_rect(pair[0], Color("223338",0.90))
 		draw_rect(pair[0], Color("9b8660",0.8), false, 2)
@@ -5902,7 +5935,7 @@ func draw_creation_panel() -> void:
 	var name_box := Rect2(300, 228, 550, 48)
 	draw_rect(name_box, Color('22363c'))
 	draw_rect(name_box, Color('8ba49c'), false, 2)
-	text_at(name_box.position + Vector2(14,31), (creation_name if creation_name != "" else "Name eingeben …") + ("_" if int(world_time*2.0)%2==0 else ""), 20, Color('fff0cf') if creation_name != "" else Color('9fb4ac'))
+	text_at(name_box.position + Vector2(14,31), (creation_name if creation_name != "" else ("Antippen zum Eingeben …" if touch_enabled else "Name eingeben …")) + ("_" if int(world_time*2.0)%2==0 and not touch_enabled else ""), 20, Color('fff0cf') if creation_name != "" else Color('9fb4ac'))
 	text_at(Vector2(270, 292), "GESCHLECHT", 14, Color('e9cc90'))
 	for i in 2:
 		ui_button(Rect2(300 + i*210, 300, 195, 40), GENDER_NAMES[i].to_upper(), true, pending_gender == i)
