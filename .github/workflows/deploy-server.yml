@@ -134,16 +134,32 @@ jobs:
             set -eu
             cd ~/sonnenhain-server/releases/current
             chmod +x sonnenhain-server.x86_64
-            if command -v systemctl >/dev/null 2>&1 && systemctl --user status >/dev/null 2>&1; then
+            linger="no"
+            if command -v loginctl >/dev/null 2>&1; then
+              linger="$(loginctl show-user "$USER" -p Linger --value 2>/dev/null || echo no)"
+            fi
+            if command -v systemctl >/dev/null 2>&1 && systemctl --user status >/dev/null 2>&1 && [ "$linger" = "yes" ]; then
               systemctl --user daemon-reload
               systemctl --user enable --now sonnenhain.service
               systemctl --user restart sonnenhain.service
+              echo "Using persistent systemd user service (linger=yes)."
             else
+              # Ohne loginctl-Linger wird ein systemd --user Dienst nach dem
+              # Ende der SSH-Sitzung häufig beendet. In diesem Fall bewusst
+              # einen vollständig entkoppelten Prozess starten.
+              if command -v systemctl >/dev/null 2>&1; then
+                systemctl --user disable --now sonnenhain.service >/dev/null 2>&1 || true
+              fi
               pkill -f "sonnenhain-server.x86_64 --headless -- --dedicated-server" || true
-              nohup ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
+              if command -v setsid >/dev/null 2>&1; then
+                nohup setsid ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
+              else
+                nohup ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
+              fi
+              echo "Using detached server process (linger=$linger)."
             fi
 
-            sleep 3
+            sleep 4
             if ! pgrep -f "sonnenhain-server.x86_64 --headless -- --dedicated-server" >/dev/null; then
               echo "Sonnenhain server process is not running."
               test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
@@ -162,15 +178,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
-            -H 'Connection: Upgrade' \
-            -H 'Upgrade: websocket' \
-            -H 'Sec-WebSocket-Version: 13' \
-            -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-            https://multiplayer.sonnenhainrpg.de/ || true)"
-          printf '%s\n' "$headers"
-          printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
-          echo "Public WSS endpoint is accepting WebSocket upgrades."
+          check_wss() {
+            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
+              -H 'Connection: Upgrade' \
+              -H 'Upgrade: websocket' \
+              -H 'Sec-WebSocket-Version: 13' \
+              -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+              https://multiplayer.sonnenhainrpg.de/ || true)"
+            printf '%s\n' "$headers"
+            printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
+          }
+          check_wss
+          echo "Initial public WSS check passed."
+          sleep 25
+          check_wss
+          echo "Public WSS endpoint stayed alive after deploy."
 
       - name: VServer deploy not configured
         if: ${{ env.VSERVER_HOST == '' || env.VSERVER_USER == '' || env.VSERVER_SSH_KEY == '' }}
