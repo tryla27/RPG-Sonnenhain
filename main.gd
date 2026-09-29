@@ -312,6 +312,7 @@ var touch_move_smoothed := Vector2.ZERO
 var touch_move_base := Vector2(118, 526)
 var touch_move_knob := Vector2(118, 526)
 var touch_attack_ids: Dictionary = {}
+var last_touch_msec := -10000
 var touch_aim_id := -1
 var touch_aim_base := Vector2(1032, 526)
 var touch_aim_knob := Vector2(1032, 526)
@@ -966,7 +967,8 @@ func _process(delta: float) -> void:
 	var camera_focus: Vector2 = ARENA_CENTER + (player_pos - ARENA_CENTER) * 0.88 if arena_mode != "" else player_pos
 	camera_pos = camera_focus - VIEW * 0.5 if arena_mode != "" else (INTERIOR_CENTER - VIEW * 0.5 if interior_id >= 0 else (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW))
 	save_timer += delta
-	if save_timer > 15 and arena_mode == "" and panel != "start":
+	var autosave_interval := 30.0 if mobile_performance_mode else 15.0
+	if save_timer > autosave_interval and arena_mode == "" and panel != "start":
 		save_game()
 		save_timer = 0.0
 	queue_redraw()
@@ -1430,6 +1432,7 @@ func reset_touch_aim(index: int = -1) -> void:
 func handle_touch_event(event: InputEvent) -> bool:
 	if not touch_enabled: return false
 	if event is InputEventScreenTouch:
+		last_touch_msec = Time.get_ticks_msec()
 		var touch_event: InputEventScreenTouch = event as InputEventScreenTouch
 		var pos: Vector2 = touch_event.position
 
@@ -1484,6 +1487,7 @@ func handle_touch_event(event: InputEvent) -> bool:
 			queue_redraw()
 			return true
 	elif event is InputEventScreenDrag:
+		last_touch_msec = Time.get_ticks_msec()
 		var drag_event: InputEventScreenDrag = event as InputEventScreenDrag
 		if drag_event.index == touch_move_id:
 			update_touch_joystick(drag_event.position)
@@ -1551,6 +1555,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		queue_redraw()
 		return
 	if handle_touch_event(event): return
+	# Mobile Browser senden nach einem Touch oft noch einen künstlichen
+	# Mausklick. Den nur kurz nach echtem Touch unterdrücken, damit Buttons
+	# nicht doppelt auslösen; eine echte Maus funktioniert danach weiterhin.
+	if is_web_platform() and touch_enabled and event is InputEventMouseButton and Time.get_ticks_msec() - last_touch_msec < 900:
+		return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			panel = "start"
