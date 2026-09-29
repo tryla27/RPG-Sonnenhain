@@ -2624,7 +2624,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 			mechanics_page = 0
 			panel = "mechanics"
 			play_sound("menu")
-		elif Rect2(860, 319, 130, 42).has_point(mouse):
+		elif Rect2(570, 135, 280, 42).has_point(mouse):
 			invite_menu_status = "Bereit zum Erstellen eines Einladungslinks."
 			panel = "invite"
 			play_sound("menu")
@@ -2661,7 +2661,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 				panel = "travel"
 		return
 	if panel == "invite":
-		if Rect2(300, 348, 550, 48).has_point(mouse):
+		if Rect2(300, 135, 250, 42).has_point(mouse):
+			panel = "pause"
+			play_sound("menu")
+		elif Rect2(300, 348, 550, 48).has_point(mouse):
 			DisplayServer.clipboard_set(WEB_INVITE_URL)
 			invite_menu_status = "Einladungslink erstellt und in die Zwischenablage kopiert."
 			play_sound("menu")
@@ -5550,12 +5553,12 @@ func draw_multiplayer_panel() -> void:
 	text_at(Vector2(205, 586), "Koop nutzt UDP %d. Falls UPnP nicht funktioniert, muss der Host den Port am Router freigeben." % network_port, 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
 
 func draw_pause_panel() -> void:
-	text_at(Vector2(300, 158), "PAUSE", 35, Color("ffeda9"))
-	text_at(Vector2(302, 190), "Level %d · %s · %d Gold" % [level, region_name(region_at(player_pos)), gold], 17, Color("e6f0dc"))
+	ui_button(Rect2(300, 135, 250, 42), "PAUSE", true, true)
+	ui_button(Rect2(570, 135, 280, 42), "EINLADELINK")
+	text_at(Vector2(302, 205), "Level %d · %s · %d Gold" % [level, region_name(region_at(player_pos)), gold], 17, Color("e6f0dc"))
 	ui_button(Rect2(300, 221, 550, 42), "FORTSETZEN")
 	ui_button(Rect2(860, 221, 130, 42), "TASTEN")
 	ui_button(Rect2(860, 270, 130, 42), "MECHANIK")
-	ui_button(Rect2(860, 319, 130, 42), "EINLADUNG")
 	ui_button(Rect2(300, 270, 550, 42), "TESTSTAND SPEICHERN" if creative_mode else "SPIEL SPEICHERN")
 	draw_volume_slider(Vector2(300, 326), "MUSIK", music_volume, Color("d9b67b"))
 	draw_volume_slider(Vector2(300, 380), "EFFEKTE", effects_volume, Color("9bcfd0"))
@@ -5569,8 +5572,9 @@ func draw_pause_panel() -> void:
 	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUM HAUPTMENÜ")
 
 func draw_invite_panel() -> void:
-	text_at(Vector2(300, 158), "EINLADUNG", 35, Color("ffeda9"))
-	text_at(Vector2(302, 198), "Privater Zugang zur Sonnenhain-Webversion", 17, Color("e6f0dc"))
+	ui_button(Rect2(300, 135, 250, 42), "PAUSE")
+	ui_button(Rect2(570, 135, 280, 42), "EINLADELINK", true, true)
+	text_at(Vector2(302, 205), "Privater Zugang zur Sonnenhain-Webversion", 17, Color("e6f0dc"))
 	text_at(Vector2(302, 240), "Teile diesen Link nur mit Personen, die Zugriff bekommen sollen.", 14, Color("d7e4d5"))
 	ui_box(Rect2(300, 272, 550, 58), Color("30443f"))
 	text_at(Vector2(316, 307), WEB_INVITE_URL, 13, Color("fff0cf"), HORIZONTAL_ALIGNMENT_LEFT, 520)
