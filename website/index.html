@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
+  <meta name="theme-color" content="#101714">
+  <title>Sonnenhain RPG – Eine Reise durch die alten Reiche</title>
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="/"><span class="brand-mark">✦</span><span>SONNENHAIN</span></a>
+  <nav aria-label="Hauptnavigation">
+    <a href="#welt">Welt</a><a href="#spiel">Spiel</a>
+    <a href="/sicherheit.html">Sicherheit</a><a href="/datenschutz.html">Datenschutz</a><a href="/impressum.html">Impressum</a>
+  </nav>
+</header>
+<main>
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">PIXEL-FANTASY-RPG</p>
+      <h1>Eine Reise durch<br>die alten Reiche.</h1>
+      <p class="lead">Erkunde Sonnenhain, erschaffe deinen Helden und entdecke Regionen voller Quests, Gegner und Geheimnisse.</p>
+      <div class="actions">
+        <a class="button primary" href="/game/">ZUM SPIEL</a>
+        <a class="button ghost" href="#einladung">EINLADUNG NUTZEN</a>
+      </div>
+      <p class="micro">Browser: Singleplayer · Desktop: Koop · privater Webzugang</p>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="sun"></div><div class="hill hill-back"></div><div class="hill hill-front"></div><div class="tower"></div>
+      <div class="pixel-stars">✦ · ✧ · ✦</div>
+    </div>
+  </section>
+
+  <section id="einladung" class="invite-panel">
+    <div>
+      <p class="eyebrow">PRIVATER ZUGANG</p>
+      <h2>Du hast eine Einladung?</h2>
+      <p>Gib deinen Einladungs-Code ein. Er wird nur verwendet, um die geschützte Spielseite zu öffnen.</p>
+    </div>
+    <form id="invite-form" class="invite-form">
+      <label for="invite-code">Einladungs-Code</label>
+      <div class="invite-row">
+        <input id="invite-code" type="text" autocomplete="off" spellcheck="false" placeholder="Code einfügen" required>
+        <button class="button primary" type="submit">EINLADUNG ÖFFNEN</button>
+      </div>
+      <p id="invite-message" class="form-message" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <section id="welt" class="section">
+    <div class="section-heading"><p class="eyebrow">DIE WELT</p><h2>Dein Abenteuer in Sonnenhain</h2></div>
+    <div class="cards">
+      <article class="card"><span class="card-number">01</span><h3>Erkunde</h3><p>Reise durch unterschiedliche Regionen, entdecke Wegsteine, Dungeons und verborgene Orte.</p></article>
+      <article class="card"><span class="card-number">02</span><h3>Wähle deinen Weg</h3><p>Spiele Krieger, Magier oder Bogenschütze und entwickle deinen Charakter mit Fähigkeiten und Ausrüstung.</p></article>
+      <article class="card"><span class="card-number">03</span><h3>Spiele privat</h3><p>Die Browser-Version ist als privater Singleplayer-Zugang ausgelegt. Koop bleibt in der Desktop-Version verfügbar.</p></article>
+    </div>
+  </section>
+
+  <section id="spiel" class="game-section">
+    <div><p class="eyebrow">SONNENHAIN RPG</p><h2>Bereit für deine Reise?</h2><p>Das Spiel läuft direkt im Browser. Spielstände und Einstellungen werden lokal auf deinem Gerät gespeichert.</p></div>
+    <a class="button primary large" href="/game/">SPIEL ÖFFNEN</a>
+  </section>
+</main>
+<footer>
+  <div class="footer-brand">SONNENHAIN RPG</div>
+  <div class="footer-links"><a href="/impressum.html">Impressum</a><a href="/datenschutz.html">Datenschutz</a><a href="/sicherheit.html">Sicherheit</a></div>
+  <p>Eine Reise durch die alten Reiche.</p>
+</footer>
+<script>
+(() => {
+  const form = document.getElementById('invite-form');
+  const input = document.getElementById('invite-code');
+  const message = document.getElementById('invite-message');
+  const params = new URLSearchParams(location.search);
+  const incoming = params.get('invite');
+  if (incoming) {
+    input.value = incoming;
+    message.textContent = 'Einladung erkannt. Du kannst sie jetzt öffnen.';
+    document.getElementById('einladung').scrollIntoView({block:'center'});
+  }
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const code = input.value.trim();
+    if (!code) { message.textContent = 'Bitte gib einen Einladungs-Code ein.'; input.focus(); return; }
+    location.assign('/game/?invite=' + encodeURIComponent(code));
+  });
+})();
+</script>
+</body></html>
