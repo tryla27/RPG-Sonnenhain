@@ -1103,9 +1103,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Zweistufige Charaktererstellung: zuerst Geschlecht, dann Rasse + Name.
 	if panel == "creation" and event is InputEventKey and event.pressed and not event.echo:
 		if creation_step == 1:
-			if event.keycode == KEY_ENTER:
+			if event.keycode == KEY_ENTER and pending_gender >= 0:
 				creation_step = 2
 				play_sound("menu")
+			elif event.keycode == KEY_ENTER:
+				message("Bitte zuerst Mann oder Frau auswählen.")
 			elif event.keycode == KEY_ESCAPE:
 				panel = "start"
 			queue_redraw()
@@ -2807,6 +2809,9 @@ func handle_panel_click(mouse: Vector2) -> void:
 					play_sound("menu")
 					return
 			if Rect2(366, 520, 420, 52).has_point(mouse):
+				if pending_gender < 0:
+					message("Bitte zuerst Mann oder Frau auswählen.")
+					return
 				creation_step = 2
 				play_sound("menu")
 			elif Rect2(165, 520, 160, 52).has_point(mouse):
@@ -2959,7 +2964,7 @@ func set_volume_from_mouse(mouse: Vector2) -> bool:
 
 func begin_character_creation() -> void:
 	creation_name = ""
-	pending_gender = 0
+	pending_gender = -1
 	pending_race = 0
 	creation_step = 1
 	character_created = false
@@ -5842,7 +5847,7 @@ func draw_creation_panel() -> void:
 			text_at(card.position + Vector2(0, 190), GENDER_NAMES[i].to_upper(), 22, Color("fff1c8"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x))
 			text_at(card.position + Vector2(0, 216), "AUSGEWÄHLT" if pending_gender == i else "AUSWÄHLEN", 12, Color("aee7ca") if pending_gender == i else Color("aebfba"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x))
 		ui_button(Rect2(165, 520, 160, 52), "ZURÜCK")
-		ui_button(Rect2(366, 520, 420, 52), "WEITER ZUR RASSE")
+		ui_button(Rect2(366, 520, 420, 52), "WEITER ZUR RASSE", pending_gender >= 0)
 		text_at(Vector2(165, 594), "Klasse: %s · Die Vorschau zeigt zunächst den Menschen." % CLASS_NAMES[pending_class], 12, Color("aebfb9"), HORIZONTAL_ALIGNMENT_CENTER, 820)
 		return
 
