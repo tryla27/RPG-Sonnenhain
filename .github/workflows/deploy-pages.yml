@@ -69,15 +69,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          set +e
-          timeout 5s build/server/sonnenhain-server.x86_64 --headless -- --dedicated-server > /tmp/sonnenhain-server.log 2>&1
-          code=$?
-          set -e
-          cat /tmp/sonnenhain-server.log
-          if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then
-            exit "$code"
+          build/server/sonnenhain-server.x86_64 --headless -- --dedicated-server > /tmp/sonnenhain-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          sleep 4
+          if ! kill -0 "$server_pid" 2>/dev/null; then
+            cat /tmp/sonnenhain-server.log
+            exit 1
           fi
-          grep -q "Dedicated WebSocket Server aktiv" /tmp/sonnenhain-server.log
+          if ! ss -ltn | grep -q ':27845 '; then
+            cat /tmp/sonnenhain-server.log
+            echo "Dedicated server process is alive but port 27845 is not listening."
+            exit 1
+          fi
+          kill "$server_pid"
+          wait "$server_pid" 2>/dev/null || true
+          trap - EXIT
+          cat /tmp/sonnenhain-server.log
 
       - name: Harden browser game shell
         run: python3 tools/harden_web.py build/site/game/index.html
