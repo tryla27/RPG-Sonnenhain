@@ -2762,7 +2762,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(860, 448, 125, 54).has_point(mouse):
 			panel = "multiplayer"
 			join_code = ""
-			network_status = "Koop läuft in der Desktop-Version." if is_web_platform() else "Offline · Host erstellen oder Einladungscode eingeben"
+			network_status = "Online-Server bereit zum Verbinden." if is_web_platform() else "Online-Server oder klassischer Desktop-Koop"
 			play_sound("menu")
 		return
 	if panel == "creation":
@@ -2781,9 +2781,11 @@ func handle_panel_click(mouse: Vector2) -> void:
 		return
 	if panel == "multiplayer":
 		if Rect2(205, 282, 340, 52).has_point(mouse):
-			if not is_web_platform(): host_multiplayer()
-		elif Rect2(605, 282, 340, 52).has_point(mouse):
-			if not is_web_platform(): join_multiplayer_from_code(join_code)
+			join_live_multiplayer()
+		elif Rect2(605, 282, 340, 52).has_point(mouse) and not is_web_platform():
+			host_multiplayer()
+		elif Rect2(205, 396, 740, 46).has_point(mouse) and not is_web_platform():
+			join_multiplayer_from_code(join_code)
 		elif Rect2(205, 454, 740, 46).has_point(mouse):
 			join_code = ""
 		elif Rect2(205, 520, 200, 46).has_point(mouse):
@@ -5766,31 +5768,28 @@ func draw_creation_panel() -> void:
 	text_at(Vector2(305, 592), "Rasse und Geschlecht verändern das Pixelmodell. Klasse wurde im Hauptmenü gewählt.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_CENTER, 540)
 
 func draw_multiplayer_panel() -> void:
-	text_at(Vector2(205, 150), "SONNENHAIN KOOP", 31, Color('ffe1a0'))
-	if is_web_platform():
-		text_at(Vector2(205, 182), "Singleplayer im Browser · Koop in der Desktop-Version", 16, Color('d8e6dc'))
-		text_at(Vector2(205, 215), "Der Browser bleibt auf Singleplayer. Für Koop startet ihr beide die Desktop-Version.", 13, Color('b9cbc3'))
-		text_at(Vector2(205, 292), "Koop: 2–4 Spieler · Einladungscode · Gruppenchat", 18, Color('fff0cf'))
-		text_at(Vector2(205, 336), "Im Browser sind keine Ports, Serveradressen oder Online-Verbindungen nötig.", 13, Color('b9cbc3'))
-		ui_button(Rect2(205, 520, 200, 46), "ZURÜCK")
-		text_at(Vector2(205, 586), "Sicherer Webmodus: Das Spiel läuft lokal im Browser und speichert lokal.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
-		return
-	text_at(Vector2(205, 182), "2–4 Spieler · Peer-to-Peer · Einladungscode · Gruppenchat", 16, Color('d8e6dc'))
-	text_at(Vector2(205, 215), "Desktop-Koop über ENet: Einer hostet, die anderen treten per Einladungscode bei.", 13, Color('b9cbc3'))
-	ui_button(Rect2(205, 282, 340, 52), "SPIEL HOSTEN")
-	ui_button(Rect2(605, 282, 340, 52), "MIT CODE BEITRETEN", join_code.length() > 4)
-	text_at(Vector2(205, 365), "EINLADUNGSCODE", 14, Color('e9cc90'))
-	var code_box := Rect2(205, 378, 740, 56)
-	draw_rect(code_box, Color('20343a'))
-	draw_rect(code_box, Color('8ba49c'), false, 2)
-	var shown := invite_code if network_mode == "host" and invite_code != "" else join_code
-	text_at(code_box.position + Vector2(14,36), (shown if shown != "" else "SH-…  Code hier eintippen") + ("_" if network_mode != "host" and int(world_time*2.0)%2==0 else ""), 22, Color('fff0cf'))
-	ui_button(Rect2(205, 454, 740, 46), "CODEFELD LEEREN")
+	text_at(Vector2(205, 150), "SONNENHAIN ONLINE", 31, Color('ffe1a0'))
+	text_at(Vector2(205, 182), "2–4 Spieler · gemeinsamer Live-Server · Gruppenchat", 16, Color('d8e6dc'))
+	text_at(Vector2(205, 215), "Browser und Desktop verbinden sich über den verschlüsselten Sonnenhain-Server.", 13, Color('b9cbc3'))
+	ui_button(Rect2(205, 282, 340, 52), "ONLINE-SERVER")
+	if not is_web_platform():
+		ui_button(Rect2(605, 282, 340, 52), "DESKTOP-HOST (LEGACY)")
+		text_at(Vector2(205, 365), "LEGACY-EINLADUNGSCODE", 14, Color('e9cc90'))
+		var code_box := Rect2(205, 378, 740, 56)
+		draw_rect(code_box, Color('20343a'))
+		draw_rect(code_box, Color('8ba49c'), false, 2)
+		var shown := invite_code if network_mode == "host" and invite_code != "" else join_code
+		text_at(code_box.position + Vector2(14,36), (shown if shown != "" else "SH-…  Code hier eintippen") + ("_" if network_mode != "host" and int(world_time*2.0)%2==0 else ""), 22, Color('fff0cf'))
+		ui_button(Rect2(205, 396, 740, 46), "MIT LEGACY-CODE BEITRETEN", join_code.length() > 4)
+		ui_button(Rect2(205, 454, 740, 46), "CODEFELD LEEREN")
+	else:
+		text_at(Vector2(205, 365), "Kein Portforwarding nötig. Die Verbindung läuft über WSS/HTTPS.", 14, Color('e9cc90'))
+		text_at(Vector2(205, 405), "Der Online-Server wird automatisch über sonnenhainrpg.de erreicht.", 13, Color('b9cbc3'))
 	text_at(Vector2(205, 511), network_status, 13, Color('bfe7d4'), HORIZONTAL_ALIGNMENT_LEFT, 740)
 	ui_button(Rect2(205, 520, 200, 46), "ZURÜCK")
 	var can_start := network_mode == "host" or (network_mode == "client" and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED)
 	ui_button(Rect2(605, 520, 340, 46), "WELT STARTEN" if network_mode == "host" else "WELT BEITRETEN", can_start)
-	text_at(Vector2(205, 586), "Koop nutzt UDP %d. Falls UPnP nicht funktioniert, muss der Host den Port am Router freigeben." % network_port, 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
+	text_at(Vector2(205, 586), "Online: wss://sonnenhainrpg.de/multiplayer · Desktop-Legacy bleibt zusätzlich verfügbar.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
 
 func draw_pause_panel() -> void:
 	ui_button(Rect2(300, 135, 250, 42), "PAUSE", true, true)
