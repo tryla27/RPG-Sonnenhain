@@ -4052,8 +4052,7 @@ func draw_enemy_sprite(type: int, p: Vector2, scale_factor: float = 1.0, flash: 
 	var src := Rect2(Vector2(frame * 32, clampi(type,0,26) * 32), Vector2(32,32))
 	var size := Vector2(70,70) * scale_factor
 	draw_texture_rect_region(enemy_sprites, Rect2(p - size * 0.5 + Vector2(0,-14*scale_factor), size), src)
-	if not mobile_performance_mode or flash or type in [12, 13, 14]:
-		draw_enemy_detail_overlay(type, p, scale_factor, flash)
+	draw_enemy_detail_overlay(type, p, scale_factor, flash)
 
 func draw_enemy_detail_overlay(type: int, p: Vector2, scale_factor: float, flash: bool) -> void:
 	var info: Dictionary = ENEMY_TYPES[clampi(type,0,ENEMY_TYPES.size()-1)]
@@ -4267,11 +4266,10 @@ func draw_world() -> void:
 		draw_dungeon_world()
 		return
 	# Alle Regionen werden über dasselbe 16px-Raster aufgebaut und nur farblich variiert.
-	var tile_margin := 1 if mobile_performance_mode else 2
-	var start_x := maxi(0, int(camera_pos.x / 64) - tile_margin)
-	var end_x := mini(int(WORLD.x / 64) + 1, int((camera_pos.x + VIEW.x) / 64) + tile_margin)
-	var start_y := maxi(0, int(camera_pos.y / 64) - tile_margin)
-	var end_y := mini(int(WORLD.y / 64) + 1, int((camera_pos.y + VIEW.y) / 64) + tile_margin)
+	var start_x := maxi(0, int(camera_pos.x / 64) - 2)
+	var end_x := mini(int(WORLD.x / 64) + 1, int((camera_pos.x + VIEW.x) / 64) + 2)
+	var start_y := maxi(0, int(camera_pos.y / 64) - 2)
+	var end_y := mini(int(WORLD.y / 64) + 1, int((camera_pos.y + VIEW.y) / 64) + 2)
 	for tx in range(start_x, end_x):
 		for ty in range(start_y, end_y):
 			var key := hash_cell(tx, ty)
@@ -4286,8 +4284,6 @@ func draw_world() -> void:
 				draw_rect(Rect2(tile_origin + Vector2(8, 41), Vector2(44, 7)), Color('f0af71', 0.18))
 			var p := Vector2(tx * 64 + (key % 23), ty * 64 + ((key / 23) % 25))
 			if distance_to_trail(p) < 120.0: continue
-			if mobile_performance_mode and key % 3 == 0:
-				continue
 			if zone == 0:
 				if key % 6 == 0: draw_flower(p, key)
 				elif key % 10 == 0: draw_grass(p)
@@ -4331,11 +4327,10 @@ func draw_world() -> void:
 				elif key % 3 == 0: draw_flower(p, key)
 				else: draw_grass(p)
 	draw_trails()
-	var obstacle_margin := 1 if mobile_performance_mode else 2
-	var cell_min_x := maxi(0, int(camera_pos.x / 250) - obstacle_margin)
-	var cell_max_x := mini(int(WORLD.x / 250) + 1, int((camera_pos.x + VIEW.x) / 250) + obstacle_margin)
-	var cell_min_y := maxi(0, int(camera_pos.y / 250) - obstacle_margin)
-	var cell_max_y := mini(int(WORLD.y / 250) + 1, int((camera_pos.y + VIEW.y) / 250) + obstacle_margin)
+	var cell_min_x := maxi(0, int(camera_pos.x / 250) - 2)
+	var cell_max_x := mini(int(WORLD.x / 250) + 1, int((camera_pos.x + VIEW.x) / 250) + 2)
+	var cell_min_y := maxi(0, int(camera_pos.y / 250) - 2)
+	var cell_max_y := mini(int(WORLD.y / 250) + 1, int((camera_pos.y + VIEW.y) / 250) + 2)
 	for cx in range(cell_min_x, cell_max_x):
 		for cy in range(cell_min_y, cell_max_y):
 			var obstacle := obstacle_in_cell(cx, cy)
