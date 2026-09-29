@@ -1217,6 +1217,8 @@ func mobility_visual_offset(race_id: int) -> Vector2:
 	var height := [28.0, 19.0, 23.0][clampi(race_id, 0, 2)]
 	if mobility_anim_kind == "arcane":
 		height += 8.0
+	elif mobility_anim_kind == "roll":
+		height *= [0.34, 0.20, 0.28][clampi(race_id, 0, 2)]
 	var lift := sin(progress * PI) * height
 	# Orks landen kompakter und schwerer, Roboter etwas mechanischer.
 	if race_id == 1:
@@ -1226,21 +1228,21 @@ func mobility_visual_offset(race_id: int) -> Vector2:
 	return Vector2(0.0, -lift)
 
 func cast_arcane_step_from_space() -> void:
-	const ARCANE_STEP_ID := 19
-	if ARCANE_STEP_ID >= learned.size() or not bool(learned[ARCANE_STEP_ID]):
+	var arcane_step_id: int = 19
+	if arcane_step_id >= learned.size() or not bool(learned[arcane_step_id]):
 		message("Lerne Arkaner Schritt, dann liegt er auf der Leertaste.")
 		return
-	if float(cooldowns[ARCANE_STEP_ID]) > 0.0:
+	if float(cooldowns[arcane_step_id]) > 0.0:
 		message("Arkaner Schritt ist noch nicht bereit.")
 		return
-	var ability: Dictionary = ABILITIES[ARCANE_STEP_ID]
+	var ability: Dictionary = ABILITIES[arcane_step_id]
 	var cost := float(ability["cost"])
 	if energy < cost:
 		message("Nicht genug Mana für Arkaner Schritt.")
 		return
 	energy -= cost
-	var rank := maxi(1, int(skill_levels[ARCANE_STEP_ID]))
-	cooldowns[ARCANE_STEP_ID] = float(ability["cd"]) * (1.0 - 0.06 * float(rank - 1))
+	var rank := maxi(1, int(skill_levels[arcane_step_id]))
+	cooldowns[arcane_step_id] = float(ability["cd"]) * (1.0 - 0.06 * float(rank - 1))
 	var direction := movement_vector()
 	if direction.length_squared() < 0.01:
 		direction = facing
@@ -1251,7 +1253,7 @@ func cast_arcane_step_from_space() -> void:
 		player_pos = destination.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
 		if network_mode == "client":
 			var power := int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012))
-			rpc_client_ability.rpc_id(1, ARCANE_STEP_ID, [cast_pos.x, cast_pos.y], [direction.x, direction.y], power, rank)
+			rpc_client_ability.rpc_id(1, arcane_step_id, [cast_pos.x, cast_pos.y], [direction.x, direction.y], power, rank)
 	invulnerable = 0.5
 	dash_cooldown = 0.75
 	start_mobility_animation("arcane", 0.34)
