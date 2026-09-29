@@ -240,14 +240,23 @@ jobs:
             test "$code" = "200"
           done
 
-          headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 15 \
-            -H 'Connection: Upgrade' \
-            -H 'Upgrade: websocket' \
-            -H 'Sec-WebSocket-Version: 13' \
-            -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-            https://multiplayer.sonnenhainrpg.de/ || true)"
-          printf '%s\n' "$headers"
-          printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
+          wss_ok=0
+          for attempt in {1..12}; do
+            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 15 \
+              -H 'Connection: Upgrade' \
+              -H 'Upgrade: websocket' \
+              -H 'Sec-WebSocket-Version: 13' \
+              -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+              https://multiplayer.sonnenhainrpg.de/ || true)"
+            printf '%s\n' "$headers"
+            if printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'; then
+              wss_ok=1
+              break
+            fi
+            echo "WSS not ready yet (attempt $attempt/12); retrying in 5 seconds."
+            sleep 5
+          done
+          test "$wss_ok" = "1"
 
           echo "END-TO-END OK: website, browser game assets and multiplayer WSS are reachable."
 
