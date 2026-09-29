@@ -47,3 +47,21 @@ Für den echten VServer werden in GitHub Actions benötigt:
 Zusätzlich muss DNS `multiplayer.sonnenhainrpg.de` auf den VServer zeigen. Auf dem VServer muss Nginx (oder ein gleichwertiger Reverse Proxy) Port 443 bedienen und zu `127.0.0.1:27845` weiterleiten. Die Vorlage liegt in `server/nginx-multiplayer.conf.example`.
 
 Der GitHub-Workflow prüft nach einem Deploy, ob der Serverprozess läuft und ob TCP-Port 27845 lauscht.
+
+
+## Empfohlener Deploy-Benutzer
+
+Für GitHub Actions soll **nicht** `root` verwendet werden. Empfohlen ist der eigene Benutzer `sonnenhain`.
+
+Einmalige Vorbereitung:
+
+1. Lokal ein eigenes Ed25519-Schlüsselpaar nur für den VServer-Deploy erzeugen.
+2. Nur den **öffentlichen** Schlüssel auf den Server übertragen.
+3. Als Root einmal `server/bootstrap-deploy-user.sh` mit dem Public-Key-Pfad ausführen.
+4. In GitHub Actions setzen:
+   - `VSERVER_HOST` = öffentliche IPv4 des VServers
+   - `VSERVER_USER` = `sonnenhain`
+   - `VSERVER_SSH_KEY` = privater Deploy-Key (OpenSSH oder Base64)
+   - `VSERVER_PORT` = `22`, sofern SSH nicht abweichend konfiguriert ist
+
+Der Workflow soll absichtlich nicht als `root` deployen.
