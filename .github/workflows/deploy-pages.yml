@@ -55,6 +55,30 @@ jobs:
           mkdir -p build/site/game
           /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-release "Web" build/site/game/index.html
 
+      - name: Export dedicated Linux server
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf build/server
+          mkdir -p build/server
+          /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-release "Linux Server" build/server/sonnenhain-server.x86_64
+          chmod +x build/server/sonnenhain-server.x86_64
+          test -x build/server/sonnenhain-server.x86_64
+
+      - name: Smoke-test dedicated server
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          timeout 5s build/server/sonnenhain-server.x86_64 --headless -- --dedicated-server > /tmp/sonnenhain-server.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/sonnenhain-server.log
+          if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then
+            exit "$code"
+          fi
+          grep -q "Dedicated WebSocket Server aktiv" /tmp/sonnenhain-server.log
+
       - name: Harden browser game shell
         run: python3 tools/harden_web.py build/site/game/index.html
 
