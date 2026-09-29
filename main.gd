@@ -1155,23 +1155,24 @@ func touch_button_at(pos: Vector2) -> String:
 func handle_touch_event(event: InputEvent) -> bool:
 	if not touch_enabled: return false
 	if event is InputEventScreenTouch:
-		var pos := event.position
+		var touch_event: InputEventScreenTouch = event as InputEventScreenTouch
+		var pos: Vector2 = touch_event.position
 		if panel != "":
-			if event.pressed:
+			if touch_event.pressed:
 				handle_panel_click(pos)
 				queue_redraw()
 			return true
-		if event.pressed and pos.x <= 285.0 and pos.y >= 360.0:
-			touch_move_id = event.index
-			var center := Vector2(118, 526)
-			var delta := pos - center
-			touch_move_vector = delta.limit_length(72.0) / 72.0
-			touch_move_knob = center + delta.limit_length(48.0)
+		if touch_event.pressed and pos.x <= 285.0 and pos.y >= 360.0:
+			touch_move_id = touch_event.index
+			var center: Vector2 = Vector2(118, 526)
+			var move_delta: Vector2 = pos - center
+			touch_move_vector = move_delta.limit_length(72.0) / 72.0
+			touch_move_knob = center + move_delta.limit_length(48.0)
 			return true
-		var action := touch_button_at(pos)
+		var action: String = touch_button_at(pos)
 		if action != "":
-			if event.pressed:
-				touch_attack_ids[event.index] = action
+			if touch_event.pressed:
+				touch_attack_ids[touch_event.index] = action
 				match action:
 					"attack":
 						if attack_timer <= 0.0: normal_attack()
@@ -1184,19 +1185,21 @@ func handle_touch_event(event: InputEvent) -> bool:
 						if action.begins_with("ability_"):
 							use_ability(int(action.get_slice("_", 1)) - 1)
 			else:
-				touch_attack_ids.erase(event.index)
+				touch_attack_ids.erase(touch_event.index)
 			return true
-		if not event.pressed and event.index == touch_move_id:
+		if not touch_event.pressed and touch_event.index == touch_move_id:
 			touch_move_id = -1
 			touch_move_vector = Vector2.ZERO
 			touch_move_knob = Vector2(118, 526)
 			return true
-	elif event is InputEventScreenDrag and event.index == touch_move_id:
-		var center := Vector2(118, 526)
-		var delta := event.position - center
-		touch_move_vector = delta.limit_length(72.0) / 72.0
-		touch_move_knob = center + delta.limit_length(48.0)
-		return true
+	elif event is InputEventScreenDrag:
+		var drag_event: InputEventScreenDrag = event as InputEventScreenDrag
+		if drag_event.index == touch_move_id:
+			var center: Vector2 = Vector2(118, 526)
+			var move_delta: Vector2 = drag_event.position - center
+			touch_move_vector = move_delta.limit_length(72.0) / 72.0
+			touch_move_knob = center + move_delta.limit_length(48.0)
+			return true
 	return false
 
 func touch_attack_held() -> bool:
