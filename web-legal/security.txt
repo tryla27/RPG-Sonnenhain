@@ -1,0 +1,4 @@
+Contact: https://github.com/tryla27/RPG-Sonnenhain/issues
+Canonical: https://sonnenhainrpg.de/.well-known/security.txt
+Policy: https://sonnenhainrpg.de/sicherheit.html
+Preferred-Languages: de, en
