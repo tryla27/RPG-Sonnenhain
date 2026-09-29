@@ -5254,19 +5254,60 @@ func draw_hud() -> void:
 	if nearest != "":
 		ui_box(Rect2(610, 549, 520, 36), Color("587767"))
 		text_at(Vector2(623, 573), nearest.replace("E  ·", "%s  ·" % binding_short("interact")), 15, Color("fff4ca"))
-	ui_box(Rect2(9, 592, 1134, 47), Color("354747"))
-	text_at(Vector2(22, 615), "LAUFEN: %s/%s/%s/%s  ·  ANGRIFF: %s  ·  ROLLE: %s" % [binding_short("move_up"), binding_short("move_left"), binding_short("move_down"), binding_short("move_right"), binding_short("attack"), binding_short("dodge")], 12, Color("f0e4c5"))
-	text_at(Vector2(22, 631), "%s Skills · %s Tasche · %s Quests · %s Karte · ENTER/T Chat" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map")], 11, Color("becfc6"))
+	if touch_enabled:
+		draw_touch_controls()
+	else:
+		ui_box(Rect2(9, 592, 1134, 47), Color("354747"))
+		text_at(Vector2(22, 615), "LAUFEN: %s/%s/%s/%s  ·  ANGRIFF: %s  ·  ROLLE: %s" % [binding_short("move_up"), binding_short("move_left"), binding_short("move_down"), binding_short("move_right"), binding_short("attack"), binding_short("dodge")], 12, Color("f0e4c5"))
+		text_at(Vector2(22, 631), "%s Skills · %s Tasche · %s Quests · %s Karte · ENTER/T Chat" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map")], 11, Color("becfc6"))
+		for slot in 4:
+			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
+			var x := 694 + slot * 81
+			ui_button(Rect2(x, 593, 75, 44), "", id >= 0, selected_slot == slot and panel == "skills")
+			text_at(Vector2(x + 8, 629), binding_short("ability_%d" % (slot + 1)), 11, Color("ffe2a3") if id >= 0 else Color("a9aa9c"))
+			if id >= 0:
+				draw_skill_icon(Vector2(x + 24, 598), id, 30)
+				if float(cooldowns[id]) > 0:
+					draw_rect(Rect2(x + 3, 596, 68, 38), Color(0.1, 0.16, 0.2, 0.7))
+					text_at(Vector2(x + 23, 620), "%.1f" % float(cooldowns[id]), 15)
+
+func draw_touch_controls() -> void:
+	# Klassisches Mobile-Layout: Bewegung links, Skills unten mittig,
+	# Interaktion/Ausweichen/Angriff rechts.
+	var base := Vector2(118, 526)
+	draw_circle(base, 76, Color(0.07, 0.12, 0.14, 0.58))
+	draw_arc(base, 76, 0, TAU, 40, Color("a9c4b8", 0.72), 3)
+	draw_circle(touch_move_knob, 34, Color("5d756b", 0.88))
+	draw_arc(touch_move_knob, 34, 0, TAU, 32, Color("e7d5a3", 0.88), 3)
+	text_at(base + Vector2(-44, 104), "BEWEGEN", 12, Color("d9e5dc"), HORIZONTAL_ALIGNMENT_CENTER, 88)
+
 	for slot in 4:
 		var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
-		var x := 694 + slot * 81
-		ui_button(Rect2(x, 593, 75, 44), "", id >= 0, selected_slot == slot and panel == "skills")
-		text_at(Vector2(x + 8, 629), binding_short("ability_%d" % (slot + 1)), 11, Color("ffe2a3") if id >= 0 else Color("a9aa9c"))
+		var rect := Rect2(424 + slot * 76, 548, 68, 70)
+		draw_rect(rect, Color("152228", 0.88))
+		draw_rect(rect, Color("b99b63", 0.82), false, 2)
+		text_at(rect.position + Vector2(7, 64), str(slot + 1), 11, Color("ffe3a5"))
 		if id >= 0:
-			draw_skill_icon(Vector2(x + 24, 598), id, 30)
+			draw_skill_icon(rect.position + Vector2(19, 9), id, 32)
 			if float(cooldowns[id]) > 0:
-				draw_rect(Rect2(x + 3, 596, 68, 38), Color(0.1, 0.16, 0.2, 0.7))
-				text_at(Vector2(x + 23, 620), "%.1f" % float(cooldowns[id]), 15)
+				draw_rect(rect.grow(-3), Color(0.08, 0.12, 0.16, 0.72))
+				text_at(rect.position + Vector2(19, 43), "%.1f" % float(cooldowns[id]), 14, Color("fff1c7"))
+		else:
+			text_at(rect.position + Vector2(14, 38), "–", 22, Color("83918b"))
+
+	for data in [
+		{"p":Vector2(1032,526),"r":58.0,"label":"ANGRIFF","fill":Color("725047",0.90)},
+		{"p":Vector2(916,550),"r":39.0,"label":"ROLLE","fill":Color("3f5c62",0.90)},
+		{"p":Vector2(967,447),"r":39.0,"label":"AKTION","fill":Color("556b4f",0.90)}
+	]:
+		draw_circle(data["p"], data["r"], data["fill"])
+		draw_arc(data["p"], data["r"], 0, TAU, 32, Color("f0daa3",0.82), 3)
+		text_at(data["p"] + Vector2(-45,5), data["label"], 11, Color("fff2cf"), HORIZONTAL_ALIGNMENT_CENTER, 90)
+
+	for pair in [[Rect2(735,557,66,54),"HP"],[Rect2(807,557,66,54),"MANA" if class_id == 1 else "ENERGIE"]]:
+		draw_rect(pair[0], Color("223338",0.90))
+		draw_rect(pair[0], Color("9b8660",0.8), false, 2)
+		text_at(pair[0].position + Vector2(4,34), pair[1], 10, Color("ffe7b0"), HORIZONTAL_ALIGNMENT_CENTER, int(pair[0].size.x-8))
 
 func tracked_quest() -> String:
 	if interior_id >= 0: return "Zur Steinrose · E an der Tür führt hinaus."
