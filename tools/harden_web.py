@@ -9,7 +9,7 @@ path = Path(sys.argv[1])
 html = path.read_text(encoding="utf-8")
 
 security_meta = """		<meta name="referrer" content="no-referrer">
-		<meta name="robots" content="index,follow">
+		<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
 		<meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()">
 		<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 """
@@ -32,8 +32,9 @@ gate_style = """
 gate_html = """
 <div id="human-gate" role="dialog" aria-modal="true" aria-labelledby="human-title">
   <div id="human-card">
-    <h1 id="human-title">Mensch-Prüfung</h1>
-    <p>Bevor Sonnenhain startet, bestätige bitte kurz, dass du ein Mensch bist.</p>
+    <h1 id="human-title">Privater Zugang</h1>
+    <p id="invite-status">Sonnenhain ist nur über einen gültigen Einladungslink zugänglich.</p>
+    <p>Nach bestätigter Einladung folgt eine kurze Mensch-Prüfung.</p>
     <p id="human-question"></p>
     <input id="human-answer" type="number" inputmode="numeric" autocomplete="off" aria-label="Antwort auf die Mensch-Prüfung">
     <label><input id="human-confirm" type="checkbox"> Ich bin ein Mensch und möchte das Spiel starten.</label>
@@ -57,19 +58,56 @@ if 'id="human-gate"' not in html:
     html = html.replace(body_marker, body_marker + gate_html, 1)
 
 gate_js = r"""
+	const INVITE_SHA256 = '200a4cd17b7f7583097f7aa1ceff92ea7a7e4a18120ceb859c41ef6d4404d1a3';
+
+	async function sha256Hex(value) {
+		const bytes = new TextEncoder().encode(value);
+		const hash = await crypto.subtle.digest('SHA-256', bytes);
+		return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
+	}
+
 	function waitForHumanGate() {
-		return new Promise((resolve) => {
+		return new Promise(async (resolve) => {
 			const gate = document.getElementById('human-gate');
+			const status = document.getElementById('invite-status');
 			const question = document.getElementById('human-question');
 			const answer = document.getElementById('human-answer');
 			const confirm = document.getElementById('human-confirm');
 			const start = document.getElementById('human-start');
 			const error = document.getElementById('human-error');
 
+			let invited = sessionStorage.getItem('sonnenhain_invited') === '1';
+			if (!invited) {
+				const params = new URLSearchParams(window.location.search);
+				const token = params.get('invite') || '';
+				if (token) {
+					try {
+						invited = (await sha256Hex(token)) === INVITE_SHA256;
+					} catch (_) {
+						invited = false;
+					}
+				}
+				if (invited) {
+					sessionStorage.setItem('sonnenhain_invited', '1');
+					history.replaceState(null, '', window.location.pathname + window.location.hash);
+				}
+			}
+
+			if (!invited) {
+				status.textContent = 'Kein gültiger Einladungslink. Bitte verwende den persönlichen Sonnenhain-Einladungslink.';
+				question.textContent = '';
+				answer.style.display = 'none';
+				confirm.parentElement.style.display = 'none';
+				start.style.display = 'none';
+				error.textContent = 'Zugriff gesperrt.';
+				return;
+			}
+
+			status.textContent = 'Einladung bestätigt.';
 			const a = 2 + Math.floor(Math.random() * 8);
 			const b = 1 + Math.floor(Math.random() * 7);
 			const expected = a + b;
-			question.textContent = 'Wie viel ist ' + a + ' + ' + b + '?';
+			question.textContent = 'Mensch-Prüfung: Wie viel ist ' + a + ' + ' + b + '?';
 
 			function refresh() {
 				start.disabled = !confirm.checked || answer.value.trim() === '';
