@@ -155,27 +155,24 @@ jobs:
             ssh300011111@ngcobalt378.manitu.net \
             'echo "SSH OK"; id; uname -a; printf "systemctl="; command -v systemctl || true; printf "nohup="; command -v nohup || true; printf "python3="; command -v python3 || true'
 
-          timeout 180s rsync -az --delete --omit-dir-times --no-perms --no-owner --no-group --exclude='sshusers/' \
-            -e "ssh -4 -i $HOME/.ssh/manitu_deploy -p 22 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12" \
-            build/site/ \
-            ssh300011111@ngcobalt378.manitu.net:/home/sites/site100047525/web/
-
-          # Manitu serves this directory through the web server. Keep directory
-          # traversal/read permissions explicit so a restrictive previous umask
-          # cannot turn the domain into HTTP 403.
+          target=/home/sites/site100047525/web/sonnenhainrpg.de
           ssh -4 -i "$HOME/.ssh/manitu_deploy" -p 22 \
             -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 \
-            ssh300011111@ngcobalt378.manitu.net '
+            ssh300011111@ngcobalt378.manitu.net "mkdir -p '$target'"
+
+          timeout 180s rsync -az --delete --omit-dir-times --no-owner --no-group --chmod=D755,F644 \
+            -e "ssh -4 -i $HOME/.ssh/manitu_deploy -p 22 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12" \
+            build/site/ \
+            ssh300011111@ngcobalt378.manitu.net:"$target/"
+
+          ssh -4 -i "$HOME/.ssh/manitu_deploy" -p 22 \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 \
+            ssh300011111@ngcobalt378.manitu.net "
               set -eu
-              webroot=/home/sites/site100047525/web
-              test -d "$webroot"
-              test -f "$webroot/index.html"
-              chmod 755 "$webroot"
-              find "$webroot" -type d -exec chmod 755 {} +
-              find "$webroot" -type f -exec chmod 644 {} +
-              printf "webroot: "; ls -ld "$webroot"
-              printf "index: "; ls -l "$webroot/index.html"
-            '
+              test -f '$target/index.html'
+              printf 'target: '; ls -ld '$target'
+              printf 'index: '; ls -l '$target/index.html'
+            "
 
       - name: Verify public website
         shell: bash
