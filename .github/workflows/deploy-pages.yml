@@ -104,6 +104,15 @@ jobs:
           mkdir -p build/site/.well-known
           cp web-legal/security.txt build/site/.well-known/security.txt
           touch build/site/.nojekyll
+          cat > build/site/.htaccess <<'EOF'
+DirectoryIndex index.html
+Require all granted
+AddType application/wasm .wasm
+AddType application/javascript .js
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+</IfModule>
+EOF
 
           test -f build/site/index.html
           test -f build/site/site.css
@@ -112,6 +121,8 @@ jobs:
           test -f build/site/game/index.wasm
           grep -q "Eine Reise durch" build/site/index.html
           grep -q "human-gate" build/site/game/index.html
+          grep -q "Require all granted" build/site/.htaccess
+          grep -q "DirectoryIndex index.html" build/site/.htaccess
 
       - name: Deploy to Manitu webspace
         if: ${{ env.MANITU_SSH_KEY != '' }}
@@ -169,27 +180,72 @@ jobs:
             -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 \
             ssh300011111@ngcobalt378.manitu.net "
               set -eu
+              test -d '$target'
               test -f '$target/index.html'
+              test -f '$target/site.css'
+              test -f '$target/.htaccess'
+              test -f '$target/game/index.html'
+              test -f '$target/game/index.js'
+              test -f '$target/game/index.pck'
+              test -f '$target/game/index.wasm'
+              test -f '$target/.well-known/security.txt'
+              printf 'SONNENHAIN_HEALTH_OK\n' > '$target/sonnenhain-health.txt'
+              chmod 755 '$target' '$target/game' '$target/.well-known'
+              chmod 644 '$target/index.html' '$target/site.css' '$target/.htaccess' '$target/sonnenhain-health.txt'
+              chmod 644 '$target/game/index.html' '$target/game/index.js' '$target/game/index.pck' '$target/game/index.wasm'
               printf 'target: '; ls -ld '$target'
               printf 'index: '; ls -l '$target/index.html'
+              printf 'htaccess: '; ls -l '$target/.htaccess'
+              printf 'game: '; ls -l '$target/game/index.html' '$target/game/index.wasm'
             "
 
-      - name: Verify public website
+      - name: Verify public website end to end
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in {1..12}; do
-            code="$(curl -L -sS -o /tmp/sonnenhain-home.html -w '%{http_code}' --max-time 15 https://sonnenhainrpg.de/ || true)"
-            echo "Attempt $attempt: HTTP $code"
-            if [ "$code" = "200" ] && grep -q "Eine Reise durch" /tmp/sonnenhain-home.html; then
-              echo "Public Sonnenhain website is live."
-              exit 0
-            fi
-            sleep 5
+
+          wait_for_200() {
+            url="$1"
+            outfile="$2"
+            for attempt in {1..18}; do
+              code="$(curl --fail-with-body -L -sS -o "$outfile" -w '%{http_code}' --max-time 20 "$url" 2>/tmp/curl.err || true)"
+              echo "$url attempt $attempt: HTTP $code"
+              if [ "$code" = "200" ]; then
+                return 0
+              fi
+              cat /tmp/curl.err || true
+              sleep 5
+            done
+            echo "FAILED: $url did not return HTTP 200"
+            head -c 1200 "$outfile" 2>/dev/null || true
+            return 1
+          }
+
+          wait_for_200 "https://sonnenhainrpg.de/" /tmp/home.html
+          grep -q "Eine Reise durch" /tmp/home.html
+
+          wait_for_200 "https://sonnenhainrpg.de/sonnenhain-health.txt" /tmp/health.txt
+          grep -qx "SONNENHAIN_HEALTH_OK" /tmp/health.txt
+
+          wait_for_200 "https://sonnenhainrpg.de/game/" /tmp/game.html
+          grep -q "human-gate" /tmp/game.html
+
+          for asset in index.js index.pck index.wasm; do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de/game/$asset" || true)"
+            echo "/game/$asset => HTTP $code"
+            test "$code" = "200"
           done
-          echo "Public website did not become healthy."
-          head -c 1000 /tmp/sonnenhain-home.html || true
-          exit 1
+
+          headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 15 \
+            -H 'Connection: Upgrade' \
+            -H 'Upgrade: websocket' \
+            -H 'Sec-WebSocket-Version: 13' \
+            -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+            https://multiplayer.sonnenhainrpg.de/ || true)"
+          printf '%s\n' "$headers"
+          printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
+
+          echo "END-TO-END OK: website, browser game assets and multiplayer WSS are reachable."
 
       - name: Manitu deploy not configured
         if: ${{ env.MANITU_SSH_KEY == '' }}
