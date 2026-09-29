@@ -121,8 +121,14 @@ jobs:
         run: |
           set -euo pipefail
           install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$MANITU_SSH_KEY" > "$HOME/.ssh/manitu_deploy"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          key = os.environ["MANITU_SSH_KEY"].replace("\\n", "\n").replace("\r", "").strip()
+          Path.home().joinpath(".ssh/manitu_deploy").write_text(key + "\n", encoding="utf-8")
+          PY
           chmod 600 "$HOME/.ssh/manitu_deploy"
+          ssh-keygen -y -f "$HOME/.ssh/manitu_deploy" >/dev/null
 
           ssh -4 -i "$HOME/.ssh/manitu_deploy" -p 22 \
             -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 \
