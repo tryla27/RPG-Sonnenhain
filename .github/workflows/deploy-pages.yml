@@ -147,6 +147,8 @@ jobs:
           ssh-keygen -y -f "$HOME/.ssh/manitu_deploy" > "$HOME/.ssh/manitu_deploy.pub"
           echo "Deploy key fingerprint:"
           ssh-keygen -lf "$HOME/.ssh/manitu_deploy.pub"
+          echo "Deploy public key (safe to copy to Manitu):"
+          cat "$HOME/.ssh/manitu_deploy.pub"
 
           ssh -4 -i "$HOME/.ssh/manitu_deploy" -p 22 \
             -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 \
