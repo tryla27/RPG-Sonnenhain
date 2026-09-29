@@ -3274,6 +3274,7 @@ func sell_item(index: int) -> void:
 	save_game()
 
 func _draw() -> void:
+	if dedicated_server_mode: return
 	draw_set_transform(-camera_pos)
 	draw_world()
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0:
