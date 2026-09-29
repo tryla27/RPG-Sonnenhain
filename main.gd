@@ -328,6 +328,7 @@ var chat_open := false
 var chat_input := ""
 var chat_messages: Array = []
 var chat_fade := 0.0
+var online_list_open := false
 var mechanics_page := 0
 var network_mode := "offline"
 var network_status := "Offline"
@@ -1419,6 +1420,10 @@ func open_mobile_chat() -> void:
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.keycode == KEY_TAB:
+		online_list_open = event.pressed
+		queue_redraw()
+		return
 	if handle_touch_event(event): return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
@@ -3629,6 +3634,7 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	draw_hud()
 	draw_chat_overlay()
+	draw_online_list()
 	if rescue_intro_timer > 0.0 or reward_scene_timer > 0.0: draw_rescue_alert()
 	if panel != "": draw_panel()
 
@@ -3660,6 +3666,32 @@ func draw_remote_players() -> void:
 		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender)
 		draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
 		text_at(rp + Vector2(-75,-57), "%s · LV %d" % [str(state.get("name","Freund")), int(state.get("level",1))], 13, Color('bfe7ff'), HORIZONTAL_ALIGNMENT_CENTER, 150)
+
+func draw_online_list() -> void:
+	if not online_list_open: return
+	var names: Array[String] = []
+	var own_name := hero_name.strip_edges() if hero_name.strip_edges() != "" else "Held"
+	names.append(own_name + "  (Du)")
+	for peer_id in remote_players.keys():
+		var state: Dictionary = remote_players[peer_id]
+		var remote_name := str(state.get("name","Held")).strip_edges()
+		if remote_name == "": remote_name = "Held"
+		names.append(remote_name)
+	var width := 360.0
+	var row_h := 34.0
+	var height := 76.0 + row_h * names.size()
+	var box := Rect2((VIEW.x - width) * 0.5, 70, width, height)
+	draw_rect(box, Color(0.04,0.08,0.11,0.94))
+	draw_rect(box, Color("c6a66e"), false, 2)
+	text_at(box.position + Vector2(18,31), "ONLINE", 21, Color("ffe1a0"))
+	text_at(box.position + Vector2(width-105,30), "%d" % names.size(), 16, Color("bfe7d4"), HORIZONTAL_ALIGNMENT_RIGHT, 80)
+	var y := box.position.y + 63.0
+	for i in names.size():
+		var row := Rect2(box.position.x + 12, y - 22, width - 24, 30)
+		draw_rect(row, Color("17272e", 0.9) if i % 2 == 0 else Color("203239", 0.9))
+		text_at(Vector2(row.position.x + 12, row.position.y + 21), names[i], 15, Color("fff0ce"))
+		y += row_h
+	text_at(box.position + Vector2(18,height-14), "TAB gedrückt halten", 11, Color("9fb4ac"))
 
 func draw_chat_overlay() -> void:
 	if not chat_open and (chat_messages.is_empty() or chat_fade <= 0.0): return
