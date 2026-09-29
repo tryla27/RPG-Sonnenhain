@@ -533,7 +533,7 @@ func disconnect_multiplayer(show_message: bool = true) -> void:
 
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null: return
-	var state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "region":region_at(player_pos)}
+	var state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "element":weapon_element(), "region":region_at(player_pos)}
 	rpc_player_state.rpc(state)
 	if network_mode == "host" and int(world_time * 5.0) % 2 == 0: push_world_snapshot()
 
@@ -541,8 +541,35 @@ func push_player_state() -> void:
 func rpc_player_state(state: Dictionary) -> void:
 	var sender := multiplayer.get_remote_sender_id()
 	if sender <= 0: return
-	remote_players[sender] = state
-	if network_mode == "host": rpc_relay_player_state.rpc(sender, state)
+	var pos_data: Array = state.get("pos", [])
+	var facing_data: Array = state.get("facing", [])
+	if pos_data.size() < 2 or facing_data.size() < 2: return
+	var incoming_pos := Vector2(float(pos_data[0]), float(pos_data[1]))
+	if not incoming_pos.is_finite(): return
+	incoming_pos = incoming_pos.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
+	if network_mode == "host" and remote_players.has(sender):
+		var old_data: Array = remote_players[sender].get("pos", [incoming_pos.x, incoming_pos.y])
+		var old_pos := Vector2(float(old_data[0]), float(old_data[1]))
+		if incoming_pos.distance_to(old_pos) > 95.0:
+			incoming_pos = old_pos + (incoming_pos - old_pos).limit_length(95.0)
+	var clean_facing := Vector2(float(facing_data[0]), float(facing_data[1]))
+	if not clean_facing.is_finite() or clean_facing.length_squared() < 0.01: clean_facing = Vector2.DOWN
+	clean_facing = clean_facing.normalized()
+	var clean := {
+		"pos":[incoming_pos.x,incoming_pos.y],
+		"facing":[clean_facing.x,clean_facing.y],
+		"class":clampi(int(state.get("class",0)),0,2),
+		"race":clampi(int(state.get("race",0)),0,2),
+		"gender":clampi(int(state.get("gender",0)),0,1),
+		"name":str(state.get("name","Held")).strip_edges().substr(0,16),
+		"level":clampi(int(state.get("level",1)),1,99),
+		"walking":bool(state.get("walking",false)),
+		"weapon":clampi(int(state.get("weapon",0)),0,32),
+		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
+		"region":region_at(incoming_pos)
+	}
+	remote_players[sender] = clean
+	if network_mode == "host": rpc_relay_player_state.rpc(sender, clean)
 
 @rpc("authority", "call_remote", "unreliable", 0)
 func rpc_relay_player_state(peer_id: int, state: Dictionary) -> void:
@@ -618,11 +645,14 @@ func send_chat_message(value: String) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_chat_message(author: String, value: String) -> void:
-	add_chat_line(author, value)
+	var sender := multiplayer.get_remote_sender_id()
+	var safe_author := author.strip_edges().substr(0,20)
+	if network_mode == "host" and remote_players.has(sender):
+		safe_author = str(remote_players[sender].get("name","Held")).strip_edges().substr(0,20)
+	add_chat_line(safe_author, value)
 	if network_mode == "host":
-		var sender := multiplayer.get_remote_sender_id()
 		for peer_id in multiplayer.get_peers():
-			if int(peer_id) != sender: rpc_chat_relay.rpc_id(int(peer_id), author, value)
+			if int(peer_id) != sender: rpc_chat_relay.rpc_id(int(peer_id), safe_author, value)
 
 @rpc("authority", "call_remote", "reliable")
 func rpc_chat_relay(author: String, value: String) -> void:
@@ -1319,8 +1349,22 @@ func normal_attack() -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class: int, design: int, power: int, element: String) -> void:
 	if network_mode != "host" or origin_data.size() < 2 or dir_data.size() < 2: return
-	var origin := Vector2(float(origin_data[0]),float(origin_data[1]))
-	var dir := Vector2(float(dir_data[0]),float(dir_data[1])).normalized()
+	var sender := multiplayer.get_remote_sender_id()
+	if sender <= 0 or not remote_players.has(sender): return
+	var state: Dictionary = remote_players[sender]
+	var state_pos: Array = state.get("pos", [])
+	if state_pos.size() < 2: return
+	var requested_origin := Vector2(float(origin_data[0]),float(origin_data[1]))
+	var origin := Vector2(float(state_pos[0]),float(state_pos[1]))
+	if requested_origin.distance_to(origin) > 125.0: return
+	var dir := Vector2(float(dir_data[0]),float(dir_data[1]))
+	if not dir.is_finite() or dir.length_squared() < 0.01: return
+	dir = dir.normalized()
+	remote_class = clampi(int(state.get("class",0)),0,2)
+	design = clampi(int(state.get("weapon",0)),0,32)
+	element = str(state.get("element",""))
+	var level_cap := clampi(int(state.get("level",1)),1,99)
+	power = clampi(power,1,80 + level_cap * 20)
 	if remote_class == 0:
 		var axe := design % 3 == 2
 		hit_arc(origin,dir,116.0 if axe else 100.0,0.08 if axe else 0.13,power,false,element)
@@ -1339,6 +1383,10 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	if index < 0 or index >= enemies.size(): return
 	play_sound("hit")
 	var enemy: Dictionary = enemies[index]
+	if network_mode == "client":
+		enemy["flash"] = 0.16
+		effect(enemy["pos"] + Vector2(0, -25), str(maxi(0, amount)), Color("fff1a1"), 0.55)
+		return
 	if float(enemy.get("marked", 0.0)) > 0.0:
 		amount = int(amount * 1.22)
 	match element:
@@ -1374,9 +1422,25 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, rank: int) -> void:
 	if network_mode != "host" or pos_data.size() < 2 or dir_data.size() < 2: return
-	var origin := Vector2(float(pos_data[0]),float(pos_data[1]))
-	var dir := Vector2(float(dir_data[0]),float(dir_data[1])).normalized()
-	# Hostautoritäre Schadensauflösung für Koop-Spieler. Visuelle Spezialeffekte bleiben lokal bei jedem Spieler.
+	var sender := multiplayer.get_remote_sender_id()
+	if sender <= 0 or not remote_players.has(sender): return
+	var state: Dictionary = remote_players[sender]
+	var state_pos: Array = state.get("pos", [])
+	if state_pos.size() < 2: return
+	var requested_origin := Vector2(float(pos_data[0]),float(pos_data[1]))
+	var origin := Vector2(float(state_pos[0]),float(state_pos[1]))
+	if requested_origin.distance_to(origin) > 145.0: return
+	var dir := Vector2(float(dir_data[0]),float(dir_data[1]))
+	if not dir.is_finite() or dir.length_squared() < 0.01: return
+	dir = dir.normalized()
+	var remote_class := clampi(int(state.get("class",0)),0,2)
+	var allowed_ids: Array = CLASS_SKILLS[remote_class].duplicate()
+	allowed_ids.append(CLASS_ULTIMATES[remote_class])
+	if id not in allowed_ids: return
+	rank = clampi(rank,1,5)
+	var level_cap := clampi(int(state.get("level",1)),1,99)
+	power = clampi(power,1,140 + level_cap * 30)
+	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
 	var radial_ids := [0,5,17,22,23,24,31,33]
 	if id in radial_ids:
 		var radius := 165.0 + rank * 12.0
