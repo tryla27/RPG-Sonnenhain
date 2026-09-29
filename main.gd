@@ -307,6 +307,7 @@ var pause_status := "Das Spiel ist angehalten."
 var touch_enabled := false
 var touch_move_id := -1
 var touch_move_vector := Vector2.ZERO
+var touch_move_base := Vector2(118, 526)
 var touch_move_knob := Vector2(118, 526)
 var touch_attack_ids: Dictionary = {}
 var sound_players: Array = []
@@ -1317,54 +1318,85 @@ func touch_button_at(pos: Vector2) -> String:
 	if Rect2(807, 557, 66, 54).has_point(pos): return "resource"
 	return ""
 
+func update_touch_joystick(pos: Vector2) -> void:
+	const MAX_RADIUS := 82.0
+	const DEADZONE := 14.0
+	var delta := pos - touch_move_base
+	var distance := delta.length()
+	if distance > MAX_RADIUS:
+		# Follow-Joystick: die Basis wandert mit, damit der Daumen nicht an einer
+		# festen Bildschirmposition "hängen bleibt".
+		touch_move_base += delta.normalized() * (distance - MAX_RADIUS)
+		delta = pos - touch_move_base
+		distance = delta.length()
+	if distance <= DEADZONE:
+		touch_move_vector = Vector2.ZERO
+		touch_move_knob = touch_move_base
+		return
+	var strength := clampf((distance - DEADZONE) / (MAX_RADIUS - DEADZONE), 0.0, 1.0)
+	touch_move_vector = delta.normalized() * strength
+	touch_move_knob = touch_move_base + delta.normalized() * minf(distance, 52.0)
+
+func reset_touch_joystick() -> void:
+	touch_move_id = -1
+	touch_move_vector = Vector2.ZERO
+	touch_move_base = Vector2(118, 526)
+	touch_move_knob = touch_move_base
+
 func handle_touch_event(event: InputEvent) -> bool:
 	if not touch_enabled: return false
 	if event is InputEventScreenTouch:
 		var touch_event: InputEventScreenTouch = event as InputEventScreenTouch
 		var pos: Vector2 = touch_event.position
+
+		# Releases müssen immer anhand der Finger-ID aufgeräumt werden. Vorher
+		# blieb z. B. "attack" aktiv, wenn der Daumen außerhalb des Buttons
+		# losgelassen wurde.
+		if not touch_event.pressed:
+			touch_attack_ids.erase(touch_event.index)
+			if touch_event.index == touch_move_id:
+				reset_touch_joystick()
+			queue_redraw()
+			return true
+
 		if panel != "":
-			if touch_event.pressed:
-				handle_panel_click(pos)
-				queue_redraw()
+			handle_panel_click(pos)
+			queue_redraw()
 			return true
-		if touch_event.pressed and pos.x <= 285.0 and pos.y >= 360.0:
-			touch_move_id = touch_event.index
-			var center: Vector2 = Vector2(118, 526)
-			var move_delta: Vector2 = pos - center
-			touch_move_vector = move_delta.limit_length(72.0) / 72.0
-			touch_move_knob = center + move_delta.limit_length(48.0)
-			return true
+
+		# Aktionsbuttons haben Vorrang und erhalten eine eigene Finger-ID.
 		var action: String = touch_button_at(pos)
 		if action != "":
-			if touch_event.pressed:
-				touch_attack_ids[touch_event.index] = action
-				match action:
-					"attack":
-						if attack_timer <= 0.0: normal_attack()
-					"dodge":
-						if dash_cooldown <= 0.0: dodge()
-					"interact": interact()
-					"chat": open_mobile_chat()
-					"heal": quick_potion(false)
-					"resource": quick_potion(true)
-					_:
-						if action.begins_with("ability_"):
-							use_ability(int(action.get_slice("_", 1)) - 1)
-			else:
-				touch_attack_ids.erase(touch_event.index)
+			touch_attack_ids[touch_event.index] = action
+			match action:
+				"attack":
+					if attack_timer <= 0.0: normal_attack()
+				"dodge":
+					if dash_cooldown <= 0.0: dodge()
+				"interact": interact()
+				"chat": open_mobile_chat()
+				"heal": quick_potion(false)
+				"resource": quick_potion(true)
+				_:
+					if action.begins_with("ability_"):
+						use_ability(int(action.get_slice("_", 1)) - 1)
+			queue_redraw()
 			return true
-		if not touch_event.pressed and touch_event.index == touch_move_id:
-			touch_move_id = -1
+
+		# Moderner Floating/Follow-Joystick: die linke Bildschirmhälfte ist die
+		# Bewegungszone, die Basis entsteht direkt unter dem Daumen.
+		if touch_move_id == -1 and pos.x <= 390.0 and pos.y >= 260.0:
+			touch_move_id = touch_event.index
+			touch_move_base = Vector2(clampf(pos.x, 82.0, 300.0), clampf(pos.y, 350.0, 555.0))
+			touch_move_knob = touch_move_base
 			touch_move_vector = Vector2.ZERO
-			touch_move_knob = Vector2(118, 526)
+			queue_redraw()
 			return true
 	elif event is InputEventScreenDrag:
 		var drag_event: InputEventScreenDrag = event as InputEventScreenDrag
 		if drag_event.index == touch_move_id:
-			var center: Vector2 = Vector2(118, 526)
-			var move_delta: Vector2 = drag_event.position - center
-			touch_move_vector = move_delta.limit_length(72.0) / 72.0
-			touch_move_knob = center + move_delta.limit_length(48.0)
+			update_touch_joystick(drag_event.position)
+			queue_redraw()
 			return true
 	return false
 
@@ -5599,12 +5631,13 @@ func draw_hud() -> void:
 func draw_touch_controls() -> void:
 	# Klassisches Mobile-Layout: Bewegung links, Skills unten mittig,
 	# Interaktion/Ausweichen/Angriff rechts.
-	var base := Vector2(118, 526)
-	draw_circle(base, 76, Color(0.07, 0.12, 0.14, 0.58))
-	draw_arc(base, 76, 0, TAU, 40, Color("a9c4b8", 0.72), 3)
-	draw_circle(touch_move_knob, 34, Color("5d756b", 0.88))
-	draw_arc(touch_move_knob, 34, 0, TAU, 32, Color("e7d5a3", 0.88), 3)
-	text_at(base + Vector2(-44, 104), "BEWEGEN", 12, Color("d9e5dc"), HORIZONTAL_ALIGNMENT_CENTER, 88)
+	var base := touch_move_base
+	var active_alpha := 0.82 if touch_move_id >= 0 else 0.42
+	draw_circle(base, 82, Color(0.07, 0.12, 0.14, active_alpha))
+	draw_arc(base, 82, 0, TAU, 40, Color("a9c4b8", active_alpha), 3)
+	draw_circle(touch_move_knob, 34, Color("5d756b", 0.92 if touch_move_id >= 0 else 0.62))
+	draw_arc(touch_move_knob, 34, 0, TAU, 32, Color("e7d5a3", 0.92 if touch_move_id >= 0 else 0.62), 3)
+	text_at(base + Vector2(-50, 108), "BEWEGEN", 12, Color("d9e5dc", active_alpha), HORIZONTAL_ALIGNMENT_CENTER, 100)
 
 	for slot in 4:
 		var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
