@@ -12,6 +12,7 @@ on:
       - "audio/**"
       - "music/**"
       - "tools/harden_web.py"
+      - "web-legal/**"
       - "CNAME"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
@@ -57,10 +58,15 @@ jobs:
       - name: Harden browser shell
         run: python3 tools/harden_web.py build/web/index.html
 
-      - name: Add custom domain and disable Jekyll
+      - name: Add legal pages, security metadata and custom domain
         shell: bash
         run: |
           cp CNAME build/web/CNAME
+          cp web-legal/datenschutz.html build/web/datenschutz.html
+          cp web-legal/impressum.html build/web/impressum.html
+          cp web-legal/sicherheit.html build/web/sicherheit.html
+          mkdir -p build/web/.well-known
+          cp web-legal/security.txt build/web/.well-known/security.txt
           touch build/web/.nojekyll
 
       - name: Upload Pages artifact
