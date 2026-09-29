@@ -125,9 +125,21 @@ jobs:
           import base64
           import os
           from pathlib import Path
-          raw = os.environ["MANITU_SSH_KEY"].strip()
-          key = base64.b64decode(raw).decode("utf-8").replace("\r", "").strip()
-          Path.home().joinpath(".ssh/manitu_deploy").write_text(key + "\n", encoding="utf-8")
+
+          raw = os.environ["MANITU_SSH_KEY"].replace("\r", "").strip()
+          if "BEGIN OPENSSH PRIVATE KEY" in raw:
+              key = raw.replace("\\n", "\n")
+          else:
+              try:
+                  decoded = base64.b64decode("".join(raw.split()), validate=True)
+                  key = decoded.decode("utf-8").replace("\r", "").strip()
+              except Exception as exc:
+                  raise SystemExit("MANITU_SSH_KEY is neither a valid OpenSSH private key nor valid Base64: %s" % exc)
+
+          if "BEGIN OPENSSH PRIVATE KEY" not in key or "END OPENSSH PRIVATE KEY" not in key:
+              raise SystemExit("Decoded MANITU_SSH_KEY does not contain a complete OpenSSH private key")
+
+          Path.home().joinpath(".ssh/manitu_deploy").write_text(key.strip() + "\n", encoding="utf-8")
           PY
           chmod 600 "$HOME/.ssh/manitu_deploy"
           ssh-keygen -y -f "$HOME/.ssh/manitu_deploy" >/dev/null
