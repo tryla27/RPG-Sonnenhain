@@ -96,6 +96,7 @@ jobs:
           set -euo pipefail
           cp website/index.html build/site/index.html
           cp website/site.css build/site/site.css
+          cp -R website/mobile-preview build/site/mobile-preview
           cp CNAME build/site/CNAME
           cp web-legal/datenschutz.html build/site/datenschutz.html
           cp web-legal/impressum.html build/site/impressum.html
@@ -116,10 +117,13 @@ jobs:
 
           test -f build/site/index.html
           test -f build/site/site.css
+          test -f build/site/mobile-preview/index.html
+          test -f build/site/mobile-preview/site.css
           test -f build/site/game/index.html
           test -f build/site/game/index.pck
           test -f build/site/game/index.wasm
           grep -q "Eine Reise durch" build/site/index.html
+          grep -q "Eine Reise durch" build/site/mobile-preview/index.html
           grep -q "human-gate" build/site/game/index.html
           grep -q "Require all granted" build/site/.htaccess
           grep -q "DirectoryIndex index.html" build/site/.htaccess
