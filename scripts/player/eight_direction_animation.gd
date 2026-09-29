@@ -16,10 +16,8 @@ static func direction_index(vector: Vector2) -> int:
 	if vector.length_squared() < 0.0001:
 		return Direction8.SOUTH
 	var angle := wrapf(vector.angle(), -PI, PI)
-	var octant := int(round((angle + PI * 0.5) / (PI / 4.0))) % 8
-	if octant < 0:
-		octant += 8
-	return octant
+	# Godot 2D: Ost=0, Süd=PI/2. Enum-Reihenfolge beginnt bei Süd.
+	return posmod(int(round(angle / (PI / 4.0))) + 6, 8)
 
 static func direction_name(index: int) -> String:
 	return ["south", "south_west", "west", "north_west", "north", "north_east", "east", "south_east"][clampi(index, 0, 7)]
