@@ -5173,7 +5173,9 @@ func draw_shadow(p: Vector2) -> void:
 
 func draw_player() -> void:
 	draw_shadow(player_pos)
-	if invulnerable > 0 and Engine.get_process_frames() % 6 < 3: return
+	# Mobilität bleibt immer sichtbar. Nur echte Schadens-Unverwundbarkeit darf blinken.
+	if invulnerable > 0 and mobility_anim_timer <= 0.0 and Engine.get_process_frames() % 6 < 3:
+		return
 	draw_hero(player_pos, 1.0, is_walking, facing, true)
 	if swing_timer > 0 and class_id == 0:
 		var swing_progress := clampf(1.0 - swing_timer / maxf(0.01, swing_duration), 0.0, 1.0)
