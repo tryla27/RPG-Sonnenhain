@@ -7,6 +7,7 @@ const GATE_HALF_WIDTH := 175.0
 const SAVE_PATH := "user://sonnenhain_save.json"
 const CREATIVE_SAVE_PATH := "user://sonnenhain_testmodus.json"
 const CONTROLS_PATH := "user://sonnenhain_tasten.json"
+const WEB_INVITE_URL := "https://sonnenhainrpg.de/?invite=TDcGAIcmPOf7dueAKd5OB2sYEkeYJwo0"
 const BIND_ACTIONS := ["move_up", "move_down", "move_left", "move_right", "attack", "dodge", "interact", "waystone", "heal", "resource", "ability_1", "ability_2", "ability_3", "ability_4", "skills", "inventory", "journal", "map", "pause"]
 const BIND_NAMES := ["Nach oben", "Nach unten", "Nach links", "Nach rechts", "Angriff", "Ausweichen", "Interagieren", "Wegstein", "Heiltrank", "Energie / Mana", "Fähigkeit 1", "Fähigkeit 2", "Fähigkeit 3", "Fähigkeit 4", "Skillbuch", "Inventar", "Questbuch", "Weltkarte", "Pause"]
 const DEFAULT_BINDINGS := {"move_up":KEY_W, "move_down":KEY_S, "move_left":KEY_A, "move_right":KEY_D, "attack":-MOUSE_BUTTON_LEFT, "dodge":KEY_SPACE, "interact":KEY_E, "waystone":KEY_F, "heal":KEY_Q, "resource":KEY_R, "ability_1":KEY_1, "ability_2":KEY_2, "ability_3":KEY_3, "ability_4":KEY_4, "skills":KEY_K, "inventory":KEY_I, "journal":KEY_J, "map":KEY_M, "pause":KEY_ESCAPE}
@@ -304,6 +305,7 @@ var event_states: Array = []
 var event_progress: Array = []
 var creative_mode := false
 var pause_status := "Das Spiel ist angehalten."
+var invite_menu_status := "Bereit zum Erstellen eines Einladungslinks."
 var sound_players: Array = []
 var sound_streams: Dictionary = {}
 var next_sound_player := 0
@@ -2622,6 +2624,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 			mechanics_page = 0
 			panel = "mechanics"
 			play_sound("menu")
+		elif Rect2(860, 319, 130, 42).has_point(mouse):
+			invite_menu_status = "Bereit zum Erstellen eines Einladungslinks."
+			panel = "invite"
+			play_sound("menu")
 		elif Rect2(300, 270, 550, 42).has_point(mouse):
 			play_sound("menu")
 			save_game()
@@ -2653,6 +2659,15 @@ func handle_panel_click(mouse: Vector2) -> void:
 					return
 			if Rect2(762, 510, 180, 38).has_point(mouse):
 				panel = "travel"
+		return
+	if panel == "invite":
+		if Rect2(300, 348, 550, 48).has_point(mouse):
+			DisplayServer.clipboard_set(WEB_INVITE_URL)
+			invite_menu_status = "Einladungslink erstellt und in die Zwischenablage kopiert."
+			play_sound("menu")
+		elif Rect2(300, 520, 220, 42).has_point(mouse):
+			panel = "pause"
+			play_sound("menu")
 		return
 	if panel == "controls":
 		if Rect2(965, 91, 41, 35).has_point(mouse):
@@ -5390,6 +5405,7 @@ func draw_panel() -> void:
 		"multiplayer": draw_multiplayer_panel()
 		"intro": draw_intro_panel()
 		"pause": draw_pause_panel()
+		"invite": draw_invite_panel()
 		"controls": draw_controls_panel()
 		"skills": draw_skills_panel()
 		"inventory": draw_inventory_panel()
@@ -5539,6 +5555,7 @@ func draw_pause_panel() -> void:
 	ui_button(Rect2(300, 221, 550, 42), "FORTSETZEN")
 	ui_button(Rect2(860, 221, 130, 42), "TASTEN")
 	ui_button(Rect2(860, 270, 130, 42), "MECHANIK")
+	ui_button(Rect2(860, 319, 130, 42), "EINLADUNG")
 	ui_button(Rect2(300, 270, 550, 42), "TESTSTAND SPEICHERN" if creative_mode else "SPIEL SPEICHERN")
 	draw_volume_slider(Vector2(300, 326), "MUSIK", music_volume, Color("d9b67b"))
 	draw_volume_slider(Vector2(300, 380), "EFFEKTE", effects_volume, Color("9bcfd0"))
@@ -5550,6 +5567,17 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(762, 510, 180, 38), "REISEN")
 	text_at(Vector2(302, 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
 	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUM HAUPTMENÜ")
+
+func draw_invite_panel() -> void:
+	text_at(Vector2(300, 158), "EINLADUNG", 35, Color("ffeda9"))
+	text_at(Vector2(302, 198), "Privater Zugang zur Sonnenhain-Webversion", 17, Color("e6f0dc"))
+	text_at(Vector2(302, 240), "Teile diesen Link nur mit Personen, die Zugriff bekommen sollen.", 14, Color("d7e4d5"))
+	ui_box(Rect2(300, 272, 550, 58), Color("30443f"))
+	text_at(Vector2(316, 307), WEB_INVITE_URL, 13, Color("fff0cf"), HORIZONTAL_ALIGNMENT_LEFT, 520)
+	ui_button(Rect2(300, 348, 550, 48), "EINLADUNGSLINK ERSTELLEN & KOPIEREN")
+	text_at(Vector2(302, 430), invite_menu_status, 14, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 550)
+	text_at(Vector2(302, 466), "Hinweis: Der aktuelle statische Webzugang verwendet einen gemeinsamen Invite-Code.", 12, Color("aebfb9"), HORIZONTAL_ALIGNMENT_LEFT, 550)
+	ui_button(Rect2(300, 520, 220, 42), "ZURÜCK")
 
 func draw_controls_panel() -> void:
 	text_at(Vector2(170, 153), "TASTENBELEGUNG", 29, Color("ffdf9f"))
