@@ -7,6 +7,9 @@ extends Resource
 @export_group("Bewegung")
 @export var move_speed_multiplier: float = 1.0
 @export var acceleration_multiplier: float = 1.0
+@export var roll_speed_multiplier: float = 1.0
+@export var roll_distance_multiplier: float = 1.0
+@export var roll_cooldown_multiplier: float = 1.0
 
 @export_group("Kampf")
 @export var max_hp_multiplier: float = 1.0
