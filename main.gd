@@ -327,6 +327,7 @@ var hero_gender := 0 # 0 Mann, 1 Frau
 var hero_race := 0 # 0 Mensch, 1 Ork, 2 Roboter
 var pending_gender := 0
 var pending_race := 0
+var creation_step: int = 1
 var creation_name := ""
 var character_created := false
 var chat_open := false
@@ -1099,14 +1100,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			if "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-".find(code_char) >= 0: join_code += code_char
 		queue_redraw()
 		return
-	# Texteingabe für einmalige Charaktererstellung.
+	# Zweistufige Charaktererstellung: zuerst Geschlecht, dann Rasse + Name.
 	if panel == "creation" and event is InputEventKey and event.pressed and not event.echo:
+		if creation_step == 1:
+			if event.keycode == KEY_ENTER:
+				creation_step = 2
+				play_sound("menu")
+			elif event.keycode == KEY_ESCAPE:
+				panel = "start"
+			queue_redraw()
+			return
 		if event.keycode == KEY_BACKSPACE:
 			if creation_name.length() > 0: creation_name = creation_name.left(creation_name.length() - 1)
 		elif event.keycode == KEY_ENTER:
 			if creation_name.strip_edges().length() >= 2: start_new_game()
+		elif event.keycode == KEY_ESCAPE:
+			creation_step = 1
 		elif event.unicode >= 32 and creation_name.length() < 16:
-			var typed := String.chr(event.unicode)
+			var typed: String = String.chr(event.unicode)
 			if "abcdefghijklmnopqrstuvwxyzäöüß0123456789 -_".find(typed.to_lower()) >= 0: creation_name += typed
 		queue_redraw()
 		return
@@ -2788,18 +2799,30 @@ func handle_panel_click(mouse: Vector2) -> void:
 			play_sound("menu")
 		return
 	if panel == "creation":
-		for i in 2:
-			if Rect2(300 + i * 210, 300, 195, 40).has_point(mouse):
-				pending_gender = i
+		if creation_step == 1:
+			for i in 2:
+				var gender_card: Rect2 = Rect2(245 + i * 335, 245, 310, 230)
+				if gender_card.has_point(mouse):
+					pending_gender = i
+					play_sound("menu")
+					return
+			if Rect2(366, 520, 420, 52).has_point(mouse):
+				creation_step = 2
 				play_sound("menu")
+			elif Rect2(165, 520, 160, 52).has_point(mouse):
+				panel = "start"
+			return
 		for i in 3:
-			if Rect2(245 + i * 220, 365, 205, 44).has_point(mouse):
+			var race_card: Rect2 = Rect2(180 + i * 260, 245, 240, 180)
+			if race_card.has_point(mouse):
 				pending_race = i
 				play_sound("menu")
-		if Rect2(300, 520, 550, 52).has_point(mouse) and creation_name.strip_edges().length() >= 2:
+				return
+		if Rect2(360, 520, 430, 52).has_point(mouse) and creation_name.strip_edges().length() >= 2:
 			start_new_game()
-		elif Rect2(165, 520, 110, 52).has_point(mouse):
-			panel = "start"
+		elif Rect2(165, 520, 160, 52).has_point(mouse):
+			creation_step = 1
+			play_sound("menu")
 		return
 	if panel == "multiplayer":
 		if Rect2(205, 282, 340, 52).has_point(mouse):
@@ -2938,6 +2961,7 @@ func begin_character_creation() -> void:
 	creation_name = ""
 	pending_gender = 0
 	pending_race = 0
+	creation_step = 1
 	character_created = false
 	panel = "creation"
 	play_sound("menu")
@@ -3774,19 +3798,29 @@ func cardinal_direction_index(dir: Vector2) -> int:
 
 func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, attack: bool = false, race_override: int = -1, gender_override: int = -1) -> void:
 	if character_sprites == null: return
-	var use_race := hero_race if race_override < 0 else race_override
-	var use_gender := hero_gender if gender_override < 0 else gender_override
-	var combo := ((clampi(use_race,0,2) * 2 + clampi(use_gender,0,1)) * 3 + clampi(visual_class,0,2))
-	var direction := cardinal_direction_index(look)
-	var frame := 3 if attack else (1 + int(world_time * 7.0) % 2 if walking else 0)
-	var src := Rect2(Vector2(frame * 32, (combo * 4 + direction) * 32), Vector2(32,32))
-	var size := Vector2(70,70) * scale_factor
-	draw_texture_rect_region(character_sprites, Rect2(p - size * 0.5 + Vector2(0,-14*scale_factor), size), src)
+	var use_race: int = hero_race if race_override < 0 else race_override
+	var use_gender: int = hero_gender if gender_override < 0 else gender_override
+	# Roboter bleiben optisch geschlechtsneutral: beide Auswahlmöglichkeiten nutzen dasselbe Modell.
+	var sprite_gender: int = 0 if use_race == 2 else clampi(use_gender, 0, 1)
+	var combo: int = ((clampi(use_race,0,2) * 2 + sprite_gender) * 3 + clampi(visual_class,0,2))
+	var direction: int = cardinal_direction_index(look)
+	var frame: int = 3 if attack else (1 + int(world_time * 7.0) % 2 if walking else 0)
+	var src: Rect2 = Rect2(Vector2(frame * 32, (combo * 4 + direction) * 32), Vector2(32,32))
+	var size: Vector2 = Vector2(70,70) * scale_factor
+	var width_scale: float = 0.94 if use_gender == 1 and use_race != 2 else 1.0
+	var dest_size: Vector2 = Vector2(size.x * width_scale, size.y)
+	var dest_pos: Vector2 = p - dest_size * 0.5 + Vector2(0,-14*scale_factor)
+	draw_texture_rect_region(character_sprites, Rect2(dest_pos, dest_size), src)
 	draw_character_detail_overlay(p, visual_class, look, scale_factor, use_race, use_gender)
 
 func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2, scale_factor: float, race: int, gender: int) -> void:
 	var accent: Color = [Color('e5bd77'),Color('8fcde6'),Color('91c787')][clampi(visual_class,0,2)]
 	var face_y: float = -25.0 if look.y >= -0.4 else -28.0
+	if gender == 1 and race != 2:
+		# Dezentes feminines Ausschnittdetail im Pixelstil; Roboter bleiben identisch.
+		var neckline: Color = Color('d9aa8f') if race == 0 else Color('8fb678')
+		draw_line(p + Vector2(-5,-17) * scale_factor, p + Vector2(0,-11) * scale_factor, neckline, 2.0 * scale_factor)
+		draw_line(p + Vector2(5,-17) * scale_factor, p + Vector2(0,-11) * scale_factor, neckline, 2.0 * scale_factor)
 	if race == 1:
 		# Orks: markante Hauer und breitere Schulterakzente.
 		draw_rect(Rect2(p+Vector2(-10,face_y+8)*scale_factor,Vector2(4,3)*scale_factor),Color('efe0bd'))
@@ -5788,33 +5822,51 @@ func draw_start_panel() -> void:
 		text_at(card.position + Vector2(11, 46), str(save_slot_labels[index]) if index < save_slot_labels.size() else "LEER", 14, Color("e0eacb"))
 
 func draw_creation_panel() -> void:
-	text_at(Vector2(270, 142), "CHARAKTER ERSTELLEN", 31, Color('ffe1a0'))
-	text_at(Vector2(270, 172), "Name, Geschlecht und Rasse werden für diesen Spielstand fest gespeichert.", 15, Color('d8e6dc'))
-	text_at(Vector2(270, 215), "NAME", 14, Color('e9cc90'))
-	var name_box := Rect2(300, 228, 550, 48)
-	draw_rect(name_box, Color('22363c'))
-	draw_rect(name_box, Color('8ba49c'), false, 2)
-	text_at(name_box.position + Vector2(14,31), (creation_name if creation_name != "" else "Name eingeben …") + ("_" if int(world_time*2.0)%2==0 else ""), 20, Color('fff0cf') if creation_name != "" else Color('9fb4ac'))
-	text_at(Vector2(270, 292), "GESCHLECHT", 14, Color('e9cc90'))
-	for i in 2:
-		ui_button(Rect2(300 + i*210, 300, 195, 40), GENDER_NAMES[i].to_upper(), true, pending_gender == i)
-	text_at(Vector2(270, 357), "RASSE", 14, Color('e9cc90'))
+	text_at(Vector2(165, 108), "CHARAKTER ERSTELLEN", 31, Color("ffe1a0"))
+	text_at(Vector2(165, 141), "SCHRITT %d VON 2" % creation_step, 13, Color("92cfc7"))
+	# Fortschrittsleiste.
+	draw_rect(Rect2(165, 159, 820, 6), Color("263b3d"))
+	draw_rect(Rect2(165, 159, 410.0 * float(creation_step), 6), Color("8fcab1"))
+	if creation_step == 1:
+		text_at(Vector2(165, 202), "WÄHLE DEINE FIGUR", 22, Color("fff0c8"))
+		text_at(Vector2(165, 228), "Zuerst legst du das Geschlecht fest. Die Rasse wählst du im nächsten Schritt.", 14, Color("c8d8d2"))
+		for i in 2:
+			var card: Rect2 = Rect2(245 + i * 335, 245, 310, 230)
+			ui_box(card, Color("527368") if pending_gender == i else Color("334d4d"))
+			draw_rect(card, Color("e2c47f") if pending_gender == i else Color("718c84"), false, 3)
+			var center: Vector2 = card.position + Vector2(card.size.x * 0.5, 112)
+			draw_character_sprite(center, pending_class, false, Vector2.DOWN, 1.55, false, 0, i)
+			draw_weapon_world(center + Vector2(0,-8), pending_class, pending_class * 4, Vector2.DOWN, 1.25)
+			text_at(card.position + Vector2(0, 190), GENDER_NAMES[i].to_upper(), 22, Color("fff1c8"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x))
+			text_at(card.position + Vector2(0, 216), "AUSGEWÄHLT" if pending_gender == i else "AUSWÄHLEN", 12, Color("aee7ca") if pending_gender == i else Color("aebfba"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x))
+		ui_button(Rect2(165, 520, 160, 52), "ZURÜCK")
+		ui_button(Rect2(366, 520, 420, 52), "WEITER ZUR RASSE")
+		text_at(Vector2(165, 594), "Klasse: %s · Die Vorschau zeigt zunächst den Menschen." % CLASS_NAMES[pending_class], 12, Color("aebfb9"), HORIZONTAL_ALIGNMENT_CENTER, 820)
+		return
+
+	text_at(Vector2(165, 194), "WÄHLE DEINE RASSE", 22, Color("fff0c8"))
+	text_at(Vector2(165, 219), "Geschlecht: %s · Klasse: %s" % [GENDER_NAMES[pending_gender], CLASS_NAMES[pending_class]], 13, Color("c8d8d2"))
 	for i in 3:
-		ui_button(Rect2(245 + i*220, 365, 205, 44), RACE_NAMES[i].to_upper(), true, pending_race == i)
-	ui_box(Rect2(905, 215, 220, 194), Color("34494b"))
-	text_at(Vector2(918, 244), RACE_NAMES[pending_race].to_upper(), 16, Color("ffe1a0"))
-	text_at(Vector2(918, 278), RACE_ADVANTAGES[pending_race], 11, Color("9fe6ae"), HORIZONTAL_ALIGNMENT_LEFT, 190)
-	text_at(Vector2(918, 318), RACE_DISADVANTAGES[pending_race], 11, Color("f0a09b"), HORIZONTAL_ALIGNMENT_LEFT, 190)
-	text_at(Vector2(918, 356), "Klasse: %s" % CLASS_NAMES[pending_class], 12, Color("d8e6dc"), HORIZONTAL_ALIGNMENT_LEFT, 190)
-	# Vorschau der drei Klassen mit gewählter Rasse/Geschlecht.
-	for cls in 3:
-		var center := Vector2(350 + cls*225, 462)
-		draw_character_sprite(center, cls, false, Vector2.DOWN, 1.0, false, pending_race, pending_gender)
-		draw_weapon_world(center + Vector2(0,-5), cls, cls*4, Vector2.DOWN, 1.0)
-		text_at(center + Vector2(-65,43), CLASS_NAMES[cls], 14, Color('eaf2df'), HORIZONTAL_ALIGNMENT_CENTER, 130)
-	ui_button(Rect2(165, 520, 110, 52), "ZURÜCK")
-	ui_button(Rect2(300, 520, 550, 52), "ABENTEUER STARTEN", creation_name.strip_edges().length() >= 2)
-	text_at(Vector2(305, 592), "Rasse und Geschlecht verändern das Pixelmodell. Klasse wurde im Hauptmenü gewählt.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_CENTER, 540)
+		var card: Rect2 = Rect2(180 + i * 260, 245, 240, 180)
+		ui_box(card, Color("527368") if pending_race == i else Color("334d4d"))
+		draw_rect(card, Color("e2c47f") if pending_race == i else Color("718c84"), false, 3)
+		var center: Vector2 = card.position + Vector2(card.size.x * 0.5, 77)
+		draw_character_sprite(center, pending_class, false, Vector2.DOWN, 1.18, false, i, pending_gender)
+		draw_weapon_world(center + Vector2(0,-6), pending_class, pending_class * 4, Vector2.DOWN, 0.95)
+		text_at(card.position + Vector2(0, 133), RACE_NAMES[i].to_upper(), 17, Color("fff1c8"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x))
+		text_at(card.position + Vector2(10, 154), RACE_ADVANTAGES[i], 10, Color("a9e4b4"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x - 20))
+		text_at(card.position + Vector2(10, 172), RACE_DISADVANTAGES[i], 10, Color("efaaa4"), HORIZONTAL_ALIGNMENT_CENTER, int(card.size.x - 20))
+	text_at(Vector2(270, 447), "NAME", 13, Color("e9cc90"))
+	var name_box: Rect2 = Rect2(300, 458, 550, 46)
+	draw_rect(name_box, Color("22363c"))
+	draw_rect(name_box, Color("8ba49c"), false, 2)
+	var shown_name: String = creation_name if creation_name != "" else "Name eingeben …"
+	if int(world_time * 2.0) % 2 == 0:
+		shown_name += "_"
+	text_at(name_box.position + Vector2(14,30), shown_name, 19, Color("fff0cf") if creation_name != "" else Color("9fb4ac"))
+	ui_button(Rect2(165, 520, 160, 52), "ZURÜCK")
+	ui_button(Rect2(360, 520, 430, 52), "ABENTEUER STARTEN", creation_name.strip_edges().length() >= 2)
+	text_at(Vector2(165, 594), "Roboter sind bei Mann/Frau optisch identisch. Mensch und Ork unterscheiden sich dezent.", 12, Color("aebfb9"), HORIZONTAL_ALIGNMENT_CENTER, 820)
 
 func draw_multiplayer_panel() -> void:
 	text_at(Vector2(205, 150), "SONNENHAIN KOOP", 31, Color('ffe1a0'))
