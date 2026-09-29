@@ -7,7 +7,6 @@ const GATE_HALF_WIDTH := 175.0
 const SAVE_PATH := "user://sonnenhain_save.json"
 const CREATIVE_SAVE_PATH := "user://sonnenhain_testmodus.json"
 const CONTROLS_PATH := "user://sonnenhain_tasten.json"
-const WEB_INVITE_URL := "https://sonnenhainrpg.de/?invite=TDcGAIcmPOf7dueAKd5OB2sYEkeYJwo0"
 const BIND_ACTIONS := ["move_up", "move_down", "move_left", "move_right", "attack", "dodge", "interact", "waystone", "heal", "resource", "ability_1", "ability_2", "ability_3", "ability_4", "skills", "inventory", "journal", "map", "pause"]
 const BIND_NAMES := ["Nach oben", "Nach unten", "Nach links", "Nach rechts", "Angriff", "Ausweichen", "Interagieren", "Wegstein", "Heiltrank", "Energie / Mana", "Fähigkeit 1", "Fähigkeit 2", "Fähigkeit 3", "Fähigkeit 4", "Skillbuch", "Inventar", "Questbuch", "Weltkarte", "Pause"]
 const DEFAULT_BINDINGS := {"move_up":KEY_W, "move_down":KEY_S, "move_left":KEY_A, "move_right":KEY_D, "attack":-MOUSE_BUTTON_LEFT, "dodge":KEY_SPACE, "interact":KEY_E, "waystone":KEY_F, "heal":KEY_Q, "resource":KEY_R, "ability_1":KEY_1, "ability_2":KEY_2, "ability_3":KEY_3, "ability_4":KEY_4, "skills":KEY_K, "inventory":KEY_I, "journal":KEY_J, "map":KEY_M, "pause":KEY_ESCAPE}
@@ -305,7 +304,6 @@ var event_states: Array = []
 var event_progress: Array = []
 var creative_mode := false
 var pause_status := "Das Spiel ist angehalten."
-var invite_menu_status := "Bereit zum Erstellen eines Einladungslinks."
 var touch_enabled := false
 var touch_move_id := -1
 var touch_move_vector := Vector2.ZERO
@@ -3014,10 +3012,6 @@ func handle_panel_click(mouse: Vector2) -> void:
 			mechanics_page = 0
 			panel = "mechanics"
 			play_sound("menu")
-		elif Rect2(570, 135, 280, 42).has_point(mouse):
-			invite_menu_status = "Bereit zum Erstellen eines Einladungslinks."
-			panel = "invite"
-			play_sound("menu")
 		elif Rect2(300, 270, 550, 42).has_point(mouse):
 			play_sound("menu")
 			save_game()
@@ -3053,18 +3047,6 @@ func handle_panel_click(mouse: Vector2) -> void:
 					return
 			if Rect2(762, 510, 180, 38).has_point(mouse):
 				panel = "travel"
-		return
-	if panel == "invite":
-		if Rect2(300, 135, 250, 42).has_point(mouse):
-			panel = "pause"
-			play_sound("menu")
-		elif Rect2(300, 348, 550, 48).has_point(mouse):
-			DisplayServer.clipboard_set(WEB_INVITE_URL)
-			invite_menu_status = "Einladungslink erstellt und in die Zwischenablage kopiert."
-			play_sound("menu")
-		elif Rect2(300, 520, 220, 42).has_point(mouse):
-			panel = "pause"
-			play_sound("menu")
 		return
 	if panel == "controls":
 		if Rect2(965, 91, 41, 35).has_point(mouse):
@@ -5878,7 +5860,6 @@ func draw_panel() -> void:
 		"multiplayer": draw_multiplayer_panel()
 		"intro": draw_intro_panel()
 		"pause": draw_pause_panel()
-		"invite": draw_invite_panel()
 		"controls": draw_controls_panel()
 		"skills": draw_skills_panel()
 		"inventory": draw_inventory_panel()
@@ -5938,7 +5919,7 @@ func draw_mechanics_panel() -> void:
 			text_at(Vector2(x+38,y+17), "%s" % str(a["desc"]), 11, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 345)
 		text_at(Vector2(190,575), "Skillbuch: K · freie Skillpunkte: %d" % skill_points, 13, Color('ffe0a1'))
 	else:
-		text_at(Vector2(190,211), "Koop: 2–4 Spieler · Host erzeugt Einladungscode · Freund tritt mit Code bei", 16, Color('e9cc90'))
+		text_at(Vector2(190,211), "Online: 2–4 Spieler · Browser und Desktop verbinden sich mit dem gemeinsamen Live-Server.", 16, Color('e9cc90'))
 		text_at(Vector2(190,250), "Status: %s" % network_status, 14, Color('bfe7d4'), HORIZONTAL_ALIGNMENT_LEFT, 750)
 		text_at(Vector2(190,286), "CHAT", 17, Color('ffe0a1'))
 		text_at(Vector2(190,315), "ENTER oder T öffnet den Gruppenchat. ENTER sendet, ESC bricht ab.", 14, Color('e5ecd9'))
@@ -6017,11 +5998,10 @@ func draw_multiplayer_panel() -> void:
 	ui_button(Rect2(205, 520, 200, 46), "ZURÜCK")
 	var can_start := network_mode == "host" or (network_mode == "client" and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED)
 	ui_button(Rect2(605, 520, 340, 46), "WELT STARTEN" if network_mode == "host" else "WELT BEITRETEN", can_start)
-	text_at(Vector2(205, 586), "Online: wss://sonnenhainrpg.de/multiplayer · Desktop-Legacy bleibt zusätzlich verfügbar.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
+	text_at(Vector2(205, 586), "Online: wss://multiplayer.sonnenhainrpg.de/ · Desktop-Legacy bleibt zusätzlich verfügbar.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
 
 func draw_pause_panel() -> void:
-	ui_button(Rect2(300, 135, 250, 42), "PAUSE", true, true)
-	ui_button(Rect2(570, 135, 280, 42), "EINLADELINK")
+	ui_button(Rect2(300, 135, 550, 42), "PAUSE", true, true)
 	text_at(Vector2(302, 205), "Level %d · %s · %d Gold" % [level, region_name(region_at(player_pos)), gold], 17, Color("e6f0dc"))
 	ui_button(Rect2(300, 221, 550, 42), "FORTSETZEN")
 	ui_button(Rect2(860, 221, 130, 42), "TASTEN")
@@ -6037,18 +6017,6 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(762, 510, 180, 38), "REISEN")
 	text_at(Vector2(302, 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
 	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUR STARTSEITE" if is_web_platform() else "SPEICHERN & ZUM HAUPTMENÜ")
-
-func draw_invite_panel() -> void:
-	ui_button(Rect2(300, 135, 250, 42), "PAUSE")
-	ui_button(Rect2(570, 135, 280, 42), "EINLADELINK", true, true)
-	text_at(Vector2(302, 205), "Privater Zugang zur Sonnenhain-Webversion", 17, Color("e6f0dc"))
-	text_at(Vector2(302, 240), "Teile diesen Link nur mit Personen, die Zugriff bekommen sollen.", 14, Color("d7e4d5"))
-	ui_box(Rect2(300, 272, 550, 58), Color("30443f"))
-	text_at(Vector2(316, 307), WEB_INVITE_URL, 13, Color("fff0cf"), HORIZONTAL_ALIGNMENT_LEFT, 520)
-	ui_button(Rect2(300, 348, 550, 48), "EINLADUNGSLINK ERSTELLEN & KOPIEREN")
-	text_at(Vector2(302, 430), invite_menu_status, 14, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 550)
-	text_at(Vector2(302, 466), "Hinweis: Der aktuelle statische Webzugang verwendet einen gemeinsamen Invite-Code.", 12, Color("aebfb9"), HORIZONTAL_ALIGNMENT_LEFT, 550)
-	ui_button(Rect2(300, 520, 220, 42), "ZURÜCK")
 
 func draw_controls_panel() -> void:
 	text_at(Vector2(170, 153), "TASTENBELEGUNG", 29, Color("ffdf9f"))
