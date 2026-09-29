@@ -104,15 +104,15 @@ jobs:
           mkdir -p build/site/.well-known
           cp web-legal/security.txt build/site/.well-known/security.txt
           touch build/site/.nojekyll
-          cat > build/site/.htaccess <<'EOF'
-DirectoryIndex index.html
-Require all granted
-AddType application/wasm .wasm
-AddType application/javascript .js
-<IfModule mod_headers.c>
-  Header always set X-Content-Type-Options "nosniff"
-</IfModule>
-EOF
+          printf '%s\n' \
+            'DirectoryIndex index.html' \
+            'Require all granted' \
+            'AddType application/wasm .wasm' \
+            'AddType application/javascript .js' \
+            '<IfModule mod_headers.c>' \
+            '  Header always set X-Content-Type-Options "nosniff"' \
+            '</IfModule>' \
+            > build/site/.htaccess
 
           test -f build/site/index.html
           test -f build/site/site.css
