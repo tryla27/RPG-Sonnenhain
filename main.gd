@@ -340,6 +340,8 @@ var join_code := ""
 var remote_players: Dictionary = {}
 var local_peer_id := 1
 var sync_timer := 0.0
+var server_spawn_timer := 0.0
+var server_action_times: Dictionary = {}
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -569,6 +571,21 @@ func disconnect_multiplayer(show_message: bool = true) -> void:
 	network_mode = "offline"
 	invite_code = ""
 	if show_message: network_status = "Offline"
+
+func server_action_allowed(peer_id: int, action_key: String, cooldown_ms: int) -> bool:
+	if peer_id <= 0: return false
+	var now := Time.get_ticks_msec()
+	var key := "%d:%s" % [peer_id, action_key]
+	var previous := int(server_action_times.get(key, 0))
+	if now - previous < cooldown_ms: return false
+	server_action_times[key] = now
+	return true
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_server_damage(amount: int) -> void:
+	if network_mode != "client": return
+	if invulnerable <= 0.0:
+		apply_player_damage(clampi(amount, 1, 500))
 
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null: return
@@ -907,9 +924,140 @@ func _process(delta: float) -> void:
 		save_timer = 0.0
 	queue_redraw()
 
+func network_player_position(peer_id: int) -> Vector2:
+	if not remote_players.has(peer_id): return Vector2(-10000, -10000)
+	var row: Dictionary = remote_players[peer_id]
+	var coords: Array = row.get("pos", [])
+	if coords.size() < 2: return Vector2(-10000, -10000)
+	return Vector2(float(coords[0]), float(coords[1]))
+
+func nearest_network_player(origin: Vector2, max_distance: float = INF) -> Dictionary:
+	var best_peer := 0
+	var best_pos := Vector2.ZERO
+	var best_distance := max_distance
+	for raw_peer in remote_players.keys():
+		var peer_id := int(raw_peer)
+		var pos := network_player_position(peer_id)
+		if pos.x < -9000.0: continue
+		var distance := origin.distance_to(pos)
+		if distance < best_distance:
+			best_distance = distance
+			best_peer = peer_id
+			best_pos = pos
+	return {"peer":best_peer, "pos":best_pos, "distance":best_distance}
+
+func spawn_dedicated_enemy() -> void:
+	if remote_players.is_empty(): return
+	var peers: Array = remote_players.keys()
+	var peer_id := int(peers[randi() % peers.size()])
+	var center := network_player_position(peer_id)
+	if center.x < -9000.0: return
+	var target_region := region_at(center)
+	if target_region == 0: return
+	var candidates: Array = []
+	for i in ENEMY_TYPES.size():
+		if i not in [12, 13, 14] and int(ENEMY_TYPES[i]["region"]) == target_region:
+			candidates.append(i)
+	if candidates.is_empty(): return
+	var type := int(candidates.pick_random())
+	for attempt in 12:
+		var pos := center + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(470.0, 760.0)
+		if region_at(pos) == target_region and not terrain_blocked(pos) and pos.distance_to(center) >= 390.0:
+			var roll := randf()
+			enemies.append(make_enemy(type, pos, 2 if roll < 0.01 and target_region >= 3 else (1 if roll < 0.075 else 0)))
+			return
+
+func update_dedicated_enemies(delta: float) -> void:
+	for i in range(enemies.size() - 1, -1, -1):
+		var enemy: Dictionary = enemies[i]
+		if float(enemy.get("hp", 0.0)) <= 0.0:
+			enemies.remove_at(i)
+			continue
+		enemy["flash"] = maxf(0.0, float(enemy.get("flash",0.0)) - delta)
+		enemy["hit"] = maxf(0.0, float(enemy.get("hit",0.0)) - delta)
+		enemy["stun"] = maxf(0.0, float(enemy.get("stun",0.0)) - delta)
+		enemy["slow"] = maxf(0.0, float(enemy.get("slow",0.0)) - delta)
+		enemy["marked"] = maxf(0.0, float(enemy.get("marked",0.0)) - delta)
+		enemy["shot"] = maxf(0.0, float(enemy.get("shot",0.0)) - delta)
+		var target := nearest_network_player(enemy["pos"], 1300.0)
+		var peer_id := int(target["peer"])
+		if peer_id <= 0:
+			enemies.remove_at(i)
+			continue
+		var target_pos: Vector2 = target["pos"]
+		if region_at(target_pos) == 0:
+			continue
+		var offset := target_pos - Vector2(enemy["pos"])
+		var distance := offset.length()
+		var info: Dictionary = ENEMY_TYPES[int(enemy["type"])]
+		if enemy["stun"] <= 0.0 and distance > 34.0 and distance < 500.0:
+			var speed := float(info["speed"]) * (0.45 if enemy["slow"] > 0.0 else 1.0) * delta
+			var next_pos := Vector2(enemy["pos"]) + offset.normalized() * speed
+			if region_at(next_pos) == region_at(enemy["pos"]) and not terrain_blocked(next_pos):
+				enemy["pos"] = next_pos
+		if distance < 42.0 and float(enemy["hit"]) <= 0.0:
+			enemy["hit"] = 0.75
+			rpc_server_damage.rpc_id(peer_id, enemy_damage(int(enemy["type"])))
+		var enemy_type := int(enemy["type"])
+		if enemy_type in [5,7,11,12,13,14,18,20,22,24,26] and distance > 95.0 and distance < 420.0 and enemy["stun"] <= 0.0 and enemy["shot"] <= 0.0:
+			enemy["shot"] = randf_range(2.4, 3.1)
+			enemy_projectiles.append({
+				"pos":enemy["pos"],
+				"dir":offset.normalized(),
+				"speed":310.0 if enemy_type in [12,13,14] else 265.0,
+				"life":2.0,
+				"damage":enemy_damage(enemy_type),
+				"type":enemy_type,
+				"target_peer":peer_id
+			})
+
+func update_dedicated_enemy_projectiles(delta: float) -> void:
+	for i in range(enemy_projectiles.size() - 1, -1, -1):
+		var shot: Dictionary = enemy_projectiles[i]
+		shot["life"] = float(shot.get("life",0.0)) - delta
+		shot["pos"] = Vector2(shot["pos"]) + Vector2(shot["dir"]) * float(shot.get("speed",265.0)) * delta
+		if shot["life"] <= 0.0:
+			enemy_projectiles.remove_at(i)
+			continue
+		var peer_id := int(shot.get("target_peer",0))
+		if peer_id <= 0 or not remote_players.has(peer_id):
+			var target := nearest_network_player(shot["pos"], 460.0)
+			peer_id = int(target["peer"])
+			shot["target_peer"] = peer_id
+		if peer_id <= 0: continue
+		var target_pos := network_player_position(peer_id)
+		if Vector2(shot["pos"]).distance_to(target_pos) < 27.0:
+			rpc_server_damage.rpc_id(peer_id, int(shot.get("damage",1)))
+			enemy_projectiles.remove_at(i)
+
+func update_dedicated_player_projectiles(delta: float) -> void:
+	for i in range(projectiles.size() - 1, -1, -1):
+		var shot: Dictionary = projectiles[i]
+		shot["life"] = float(shot.get("life",0.0)) - delta
+		shot["pos"] = Vector2(shot["pos"]) + Vector2(shot["dir"]) * float(shot.get("speed",520.0)) * delta
+		if shot["life"] <= 0.0:
+			projectiles.remove_at(i)
+			continue
+		var consumed := false
+		for e in range(enemies.size() - 1, -1, -1):
+			if Vector2(shot["pos"]).distance_to(Vector2(enemies[e]["pos"])) < 30.0:
+				damage_enemy(e, int(shot.get("damage",1)), Vector2(shot["dir"]), false, str(shot.get("element","")))
+				consumed = true
+				break
+		if consumed:
+			projectiles.remove_at(i)
+
 func process_dedicated_server(delta: float) -> void:
 	world_time += delta
 	if network_mode != "host": return
+	server_spawn_timer += delta
+	if server_spawn_timer >= 2.4:
+		server_spawn_timer = 0.0
+		if enemies.size() < mini(24, remote_players.size() * 8):
+			spawn_dedicated_enemy()
+	update_dedicated_enemies(delta)
+	update_dedicated_player_projectiles(delta)
+	update_dedicated_enemy_projectiles(delta)
 	sync_timer -= delta
 	if sync_timer <= 0.0:
 		sync_timer = 0.10
@@ -1404,6 +1552,7 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 	if network_mode != "host" or origin_data.size() < 2 or dir_data.size() < 2: return
 	var sender := multiplayer.get_remote_sender_id()
 	if sender <= 0 or not remote_players.has(sender): return
+	if not server_action_allowed(sender, "normal", 140): return
 	var state: Dictionary = remote_players[sender]
 	var state_pos: Array = state.get("pos", [])
 	if state_pos.size() < 2: return
@@ -1477,6 +1626,9 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	if network_mode != "host" or pos_data.size() < 2 or dir_data.size() < 2: return
 	var sender := multiplayer.get_remote_sender_id()
 	if sender <= 0 or not remote_players.has(sender): return
+	if id < 0 or id >= ABILITIES.size(): return
+	var server_cd_ms := maxi(250, int(float(ABILITIES[id]["cd"]) * 850.0))
+	if not server_action_allowed(sender, "ability_%d" % id, server_cd_ms): return
 	var state: Dictionary = remote_players[sender]
 	var state_pos: Array = state.get("pos", [])
 	if state_pos.size() < 2: return
