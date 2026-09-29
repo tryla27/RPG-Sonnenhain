@@ -113,8 +113,13 @@ jobs:
           ssh-keyscan -p 22 ngcobalt378.manitu.net >> "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
 
-          rsync -az --delete \
-            -e "ssh -i $HOME/.ssh/manitu_deploy -p 22 -o IdentitiesOnly=yes" \
+          ssh -i "$HOME/.ssh/manitu_deploy" -p 22 \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=12 \
+            ssh300011111@ngcobalt378.manitu.net \
+            'echo "SSH OK"; id; uname -a; printf "systemctl="; command -v systemctl || true; printf "nohup="; command -v nohup || true; printf "python3="; command -v python3 || true'
+
+          timeout 180s rsync -az --delete \
+            -e "ssh -i $HOME/.ssh/manitu_deploy -p 22 -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=12" \
             build/site/ \
             ssh300011111@ngcobalt378.manitu.net:/home/sites/site100047525/web/
 
