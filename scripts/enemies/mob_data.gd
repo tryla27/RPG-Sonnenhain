@@ -23,6 +23,8 @@ extends Resource
 @export var animation_fps: float = 7.0
 
 @export_group("Verhalten")
+@export var flying: bool = false
+@export var wing_flap_speed: float = 0.0
 @export var ranged: bool = false
 @export var boss: bool = false
 @export var heavy_melee: bool = false
