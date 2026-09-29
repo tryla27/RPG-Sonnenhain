@@ -17,7 +17,9 @@ permissions:
 
 concurrency:
   group: sonnenhain-game-server
-  cancel-in-progress: true
+  # Niemals einen laufenden Server-Deploy mitten zwischen Stop und Start
+  # abbrechen. Neue Builds warten stattdessen seriell.
+  cancel-in-progress: false
 
 jobs:
   server:
