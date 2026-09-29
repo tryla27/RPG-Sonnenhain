@@ -1,15 +1,28 @@
-# Example snippet for sonnenhainrpg.de.
-# Requires a Godot WebSocket server listening only on 127.0.0.1:27845.
+# Sonnenhain multiplayer reverse proxy
+# DNS: multiplayer.sonnenhainrpg.de must point to the VServer.
+# Godot listens locally on 127.0.0.1:27845.
+# TLS can be supplied by Certbot or the server's existing certificate setup.
 
-location /multiplayer {
-    proxy_pass http://127.0.0.1:27845;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_read_timeout 75s;
-    proxy_send_timeout 75s;
+server {
+    listen 80;
+    listen [::]:80;
+    server_name multiplayer.sonnenhainrpg.de;
+
+    location / {
+        proxy_pass http://127.0.0.1:27845;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 75s;
+        proxy_send_timeout 75s;
+        proxy_connect_timeout 10s;
+        proxy_buffering off;
+    }
 }
+
+# After DNS resolves, enable HTTPS/WSS, for example:
+#   sudo certbot --nginx -d multiplayer.sonnenhainrpg.de
