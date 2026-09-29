@@ -13,6 +13,7 @@ on:
       - "music/**"
       - "tools/harden_web.py"
       - "web-legal/**"
+      - "website/**"
       - "CNAME"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
@@ -52,28 +53,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/web
-          /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-release "Web" build/web/index.html
+          mkdir -p build/site/game
+          /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-release "Web" build/site/game/index.html
 
       - name: Harden browser shell
-        run: python3 tools/harden_web.py build/web/index.html
+        run: python3 tools/harden_web.py build/site/game/index.html
 
-      - name: Add legal pages, security metadata and custom domain
+      - name: Assemble website
         shell: bash
         run: |
-          cp CNAME build/web/CNAME
-          cp web-legal/datenschutz.html build/web/datenschutz.html
-          cp web-legal/impressum.html build/web/impressum.html
-          cp web-legal/sicherheit.html build/web/sicherheit.html
-          cp web-legal/robots.txt build/web/robots.txt
-          mkdir -p build/web/.well-known
-          cp web-legal/security.txt build/web/.well-known/security.txt
-          touch build/web/.nojekyll
+          set -euo pipefail
+          cp website/index.html build/site/index.html
+          cp website/site.css build/site/site.css
+          cp CNAME build/site/CNAME
+          cp web-legal/datenschutz.html build/site/datenschutz.html
+          cp web-legal/impressum.html build/site/impressum.html
+          cp web-legal/sicherheit.html build/site/sicherheit.html
+          cp web-legal/robots.txt build/site/robots.txt
+          mkdir -p build/site/.well-known
+          cp web-legal/security.txt build/site/.well-known/security.txt
+          touch build/site/.nojekyll
+          test -f build/site/index.html
+          test -f build/site/game/index.html
+          test -f build/site/game/index.pck
+          test -f build/site/game/index.wasm
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/web
+          path: build/site
 
   deploy:
     environment:
