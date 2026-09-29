@@ -42,13 +42,12 @@ jobs:
           $SSH ssh300011111@ngcobalt378.manitu.net '
             set -eu
             echo "=== identity ==="; id
-            echo "=== web tree ==="; find /home/sites/site100047525/web -maxdepth 2 -mindepth 1 -printf "%M %u %g %p\n" | head -200
-            echo "=== htaccess files ==="; find /home/sites/site100047525/web -maxdepth 3 -name .htaccess -print || true
-            echo "=== candidate indexes ==="; find /home/sites/site100047525/web -maxdepth 3 -type f -name "index.*" -printf "%M %u %g %p\n" | head -100
-            printf "SONNENHAIN_HEALTH_OK\n" > /home/sites/site100047525/web/sonnenhain-health.txt
-            mkdir -p /home/sites/site100047525/web/sonnenhainrpg.de
-            printf "SONNENHAIN_HEALTH_OK\n" > /home/sites/site100047525/web/sonnenhainrpg.de/sonnenhain-health.txt
-            chmod 644 /home/sites/site100047525/web/sonnenhain-health.txt /home/sites/site100047525/web/sonnenhainrpg.de/sonnenhain-health.txt
+            echo "=== htdocs path permissions ==="; namei -l /home/sites/site100047525/htdocs/sonnenhainrpg.de/index.html || true
+            echo "=== htdocs tree ==="; find /home/sites/site100047525/htdocs -maxdepth 2 -mindepth 1 -printf "%M %u %g %p\n" | head -200
+            echo "=== htaccess files ==="; find /home/sites/site100047525/htdocs -maxdepth 3 -name .htaccess -print -exec sh -c 'echo "--- {}"; sed -n "1,160p" "{}"' \; || true
+            echo "=== candidate indexes ==="; find /home/sites/site100047525/htdocs -maxdepth 3 -type f -name "index.*" -printf "%M %u %g %p\n" | head -100
+            printf "SONNENHAIN_HEALTH_OK\n" > /home/sites/site100047525/htdocs/sonnenhainrpg.de/sonnenhain-health.txt
+            chmod 644 /home/sites/site100047525/htdocs/sonnenhainrpg.de/sonnenhain-health.txt
           '
 
       - name: Test public vhost
