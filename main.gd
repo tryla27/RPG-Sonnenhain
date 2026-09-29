@@ -353,12 +353,22 @@ const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
 func detect_touch_capability() -> bool:
-	if DisplayServer.is_touchscreen_available():
-		return true
 	if not is_web_platform():
+		return DisplayServer.is_touchscreen_available()
+
+	# Die Website startet PC und Mobile bewusst über getrennte Links.
+	# Dadurch bekommen Touch-Laptops im Desktop-Browser nicht versehentlich
+	# die Mobile-Steuerung.
+	var forced_mode = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('mode') || ''")
+	if str(forced_mode) == "mobile":
+		return true
+	if str(forced_mode) == "desktop":
 		return false
-	var result = JavaScriptBridge.eval("Boolean((navigator.maxTouchPoints||0)>0 && (!window.matchMedia || window.matchMedia('(pointer: coarse)').matches))")
-	return bool(result)
+
+	# Direkte /game/-Aufrufe bleiben benutzbar: nur klar mobile Geräte
+	# werden automatisch als Touch-Version behandelt.
+	var auto_mobile = JavaScriptBridge.eval("Boolean(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ((navigator.maxTouchPoints||0)>0 && Math.min(window.screen.width,window.screen.height)<=700))")
+	return bool(auto_mobile)
 
 func clear_touch_inputs() -> void:
 	touch_attack_ids.clear()
@@ -6084,7 +6094,7 @@ func draw_mechanics_panel() -> void:
 
 func draw_start_panel() -> void:
 	text_at(Vector2(291, 151), "SONNENHAIN", 39, Color("ffe2aa"))
-	text_at(Vector2(900, 148), "v27.5", 16, Color("f4d7a3"))
+	text_at(Vector2(900, 148), "v27.5 · %s" % ("MOBILE" if touch_enabled else "PC"), 16, Color("f4d7a3"))
 	ui_button(Rect2(855, 158, 130, 33), "TASTEN")
 	text_at(Vector2(295, 184), "Eine Reise durch die alten Reiche  ·  Wähle deinen Helden", 18, Color("dce7d8"))
 	for i in 3:
