@@ -65,6 +65,7 @@ jobs:
           cp web-legal/datenschutz.html build/web/datenschutz.html
           cp web-legal/impressum.html build/web/impressum.html
           cp web-legal/sicherheit.html build/web/sicherheit.html
+          cp web-legal/robots.txt build/web/robots.txt
           mkdir -p build/web/.well-known
           cp web-legal/security.txt build/web/.well-known/security.txt
           touch build/web/.nojekyll
