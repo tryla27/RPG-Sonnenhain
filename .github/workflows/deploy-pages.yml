@@ -122,9 +122,11 @@ jobs:
           set -euo pipefail
           install -d -m 700 "$HOME/.ssh"
           python3 - <<'PY'
+          import base64
           import os
           from pathlib import Path
-          key = os.environ["MANITU_SSH_KEY"].replace("\\n", "\n").replace("\r", "").strip()
+          raw = os.environ["MANITU_SSH_KEY"].strip()
+          key = base64.b64decode(raw).decode("utf-8").replace("\r", "").strip()
           Path.home().joinpath(".ssh/manitu_deploy").write_text(key + "\n", encoding="utf-8")
           PY
           chmod 600 "$HOME/.ssh/manitu_deploy"
