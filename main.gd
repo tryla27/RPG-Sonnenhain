@@ -306,6 +306,11 @@ var event_progress: Array = []
 var creative_mode := false
 var pause_status := "Das Spiel ist angehalten."
 var invite_menu_status := "Bereit zum Erstellen eines Einladungslinks."
+var touch_enabled := false
+var touch_move_id := -1
+var touch_move_vector := Vector2.ZERO
+var touch_move_knob := Vector2(118, 526)
+var touch_attack_ids: Dictionary = {}
 var sound_players: Array = []
 var sound_streams: Dictionary = {}
 var next_sound_player := 0
@@ -337,6 +342,7 @@ const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
 func _ready() -> void:
 	font = ThemeDB.fallback_font
+	touch_enabled = DisplayServer.is_touchscreen_available()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	environment_tiles = load("res://art/sonnenhain_tiles.png")
 	region_tiles = load("res://art/regions_16.png")
@@ -845,16 +851,19 @@ func update_player(delta: float) -> void:
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
 		play_sound("step")
 		step_timer = 0.43 if dash_timer <= 0 else 0.25
-	var aim: Vector2 = get_global_mouse_position() + camera_pos - player_pos
-	if aim.length() > 8: facing = aim.normalized()
+	if touch_enabled:
+		if move.length() > 0.15: facing = move.normalized()
+	else:
+		var aim: Vector2 = get_global_mouse_position() + camera_pos - player_pos
+		if aim.length() > 8: facing = aim.normalized()
 	if arena_mode != "":
 		if player_pos.distance_to(ARENA_CENTER) > ARENA_RADIUS - 26:
 			player_pos = ARENA_CENTER + (player_pos - ARENA_CENTER).normalized() * (ARENA_RADIUS - 26)
-		if panel == "" and binding_pressed("attack") and attack_timer <= 0: normal_attack()
+		if panel == "" and (binding_pressed("attack") or touch_attack_held()) and attack_timer <= 0: normal_attack()
 		return
 	if interior_id >= 0: return
 	if dungeon_id >= 0:
-		if panel == "" and binding_pressed("attack") and attack_timer <= 0: normal_attack()
+		if panel == "" and (binding_pressed("attack") or touch_attack_held()) and attack_timer <= 0: normal_attack()
 		return
 	var region: int = region_at(player_pos)
 	if region != previous_region:
@@ -868,7 +877,7 @@ func update_player(delta: float) -> void:
 		if region != 0:
 			for i in 5: spawn_enemy()
 	# Gedrückt halten löst nach jeder Abklingzeit den nächsten Hieb aus.
-	if panel == "" and binding_pressed("attack") and attack_timer <= 0:
+	if panel == "" and (binding_pressed("attack") or touch_attack_held()) and attack_timer <= 0:
 		normal_attack()
 
 func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
@@ -1054,7 +1063,72 @@ func event_matches_binding(event: InputEvent, action: String) -> bool:
 
 func movement_vector() -> Vector2:
 	var direction := Vector2((1.0 if binding_pressed("move_right") else 0.0) - (1.0 if binding_pressed("move_left") else 0.0), (1.0 if binding_pressed("move_down") else 0.0) - (1.0 if binding_pressed("move_up") else 0.0))
-	return direction.normalized()
+	if touch_enabled and touch_move_vector.length_squared() > direction.length_squared():
+		direction = touch_move_vector
+	return direction.normalized() if direction.length() > 1.0 else direction
+
+func touch_button_at(pos: Vector2) -> String:
+	if pos.y < 360.0: return ""
+	if pos.distance_to(Vector2(1032, 526)) <= 67.0: return "attack"
+	if pos.distance_to(Vector2(916, 550)) <= 43.0: return "dodge"
+	if pos.distance_to(Vector2(967, 447)) <= 43.0: return "interact"
+	for slot in 4:
+		if Rect2(424 + slot * 76, 548, 68, 70).has_point(pos): return "ability_%d" % (slot + 1)
+	if Rect2(735, 557, 66, 54).has_point(pos): return "heal"
+	if Rect2(807, 557, 66, 54).has_point(pos): return "resource"
+	return ""
+
+func handle_touch_event(event: InputEvent) -> bool:
+	if not touch_enabled: return false
+	if event is InputEventScreenTouch:
+		var pos := event.position
+		if panel != "":
+			if event.pressed:
+				handle_panel_click(pos)
+				queue_redraw()
+			return true
+		if event.pressed and pos.x <= 285.0 and pos.y >= 360.0:
+			touch_move_id = event.index
+			var center := Vector2(118, 526)
+			var delta := pos - center
+			touch_move_vector = delta.limit_length(72.0) / 72.0
+			touch_move_knob = center + delta.limit_length(48.0)
+			return true
+		var action := touch_button_at(pos)
+		if action != "":
+			if event.pressed:
+				touch_attack_ids[event.index] = action
+				match action:
+					"attack":
+						if attack_timer <= 0.0: normal_attack()
+					"dodge":
+						if dash_cooldown <= 0.0: dodge()
+					"interact": interact()
+					"heal": quick_potion(false)
+					"resource": quick_potion(true)
+					_:
+						if action.begins_with("ability_"):
+							use_ability(int(action.get_slice("_", 1)) - 1)
+			else:
+				touch_attack_ids.erase(event.index)
+			return true
+		if not event.pressed and event.index == touch_move_id:
+			touch_move_id = -1
+			touch_move_vector = Vector2.ZERO
+			touch_move_knob = Vector2(118, 526)
+			return true
+	elif event is InputEventScreenDrag and event.index == touch_move_id:
+		var center := Vector2(118, 526)
+		var delta := event.position - center
+		touch_move_vector = delta.limit_length(72.0) / 72.0
+		touch_move_knob = center + delta.limit_length(48.0)
+		return true
+	return false
+
+func touch_attack_held() -> bool:
+	for action in touch_attack_ids.values():
+		if action == "attack": return true
+	return false
 
 func set_binding(action: String, code: int) -> void:
 	if code == KEY_ESCAPE and action != "pause":
@@ -1079,6 +1153,7 @@ func reset_bindings() -> void:
 	save_bindings()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if handle_touch_event(event): return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			panel = "start"
