@@ -4,7 +4,6 @@ const NetworkManager = preload("res://scripts/network/network_manager.gd")
 const MobCatalog = preload("res://scripts/enemies/mob_catalog.gd")
 const MobAnimation = preload("res://scripts/enemies/mob_animation.gd")
 const ItemProtection = preload("res://scripts/inventory/item_protection.gd")
-const MaxLevelBalanceAudit = preload("res://scripts/balance/max_level_balance_audit.gd")
 const MinimapRenderer = preload("res://scripts/ui/minimap_renderer.gd")
 const MovementRules = preload("res://scripts/player/movement_rules.gd")
 const SaveMigrator = preload("res://scripts/save/save_migrator.gd")
@@ -360,7 +359,6 @@ func _ready() -> void:
 	if OS.is_debug_build():
 		for mob_error in MobCatalog.validate():
 			push_error(mob_error)
-		MaxLevelBalanceAudit.print_report(ABILITIES, CLASS_SKILLS, CLASS_ULTIMATES)
 	font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	environment_tiles = load("res://art/sonnenhain_tiles.png")
