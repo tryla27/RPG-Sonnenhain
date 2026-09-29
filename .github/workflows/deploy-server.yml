@@ -93,8 +93,14 @@ jobs:
           set -euo pipefail
           port="${VSERVER_PORT:-22}"
           install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$VSERVER_SSH_KEY" > "$HOME/.ssh/vserver_deploy"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          key = os.environ["VSERVER_SSH_KEY"].replace("\\n", "\n").replace("\r", "").strip()
+          Path.home().joinpath(".ssh/vserver_deploy").write_text(key + "\n", encoding="utf-8")
+          PY
           chmod 600 "$HOME/.ssh/vserver_deploy"
+          ssh-keygen -y -f "$HOME/.ssh/vserver_deploy" >/dev/null
 
           ssh_opts="-4 -i $HOME/.ssh/vserver_deploy -p $port -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
 
