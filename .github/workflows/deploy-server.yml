@@ -157,6 +157,21 @@ jobs:
             echo "Sonnenhain dedicated server is running on port 27845."
           '
 
+      - name: Verify public WebSocket endpoint
+        if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
+            -H 'Connection: Upgrade' \
+            -H 'Upgrade: websocket' \
+            -H 'Sec-WebSocket-Version: 13' \
+            -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+            https://multiplayer.sonnenhainrpg.de/ || true)"
+          printf '%s\n' "$headers"
+          printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
+          echo "Public WSS endpoint is accepting WebSocket upgrades."
+
       - name: VServer deploy not configured
         if: ${{ env.VSERVER_HOST == '' || env.VSERVER_USER == '' || env.VSERVER_SSH_KEY == '' }}
         run: echo "Server build is ready; VSERVER_HOST, VSERVER_USER and VSERVER_SSH_KEY are still required for live deployment."
