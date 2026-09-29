@@ -311,6 +311,10 @@ var touch_move_smoothed := Vector2.ZERO
 var touch_move_base := Vector2(118, 526)
 var touch_move_knob := Vector2(118, 526)
 var touch_attack_ids: Dictionary = {}
+var touch_aim_id := -1
+var touch_aim_base := Vector2(1032, 526)
+var touch_aim_knob := Vector2(1032, 526)
+var touch_aim_vector := Vector2.RIGHT
 var sound_players: Array = []
 var sound_streams: Dictionary = {}
 var next_sound_player := 0
@@ -1095,7 +1099,10 @@ func update_player(delta: float) -> void:
 		play_sound("step")
 		step_timer = 0.43 if dash_timer <= 0 else 0.25
 	if touch_enabled:
-		if move.length() > 0.15: facing = move.normalized()
+		if touch_aim_id >= 0 and touch_aim_vector.length_squared() > 0.01:
+			facing = facing.slerp(touch_aim_vector.normalized(), minf(1.0, delta * 18.0)).normalized()
+		elif move.length() > 0.15:
+			facing = facing.slerp(move.normalized(), minf(1.0, delta * 14.0)).normalized()
 	else:
 		var aim: Vector2 = get_global_mouse_position() + camera_pos - player_pos
 		if aim.length() > 8: facing = aim.normalized()
@@ -1355,6 +1362,39 @@ func reset_touch_joystick() -> void:
 	touch_move_base = Vector2(118, 526)
 	touch_move_knob = touch_move_base
 
+func update_touch_aim(pos: Vector2) -> void:
+	const MAX_RADIUS := 94.0
+	const DEADZONE := 10.0
+	var delta := pos - touch_aim_base
+	var distance := delta.length()
+	if distance > MAX_RADIUS:
+		touch_aim_base += delta.normalized() * (distance - MAX_RADIUS)
+		delta = pos - touch_aim_base
+		distance = delta.length()
+	if distance <= DEADZONE:
+		touch_aim_knob = touch_aim_base
+		return
+	touch_aim_vector = delta.normalized()
+	touch_aim_knob = touch_aim_base + touch_aim_vector * minf(distance, 58.0)
+
+func begin_touch_aim(index: int, pos: Vector2) -> void:
+	touch_aim_id = index
+	touch_aim_base = Vector2(clampf(pos.x, 850.0, 1080.0), clampf(pos.y, 390.0, 555.0))
+	touch_aim_knob = touch_aim_base
+	touch_aim_vector = facing.normalized() if facing.length_squared() > 0.01 else Vector2.RIGHT
+	touch_attack_ids[index] = "attack"
+
+func reset_touch_aim(index: int = -1) -> void:
+	if index >= 0:
+		touch_attack_ids.erase(index)
+	else:
+		for key in touch_attack_ids.keys():
+			if touch_attack_ids[key] == "attack":
+				touch_attack_ids.erase(key)
+	touch_aim_id = -1
+	touch_aim_base = Vector2(1032, 526)
+	touch_aim_knob = touch_aim_base
+
 func handle_touch_event(event: InputEvent) -> bool:
 	if not touch_enabled: return false
 	if event is InputEventScreenTouch:
@@ -1368,6 +1408,8 @@ func handle_touch_event(event: InputEvent) -> bool:
 			touch_attack_ids.erase(touch_event.index)
 			if touch_event.index == touch_move_id:
 				reset_touch_joystick()
+			if touch_event.index == touch_aim_id:
+				reset_touch_aim(touch_event.index)
 			queue_redraw()
 			return true
 
@@ -1379,10 +1421,13 @@ func handle_touch_event(event: InputEvent) -> bool:
 		# Aktionsbuttons haben Vorrang und erhalten eine eigene Finger-ID.
 		var action: String = touch_button_at(pos)
 		if action != "":
+			if action == "attack":
+				begin_touch_aim(touch_event.index, pos)
+				if attack_timer <= 0.0: normal_attack()
+				queue_redraw()
+				return true
 			touch_attack_ids[touch_event.index] = action
 			match action:
-				"attack":
-					if attack_timer <= 0.0: normal_attack()
 				"dodge":
 					if dash_cooldown <= 0.0: dodge()
 				"interact": interact()
@@ -1408,6 +1453,10 @@ func handle_touch_event(event: InputEvent) -> bool:
 		var drag_event: InputEventScreenDrag = event as InputEventScreenDrag
 		if drag_event.index == touch_move_id:
 			update_touch_joystick(drag_event.position)
+			queue_redraw()
+			return true
+		if drag_event.index == touch_aim_id:
+			update_touch_aim(drag_event.position)
 			queue_redraw()
 			return true
 	return false
@@ -5665,8 +5714,17 @@ func draw_touch_controls() -> void:
 		else:
 			text_at(rect.position + Vector2(14, 38), "–", 22, Color("83918b"))
 
+	var attack_base := touch_aim_base if touch_aim_id >= 0 else Vector2(1032,526)
+	var attack_knob := touch_aim_knob if touch_aim_id >= 0 else attack_base
+	draw_circle(attack_base, 64.0, Color("725047",0.58 if touch_aim_id < 0 else 0.88))
+	draw_arc(attack_base, 64.0, 0, TAU, 36, Color("f0daa3",0.86), 3)
+	draw_circle(attack_knob, 28.0, Color("9a675b",0.92))
+	draw_arc(attack_knob, 28.0, 0, TAU, 28, Color("fff0c8",0.88), 2)
+	if touch_aim_id >= 0 and touch_aim_vector.length_squared() > 0.01:
+		draw_line(attack_base, attack_base + touch_aim_vector.normalized() * 78.0, Color("ffe2a8",0.82), 4)
+	text_at(attack_base + Vector2(-48, 5), "ANGRIFF", 11, Color("fff2cf"), HORIZONTAL_ALIGNMENT_CENTER, 96)
+
 	for data in [
-		{"p":Vector2(1032,526),"r":58.0,"label":"ANGRIFF","fill":Color("725047",0.90)},
 		{"p":Vector2(916,550),"r":39.0,"label":"ROLLE","fill":Color("3f5c62",0.90)},
 		{"p":Vector2(967,447),"r":39.0,"label":"AKTION","fill":Color("556b4f",0.90)}
 	]:
