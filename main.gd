@@ -351,6 +351,23 @@ var server_action_times: Dictionary = {}
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
+func detect_touch_capability() -> bool:
+	if DisplayServer.is_touchscreen_available():
+		return true
+	if not is_web_platform():
+		return false
+	var result = JavaScriptBridge.eval("Boolean((navigator.maxTouchPoints||0)>0 && (!window.matchMedia || window.matchMedia('(pointer: coarse)').matches))")
+	return bool(result)
+
+func clear_touch_inputs() -> void:
+	touch_attack_ids.clear()
+	reset_touch_joystick()
+	reset_touch_aim()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and touch_enabled:
+		clear_touch_inputs()
+
 func _ready() -> void:
 	setup_multiplayer_signals()
 	dedicated_server_mode = OS.has_feature("dedicated_server") or "--dedicated-server" in OS.get_cmdline_user_args()
@@ -365,7 +382,7 @@ func _ready() -> void:
 		start_websocket_server()
 		return
 	font = ThemeDB.fallback_font
-	touch_enabled = DisplayServer.is_touchscreen_available()
+	touch_enabled = detect_touch_capability()
 	mobile_performance_mode = touch_enabled and is_web_platform()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	environment_tiles = load("res://art/sonnenhain_tiles.png")
@@ -436,6 +453,9 @@ func _on_peer_connected(id: int) -> void:
 	add_chat_line("SYSTEM", network_status)
 	if network_mode == "host":
 		push_world_snapshot()
+		if not dedicated_server_mode:
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "element":weapon_element(), "region":region_at(player_pos)}
+			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
 				rpc_receive_player_state.rpc_id(id, int(peer_id), remote_players[peer_id])
@@ -603,8 +623,9 @@ func push_player_state() -> void:
 	var state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "element":weapon_element(), "region":region_at(player_pos)}
 	if network_mode == "client":
 		rpc_player_state.rpc_id(1, state)
-	else:
-		rpc_player_state(state)
+	elif network_mode == "host":
+		for peer_id in multiplayer.get_peers():
+			rpc_receive_player_state.rpc_id(int(peer_id), 1, state)
 	if network_mode == "host" and int(world_time * 5.0) % 2 == 0: push_world_snapshot()
 
 @rpc("any_peer", "call_remote", "unreliable", 0)
@@ -1340,7 +1361,8 @@ func touch_button_at(pos: Vector2) -> String:
 	if pos.distance_to(Vector2(1032, 526)) <= 67.0: return "attack"
 	if pos.distance_to(Vector2(916, 550)) <= 43.0: return "dodge"
 	if pos.distance_to(Vector2(967, 447)) <= 43.0: return "interact"
-	if Rect2(866, 365, 180, 54).has_point(pos): return "chat"
+	if Rect2(866, 365, 86, 54).has_point(pos): return "chat"
+	if Rect2(960, 365, 86, 54).has_point(pos): return "online"
 	for slot in 4:
 		if Rect2(424 + slot * 76, 548, 68, 70).has_point(pos): return "ability_%d" % (slot + 1)
 	if Rect2(735, 557, 66, 54).has_point(pos): return "heal"
@@ -1442,6 +1464,8 @@ func handle_touch_event(event: InputEvent) -> bool:
 					if dash_cooldown <= 0.0: dodge()
 				"interact": interact()
 				"chat": open_mobile_chat()
+				"online":
+					online_list_open = not online_list_open
 				"heal": quick_potion(false)
 				"resource": quick_potion(true)
 				_:
@@ -1510,6 +1534,7 @@ func mobile_text_prompt(title: String, current: String, max_length: int) -> Stri
 
 func open_mobile_chat() -> void:
 	if is_web_platform() and touch_enabled:
+		clear_touch_inputs()
 		var entered := mobile_text_prompt("Nachricht an die Gruppe", chat_input, 120)
 		chat_open = false
 		chat_input = ""
@@ -3776,7 +3801,7 @@ func draw_online_list() -> void:
 		draw_rect(row, Color("17272e", 0.9) if i % 2 == 0 else Color("203239", 0.9))
 		text_at(Vector2(row.position.x + 12, row.position.y + 21), names[i], 15, Color("fff0ce"))
 		y += row_h
-	text_at(box.position + Vector2(18,height-14), "TAB gedrückt halten", 11, Color("9fb4ac"))
+	text_at(box.position + Vector2(18,height-14), "ONLINE antippen zum Schließen" if touch_enabled else "TAB gedrückt halten", 11, Color("9fb4ac"))
 
 func draw_chat_overlay() -> void:
 	if not chat_open and (chat_messages.is_empty() or chat_fade <= 0.0): return
@@ -5742,10 +5767,14 @@ func draw_touch_controls() -> void:
 		draw_arc(data["p"], data["r"], 0, TAU, 32, Color("f0daa3",0.82), 3)
 		text_at(data["p"] + Vector2(-45,5), data["label"], 11, Color("fff2cf"), HORIZONTAL_ALIGNMENT_CENTER, 90)
 
-	var chat_rect := Rect2(866, 365, 180, 54)
+	var chat_rect := Rect2(866, 365, 86, 54)
 	draw_rect(chat_rect, Color("223338",0.92))
 	draw_rect(chat_rect, Color("c7aa70",0.88), false, 2)
-	text_at(chat_rect.position + Vector2(8,34), "CHAT", 14, Color("fff0c8"), HORIZONTAL_ALIGNMENT_CENTER, int(chat_rect.size.x-16))
+	text_at(chat_rect.position + Vector2(5,34), "CHAT", 13, Color("fff0c8"), HORIZONTAL_ALIGNMENT_CENTER, int(chat_rect.size.x-10))
+	var online_rect := Rect2(960, 365, 86, 54)
+	draw_rect(online_rect, Color("223338",0.92))
+	draw_rect(online_rect, Color("8eb6a5",0.88), false, 2)
+	text_at(online_rect.position + Vector2(5,34), "ONLINE", 11, Color("e1fff1"), HORIZONTAL_ALIGNMENT_CENTER, int(online_rect.size.x-10))
 
 	for pair in [[Rect2(735,557,66,54),"HP"],[Rect2(807,557,66,54),"MANA" if class_id == 1 else "ENERGIE"]]:
 		draw_rect(pair[0], Color("223338",0.90))
