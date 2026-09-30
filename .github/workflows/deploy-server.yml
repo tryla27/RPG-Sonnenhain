@@ -56,13 +56,20 @@ jobs:
           chmod +x build/server/sonnenhain-server.x86_64
           test -x build/server/sonnenhain-server.x86_64
 
-      - name: Smoke test
+      - name: Multiplayer integration smoke test
         shell: bash
         run: |
           set -euo pipefail
           build/server/sonnenhain-server.x86_64 --headless -- --dedicated-server > /tmp/sonnenhain-server.log 2>&1 &
           server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          client_a=""
+          client_b=""
+          cleanup() {
+            [ -z "$client_a" ] || kill "$client_a" 2>/dev/null || true
+            [ -z "$client_b" ] || kill "$client_b" 2>/dev/null || true
+            kill "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
           sleep 4
           if ! kill -0 "$server_pid" 2>/dev/null; then
             cat /tmp/sonnenhain-server.log
@@ -73,10 +80,32 @@ jobs:
             echo "Dedicated server process is alive but port 27845 is not listening."
             exit 1
           fi
-          kill "$server_pid"
-          wait "$server_pid" 2>/dev/null || true
-          trap - EXIT
+
+          /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . -- --multiplayer-smoke-client --smoke-name=SmokeA > /tmp/smoke-a.log 2>&1 &
+          client_a=$!
+          sleep 1
+          /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . -- --multiplayer-smoke-client --smoke-name=SmokeB > /tmp/smoke-b.log 2>&1 &
+          client_b=$!
+
+          set +e
+          wait "$client_a"; status_a=$?
+          wait "$client_b"; status_b=$?
+          set -e
+
+          cat /tmp/smoke-a.log
+          cat /tmp/smoke-b.log
           cat /tmp/sonnenhain-server.log
+
+          test "$status_a" = "0"
+          test "$status_b" = "0"
+          grep -q "MULTIPLAYER_SMOKE_OK" /tmp/smoke-a.log
+          grep -q "MULTIPLAYER_SMOKE_OK" /tmp/smoke-b.log
+
+          kill "$server_pid" 2>/dev/null || true
+          wait "$server_pid" 2>/dev/null || true
+          server_pid=""
+          trap - EXIT
+          echo "MULTIPLAYER INTEGRATION OK: two clients saw each other, chat relay and world snapshot."
 
       - name: Upload server build
         uses: actions/upload-artifact@v4
