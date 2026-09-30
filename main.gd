@@ -380,6 +380,7 @@ var local_peer_id := 1
 var sync_timer := 0.0
 var server_spawn_timer := 0.0
 var server_action_times: Dictionary = {}
+var live_reconnect_timer := 0.0
 var multiplayer_smoke_client_mode := false
 var multiplayer_smoke_name := ""
 var multiplayer_smoke_deadline := 0
@@ -555,6 +556,16 @@ func setup_multiplayer_signals() -> void:
 	if not multiplayer.connection_failed.is_connected(_on_connection_failed): multiplayer.connection_failed.connect(_on_connection_failed)
 	if not multiplayer.server_disconnected.is_connected(_on_server_disconnected): multiplayer.server_disconnected.connect(_on_server_disconnected)
 
+func local_player_state() -> Dictionary:
+	return {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+
+func ensure_live_multiplayer() -> void:
+	if not is_web_platform() or dedicated_server_mode or not character_created:
+		return
+	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED:
+		return
+	join_live_multiplayer()
+
 func _on_peer_connected(id: int) -> void:
 	network_status = "Spieler %d verbunden" % id
 	add_chat_line("SYSTEM", network_status)
@@ -577,19 +588,26 @@ func _on_peer_disconnected(id: int) -> void:
 
 func _on_connected_to_server() -> void:
 	local_peer_id = multiplayer.get_unique_id()
-	network_status = "Verbunden · Peer %d" % local_peer_id
-	add_chat_line("SYSTEM", "Koop-Verbindung hergestellt.")
-	push_player_state()
+	live_reconnect_timer = 0.0
+	network_status = "Online · Peer %d" % local_peer_id
+	add_chat_line("SYSTEM", "Mit dem Sonnenhain-Live-Server verbunden.")
+	if character_created:
+		rpc_player_presence.rpc_id(1, local_player_state())
+		push_player_state()
 
 func _on_connection_failed() -> void:
-	network_status = "Verbindung fehlgeschlagen. Code oder Port prüfen."
+	network_status = "Live-Server momentan nicht erreichbar · neuer Versuch …"
 	disconnect_multiplayer(false)
+	if is_web_platform() and character_created:
+		live_reconnect_timer = 2.0
 
 func _on_server_disconnected() -> void:
-	network_status = "Host-Verbindung beendet."
+	network_status = "Live-Server-Verbindung unterbrochen · verbinde neu …"
 	remote_players.clear()
 	network_mode = "offline"
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	if is_web_platform() and character_created:
+		live_reconnect_timer = 2.0
 
 func to_base36(value: int) -> String:
 	var chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -666,6 +684,8 @@ func start_websocket_server() -> void:
 	print(network_status)
 
 func join_live_multiplayer() -> void:
+	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED:
+		return
 	disconnect_multiplayer(false)
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_client(LIVE_MULTIPLAYER_URL)
@@ -674,7 +694,8 @@ func join_live_multiplayer() -> void:
 		return
 	multiplayer.multiplayer_peer = peer
 	network_mode = "client"
-	network_status = "Verbinde mit Sonnenhain Online …"
+	network_status = "Verbinde mit Sonnenhain Live-Server …"
+	live_reconnect_timer = 0.0
 
 func host_multiplayer() -> void:
 	disconnect_multiplayer(false)
@@ -783,13 +804,54 @@ func push_player_state() -> void:
 		return
 	if network_mode == "client" and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
-	var state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+	var state := local_player_state()
 	if network_mode == "client":
 		rpc_player_state.rpc_id(1, state)
 	elif network_mode == "host":
 		for peer_id in multiplayer.get_peers():
 			rpc_receive_player_state.rpc_id(int(peer_id), 1, state)
 	if network_mode == "host" and int(world_time * 5.0) % 2 == 0: push_world_snapshot()
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_player_presence(state: Dictionary) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender <= 0 or network_mode != "host": return
+	var pos_data: Array = state.get("pos", [])
+	var facing_data: Array = state.get("facing", [])
+	if pos_data.size() < 2 or facing_data.size() < 2: return
+	var incoming_pos := Vector2(float(pos_data[0]), float(pos_data[1]))
+	if not incoming_pos.is_finite(): return
+	incoming_pos = incoming_pos.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
+	var clean_facing := Vector2(float(facing_data[0]), float(facing_data[1]))
+	if not clean_facing.is_finite() or clean_facing.length_squared() < 0.01: clean_facing = Vector2.DOWN
+	clean_facing = clean_facing.normalized()
+	var clean := {
+		"pos":[incoming_pos.x,incoming_pos.y],
+		"facing":[clean_facing.x,clean_facing.y],
+		"class":clampi(int(state.get("class",0)),0,2),
+		"race":clampi(int(state.get("race",0)),0,2),
+		"gender":clampi(int(state.get("gender",0)),0,1),
+		"name":str(state.get("name","Held")).strip_edges().substr(0,16),
+		"level":clampi(int(state.get("level",1)),1,99),
+		"walking":bool(state.get("walking",false)),
+		"weapon":clampi(int(state.get("weapon",0)),0,32),
+		"armor":clampi(int(state.get("armor",-1)),-1,32),
+		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
+		"region":region_at(incoming_pos)
+	}
+	remote_players[sender] = clean
+	for peer_id in multiplayer.get_peers():
+		if int(peer_id) != sender:
+			rpc_receive_player_presence.rpc_id(int(peer_id), sender, clean)
+	for existing_id in remote_players.keys():
+		if int(existing_id) != sender:
+			rpc_receive_player_presence.rpc_id(sender, int(existing_id), remote_players[existing_id])
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_receive_player_presence(peer_id: int, state: Dictionary) -> void:
+	if peer_id == multiplayer.get_unique_id(): return
+	remote_players[peer_id] = state
+	queue_redraw()
 
 @rpc("any_peer", "call_remote", "unreliable", 0)
 func rpc_player_state(state: Dictionary) -> void:
@@ -819,6 +881,7 @@ func rpc_player_state(state: Dictionary) -> void:
 		"level":clampi(int(state.get("level",1)),1,99),
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
+		"armor":clampi(int(state.get("armor",-1)),-1,32),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos)
 	}
@@ -1065,6 +1128,11 @@ func _process(delta: float) -> void:
 	world_time += delta
 	if chat_open: chat_fade = 7.0
 	else: chat_fade = maxf(0.0, chat_fade - delta)
+	if is_web_platform() and character_created and network_mode == "offline" and panel not in ["start", "creation"]:
+		live_reconnect_timer = maxf(0.0, live_reconnect_timer - delta)
+		if live_reconnect_timer <= 0.0:
+			live_reconnect_timer = 3.0
+			ensure_live_multiplayer()
 	if multiplayer.multiplayer_peer != null and network_mode != "offline":
 		sync_timer -= delta
 		if sync_timer <= 0.0:
@@ -3364,6 +3432,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 				panel = "arena_reward"
 				arena_pending_loaded = false
 			else: panel = ""
+			if is_web_platform(): ensure_live_multiplayer()
 			message("Spielstand %d geladen. Willkommen zurück!" % active_save_slot)
 		elif Rect2(860, 448, 125, 54).has_point(mouse):
 			panel = "multiplayer"
@@ -3609,6 +3678,7 @@ func start_new_game() -> void:
 	drain_timer = 0
 	poison_blade_timer = 0
 	panel = "intro"
+	if is_web_platform(): ensure_live_multiplayer()
 	message("Willkommen in Sonnenhain! Rede mit Mira, Borin oder Liora.")
 	save_game()
 
@@ -3616,6 +3686,10 @@ func finish_intro() -> void:
 	if panel != "intro": return
 	panel = ""
 	intro_timer = 0.0
+	if is_web_platform():
+		ensure_live_multiplayer()
+		if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+			rpc_player_presence.rpc_id(1, local_player_state())
 	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
 
 func toggle_creative_mode() -> void:
@@ -4089,6 +4163,8 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		var race := clampi(int(state.get("race",0)),0,2)
 		var gender := clampi(int(state.get("gender",0)),0,1)
 		var cls := clampi(int(state.get("class",0)),0,2)
+		draw_circle(rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
+		draw_arc(rp + Vector2(0, 10), 30.0, 0.0, TAU, 24, Color("8ee7ff", 0.82), 2.0)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
 		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)))
 		draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
