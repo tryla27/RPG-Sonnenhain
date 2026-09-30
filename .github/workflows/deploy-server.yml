@@ -108,6 +108,33 @@ jobs:
           trap - EXIT
           echo "MULTIPLAYER INTEGRATION OK: state relay, chat relay and world snapshot passed with two clients."
 
+      - name: Quest, XP and persistent save regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot=/tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+          "$godot" --headless --path . --script tools/check_quest_guide.gd
+          "$godot" --headless --path . --script tools/check_party_xp.gd
+          "$godot" --headless --path . --script tools/check_server_saves.gd
+          "$godot" --headless --path . --script tools/check_party_xp_network.gd
+          save_dir="$(mktemp -d /tmp/sonnenhain-save-network.XXXXXX)"
+          start_save_server() {
+            build/server/sonnenhain-server.x86_64 --headless -- --dedicated-server --server-port=31876 --save-dir="$save_dir" > /tmp/save-server.log 2>&1 &
+            save_server_pid=$!
+            sleep 1
+          }
+          start_save_server
+          trap 'kill "$save_server_pid" 2>/dev/null || true' EXIT
+          "$godot" --headless --path . --script tools/check_server_save_network.gd
+          kill "$save_server_pid"
+          wait "$save_server_pid" 2>/dev/null || true
+          start_save_server
+          "$godot" --headless --path . --script tools/check_server_save_network.gd
+          kill "$save_server_pid"
+          wait "$save_server_pid" 2>/dev/null || true
+          trap - EXIT
+          cat /tmp/save-server.log
+
       - name: Assemble dedicated server host package
         shell: bash
         run: |

@@ -95,6 +95,7 @@ func handle(g, event: InputEvent) -> bool:
 		if g.panel == "controller" and not awaiting.is_empty(): return true
 		if event.button_index == JOY_BUTTON_B or event.button_index == JOY_BUTTON_START:
 			if g.panel == "controller": g.panel = "pause"
+			elif g.panel == "quest_details": g.panel = g.quest_guide.return_panel
 			elif g.panel not in ["start", "creation"]: g.panel = ""
 			g.chat_open = false
 		elif event.button_index == JOY_BUTTON_A:
@@ -222,6 +223,7 @@ func panel_points(g) -> Array:
 			points.append(Vector2(229,314))
 			points.append(Vector2(550,274))
 			points.append(Vector2(550,386))
+			if g.class_id == 1: points.append(Vector2(229,433))
 			points.append(Vector2(866,172))
 			points.append(Vector2(947,172))
 			for cell in 25:
@@ -246,6 +248,14 @@ func panel_points(g) -> Array:
 				points.append(Vector2(669,582))
 				if g.selected_item >= 0: points.append(Vector2(878,582))
 			points.append(Vector2(986,109))
+		"journal":
+			points.append(Vector2(570,181))
+			for row in mini(6,g.quests.size()-g.menu_scroll): points.append(Vector2(570,252+row*57))
+			points.append(Vector2(882,576))
+			points.append(Vector2(947,576))
+			points.append(Vector2(986,109))
+		"quest_details":
+			points = [Vector2(260,569),Vector2(520,569),Vector2(830,569),Vector2(986,109)]
 		"travel":
 			for i in range(1,g.WAYSTONES.size()):
 				var col := (i-1)%3

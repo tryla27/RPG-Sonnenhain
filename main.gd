@@ -4,6 +4,12 @@ var patch_notice = PatchNotice.new()
 const ExperienceRules = preload("res://components/experience_rules.gd")
 const ControllerControls = preload("res://components/controller_controls.gd")
 var controller = ControllerControls.new()
+const QuestGuide = preload("res://components/quest_guide.gd")
+var quest_guide = QuestGuide.new()
+const ServerSaveStore = preload("res://components/server_save_store.gd")
+const ServerSaveClient = preload("res://components/server_save_client.gd")
+var server_save_store = ServerSaveStore.new()
+var server_save = ServerSaveClient.new()
 const KonfluxMap = preload("res://components/konflux_map.gd")
 var konflux = KonfluxMap.new()
 var konflux_preview_mode := false
@@ -242,6 +248,7 @@ var death_timer := 0.0
 var arcane_step_learned := false
 const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
+var equipped_ring2_uid := -1
 var next_uid := 1
 var selected_item := -1
 var inventory_page := 0
@@ -387,7 +394,7 @@ var network_status := "Offline"
 var network_port := 27844
 var websocket_port := 27845
 const LIVE_MULTIPLAYER_URL := "wss://multiplayer.sonnenhainrpg.de/"
-const NETWORK_PROTOCOL_VERSION := 7
+const NETWORK_PROTOCOL_VERSION := 8
 var dedicated_server_mode := false
 var invite_code := ""
 var join_code := ""
@@ -426,6 +433,7 @@ var recent_players: Array = []
 var save_notice_timer := 0.0
 var save_notice_text := ""
 var last_save_unix := 0
+var server_save_timer := 5.0
 var client_ping_timer := 0.0
 var server_last_reply_ms := 0
 var network_ping_ms := -1
@@ -721,19 +729,21 @@ func _on_connected_to_server() -> void:
 	if character_created:
 		rpc_player_presence.rpc_id(1, local_player_state())
 		push_player_state()
+		server_save.begin(self)
 
 func _on_connection_failed() -> void:
 	network_status = "Live-Server momentan nicht erreichbar · neuer Versuch …"
 	disconnect_multiplayer(false)
-	if is_web_platform() and character_created:
+	if character_created and not creative_mode and not multiplayer_smoke_client_mode:
 		live_reconnect_timer = 2.0
 
 func _on_server_disconnected() -> void:
+	server_save.disconnected()
 	network_status = "Live-Server-Verbindung unterbrochen · verbinde neu …"
 	remote_players.clear()
 	network_mode = "offline"
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
-	if is_web_platform() and character_created:
+	if character_created and not creative_mode and not multiplayer_smoke_client_mode:
 		live_reconnect_timer = 2.0
 
 func to_base36(value: int) -> String:
@@ -797,6 +807,10 @@ func preferred_host_address() -> String:
 	return "127.0.0.1"
 
 func start_websocket_server() -> void:
+	var home_dir := OS.get_environment("HOME")
+	var save_dir := command_arg_value("--save-dir=",home_dir.path_join("sonnenhain-server/data/player-saves") if home_dir != "" else "user://server-player-saves")
+	if server_save_store.configure(save_dir) != OK:
+		push_error("Server-Speicherverzeichnis konnte nicht geöffnet werden")
 	websocket_port = clampi(int(command_arg_value("--server-port=", "27845")), 1024, 65535)
 	disconnect_multiplayer(false)
 	var peer := WebSocketMultiplayerPeer.new()
@@ -856,6 +870,7 @@ func join_multiplayer_from_code(code: String) -> void:
 	network_status = "Verbinde mit %s …" % str(endpoint["address"])
 
 func disconnect_multiplayer(show_message: bool = true) -> void:
+	server_save.disconnected()
 	if network_mode != "offline" and multiplayer.multiplayer_peer != null: multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	remote_players.clear()
@@ -1198,7 +1213,7 @@ func update_music(delta: float = 0.0) -> void:
 		music_player.volume_db = move_toward(music_player.volume_db, base_volume, delta * 22.0)
 
 func max_hp() -> float:
-	return 100.0 + float(level - 1) * 8.0 + float(skill_levels[10]) * 25.0 + equipment_power(equipped_ring_uid) + item_attribute("str") * (2 if class_id == 0 else 1)
+	return 100.0 + float(level - 1) * 8.0 + float(skill_levels[10]) * 25.0 + equipment_power(equipped_ring_uid) + (equipment_power(equipped_ring2_uid) if class_id == 1 and equipped_ring2_uid != equipped_ring_uid else 0) + item_attribute("str") * (2 if class_id == 0 else 1)
 
 func max_energy() -> float:
 	return 100.0 + float(skill_levels[11]) * 25.0
@@ -1209,10 +1224,15 @@ func equipment_power(uid: int) -> int:
 			return int(item.get("power", 0))
 	return 0
 
+func equipped_item_uids() -> Array:
+	var ids := [equipped_uid,equipped_armor_uid,equipped_ring_uid]
+	if class_id == 1 and equipped_ring2_uid >= 0 and equipped_ring2_uid != equipped_ring_uid: ids.append(equipped_ring2_uid)
+	return ids
+
 func item_attribute(key: String) -> int:
 	var total := 0
 	for item in inventory:
-		if int(item.get("uid", -1)) in [equipped_uid, equipped_armor_uid, equipped_ring_uid]:
+		if int(item.get("uid", -1)) in equipped_item_uids():
 			total += int(item.get(key, 0))
 	return total
 
@@ -1270,6 +1290,7 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 
 func _process(delta: float) -> void:
 	update_connection_health(delta)
+	server_save.update(self)
 	if not dedicated_server_mode: controller.update(self, delta)
 	if death_timer > 0.0:
 		death_timer = maxf(0.0,death_timer-delta)
@@ -1284,6 +1305,14 @@ func _process(delta: float) -> void:
 	if konflux.active:
 		konflux.update(self,delta)
 		return
+	if server_save.loading:
+		queue_redraw()
+		return
+	if character_created and panel not in ["start","creation"]:
+		server_save_timer -= delta
+		if server_save_timer <= 0:
+			server_save_timer = 5.0
+			save_game()
 	process_multiplayer_smoke(delta)
 	update_music(delta)
 	if panel == "pause":
@@ -1297,7 +1326,7 @@ func _process(delta: float) -> void:
 	update_network_interpolation(delta)
 	if chat_open: chat_fade = 7.0
 	else: chat_fade = maxf(0.0, chat_fade - delta)
-	if is_web_platform() and character_created and network_mode == "offline" and panel not in ["start", "creation"]:
+	if character_created and not creative_mode and not multiplayer_smoke_client_mode and network_mode == "offline" and panel not in ["start", "creation"]:
 		live_reconnect_timer = maxf(0.0, live_reconnect_timer - delta)
 		if live_reconnect_timer <= 0.0:
 			live_reconnect_timer = 3.0
@@ -2074,6 +2103,7 @@ func open_mobile_chat() -> void:
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if server_save.loading: return
 	if controller.handle(self, event): return
 	if event is InputEventMouseMotion: controller.used = false
 	if panel == "controller" and event is InputEventKey and event.pressed and event.keycode == KEY_DELETE and controller.awaiting != "":
@@ -2165,6 +2195,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey: triggered = event.pressed and not event.echo
 	elif event is InputEventMouseButton: triggered = event.pressed
 	if not triggered: return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and Rect2(10,118,348,46).has_point(event.position):
+		quest_guide.open(self,quest_guide.current_id(self),"")
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and party_widget_rect().has_point(event.position) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 		panel = "party"
 		play_sound("menu")
@@ -2188,6 +2221,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			pause_status = "Konflux läuft online weiter." if konflux.active else "Das Spiel ist angehalten."
 		elif panel == "controls": panel = controls_return_panel
 		elif panel == "controller": panel = "pause"
+		elif panel == "quest_details": panel = quest_guide.return_panel
 		else: panel = ""
 		return
 	if panel in ["pause", "start", "controls", "arena_reward", "victory"]: return
@@ -3555,21 +3589,40 @@ func refresh_save_slot_labels() -> void:
 			save_slot_labels.append("%s · LV %d · %s" % [str(data.get("hero_name", "Held")), int(data.get("level", 1)), CLASS_NAMES[id]])
 		else: save_slot_labels.append("BESCHÄDIGT")
 
-func save_game() -> void:
-	if konflux_preview_mode or multiplayer_smoke_client_mode: return
+func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
-	var file: FileAccess = FileAccess.open(slot_save_path(active_save_slot, creative_mode), FileAccess.WRITE)
+	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
+	return data.duplicate(true)
+
+func save_game() -> void:
+	if dedicated_server_mode or konflux_preview_mode or multiplayer_smoke_client_mode: return
+	var data := capture_save_data()
+	server_save.queue(self,data)
+	write_local_save(data if creative_mode else server_save.decorate(data))
+
+func write_local_save(data: Dictionary) -> void:
+	if dedicated_server_mode or konflux_preview_mode or multiplayer_smoke_client_mode: return
+	var file := FileAccess.open(slot_save_path(active_save_slot,creative_mode),FileAccess.WRITE)
+	if file == null:
+		message("Lokales Speichern fehlgeschlagen. Bitte Serverstatus prüfen.")
+		return
+	file.store_string(JSON.stringify(data))
+	file.flush()
+	file.close()
+	last_save_unix = int(Time.get_unix_time_from_system())
+	save_notice_text = "LOKAL GESICHERT" if creative_mode or server_save.dirty else "SERVER GESPEICHERT ✓"
+	save_notice_timer = 2.8
+	if not creative_mode: refresh_save_slot_labels()
+
+func preserve_save_conflict(data: Dictionary) -> void:
+	var file := FileAccess.open(slot_save_path(active_save_slot).trim_suffix(".json")+"_conflict_%d.json" % int(Time.get_unix_time_from_system()),FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify(data))
+		file.flush()
 		file.close()
-		last_save_unix = int(Time.get_unix_time_from_system())
-		save_notice_text = "GESPEICHERT ✓"
-		save_notice_timer = 2.8
-		if not creative_mode: refresh_save_slot_labels()
 
 func load_game() -> void:
 	konflux.active=false
@@ -3579,7 +3632,12 @@ func load_game() -> void:
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null: return
 	var data: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
 	if not data is Dictionary: return
+	apply_save_data(data)
+	if server_save.connected(self): server_save.begin(self)
+
+func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	opened_village_gates.clear()
 	var saved_gates: Array = data.get("village_gates",[])
 	for gate_index in mini(saved_gates.size(),VILLAGE_GATES.size()):
@@ -3616,6 +3674,7 @@ func load_game() -> void:
 	character_created = bool(data.get("character_created", data.has("class_id")))
 	player_uuid = str(data.get("player_uuid",""))
 	ensure_player_uuid()
+	if not from_server and not creative_mode: server_save.restore(data)
 	var stored_recent: Variant = data.get("recent_players",[])
 	recent_players = stored_recent if stored_recent is Array else []
 	while recent_players.size() > 12: recent_players.pop_back()
@@ -3683,6 +3742,7 @@ func load_game() -> void:
 	equipped_armor_uid = int(data.get("equipped_armor_uid", -1))
 	arcane_step_learned = bool(data.get("arcane_step_learned", false))
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
+	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1)) if class_id == 1 else -1
 	last_waystone = clampi(int(data.get("last_waystone", 1)), 1, WAYSTONES.size() - 1)
 	var stored_stones: Array = data.get("waystone_unlocked", [])
 	for i in mini(stored_stones.size(), WAYSTONES.size()): waystone_unlocked[i] = bool(stored_stones[i])
@@ -3702,6 +3762,7 @@ func load_game() -> void:
 		for i in 3:
 			bosses_defeated[i] = int(quests[12 + i].get("state", 0)) >= 2
 	next_uid = maxi(next_uid, int(data.get("next_uid", 1)))
+	quest_guide.tracked_id = int(data.get("tracked_quest_id",QuestGuide.AUTO))
 	var stored_quests: Array = data.get("quests", [])
 	if stored_quests.size() > 0:
 		for i in mini(stored_quests.size(), QUESTS.size()):
@@ -3765,7 +3826,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 				panel = "arena_reward"
 				arena_pending_loaded = false
 			else: panel = ""
-			if is_web_platform(): ensure_live_multiplayer()
+			ensure_live_multiplayer()
 			message("Spielstand %d geladen. Willkommen zurück!" % active_save_slot)
 		elif Rect2(860, 448, 125, 54).has_point(mouse):
 			panel = "multiplayer"
@@ -3923,7 +3984,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		if Rect2(350, 491, 450, 54).has_point(mouse): leave_arena()
 		return
 	if Rect2(965, 91, 41, 35).has_point(mouse):
-		panel = controls_return_panel if panel == "controls" else ""
+		panel = controls_return_panel if panel == "controls" else (quest_guide.return_panel if panel == "quest_details" else "")
 		sell_all_confirm = false
 		pending_purchase = -1
 		return
@@ -3932,6 +3993,8 @@ func handle_panel_click(mouse: Vector2) -> void:
 		"inventory": click_inventory(mouse)
 		"shop": click_shop(mouse)
 		"travel": click_travel(mouse)
+		"journal": quest_guide.click_journal(self,mouse)
+		"quest_details": quest_guide.click_details(self,mouse)
 
 func set_volume_from_mouse(mouse: Vector2) -> bool:
 	if Rect2(300, 337, 550, 25).has_point(mouse):
@@ -3953,6 +4016,7 @@ func begin_character_creation() -> void:
 	play_sound("menu")
 
 func start_new_game() -> void:
+	quest_guide.tracked_id = QuestGuide.AUTO
 	creative_mode = false
 	opened_village_gates.clear()
 	dash_timer = 0.0
@@ -4008,6 +4072,7 @@ func start_new_game() -> void:
 	equipped_uid = -1
 	equipped_armor_uid = -1
 	equipped_ring_uid = -1
+	equipped_ring2_uid = -1
 	next_uid = 1
 	selected_item = -1
 	quests.clear()
@@ -4034,9 +4099,10 @@ func start_new_game() -> void:
 	drain_timer = 0
 	poison_blade_timer = 0
 	panel = "intro"
-	if is_web_platform(): ensure_live_multiplayer()
+	ensure_live_multiplayer()
 	message("Willkommen in Sonnenhain! Rede mit Mira, Borin oder Liora.")
 	save_game()
+	if server_save.connected(self): server_save.begin(self)
 
 func finish_intro() -> void:
 	if panel != "intro": return
@@ -4158,6 +4224,9 @@ func click_inventory(mouse: Vector2) -> void:
 	if Rect2(501,235,98,77).has_point(mouse) and equipped_armor_uid >= 0:
 		unequip_slot("armor")
 		return
+	if class_id == 1 and Rect2(180,395,98,77).has_point(mouse) and equipped_ring2_uid >= 0:
+		unequip_slot("ring2")
+		return
 	if Rect2(501,347,98,77).has_point(mouse) and equipped_ring_uid >= 0:
 		unequip_slot("ring")
 		return
@@ -4235,7 +4304,7 @@ func sell_all_unequipped() -> void:
 	var count := 0
 	for i in range(inventory.size() - 1, -1, -1):
 		var item: Dictionary = inventory[i]
-		if int(item["uid"]) in [equipped_uid, equipped_armor_uid, equipped_ring_uid]: continue
+		if int(item["uid"]) in equipped_item_uids(): continue
 		total += item_sale_value(item)
 		count += int(item.get("count", 1))
 		inventory.remove_at(i)
@@ -5599,7 +5668,7 @@ func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_lev
 			text_at(gate+Vector2(-85,-82),"TOR OFFEN",14,Color("fff0bc"))
 
 	var level_locked := level < required_level
-	var boss_locked := boss_index >= 0 and not bosses_defeated[boss_index]
+	var boss_locked: bool = boss_index >= 0 and not bosses_defeated[boss_index]
 	if level_locked or boss_locked:
 		var seal := Rect2(gate+(Vector2(-28,-GATE_HALF_WIDTH+39) if vertical else Vector2(-GATE_HALF_WIDTH+39,-28)),Vector2(56,GATE_HALF_WIDTH*2-78) if vertical else Vector2(GATE_HALF_WIDTH*2-78,56))
 		draw_rect(seal,Color("6e405b",0.94))
@@ -6216,7 +6285,7 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	# Facing north: the body masks the rear arm and weapon across the head.
 	if base_look == Vector2.UP:
 		draw_character_sprite(p,visual_class,walking,look,scale_factor,attack_now,use_race,use_gender)
-	if equipped_ring_uid >= 0 and preview_class < 0:
+	if (equipped_ring_uid >= 0 or (class_id == 1 and equipped_ring2_uid >= 0)) and preview_class < 0:
 		draw_rect(Rect2(p + Vector2(-23,-2) * scale_factor, Vector2(5,3) * scale_factor), Color('f8d982'))
 
 func weapon_attack_look(look: Vector2, family: int, design: int, progress: float) -> Vector2:
@@ -6482,7 +6551,7 @@ func draw_hud() -> void:
 	bar(Rect2(23, 65, 324, 17), energy, max_energy(), Color("3f7fd9") if class_id == 1 else Color("35b381"), "%s  %d / %d" % ["MANA" if class_id == 1 else "ENERGIE", ceili(energy), ceili(max_energy())])
 	bar(Rect2(23, 86, 324, 14), float(xp), float(xp_required()), Color("d9932e"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
 	draw_ref_panel(Rect2(10, 118, 348, 46))
-	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL", 13, Color("f0cf92"))
+	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL · DETAILS ›", 13, Color("f0cf92"))
 	text_at(Vector2(23, 155), tracked_quest().substr(0, 44), 14, Color("fff2d9"))
 	for enemy in enemies:
 		if int(enemy["type"]) in [12, 13, 14] and enemy["pos"].distance_to(player_pos) < 620:
@@ -6511,6 +6580,8 @@ func draw_hud() -> void:
 	if network_mode != "offline":
 		var ping_text := " · %d ms" % network_ping_ms if network_ping_ms >= 0 else ""
 		text_at(Vector2(925, 188), "KOOP %d/4%s" % [remote_players.size()+1,ping_text], 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+	if character_created and not creative_mode:
+		text_at(Vector2(14,181),server_save.status,10,Color("c9f0c4") if not server_save.dirty and server_save.ready else Color("ffe498"))
 	if save_notice_timer > 0.0:
 		text_at(Vector2(925, 205), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, 180)
 	if notice_timer > 0:
@@ -6629,18 +6700,7 @@ func draw_touch_controls() -> void:
 		text_at(pair[0].position + Vector2(4,34), pair[1], 10, Color("ffe7b0"), HORIZONTAL_ALIGNMENT_CENTER, int(pair[0].size.x-8))
 
 func tracked_quest() -> String:
-	if interior_id >= 0: return "Zur Steinrose · E an der Tür führt hinaus."
-	if dungeon_id >= 0: return "%s · %d Feinde · Truhe am Ende" % [DUNGEON_NAMES[dungeon_id], enemies.size()]
-	if rescue_state == 0: return "Mira: Folge dem östlichen Weg nach Blütenweiler."
-	if rescue_state == 1: return "Blütenweiler retten · Dornenwesen %d/%d" % [rescue_kills, RESCUE_GOAL]
-	if rescue_state == 2: return "Blütenweiler gerettet · Sprich mit Nela (E)."
-	for i in QUESTS.size():
-		if quests[i]["state"] == 2:
-			return "%s · Abgabe bei %s" % [QUESTS[i]["title"], QUESTS[i]["npc"]]
-	for i in QUESTS.size():
-		if quests[i]["state"] == 1:
-			return "%s · %d/%d" % [QUESTS[i]["title"], quests[i]["progress"], QUESTS[i]["count"]]
-	return "Sprich mit Mira, Borin oder Liora im Dorf."
+	return quest_guide.summary(self)
 
 func draw_minimap(rect: Rect2, compact: bool) -> void:
 	if konflux.active:
@@ -6704,12 +6764,7 @@ func draw_minimap(rect: Rect2, compact: bool) -> void:
 			draw_rect(Rect2(inset.position + p * Vector2(sx, sy) - Vector2(2, 2), Vector2(4, 4)), Color("e37c78"))
 	var player_map := inset.position + player_pos * Vector2(sx, sy)
 	draw_rect(Rect2(player_map - Vector2(4, 4), Vector2(8, 8)), Color.WHITE)
-	for i in QUESTS.size():
-		if quests[i]["state"] in [1, 2]:
-			var target_pos: Vector2 = region_rect(int(ENEMY_TYPES[int(QUESTS[i]["target"])]["region"])).get_center() if quests[i]["state"] == 1 else npc_position(String(QUESTS[i]["npc"]))
-			var marker: Vector2 = inset.position + target_pos * Vector2(sx, sy)
-			draw_arc(marker, 6 if compact else 10, 0, TAU, 16, Color("ffdf7b"), 2)
-			break
+	quest_guide.draw_on_map(self,inset,Vector2(sx,sy))
 	if not compact:
 		draw_rect(Rect2(inset.position + camera_pos * Vector2(sx, sy), VIEW * Vector2(sx, sy)), Color.WHITE, false, 2)
 
@@ -6786,6 +6841,7 @@ func draw_local_minimap(rect: Rect2) -> void:
 		if member_mark.distance_to(circle_center) < circle_radius-4.0:
 			draw_circle(member_mark,4,Color("8ff1c1"))
 			draw_arc(member_mark,5,0.0,TAU,14,Color("eaffd9"),1)
+	quest_guide.draw_on_minimap(self,circle_center,circle_radius,scale_map,start)
 	draw_circle(rect.get_center(), 4, Color.WHITE)
 	draw_line(rect.get_center(), rect.get_center() + facing.normalized() * 10, Color("fff1ad"), 2)
 	draw_arc(circle_center, circle_radius + 3.0, 0.0, TAU, 64, Color("f0d393"), 3)
@@ -6869,6 +6925,7 @@ func draw_panel() -> void:
 		"shop": draw_shop_panel()
 		"travel": draw_travel_panel()
 		"journal": draw_journal_panel()
+		"quest_details": quest_guide.draw_details(self)
 		"map": draw_map_panel()
 		"mechanics": draw_mechanics_panel()
 		"party": draw_party_panel()
@@ -7184,7 +7241,8 @@ func draw_inventory_panel() -> void:
 	draw_hero(Vector2(395, 370), 2.0, false, Vector2.DOWN)
 	draw_equipment_slot(Vector2(180, 275), "WAFFE", equipped_uid, class_weapon_icon())
 	draw_equipment_slot(Vector2(501, 235), "RÜSTUNG", equipped_armor_uid, "armor")
-	draw_equipment_slot(Vector2(501, 347), "RING", equipped_ring_uid, "ring")
+	draw_equipment_slot(Vector2(501, 347), "RING 1" if class_id == 1 else "RING", equipped_ring_uid, "ring")
+	if class_id == 1: draw_equipment_slot(Vector2(180,395),"RING 2",equipped_ring2_uid,"ring")
 	text_at(Vector2(186, 534), "HP %d  ·  ANGRIFF %d  ·  SCHUTZ %d" % [int(max_hp()), normal_attack_power(), equipment_power(equipped_armor_uid)], 15, Color("e6efdd"))
 	ui_box(Rect2(625, 153, 352, 426), Color("365b5d"))
 	text_at(Vector2(644, 179), "TASCHE · Doppelklick: benutzen / an- oder ausziehen", 12, Color("ffeda9"))
@@ -7196,7 +7254,7 @@ func draw_inventory_panel() -> void:
 		var col := cell % 5
 		var row := cell / 5
 		var pos := Vector2(641 + col * 65, 200 + row * 55)
-		var is_equipped := i < inventory.size() and int(inventory[i]["uid"]) in [equipped_uid, equipped_armor_uid, equipped_ring_uid]
+		var is_equipped := i < inventory.size() and int(inventory[i]["uid"]) in equipped_item_uids()
 		draw_rect(Rect2(pos, Vector2(54, 48)), Color("ffdda0") if is_equipped else (Color("e3c78c") if i == selected_item else Color("263f43")))
 		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("496b62"))
 		if i < inventory.size():
@@ -7236,6 +7294,10 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 	text_at(pos + Vector2(14, 66), "%s · %s · LV %d" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), int(item.get("level", 1))], 13, Color("e2ebde"))
 	var icon: String = item["icon"]
 	var equipped := equipped_uid if icon in ["sword", "bow", "staff"] else (equipped_armor_uid if icon == "armor" else (equipped_ring_uid if icon == "ring" else -1))
+	if icon == "ring" and class_id == 1:
+		var uid := int(item.get("uid",-1))
+		if uid == equipped_ring2_uid: equipped = equipped_ring2_uid
+		elif uid != equipped_ring_uid: equipped = -1 if equipped_ring_uid < 0 else equipped_ring2_uid
 	var current := equipment_power(equipped)
 	var worn: Dictionary = {}
 	for candidate in inventory:
@@ -7423,7 +7485,10 @@ func draw_journal_panel() -> void:
 		var group_suffix := " · GRUPPE" if not (party_state.get("members",[]) as Array).is_empty() and state == 1 else ""
 		text_at(Vector2(180, y + 42), "%s %d/%d  ·  %d XP / %d Gold%s" % [ENEMY_TYPES[int(q["target"])]["name"], quests[id]["progress"], q["count"], q["xp"], q["gold"],group_suffix], 14, Color("d8e6d3"))
 		text_at(Vector2(867, y + 29), status, 14, Color("fff0ad"))
-	text_at(Vector2(170, 592), "Sprich mit dem Questgeber, um die nächste Aufgabe anzunehmen. Mausrad: scrollen.", 15, Color("d9e6d5"))
+	text_at(Vector2(170, 592), "Klicke eine Quest für Details. Mausrad / Pfeile: scrollen.", 15, Color("d9e6d5"))
+
+	ui_button(Rect2(855,558,55,36),"↑")
+	ui_button(Rect2(920,558,55,36),"↓")
 
 func draw_map_panel() -> void:
 	if konflux.active:
@@ -7442,7 +7507,9 @@ func draw_map_panel() -> void:
 		return
 	text_at(Vector2(165, 125), "%s · EINGANG MARKIERT" % DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "WELTKARTE · SONNENHAIN", 24, Color("ffe0a4"))
 	draw_world_atlas(Rect2(167, 148, 800, 405))
-	text_at(Vector2(168, 584), "◆ Du   ◆ Wegstein   ◇ Eingang / Gewölbe   ● Auftrag   ★ Boss   ·   Gold: offen / Rot: gesperrt", 14, Color("efe1bc"))
+	text_at(Vector2(168, 579),"Gelb blinkend: Questziel · Weiß: Du · Cyan: Wegstein · Stern: Boss",13,Color("efe1bc"))
+	var quest_target: Dictionary = quest_guide.target(self)
+	if not quest_target.is_empty(): text_at(Vector2(168,602),String(quest_target["label"]),14,Color("ffe34b"))
 
 func draw_world_atlas(rect: Rect2) -> void:
 	if konflux.active:
@@ -7512,12 +7579,7 @@ func draw_world_atlas(rect: Rect2) -> void:
 		var point: Vector2 = inset.position + WORLD_EVENTS[i]["pos"] * map_scale
 		draw_circle(point, 5, Color("222e35"))
 		draw_circle(point, 3, Color("ffe09a") if int(event_states[i]) in [0, 2] else Color("98d6c8"))
-	for i in QUESTS.size():
-		if int(quests[i]["state"]) in [1, 2]:
-			var target: Vector2 = region_rect(int(ENEMY_TYPES[int(QUESTS[i]["target"])]["region"])).get_center() if int(quests[i]["state"]) == 1 else npc_position(String(QUESTS[i]["npc"]))
-			var marker: Vector2 = inset.position + target * map_scale
-			draw_circle(marker, 5, Color("f6d486"))
-			break
+
 	for boss_index in 3:
 		var boss_pos: Vector2 = LANDMARKS[boss_index + 2]["pos"]
 		if not region_available(region_at(boss_pos)): continue
@@ -7542,6 +7604,7 @@ func draw_world_atlas(rect: Rect2) -> void:
 		var party_marker := inset.position + member_pos*map_scale
 		draw_circle(party_marker,6,Color("273740"))
 		draw_arc(party_marker,5,0.0,TAU,16,Color("8ff1c1"),2)
+	quest_guide.draw_on_map(self,inset,map_scale)
 	var player_map := inset.position + (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)) * map_scale
 	draw_arc(player_map, 9.0 + sin(world_time * 3.0) * 1.0, 0.0, TAU, 24, Color("ffffff"), 3)
 	draw_colored_polygon(PackedVector2Array([player_map + Vector2(0,-7),player_map + Vector2(6,0),player_map + Vector2(0,7),player_map + Vector2(-6,0)]), Color("252b32"))
@@ -7940,7 +8003,7 @@ func class_weapon_icon_for(value: int) -> String:
 
 
 func ensure_live_multiplayer() -> void:
-	if not is_web_platform() or dedicated_server_mode or not character_created:
+	if dedicated_server_mode or creative_mode or konflux_preview_mode or multiplayer_smoke_client_mode or not character_created:
 		return
 	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED:
 		return
@@ -8417,6 +8480,8 @@ func rpc_server_party_progress(payload: Dictionary) -> void:
 	var xp_reward := clampi(int(payload.get("xp",0)),0,100000)
 	if xp_reward > 0:
 		gain_xp(xp_reward)
+		message("+%d XP · Gruppenbelohnung" % xp_reward)
+		add_chat_line("GRUPPE","+%d XP · Gruppenbelohnung" % xp_reward)
 		save_game()
 	ack_server_transaction(tx_id)
 
@@ -8574,6 +8639,7 @@ func draw_party_panel() -> void:
 	ui_button(Rect2(750,548,160,38),"SCHLIESSEN")
 
 func _on_peer_disconnected(id: int) -> void:
+	server_save_store.release(id)
 	konflux.fighter_stats.erase(id)
 	if network_mode == "host":
 		server_reserve_party_reconnect(id)
@@ -8718,11 +8784,13 @@ func run_inventory_consistency_smoke() -> bool:
 	var old_weapon := equipped_uid
 	var old_armor := equipped_armor_uid
 	var old_ring := equipped_ring_uid
+	var old_ring2 := equipped_ring2_uid
 	var old_next := next_uid
 	inventory = []
 	equipped_uid = -1
 	equipped_armor_uid = -1
 	equipped_ring_uid = -1
+	equipped_ring2_uid = -1
 	next_uid = 1
 	var armor := make_item("Smoke Rüstung","armor",1,4,10)
 	var ring := make_item("Smoke Ring","ring",1,8,10)
@@ -8774,6 +8842,7 @@ func run_inventory_consistency_smoke() -> bool:
 	equipped_uid = old_weapon
 	equipped_armor_uid = old_armor
 	equipped_ring_uid = old_ring
+	equipped_ring2_uid = old_ring2
 	next_uid = old_next
 	validate_equipment_slots()
 	print("INVENTORY_SMOKE_OK unique_uids=true toggle_armor=true buy=true equipped_sell_block=true server_loot_local_uid=true loadout_state=true tx_dedupe=persistent")
@@ -8893,10 +8962,11 @@ func validate_equipment_slots() -> void:
 		equipped_armor_uid = -1
 	if equipped_ring_uid >= 0 and item_icon_for_uid(equipped_ring_uid) != "ring":
 		equipped_ring_uid = -1
+	if class_id != 1 or item_icon_for_uid(equipped_ring2_uid) != "ring" or equipped_ring2_uid == equipped_ring_uid: equipped_ring2_uid = -1
 	hp = minf(hp,max_hp())
 
 func is_equipped_uid(uid: int) -> bool:
-	return uid >= 0 and uid in [equipped_uid,equipped_armor_uid,equipped_ring_uid]
+	return uid >= 0 and uid in equipped_item_uids()
 
 func toggle_equipment_item(index: int) -> bool:
 	if index < 0 or index >= inventory.size(): return false
@@ -8927,16 +8997,16 @@ func toggle_equipment_item(index: int) -> bool:
 		announce_multiplayer_context()
 		return true
 	if icon == "ring":
-		if equipped_ring_uid == uid:
-			equipped_ring_uid = -1
-			hp = minf(hp,max_hp())
-			message("Ausgezogen: %s" % str(item.get("name","Ring")))
-		else:
-			var old_max := max_hp()
-			equipped_ring_uid = uid
-			var new_max := max_hp()
-			hp = minf(new_max,hp+maxf(0.0,new_max-old_max))
-			message("Ausgerüstet: %s (+%d maximales Leben)" % [str(item.get("name","Ring")),int(item.get("power",0))])
+		var old_max := max_hp()
+		var removing := uid in [equipped_ring_uid,equipped_ring2_uid]
+		if equipped_ring_uid == uid: equipped_ring_uid = -1
+		elif equipped_ring2_uid == uid: equipped_ring2_uid = -1
+		elif equipped_ring_uid < 0: equipped_ring_uid = uid
+		elif class_id == 1: equipped_ring2_uid = uid
+		else: equipped_ring_uid = uid
+		validate_equipment_slots()
+		hp = minf(max_hp(),hp+maxf(0,max_hp()-old_max))
+		message(("Ausgezogen: " if removing else "Ausgerüstet: ")+str(item.get("name","Ring")))
 		save_game()
 		announce_multiplayer_context()
 		return true
@@ -8946,6 +9016,7 @@ func unequip_slot(slot: String) -> void:
 	match slot:
 		"weapon": equipped_uid = -1
 		"armor": equipped_armor_uid = -1
+		"ring2": equipped_ring2_uid = -1
 		"ring":
 			equipped_ring_uid = -1
 			hp = minf(hp,max_hp())
@@ -9243,6 +9314,10 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 		server_register_transaction(peer_id,tx)
 		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer})
 
+func server_party_member_xp(type: int, elite_kind: int, member: int) -> int:
+	if not remote_players.has(member): return 0
+	return enemy_xp_reward(type,elite_kind,int(remote_players[member].get("level",1)))
+
 func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
 	server_send_all_quest_progress(peer_id,enemy)
@@ -9271,17 +9346,16 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	var reward_tx := "reward:%d:%s" % [mob_uid,killer_uuid]
 	server_register_transaction(peer_id,reward_tx)
 	if party_members.size() > 1:
-		# Killer erhält Beute/Gold; XP geht separat an alle Gruppenmitglieder.
-		# Der Killer bekommt den Quest-Kill bereits über combat_reward, daher dort
-		# kein zweiter Questfortschritt im Gruppenpaket.
-		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,0,gold_reward,network_rewards)
+		# Each recipient uses their own level. Killer XP travels with loot, never a fake zero.
+		# Other members receive a separate, visible XP transaction.
+		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
 		for raw_member in party_members:
 			var member := int(raw_member)
-			if member <= 0 or not remote_players.has(member): continue
+			if member == peer_id or member <= 0 or not remote_players.has(member): continue
 			var member_uuid := str(remote_players[member].get("uuid","peer%d" % member))
 			var party_tx := "partyxp:%d:%s" % [mob_uid,member_uuid]
 			server_register_transaction(member,party_tx)
-			var member_xp := enemy_xp_reward(type, elite_kind, int(remote_players[member].get("level",1)))
+			var member_xp := server_party_member_xp(type,elite_kind,member)
 			rpc_server_party_progress.rpc_id(member,{"tx":party_tx,"xp":member_xp})
 	else:
 		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
@@ -9342,3 +9416,28 @@ func run_teleport_consistency_smoke() -> bool:
 		print("TELEPORT_SMOKE_OK konflux_lv40=true entrance=true center=true rooms=true portals=true")
 	return ok
 
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_zz_save_open(token: String, uuid: String) -> void:
+	if not dedicated_server_mode or network_mode != "host": return
+	var peer := multiplayer.get_remote_sender_id()
+	if not server_action_allowed(peer,"save_open",500): return
+	var response: Dictionary = server_save_store.open(peer,token,uuid)
+	response["uuid"] = uuid
+	rpc_zz_save_reply.rpc_id(peer,response)
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_zz_save_put(token: String, uuid: String, revision: int, request: String, data: Dictionary) -> void:
+	if not dedicated_server_mode or network_mode != "host": return
+	var peer := multiplayer.get_remote_sender_id()
+	if peer <= 0: return
+	if not server_action_allowed(peer,"save_put",200):
+		rpc_zz_save_reply.rpc_id(peer,{"ok":false,"uuid":uuid,"error":"retry"})
+		return
+	rpc_zz_save_reply.rpc_id(peer,server_save_store.put(peer,token,uuid,revision,request,data))
+
+@rpc("authority","call_remote","reliable")
+func rpc_zz_save_reply(response: Dictionary) -> void:
+	if network_mode != "client": return
+	server_last_reply_ms = Time.get_ticks_msec()
+	server_save.reply(self,response)
