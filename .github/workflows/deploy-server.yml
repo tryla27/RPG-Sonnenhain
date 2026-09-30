@@ -152,7 +152,7 @@ jobs:
               if command -v systemctl >/dev/null 2>&1; then
                 systemctl --user disable --now sonnenhain.service >/dev/null 2>&1 || true
               fi
-              pkill -f '(^|/)sonnenhain-server\.x86_64 --headless -- --dedicated-server
+              pkill -f "(^|/)sonnenhain-server\\.x86_64 --headless -- --dedicated-server$" || true
               if command -v setsid >/dev/null 2>&1; then
                 nohup setsid ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
               else
@@ -162,7 +162,7 @@ jobs:
             fi
 
             sleep 4
-            if ! pgrep -f '(^|/)sonnenhain-server\.x86_64 --headless -- --dedicated-server >/dev/null; then
+            if ! pgrep -f "(^|/)sonnenhain-server\\.x86_64 --headless -- --dedicated-server$" >/dev/null; then
               echo "Sonnenhain server process is not running."
               test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
               exit 1
