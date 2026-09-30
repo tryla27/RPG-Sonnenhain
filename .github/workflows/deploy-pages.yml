@@ -137,6 +137,7 @@ jobs:
           cp web-legal/nutzungsregeln.html build/site/nutzungsregeln.html
           cp web-legal/jugendschutz.html build/site/jugendschutz.html
           cp web-legal/lizenzen.html build/site/lizenzen.html
+          cp web-legal/rechtliches.html build/site/rechtliches.html
           cp web-legal/robots.txt build/site/robots.txt
           mkdir -p build/site/.well-known
           cp web-legal/security.txt build/site/.well-known/security.txt
@@ -165,6 +166,7 @@ jobs:
           test -f build/site/nutzungsregeln.html
           test -f build/site/jugendschutz.html
           test -f build/site/lizenzen.html
+          test -f build/site/rechtliches.html
           test -f build/site/game/index.html
           test -f build/site/game/index.pck
           test -f build/site/game/index.wasm
