@@ -372,7 +372,7 @@ var network_status := "Offline"
 var network_port := 27844
 var websocket_port := 27845
 const LIVE_MULTIPLAYER_URL := "wss://multiplayer.sonnenhainrpg.de/"
-const NETWORK_PROTOCOL_VERSION := 3
+const NETWORK_PROTOCOL_VERSION := 4
 var dedicated_server_mode := false
 var invite_code := ""
 var join_code := ""
@@ -383,15 +383,22 @@ var server_spawn_timer := 0.0
 var server_status_timer := 0.0
 var server_next_mob_uid := 1
 var server_moving_mobs := 0
+var server_party_of_peer: Dictionary = {}
+var server_parties: Dictionary = {}
+var server_party_invites: Dictionary = {}
+var server_next_party_id := 1
 var server_action_times: Dictionary = {}
 var live_reconnect_timer := 0.0
 var multiplayer_smoke_client_mode := false
 var multiplayer_smoke_name := ""
 var multiplayer_smoke_deadline := 0
 var multiplayer_smoke_chat_timer := 0.0
+var multiplayer_smoke_attack_timer := 0.0
 var multiplayer_smoke_success_since := 0
 var server_sync_status: Dictionary = {}
 var server_world_manifest: Dictionary = {}
+var party_state: Dictionary = {}
+var remote_combat_visuals: Array = []
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -451,6 +458,10 @@ func process_multiplayer_smoke(delta: float) -> void:
 	if not multiplayer_smoke_client_mode:
 		return
 	multiplayer_smoke_chat_timer -= delta
+	multiplayer_smoke_attack_timer -= delta
+	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer_smoke_attack_timer <= 0.0:
+		multiplayer_smoke_attack_timer = 0.85
+		rpc_client_normal_attack.rpc_id(1,[player_pos.x,player_pos.y],[facing.x,facing.y],class_id,equipped_weapon_design(),5,weapon_element())
 	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer_smoke_chat_timer <= 0.0:
 		multiplayer_smoke_chat_timer = 0.7
 		send_chat_message("SMOKE:%s" % multiplayer_smoke_name)
@@ -472,18 +483,19 @@ func process_multiplayer_smoke(delta: float) -> void:
 		var facing_data: Array = remote_state.get("facing", [])
 		if pos_data.size() >= 2 and facing_data.size() >= 2 and remote_state.has("class") and remote_state.has("race") and str(remote_state.get("name", "")).strip_edges() != "":
 			complete_remote_count += 1
-	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and saw_other_chat and multiplayer_smoke_success_since == 0:
+	var saw_remote_attack := remote_combat_visuals.size() >= 1
+	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and saw_other_chat and saw_remote_attack and multiplayer_smoke_success_since == 0:
 		multiplayer_smoke_success_since = Time.get_ticks_msec()
-		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size())
+		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack)
 	# Sobald dieser Client den anderen Spieler, dessen Chat und den
 	# Server-Snapshot gemeinsam gesehen hat, ist die Relay-Prüfung erfüllt.
 	# Er bleibt nur noch kurz online, damit der Gegenclient dasselbe prüfen kann.
 	if multiplayer_smoke_success_since > 0 and Time.get_ticks_msec() - multiplayer_smoke_success_since >= 2500:
-		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size())
+		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack)
 		get_tree().quit(0)
 		return
 	if multiplayer_smoke_deadline > 0 and Time.get_ticks_msec() > multiplayer_smoke_deadline:
-		print("MULTIPLAYER_SMOKE_FAIL name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " chat=", saw_other_chat)
+		print("MULTIPLAYER_SMOKE_FAIL name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " chat=", saw_other_chat, " combat=", saw_remote_attack)
 		get_tree().quit(32)
 
 func _ready() -> void:
@@ -628,6 +640,229 @@ func build_world_manifest() -> Dictionary:
 		})
 	return {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","entities":entities,"npc_count":NPCS.size(),"event_count":WORLD_EVENTS.size(),"quest_count":QUESTS.size()}
 
+func server_party_members(peer_id: int) -> Array:
+	if server_party_of_peer.has(peer_id):
+		var party_id := int(server_party_of_peer[peer_id])
+		if server_parties.has(party_id):
+			return server_parties[party_id].duplicate()
+	return [peer_id]
+
+func server_party_member_rows(party_id: int) -> Array:
+	var rows: Array = []
+	if not server_parties.has(party_id): return rows
+	for raw_peer in server_parties[party_id]:
+		var peer_id := int(raw_peer)
+		if not remote_players.has(peer_id): continue
+		var state: Dictionary = remote_players[peer_id]
+		rows.append({
+			"peer_id":peer_id,
+			"name":str(state.get("name","Held")),
+			"class":int(state.get("class",0)),
+			"level":int(state.get("level",1)),
+			"context":str(state.get("context","world")),
+			"instance_id":str(state.get("instance_id","world"))
+		})
+	return rows
+
+func server_party_notice(peer_id: int, value: String) -> void:
+	if peer_id > 0 and peer_id in multiplayer.get_peers():
+		rpc_party_notice.rpc_id(peer_id,value.substr(0,120))
+
+func server_send_party_state(peer_id: int) -> void:
+	if peer_id <= 0 or peer_id not in multiplayer.get_peers(): return
+	var payload := {"party_id":0,"leader":0,"members":[],"invite_from":0,"invite_name":""}
+	if server_party_of_peer.has(peer_id):
+		var party_id := int(server_party_of_peer[peer_id])
+		var members := server_party_member_rows(party_id)
+		payload["party_id"] = party_id
+		payload["members"] = members
+		payload["leader"] = int(server_parties[party_id][0]) if server_parties.has(party_id) and not server_parties[party_id].is_empty() else 0
+	if server_party_invites.has(peer_id):
+		var invite: Dictionary = server_party_invites[peer_id]
+		if int(invite.get("expires",0)) >= Time.get_ticks_msec() and remote_players.has(int(invite.get("from",0))):
+			var inviter := int(invite["from"])
+			payload["invite_from"] = inviter
+			payload["invite_name"] = str(remote_players[inviter].get("name","Held"))
+		else:
+			server_party_invites.erase(peer_id)
+	rpc_party_state.rpc_id(peer_id,payload)
+
+func server_broadcast_party(party_id: int) -> void:
+	if not server_parties.has(party_id): return
+	for raw_peer in server_parties[party_id]:
+		server_send_party_state(int(raw_peer))
+
+func server_find_peer_by_name(value: String) -> int:
+	var wanted := value.strip_edges().to_lower()
+	if wanted == "": return 0
+	var found := 0
+	for raw_peer in remote_players.keys():
+		var peer_id := int(raw_peer)
+		if str(remote_players[raw_peer].get("name","")).strip_edges().to_lower() == wanted:
+			if found != 0: return -1
+			found = peer_id
+	return found
+
+func server_remove_peer_from_party(peer_id: int) -> void:
+	if not server_party_of_peer.has(peer_id):
+		server_send_party_state(peer_id)
+		return
+	var party_id := int(server_party_of_peer[peer_id])
+	server_party_of_peer.erase(peer_id)
+	if not server_parties.has(party_id): return
+	var members: Array = server_parties[party_id]
+	members.erase(peer_id)
+	if members.size() <= 1:
+		if members.size() == 1:
+			var remaining := int(members[0])
+			server_party_of_peer.erase(remaining)
+			server_party_notice(remaining,"Gruppe aufgelöst.")
+			server_send_party_state(remaining)
+		server_parties.erase(party_id)
+	else:
+		server_parties[party_id] = members
+		server_broadcast_party(party_id)
+	server_send_party_state(peer_id)
+
+func server_relay_combat_visual(sender: int, payload: Dictionary) -> void:
+	if network_mode != "host" or not remote_players.has(sender): return
+	var source: Dictionary = remote_players[sender]
+	var context := str(source.get("context","world"))
+	var instance_id := str(source.get("instance_id","world"))
+	var clean := payload.duplicate(true)
+	clean["protocol"] = NETWORK_PROTOCOL_VERSION
+	clean["server_time"] = Time.get_ticks_msec()
+	for raw_peer in multiplayer.get_peers():
+		var peer_id := int(raw_peer)
+		if peer_id == sender or not remote_players.has(peer_id): continue
+		var target: Dictionary = remote_players[peer_id]
+		if str(target.get("context","world")) != context or str(target.get("instance_id","world")) != instance_id: continue
+		rpc_remote_combat_visual.rpc_id(peer_id,sender,clean)
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_party_command(command: Dictionary) -> void:
+	if network_mode != "host": return
+	var sender := multiplayer.get_remote_sender_id()
+	if sender <= 0 or not remote_players.has(sender): return
+	var action := str(command.get("action",""))
+	if action == "invite":
+		var target_name := str(command.get("name","")).strip_edges().substr(0,16)
+		var target := server_find_peer_by_name(target_name)
+		if target == -1:
+			server_party_notice(sender,"Mehrere Spieler haben diesen Namen.")
+			return
+		if target <= 0:
+			server_party_notice(sender,"Spieler '%s' ist nicht online." % target_name)
+			return
+		if target == sender:
+			server_party_notice(sender,"Du kannst dich nicht selbst einladen.")
+			return
+		if server_party_of_peer.has(target):
+			server_party_notice(sender,"%s ist bereits in einer Gruppe." % str(remote_players[target].get("name","Held")))
+			return
+		if server_party_of_peer.has(sender):
+			var existing_party := int(server_party_of_peer[sender])
+			if server_parties.has(existing_party) and server_parties[existing_party].size() >= 4:
+				server_party_notice(sender,"Deine Gruppe ist bereits voll.")
+				return
+		server_party_invites[target] = {"from":sender,"expires":Time.get_ticks_msec()+30000}
+		server_party_notice(sender,"Einladung an %s gesendet." % str(remote_players[target].get("name","Held")))
+		server_party_notice(target,"%s lädt dich in eine Gruppe ein." % str(remote_players[sender].get("name","Held")))
+		server_send_party_state(target)
+	elif action == "accept":
+		if not server_party_invites.has(sender):
+			server_party_notice(sender,"Keine offene Gruppeneinladung.")
+			return
+		var invite: Dictionary = server_party_invites[sender]
+		server_party_invites.erase(sender)
+		if int(invite.get("expires",0)) < Time.get_ticks_msec():
+			server_party_notice(sender,"Die Gruppeneinladung ist abgelaufen.")
+			server_send_party_state(sender)
+			return
+		var inviter := int(invite.get("from",0))
+		if inviter <= 0 or not remote_players.has(inviter):
+			server_party_notice(sender,"Der einladende Spieler ist nicht mehr online.")
+			server_send_party_state(sender)
+			return
+		var party_id := 0
+		if server_party_of_peer.has(inviter):
+			party_id = int(server_party_of_peer[inviter])
+		else:
+			party_id = server_next_party_id
+			server_next_party_id += 1
+			server_parties[party_id] = [inviter]
+			server_party_of_peer[inviter] = party_id
+		if not server_parties.has(party_id) or server_parties[party_id].size() >= 4:
+			server_party_notice(sender,"Die Gruppe ist inzwischen voll.")
+			server_send_party_state(sender)
+			return
+		server_parties[party_id].append(sender)
+		server_party_of_peer[sender] = party_id
+		server_party_notice(sender,"Gruppe beigetreten. XP und Quest-Kills werden geteilt.")
+		server_party_notice(inviter,"%s ist der Gruppe beigetreten." % str(remote_players[sender].get("name","Held")))
+		server_broadcast_party(party_id)
+	elif action == "decline":
+		server_party_invites.erase(sender)
+		server_party_notice(sender,"Gruppeneinladung abgelehnt.")
+		server_send_party_state(sender)
+	elif action == "leave":
+		server_remove_peer_from_party(sender)
+
+@rpc("authority","call_remote","reliable")
+func rpc_party_state(state: Dictionary) -> void:
+	party_state = state.duplicate(true)
+	queue_redraw()
+
+@rpc("authority","call_remote","reliable")
+func rpc_party_notice(value: String) -> void:
+	add_chat_line("GRUPPE",value)
+	message(value)
+
+@rpc("authority","call_remote","reliable")
+func rpc_server_party_progress(payload: Dictionary) -> void:
+	if network_mode != "client": return
+	var xp_reward := clampi(int(payload.get("xp",0)),0,100000)
+	var enemy_type := clampi(int(payload.get("enemy_type",0)),0,ENEMY_TYPES.size()-1)
+	if xp_reward > 0:
+		gain_xp(xp_reward)
+	if bool(payload.get("quest",false)):
+		for qindex in quests.size():
+			var quest: Dictionary = quests[qindex]
+			if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == enemy_type:
+				quest["progress"] = mini(int(QUESTS[qindex]["count"]),int(quest["progress"])+1)
+				if quest["progress"] >= int(QUESTS[qindex]["count"]):
+					quest["state"] = 2
+					message("Gruppen-Questziel erreicht: %s" % QUESTS[qindex]["title"])
+	if xp_reward > 0 or bool(payload.get("quest",false)):
+		save_game()
+
+@rpc("authority","call_remote","reliable")
+func rpc_remote_combat_visual(peer_id: int, payload: Dictionary) -> void:
+	if int(payload.get("protocol",-1)) != NETWORK_PROTOCOL_VERSION: return
+	if peer_id == multiplayer.get_unique_id(): return
+	if remote_players.has(peer_id) and not state_matches_local_context(remote_players[peer_id]): return
+	var pos_data: Array = payload.get("pos",[])
+	var dir_data: Array = payload.get("dir",[])
+	if pos_data.size() < 2 or dir_data.size() < 2: return
+	var pos := Vector2(float(pos_data[0]),float(pos_data[1]))
+	var dir := Vector2(float(dir_data[0]),float(dir_data[1]))
+	if not pos.is_finite() or not dir.is_finite() or dir.length_squared() < 0.01: return
+	dir = dir.normalized()
+	remote_combat_visuals.append({
+		"peer_id":peer_id,
+		"kind":str(payload.get("kind","normal")),
+		"ability":int(payload.get("ability",-1)),
+		"class":clampi(int(payload.get("class",0)),0,2),
+		"weapon":clampi(int(payload.get("weapon",0)),0,32),
+		"element":str(payload.get("element","")),
+		"pos":pos,
+		"dir":dir,
+		"life":0.42,
+		"max":0.42
+	})
+	while remote_combat_visuals.size() > 40: remote_combat_visuals.pop_front()
+	queue_redraw()
+
 func local_player_state() -> Dictionary:
 	return {"protocol":NETWORK_PROTOCOL_VERSION, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 
@@ -651,6 +886,12 @@ func _on_peer_connected(id: int) -> void:
 				rpc_receive_player_state.rpc_id(id, int(peer_id), remote_players[peer_id])
 
 func _on_peer_disconnected(id: int) -> void:
+	if network_mode == "host":
+		server_remove_peer_from_party(id)
+		server_party_invites.erase(id)
+		for target in server_party_invites.keys():
+			if int(server_party_invites[target].get("from",0)) == id:
+				server_party_invites.erase(target)
 	remote_players.erase(id)
 	var action_prefix := "%d:" % id
 	for key in server_action_times.keys():
@@ -868,7 +1109,18 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 		rewards.append(random_loot(type, reward_class))
 	if randf() < 0.03:
 		rewards.append(make_item("Heiltrank", "potion", 1, 0, 18))
-	rpc_server_combat_reward.rpc_id(peer_id, type, xp_reward, gold_reward, rewards)
+	var party_members := server_party_members(peer_id)
+	if party_members.size() > 1:
+		# Killer erhält Beute/Gold; XP geht separat an alle Gruppenmitglieder.
+		# Der Killer bekommt den Quest-Kill bereits über combat_reward, daher dort
+		# kein zweiter Questfortschritt im Gruppenpaket.
+		rpc_server_combat_reward.rpc_id(peer_id,type,0,gold_reward,rewards)
+		for raw_member in party_members:
+			var member := int(raw_member)
+			if member <= 0 or not remote_players.has(member): continue
+			rpc_server_party_progress.rpc_id(member,{"enemy_type":type,"xp":xp_reward,"quest":member != peer_id})
+	else:
+		rpc_server_combat_reward.rpc_id(peer_id,type,xp_reward,gold_reward,rewards)
 
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null or dedicated_server_mode: return
@@ -944,6 +1196,7 @@ func send_server_session_status(peer_id: int) -> void:
 		"npc_count":NPCS.size(),
 		"event_count":WORLD_EVENTS.size(),
 		"quest_count":QUESTS.size(),
+		"party_size":server_party_members(peer_id).size() if server_party_of_peer.has(peer_id) else 1,
 		"server_time":Time.get_ticks_msec()
 	})
 
@@ -1100,6 +1353,22 @@ func start_coop_world() -> void:
 func send_chat_message(value: String) -> void:
 	var clean := value.strip_edges().substr(0,120)
 	if clean == "": return
+	if clean.to_lower().begins_with("/invite "):
+		var target_name := clean.substr(8).strip_edges()
+		if network_mode == "client" and target_name != "":
+			rpc_party_command.rpc_id(1,{"action":"invite","name":target_name})
+		elif network_mode != "client":
+			add_chat_line("GRUPPE","Gruppenbefehle benötigen den Live-Server.")
+		return
+	if clean.to_lower() == "/accept":
+		if network_mode == "client": rpc_party_command.rpc_id(1,{"action":"accept"})
+		return
+	if clean.to_lower() == "/decline":
+		if network_mode == "client": rpc_party_command.rpc_id(1,{"action":"decline"})
+		return
+	if clean.to_lower() == "/leave":
+		if network_mode == "client": rpc_party_command.rpc_id(1,{"action":"leave"})
+		return
 	var author := hero_name.strip_edges().substr(0,20) if hero_name.strip_edges() != "" else "Held"
 	add_chat_line(author, clean)
 	if network_mode == "client":
@@ -1342,6 +1611,10 @@ func _process(delta: float) -> void:
 		while effects.size() > 24: effects.pop_front()
 		while spell_visuals.size() > 18: spell_visuals.pop_front()
 		while lightning_lines.size() > 12: lightning_lines.pop_front()
+	for i in range(remote_combat_visuals.size()-1,-1,-1):
+		remote_combat_visuals[i]["life"] = float(remote_combat_visuals[i].get("life",0.0))-delta
+		if remote_combat_visuals[i]["life"] <= 0.0:
+			remote_combat_visuals.remove_at(i)
 	for i in range(effects.size() - 1, -1, -1):
 		effects[i]["life"] = float(effects[i]["life"]) - delta
 		if effects[i]["life"] <= 0:
@@ -1449,10 +1722,19 @@ func update_dedicated_enemies(delta: float) -> void:
 		var offset := target_pos - Vector2(enemy["pos"])
 		var distance := offset.length()
 		var info: Dictionary = ENEMY_TYPES[int(enemy["type"])]
-		if enemy["stun"] <= 0.0 and distance > 34.0 and distance < 720.0:
+		if enemy["stun"] <= 0.0 and distance > 34.0 and distance < 980.0:
 			var speed := float(info["speed"]) * (0.45 if enemy["slow"] > 0.0 else 1.0) * (1.08 if int(enemy.get("elite",0)) > 0 else 1.0) * delta
 			var origin: Vector2 = enemy["pos"]
 			var desired := offset.normalized()
+			var separation := Vector2.ZERO
+			for other_index in enemies.size():
+				if other_index == i: continue
+				var other_pos: Vector2 = enemies[other_index]["pos"]
+				var away := origin - other_pos
+				if away.length_squared() > 0.01 and away.length() < 54.0:
+					separation += away.normalized() * (54.0-away.length())/54.0
+			if separation.length_squared() > 0.01:
+				desired = (desired + separation.normalized()*0.72).normalized()
 			var moved := false
 			# Dedicated-Server-Steering: nicht an einem Baum/Haus auf der direkten
 			# Linie hängen bleiben, sondern wie der lokale Gegnercode ausweichen.
@@ -1911,6 +2193,12 @@ func handle_touch_event(event: InputEvent) -> bool:
 			queue_redraw()
 			return true
 
+		if party_widget_rect().has_point(pos) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
+			panel = "party"
+			play_sound("menu")
+			queue_redraw()
+			return true
+
 		# Aktionsbuttons haben Vorrang und erhalten eine eigene Finger-ID.
 		var action: String = touch_button_at(pos)
 		if action != "":
@@ -2090,6 +2378,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey: triggered = event.pressed and not event.echo
 	elif event is InputEventMouseButton: triggered = event.pressed
 	if not triggered: return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and party_widget_rect().has_point(event.position) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
+		panel = "party"
+		play_sound("menu")
+		queue_redraw()
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and (event.position.distance_to(Vector2(1035,116)) <= 90.0 or (touch_enabled and Rect2(984,16,145,105).has_point(event.position))):
 		panel = "map"
 		menu_scroll = 0
@@ -2217,6 +2510,7 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 	remote_class = clampi(int(state.get("class",0)),0,2)
 	design = clampi(int(state.get("weapon",0)),0,32)
 	element = str(state.get("element",""))
+	server_relay_combat_visual(sender,{"kind":"normal","pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":design,"element":element})
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	power = clampi(power,1,80 + level_cap * 20)
 	if remote_class == 0:
@@ -2299,6 +2593,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	allowed_ids.append(CLASS_ULTIMATES[remote_class])
 	if id not in allowed_ids: return
 	rank = clampi(rank,1,5)
+	server_relay_combat_visual(sender,{"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))})
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	power = clampi(power,1,140 + level_cap * 30)
 	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
@@ -3650,6 +3945,22 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(605, 520, 340, 46).has_point(mouse):
 			start_coop_world()
 		return
+	if panel == "party":
+		var invite_from := int(party_state.get("invite_from",0))
+		if invite_from > 0 and Rect2(205,285,335,48).has_point(mouse):
+			if network_mode == "client": rpc_party_command.rpc_id(1,{"action":"accept"})
+			return
+		if invite_from > 0 and Rect2(575,285,335,48).has_point(mouse):
+			if network_mode == "client": rpc_party_command.rpc_id(1,{"action":"decline"})
+			return
+		if Rect2(205,510,335,46).has_point(mouse) and not (party_state.get("members",[]) as Array).is_empty():
+			if network_mode == "client": rpc_party_command.rpc_id(1,{"action":"leave"})
+			panel = ""
+			return
+		if Rect2(750,548,160,38).has_point(mouse):
+			panel = ""
+			return
+		return
 	if panel == "mechanics":
 		for tab in 4:
 			if Rect2(190 + tab * 195, 142, 180, 38).has_point(mouse):
@@ -4297,6 +4608,7 @@ func _draw() -> void:
 		draw_line(middle, b, Color.WHITE, 4)
 	for visual in spell_visuals:
 		if visible_world(visual["pos"], 210) or visible_world(visual["end"], 210): draw_spell_visual(visual)
+	draw_remote_combat_visuals()
 	if dungeon_id >= 0: draw_dungeon_atmosphere()
 	elif arena_mode == "" and interior_id < 0: draw_overworld_atmosphere()
 	for e in effects:
@@ -4309,6 +4621,7 @@ func _draw() -> void:
 	character_canvas_offset = Vector2.ZERO
 	draw_chat_overlay()
 	draw_online_list()
+	draw_party_widget()
 	draw_multiplayer_debug_overlay()
 	if rescue_intro_timer > 0.0 or reward_scene_timer > 0.0: draw_rescue_alert()
 	if panel != "": draw_panel()
@@ -4349,35 +4662,61 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
 		text_at(rp + Vector2(-75,-57), "%s · LV %d" % [str(state.get("name","Freund")), int(state.get("level",1))], 13, Color('bfe7ff'), HORIZONTAL_ALIGNMENT_CENTER, 150)
 
+func draw_remote_combat_visuals() -> void:
+	for visual in remote_combat_visuals:
+		var pos: Vector2 = visual["pos"]
+		var dir: Vector2 = visual["dir"]
+		if not visible_world(pos,280): continue
+		var life := float(visual.get("life",0.0))
+		var max_life := maxf(0.01,float(visual.get("max",0.42)))
+		var progress := 1.0-clampf(life/max_life,0.0,1.0)
+		var cls := clampi(int(visual.get("class",0)),0,2)
+		var accent := [Color("ffd18a"),Color("b9b4ff"),Color("bce89e")][cls]
+		var element := str(visual.get("element",""))
+		if element != "": accent = element_color(element)
+		if str(visual.get("kind","normal")) == "normal":
+			if cls == 0:
+				var angle := dir.angle()
+				draw_arc(pos,68.0,angle-0.82,angle+0.82,18,Color(accent,0.85*(1.0-progress)),6.0)
+				draw_line(pos+dir*18.0,pos+dir*83.0,Color.WHITE,3.0)
+			else:
+				var p := pos+dir*(35.0+progress*230.0)
+				draw_line(p-dir*34.0,p+dir*12.0,Color(accent,0.85),6.0)
+				draw_circle(p,7.0,Color.WHITE)
+		else:
+			var radius := 28.0+progress*96.0
+			draw_circle(pos,radius,Color(accent,0.10*(1.0-progress)))
+			draw_arc(pos,radius,0.0,TAU,28,Color(accent,0.88*(1.0-progress)),4.0)
+			draw_line(pos,pos+dir*(70.0+progress*70.0),Color(accent,0.72*(1.0-progress)),7.0)
+
+func party_widget_rect() -> Rect2:
+	return Rect2((VIEW.x-300.0)*0.5,12.0,300.0,42.0)
+
+func draw_party_widget() -> void:
+	var invite_from := int(party_state.get("invite_from",0))
+	var members: Array = party_state.get("members",[])
+	if invite_from <= 0 and members.is_empty(): return
+	var box := party_widget_rect()
+	draw_rect(box,Color(0.03,0.08,0.10,0.88))
+	draw_rect(box,Color("8bc7ad"),false,2.0)
+	if invite_from > 0:
+		text_at(box.position+Vector2(10,17),"GRUPPENEINLADUNG",12,Color("ffe0a1"))
+		text_at(box.position+Vector2(10,34),"%s · klicken zum Antworten" % str(party_state.get("invite_name","Spieler")),12,Color("e7f2e8"))
+	else:
+		var member_names: Array[String] = []
+		for row in members:
+			if row is Dictionary: member_names.append(str(row.get("name","Held")))
+		text_at(box.position+Vector2(10,17),"GRUPPE · %d/4" % members.size(),12,Color("ffe0a1"))
+		text_at(box.position+Vector2(10,34),", ".join(member_names).substr(0,42),11,Color("e7f2e8"))
+
 func draw_multiplayer_debug_overlay() -> void:
-	if not is_web_platform() or network_mode == "offline" or not character_created:
-		return
+	if not is_web_platform() or network_mode == "offline" or not character_created: return
 	var peer_id := multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else local_peer_id
-	var rows: Array[String] = []
-	var visible_count := 0
-	for raw_peer_id in remote_players.keys():
-		var remote_id := int(raw_peer_id)
-		var remote_pos := network_player_position(remote_id)
-		var state: Dictionary = remote_players[raw_peer_id]
-		var same_context := state_matches_local_context(state)
-		var on_screen := same_context and visible_world(remote_pos, 130)
-		if on_screen: visible_count += 1
-		var remote_name := str(state.get("name", "Held")).strip_edges()
-		if remote_name == "": remote_name = "Held"
-		var remote_context := "%s:%s" % [str(state.get("context","world")),str(state.get("instance_id","world"))]
-		rows.append("#%d %s · %s · (%.0f, %.0f) · %s" % [remote_id, remote_name, remote_context, remote_pos.x, remote_pos.y, "SICHTBAR" if on_screen else ("ANDERE INSTANZ" if not same_context else "AUSSERHALB")])
-	var width := 430.0
-	var row_h := 18.0
-	var height := 94.0 + row_h * mini(rows.size(), 5)
-	var box := Rect2(VIEW.x - width - 12.0, 12.0, width, height)
-	draw_rect(box, Color(0.03, 0.07, 0.09, 0.82))
-	draw_rect(box, Color("78c7d9", 0.82), false, 1.0)
-	text_at(box.position + Vector2(10, 19), "MULTIPLAYER DEBUG · PROTOKOLL v%d" % NETWORK_PROTOCOL_VERSION, 12, Color("d9f7ff"))
-	text_at(box.position + Vector2(10, 38), "Peer #%d · %s:%s · Remotes %d · sichtbar %d" % [peer_id,multiplayer_context(),multiplayer_instance_id(),remote_players.size(),visible_count], 12, Color("bfe7d4"))
-	text_at(box.position + Vector2(10, 57), "Server: %d online · %d Mobs (%d bewegt) · %d NPCs · %d Events · %d Quests" % [int(server_sync_status.get("online",0)),int(server_sync_status.get("mobs",enemies.size())),int(server_sync_status.get("moving_mobs",0)),int(server_sync_status.get("npc_count",server_world_manifest.get("npc_count",0))),int(server_sync_status.get("event_count",server_world_manifest.get("event_count",0))),int(server_sync_status.get("quest_count",server_world_manifest.get("quest_count",0)))], 11, Color("f0d89a"))
-	text_at(box.position + Vector2(10, 75), "Manifest-Entitäten: %d" % int(server_world_manifest.get("entities",[]).size()), 11, Color("a9d9e5"))
-	for i in range(mini(rows.size(), 5)):
-		text_at(box.position + Vector2(10, 94 + i * row_h), rows[i], 11, Color("dbe8e8"))
+	var box := Rect2(VIEW.x-265.0,8.0,253.0,39.0)
+	draw_rect(box,Color(0.02,0.05,0.07,0.62))
+	draw_rect(box,Color("78c7d9",0.55),false,1.0)
+	text_at(box.position+Vector2(7,15),"NET v%d · #%d · %d online" % [NETWORK_PROTOCOL_VERSION,peer_id,int(server_sync_status.get("online",0))],10,Color("d9f7ff"))
+	text_at(box.position+Vector2(7,31),"%d Mobs · %d bewegen · Remote %d" % [int(server_sync_status.get("mobs",enemies.size())),int(server_sync_status.get("moving_mobs",0)),remote_players.size()],10,Color("d5dfb8"))
 
 func draw_online_list() -> void:
 	if not online_list_open: return
@@ -6649,9 +6988,35 @@ func draw_panel() -> void:
 		"journal": draw_journal_panel()
 		"map": draw_map_panel()
 		"mechanics": draw_mechanics_panel()
+		"party": draw_party_panel()
 		"arena_entry": draw_arena_entry_panel()
 		"arena_reward": draw_arena_reward_panel()
 		"victory": draw_victory_panel()
+
+func draw_party_panel() -> void:
+	text_at(Vector2(205,150),"GRUPPE",31,Color("ffe1a0"))
+	text_at(Vector2(205,181),"XP und aktive Kill-Questfortschritte werden serverseitig geteilt.",13,Color("b9cbc3"))
+	var invite_from := int(party_state.get("invite_from",0))
+	var members: Array = party_state.get("members",[])
+	if invite_from > 0:
+		text_at(Vector2(205,235),"%s lädt dich in eine Gruppe ein." % str(party_state.get("invite_name","Spieler")),20,Color("e8efdc"))
+		ui_button(Rect2(205,285,335,48),"ANNEHMEN")
+		ui_button(Rect2(575,285,335,48),"ABLEHNEN")
+	else:
+		text_at(Vector2(205,225),"MITGLIEDER · %d/4" % members.size(),17,Color("e9cc90"))
+		for i in members.size():
+			var row: Dictionary = members[i]
+			var y := 265.0+i*54.0
+			draw_rect(Rect2(205,y-25,705,43),Color("203239",0.88))
+			var cls := clampi(int(row.get("class",0)),0,2)
+			text_at(Vector2(220,y),"%s · %s · LV %d" % [str(row.get("name","Held")),CLASS_NAMES[cls],int(row.get("level",1))],15,Color("fff0ce"))
+			text_at(Vector2(650,y),"%s:%s" % [str(row.get("context","world")),str(row.get("instance_id","world"))],12,Color("a9beb7"),HORIZONTAL_ALIGNMENT_RIGHT,240)
+		if members.size() > 0:
+			ui_button(Rect2(205,510,335,46),"GRUPPE VERLASSEN")
+		else:
+			text_at(Vector2(205,285),"Im Chat: /invite Spielername",18,Color("dfe9dc"))
+			text_at(Vector2(205,316),"Alternativ: /accept · /decline · /leave",13,Color("a9beb7"))
+	ui_button(Rect2(750,548,160,38),"SCHLIESSEN")
 
 func draw_mechanics_panel() -> void:
 	text_at(Vector2(190,126), "MECHANIK-ÜBERSICHT", 28, Color('ffe1a0'))
