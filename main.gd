@@ -462,6 +462,11 @@ func command_arg_value(prefix: String, fallback: String = "") -> String:
 
 func start_multiplayer_smoke_client() -> void:
 	multiplayer_smoke_client_mode = true
+	if not controller.self_test():
+		print("CONTROLLER_SMOKE_FAIL")
+		get_tree().quit(36)
+		return
+	print("CONTROLLER_SMOKE_OK deadzone=true trigger=true menu_focus=true")
 	if not run_inventory_consistency_smoke():
 		print("INVENTORY_SMOKE_FAIL")
 		get_tree().quit(33)
