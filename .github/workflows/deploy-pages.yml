@@ -90,35 +90,21 @@ jobs:
       - name: Harden browser game shell
         run: python3 tools/harden_web.py build/site/game/index.html
 
-      - name: Create separate desktop and mobile game shells
+      - name: Mark desktop browser shell
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import shutil
-
-          desktop_dir = Path("build/site/game")
-          mobile_dir = Path("build/site/mobile")
-          if mobile_dir.exists():
-              shutil.rmtree(mobile_dir)
-          shutil.copytree(desktop_dir, mobile_dir)
-
+          path = Path("build/site/game/index.html")
+          html = path.read_text(encoding="utf-8")
           marker = "<head>"
-          desktop = desktop_dir.joinpath("index.html")
-          mobile = mobile_dir.joinpath("index.html")
-
-          desktop_html = desktop.read_text(encoding="utf-8")
-          mobile_html = mobile.read_text(encoding="utf-8")
-          if marker not in desktop_html or marker not in mobile_html:
+          if marker not in html:
               raise SystemExit("Godot HTML head marker missing")
-          desktop_html = desktop_html.replace(marker, marker + "\n<script>window.SONNENHAIN_CONTROL_MODE='desktop';</script>", 1)
-          mobile_html = mobile_html.replace(marker, marker + "\n<script>window.SONNENHAIN_CONTROL_MODE='mobile';</script>", 1)
-          desktop.write_text(desktop_html, encoding="utf-8")
-          mobile.write_text(mobile_html, encoding="utf-8")
+          html = html.replace(marker, marker + "\n<script>window.SONNENHAIN_CONTROL_MODE='desktop';</script>", 1)
+          path.write_text(html, encoding="utf-8")
           PY
           grep -q "SONNENHAIN_CONTROL_MODE='desktop'" build/site/game/index.html
-          grep -q "SONNENHAIN_CONTROL_MODE='mobile'" build/site/mobile/index.html
 
       - name: Assemble website
         shell: bash
@@ -127,8 +113,8 @@ jobs:
           cp website/index.html build/site/index.html
           cp website/site.css build/site/site.css
           cp website/ui-preview.png build/site/ui-preview.png
-          cp -R website/mobile-preview build/site/mobile-preview
           cp -R website/konflux-gallery build/site/konflux-gallery
+          cp -R website/mobile build/site/mobile
           cp CNAME build/site/CNAME
           printf '{"version":"v29.1","commit":"%s"}\n' "$GITHUB_SHA" > build/site/version.json
           cp web-legal/datenschutz.html build/site/datenschutz.html
@@ -159,8 +145,6 @@ jobs:
 
           test -f build/site/index.html
           test -f build/site/site.css
-          test -f build/site/mobile-preview/index.html
-          test -f build/site/mobile-preview/site.css
           test -f build/site/impressum.html
           test -f build/site/datenschutz.html
           test -f build/site/nutzungsregeln.html
@@ -171,12 +155,11 @@ jobs:
           test -f build/site/game/index.pck
           test -f build/site/game/index.wasm
           test -f build/site/mobile/index.html
-          test -f build/site/mobile/index.pck
-          test -f build/site/mobile/index.wasm
+          grep -q "APP IN ENTWICKLUNG" build/site/mobile/index.html
           grep -q "Eine Reise durch" build/site/index.html
           grep -Fq 'href="/game/"' build/site/index.html
           grep -Fq 'href="/mobile/"' build/site/index.html
-          grep -q "Eine Reise durch" build/site/mobile-preview/index.html
+          grep -q "Mobile-App kommt bald" build/site/index.html
           grep -q "human-gate" build/site/game/index.html
           grep -q "Cache-Control.*no-store" build/site/.htaccess
           grep -q "Require all granted" build/site/.htaccess
@@ -247,15 +230,12 @@ jobs:
               test -f '$target/game/index.pck'
               test -f '$target/game/index.wasm'
               test -f '$target/mobile/index.html'
-              test -f '$target/mobile/index.js'
-              test -f '$target/mobile/index.pck'
-              test -f '$target/mobile/index.wasm'
               test -f '$target/.well-known/security.txt'
               printf 'SONNENHAIN_HEALTH_OK\n' > '$target/sonnenhain-health.txt'
               chmod 770 '$target' '$target/game' '$target/mobile' '$target/.well-known'
               chmod 660 '$target/index.html' '$target/site.css' '$target/.htaccess' '$target/sonnenhain-health.txt'
               chmod 660 '$target/game/index.html' '$target/game/index.js' '$target/game/index.pck' '$target/game/index.wasm'
-              chmod 660 '$target/mobile/index.html' '$target/mobile/index.js' '$target/mobile/index.pck' '$target/mobile/index.wasm'
+              chmod 660 '$target/mobile/index.html'
               printf 'target: '; ls -ld '$target'
               printf 'index: '; ls -l '$target/index.html'
               printf 'htaccess: '; ls -l '$target/.htaccess'
@@ -288,9 +268,14 @@ jobs:
           grep -q "Eine Reise durch" /tmp/home.html
           grep -Fq 'href="/game/"' /tmp/home.html
           grep -Fq 'href="/mobile/"' /tmp/home.html
+          grep -q "Mobile-App kommt bald" /tmp/home.html
 
-          wait_for_200 "https://sonnenhainrpg.de/mobile-preview/" /tmp/mobile-preview.html
-          grep -q "MOBILE / TOUCH" /tmp/mobile-preview.html
+          wait_for_200 "https://sonnenhainrpg.de/mobile/" /tmp/mobile.html
+          grep -q "APP IN ENTWICKLUNG" /tmp/mobile.html
+          if grep -q "index.pck" /tmp/mobile.html; then
+            echo "FAILED: /mobile/ still exposes the old playable web client"
+            exit 1
+          fi
 
           wait_for_200 "https://sonnenhainrpg.de/sonnenhain-health.txt" /tmp/health.txt
           grep -qx "SONNENHAIN_HEALTH_OK" /tmp/health.txt
