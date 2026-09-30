@@ -562,13 +562,39 @@ func run_inventory_consistency_smoke() -> bool:
 		var uid := int(item.get("uid",-1))
 		if uid < 0 or seen.has(uid): return false
 		seen[uid] = true
+	# Shop-Kauf muss Gold exakt abbuchen und ein lokales, eindeutiges Item erzeugen.
+	var old_gold := gold
+	gold = 1000
+	var before_count := inventory.size()
+	var offer := {"name":"Smoke Kauf-Rüstung","icon":"armor","rarity":2,"power":9,"price":175,"level":5}
+	buy_item(offer)
+	if gold != 825 or inventory.size() != before_count+1: return false
+	var bought_index := inventory.size()-1
+	var bought_uid := int(inventory[bought_index].get("uid",-1))
+	if bought_uid < 0: return false
+	for j in inventory.size():
+		if j != bought_index and int(inventory[j].get("uid",-1)) == bought_uid: return false
+	toggle_equipment_item(bought_index)
+	if equipped_armor_uid != bought_uid: return false
+	var count_before_sell := inventory.size()
+	var gold_before_sell := gold
+	sell_item(bought_index)
+	if inventory.size() != count_before_sell or gold != gold_before_sell: return false
+	# Ausgerüstetes Item muss im Netzwerkstate als Rüstungsvisual auftauchen.
+	var smoke_state := local_player_state()
+	if int(smoke_state.get("armor",-1)) != armor_visual(): return false
+	toggle_equipment_item(bought_index)
+	if equipped_armor_uid != -1: return false
+	sell_item(bought_index)
+	if inventory.size() != count_before_sell-1: return false
+	gold = old_gold
 	inventory = old_inventory
 	equipped_uid = old_weapon
 	equipped_armor_uid = old_armor
 	equipped_ring_uid = old_ring
 	next_uid = old_next
 	validate_equipment_slots()
-	print("INVENTORY_SMOKE_OK unique_uids=true toggle_armor=true server_loot_local_uid=true")
+	print("INVENTORY_SMOKE_OK unique_uids=true toggle_armor=true buy=true equipped_sell_block=true server_loot_local_uid=true loadout_state=true")
 	return true
 
 func start_multiplayer_smoke_client() -> void:
@@ -1338,6 +1364,13 @@ func rpc_server_combat_reward(enemy_type: int, xp_reward: int, gold_reward: int,
 		message("+%d XP · +%d Gold%s" % [xp_reward, gold_reward, " · Beute erhalten" if not item_rewards.is_empty() else ""])
 		save_game()
 
+func network_reward_payload(item: Dictionary) -> Dictionary:
+	var payload: Dictionary = item.duplicate(true)
+	payload.erase("uid")
+	# Identität eines Inventargegenstands gehört ausschließlich dem Browser-Save.
+	payload.erase("stack_value")
+	return payload
+
 func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
 	var player_state: Dictionary = remote_players[peer_id]
@@ -1355,18 +1388,22 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 		rewards.append(random_loot(type, reward_class))
 	if randf() < 0.03:
 		rewards.append(make_item("Heiltrank", "potion", 1, 0, 18))
+	var network_rewards: Array = []
+	for reward in rewards:
+		if reward is Dictionary:
+			network_rewards.append(network_reward_payload(reward))
 	var party_members := server_party_members(peer_id)
 	if party_members.size() > 1:
 		# Killer erhält Beute/Gold; XP geht separat an alle Gruppenmitglieder.
 		# Der Killer bekommt den Quest-Kill bereits über combat_reward, daher dort
 		# kein zweiter Questfortschritt im Gruppenpaket.
-		rpc_server_combat_reward.rpc_id(peer_id,type,0,gold_reward,rewards)
+		rpc_server_combat_reward.rpc_id(peer_id,type,0,gold_reward,network_rewards)
 		for raw_member in party_members:
 			var member := int(raw_member)
 			if member <= 0 or not remote_players.has(member): continue
 			rpc_server_party_progress.rpc_id(member,{"enemy_type":type,"xp":xp_reward,"quest":member != peer_id})
 	else:
-		rpc_server_combat_reward.rpc_id(peer_id,type,xp_reward,gold_reward,rewards)
+		rpc_server_combat_reward.rpc_id(peer_id,type,xp_reward,gold_reward,network_rewards)
 
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null or dedicated_server_mode: return
@@ -4842,16 +4879,26 @@ func append_new_equipment() -> void:
 		if not exists: shop_stock["merchant"].append(offer)
 
 func buy_item(stock_item: Dictionary) -> void:
-	if gold < int(stock_item["price"]):
-		message("Dafür fehlen dir %d Gold." % (int(stock_item["price"]) - gold))
+	var price := maxi(0,int(stock_item.get("price",0)))
+	if gold < price:
+		message("Dafür fehlen dir %d Gold." % (price-gold))
 		return
-	var purchased := make_item(String(stock_item["name"]), String(stock_item["icon"]), int(stock_item.get("rarity", 1)), int(stock_item["power"]), int(stock_item["price"]) / 2, String(stock_item.get("element", "")), int(stock_item.get("level", level)))
+	var icon := str(stock_item.get("icon","gem"))
+	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence"]:
+		message("Dieses Angebot ist ungültig.")
+		return
+	var purchased := make_item(String(stock_item.get("name","Fundstück")), icon, clampi(int(stock_item.get("rarity",1)),0,4), maxi(0,int(stock_item.get("power",0))), int(price/2.0), String(stock_item.get("element","")), maxi(1,int(stock_item.get("level",level))))
 	if not can_add_item(purchased):
 		message("Dein Inventar ist voll.")
 		return
-	gold -= int(stock_item["price"])
-	add_item(purchased)
-	message("Gekauft: %s" % stock_item["name"])
+	var gold_before := gold
+	gold -= price
+	if not add_item(purchased):
+		gold = gold_before
+		message("Kauf abgebrochen · Inventar konnte nicht aktualisiert werden.")
+		return
+	validate_equipment_slots()
+	message("Gekauft: %s" % stock_item.get("name","Fundstück"))
 	save_game()
 
 func sell_item(index: int) -> void:
