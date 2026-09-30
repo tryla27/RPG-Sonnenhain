@@ -128,8 +128,11 @@ jobs:
           test -f build/site/game/index.pck
           test -f build/site/game/index.wasm
           grep -q "Eine Reise durch" build/site/index.html
+          grep -Fq '/game/?mode=desktop' build/site/index.html
+          grep -Fq '/game/?mode=mobile' build/site/index.html
           grep -q "Eine Reise durch" build/site/mobile-preview/index.html
           grep -q "human-gate" build/site/game/index.html
+          grep -q "Cache-Control.*no-store" build/site/.htaccess
           grep -q "Require all granted" build/site/.htaccess
           grep -q "DirectoryIndex index.html" build/site/.htaccess
 
@@ -232,6 +235,11 @@ jobs:
 
           wait_for_200 "https://sonnenhainrpg.de/" /tmp/home.html
           grep -q "Eine Reise durch" /tmp/home.html
+          grep -Fq '/game/?mode=desktop' /tmp/home.html
+          grep -Fq '/game/?mode=mobile' /tmp/home.html
+
+          wait_for_200 "https://sonnenhainrpg.de/mobile-preview/" /tmp/mobile-preview.html
+          grep -q "MOBILE / TOUCH" /tmp/mobile-preview.html
 
           wait_for_200 "https://sonnenhainrpg.de/sonnenhain-health.txt" /tmp/health.txt
           grep -qx "SONNENHAIN_HEALTH_OK" /tmp/health.txt
@@ -243,6 +251,17 @@ jobs:
             code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de/game/$asset" || true)"
             echo "/game/$asset => HTTP $code"
             test "$code" = "200"
+          done
+
+          cache_headers="$(curl -sSI --max-time 20 "https://sonnenhainrpg.de/game/index.pck" || true)"
+          printf '%s\n' "$cache_headers"
+          printf '%s\n' "$cache_headers" | grep -qiE '^Cache-Control:.*no-store'
+
+          for mode in desktop mobile; do
+            code="$(curl -L -sS -o /tmp/game-$mode.html -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de/game/?mode=$mode" || true)"
+            echo "/game/?mode=$mode => HTTP $code"
+            test "$code" = "200"
+            grep -q "human-gate" "/tmp/game-$mode.html"
           done
 
           wss_ok=0
