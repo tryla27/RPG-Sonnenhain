@@ -463,8 +463,6 @@ func _ready() -> void:
 	refresh_save_slot_labels()
 	refresh_shop_stock()
 	reset_class_skills()
-	if multiplayer_smoke_client_mode:
-		start_multiplayer_smoke_client()
 	for i in QUESTS.size():
 		quests.append({"state":0, "progress":0})
 	for i in WORLD_EVENTS.size():
@@ -489,6 +487,11 @@ func _ready() -> void:
 		add_child(player)
 		sound_players.append(player)
 	update_music()
+	if multiplayer_smoke_client_mode:
+		enemies.clear()
+		projectiles.clear()
+		enemy_projectiles.clear()
+		start_multiplayer_smoke_client()
 
 func reset_class_skills() -> void:
 	learned.resize(ABILITIES.size())
