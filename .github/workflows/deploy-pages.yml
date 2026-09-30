@@ -90,6 +90,36 @@ jobs:
       - name: Harden browser game shell
         run: python3 tools/harden_web.py build/site/game/index.html
 
+      - name: Create separate desktop and mobile game shells
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          desktop_dir = Path("build/site/game")
+          mobile_dir = Path("build/site/mobile")
+          if mobile_dir.exists():
+              shutil.rmtree(mobile_dir)
+          shutil.copytree(desktop_dir, mobile_dir)
+
+          marker = "<head>"
+          desktop = desktop_dir.joinpath("index.html")
+          mobile = mobile_dir.joinpath("index.html")
+
+          desktop_html = desktop.read_text(encoding="utf-8")
+          mobile_html = mobile.read_text(encoding="utf-8")
+          if marker not in desktop_html or marker not in mobile_html:
+              raise SystemExit("Godot HTML head marker missing")
+          desktop_html = desktop_html.replace(marker, marker + "\n<script>window.SONNENHAIN_CONTROL_MODE='desktop';</script>", 1)
+          mobile_html = mobile_html.replace(marker, marker + "\n<script>window.SONNENHAIN_CONTROL_MODE='mobile';</script>", 1)
+          desktop.write_text(desktop_html, encoding="utf-8")
+          mobile.write_text(mobile_html, encoding="utf-8")
+          PY
+          grep -q "SONNENHAIN_CONTROL_MODE='desktop'" build/site/game/index.html
+          grep -q "SONNENHAIN_CONTROL_MODE='mobile'" build/site/mobile/index.html
+
       - name: Assemble website
         shell: bash
         run: |
@@ -127,6 +157,9 @@ jobs:
           test -f build/site/game/index.html
           test -f build/site/game/index.pck
           test -f build/site/game/index.wasm
+          test -f build/site/mobile/index.html
+          test -f build/site/mobile/index.pck
+          test -f build/site/mobile/index.wasm
           grep -q "Eine Reise durch" build/site/index.html
           grep -Fq '/game/?mode=desktop' build/site/index.html
           grep -Fq '/game/?mode=mobile' build/site/index.html
@@ -200,11 +233,16 @@ jobs:
               test -f '$target/game/index.js'
               test -f '$target/game/index.pck'
               test -f '$target/game/index.wasm'
+              test -f '$target/mobile/index.html'
+              test -f '$target/mobile/index.js'
+              test -f '$target/mobile/index.pck'
+              test -f '$target/mobile/index.wasm'
               test -f '$target/.well-known/security.txt'
               printf 'SONNENHAIN_HEALTH_OK\n' > '$target/sonnenhain-health.txt'
-              chmod 770 '$target' '$target/game' '$target/.well-known'
+              chmod 770 '$target' '$target/game' '$target/mobile' '$target/.well-known'
               chmod 660 '$target/index.html' '$target/site.css' '$target/.htaccess' '$target/sonnenhain-health.txt'
               chmod 660 '$target/game/index.html' '$target/game/index.js' '$target/game/index.pck' '$target/game/index.wasm'
+              chmod 660 '$target/mobile/index.html' '$target/mobile/index.js' '$target/mobile/index.pck' '$target/mobile/index.wasm'
               printf 'target: '; ls -ld '$target'
               printf 'index: '; ls -l '$target/index.html'
               printf 'htaccess: '; ls -l '$target/.htaccess'
@@ -246,11 +284,18 @@ jobs:
 
           wait_for_200 "https://sonnenhainrpg.de/game/" /tmp/game.html
           grep -q "human-gate" /tmp/game.html
+          grep -q "SONNENHAIN_CONTROL_MODE='desktop'" /tmp/game.html
 
-          for asset in index.js index.pck index.wasm; do
-            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de/game/$asset" || true)"
-            echo "/game/$asset => HTTP $code"
-            test "$code" = "200"
+          wait_for_200 "https://sonnenhainrpg.de/mobile/" /tmp/mobile.html
+          grep -q "human-gate" /tmp/mobile.html
+          grep -q "SONNENHAIN_CONTROL_MODE='mobile'" /tmp/mobile.html
+
+          for base in game mobile; do
+            for asset in index.js index.pck index.wasm; do
+              code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de/$base/$asset" || true)"
+              echo "/$base/$asset => HTTP $code"
+              test "$code" = "200"
+            done
           done
 
           cache_headers="$(curl -sSI --max-time 20 "https://sonnenhainrpg.de/game/index.pck" || true)"
