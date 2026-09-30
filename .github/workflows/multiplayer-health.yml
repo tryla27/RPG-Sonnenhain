@@ -1,0 +1,115 @@
+name: Keep Sonnenhain multiplayer online
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonnenhain-multiplayer-health
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    env:
+      VSERVER_HOST: ${{ secrets.VSERVER_HOST }}
+      VSERVER_USER: ${{ secrets.VSERVER_USER }}
+      VSERVER_SSH_KEY: ${{ secrets.VSERVER_SSH_KEY }}
+      VSERVER_PORT: ${{ secrets.VSERVER_PORT }}
+    steps:
+      - name: Check public multiplayer endpoint
+        id: public_check
+        shell: bash
+        run: |
+          set +e
+          check_wss() {
+            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
+              -H 'Connection: Upgrade' \
+              -H 'Upgrade: websocket' \
+              -H 'Sec-WebSocket-Version: 13' \
+              -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+              https://multiplayer.sonnenhainrpg.de/ || true)"
+            printf '%s\n' "$headers"
+            printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
+          }
+
+          if check_wss; then
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
+            echo "Multiplayer WSS is healthy."
+            exit 0
+          fi
+
+          sleep 8
+          if check_wss; then
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
+            echo "Multiplayer WSS recovered without intervention."
+            exit 0
+          fi
+
+          echo "healthy=false" >> "$GITHUB_OUTPUT"
+          echo "Multiplayer WSS is down; recovery will run."
+          exit 0
+
+      - name: Recover server through SSH watchdog
+        if: ${{ steps.public_check.outputs.healthy != 'true' && env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          port="${VSERVER_PORT:-22}"
+          umask 077
+          install -d -m 700 "$HOME/.ssh"
+          trap 'rm -f "$HOME/.ssh/vserver_health"' EXIT
+
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          raw = os.environ["VSERVER_SSH_KEY"].replace("\r", "").strip()
+          if "BEGIN OPENSSH PRIVATE KEY" in raw:
+              key = raw.replace("\\n", "\n")
+          else:
+              key = base64.b64decode("".join(raw.split()), validate=True).decode("utf-8").replace("\r", "").strip()
+          if "BEGIN OPENSSH PRIVATE KEY" not in key or "END OPENSSH PRIVATE KEY" not in key:
+              raise SystemExit("VSERVER_SSH_KEY is not a complete OpenSSH private key")
+          Path.home().joinpath(".ssh/vserver_health").write_text(key.strip() + "\n", encoding="utf-8")
+          PY
+
+          chmod 600 "$HOME/.ssh/vserver_health"
+          ssh_opts="-4 -i $HOME/.ssh/vserver_health -p $port -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=3"
+
+          ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" '
+            set -eu
+            watchdog="$HOME/sonnenhain-server/releases/current/ensure-sonnenhain-server.sh"
+            if [ ! -x "$watchdog" ]; then
+              echo "Watchdog missing: $watchdog" >&2
+              exit 1
+            fi
+            "$watchdog"
+          '
+
+      - name: Verify recovery
+        if: ${{ steps.public_check.outputs.healthy != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
+              -H 'Connection: Upgrade' \
+              -H 'Upgrade: websocket' \
+              -H 'Sec-WebSocket-Version: 13' \
+              -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+              https://multiplayer.sonnenhainrpg.de/ || true)"
+            printf '%s\n' "$headers"
+            if printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'; then
+              echo "MULTIPLAYER RECOVERY OK"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Multiplayer endpoint is still unavailable after recovery." >&2
+          exit 1
