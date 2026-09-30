@@ -26,7 +26,7 @@ static func house(c:CanvasItem,p:Vector2,kind:int=0)->void:
 		# houses_192.png enthält die drei robust exportierbaren Hausvarianten.
 		c.draw_texture_rect_region(houses,Rect2(p,Vector2(192,160)),Rect2(kind*192,0,192,160),Color.WHITE,false,true)
 	else:
-		var roof := [Color("a7422d"),Color("87563d"),Color("6f5540")][clampi(kind,0,2)]
+		var roof: Color = [Color("a7422d"),Color("87563d"),Color("6f5540")][clampi(kind,0,2)]
 		ReferenceHouse.paint(c,p,roof,Color("ffd482"),false)
 static func tree(c:CanvasItem,p:Vector2,_key:int)->void:
 	init_art()
