@@ -398,7 +398,8 @@ func start_multiplayer_smoke_client() -> void:
 	player_pos = Vector2(2200.0, 1000.0) if class_id == 0 else Vector2(2260.0, 1000.0)
 	panel = ""
 	var peer := WebSocketMultiplayerPeer.new()
-	var err := peer.create_client("ws://127.0.0.1:27845")
+	var smoke_url := command_arg_value("--smoke-url=", "ws://127.0.0.1:27845")
+	var err := peer.create_client(smoke_url)
 	if err != OK:
 		print("MULTIPLAYER_SMOKE_FAIL connect_error=", err)
 		get_tree().quit(31)
@@ -406,7 +407,7 @@ func start_multiplayer_smoke_client() -> void:
 	multiplayer.multiplayer_peer = peer
 	network_mode = "client"
 	multiplayer_smoke_deadline = Time.get_ticks_msec() + 15000
-	print("MULTIPLAYER_SMOKE_CONNECT ", multiplayer_smoke_name)
+	print("MULTIPLAYER_SMOKE_CONNECT ", multiplayer_smoke_name, " url=", smoke_url)
 
 func process_multiplayer_smoke(delta: float) -> void:
 	if not multiplayer_smoke_client_mode:
