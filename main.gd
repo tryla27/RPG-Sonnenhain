@@ -416,16 +416,16 @@ func process_multiplayer_smoke(delta: float) -> void:
 		if text_value.begins_with("SMOKE:") and text_value != "SMOKE:%s" % multiplayer_smoke_name:
 			saw_other_chat = true
 			break
-	if remote_players.size() >= 1 and enemies.size() >= 1 and saw_other_chat:
-		if multiplayer_smoke_success_since == 0:
-			multiplayer_smoke_success_since = Time.get_ticks_msec()
-			print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
-		# Kurz verbunden bleiben, damit der zweite Test-Client denselben
-		# bidirektionalen Zustand und Chat ebenfalls sicher empfangen kann.
-		if Time.get_ticks_msec() - multiplayer_smoke_success_since >= 2500:
-			print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
-			get_tree().quit(0)
-			return
+	if remote_players.size() >= 1 and enemies.size() >= 1 and saw_other_chat and multiplayer_smoke_success_since == 0:
+		multiplayer_smoke_success_since = Time.get_ticks_msec()
+		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
+	# Sobald dieser Client den anderen Spieler, dessen Chat und den
+	# Server-Snapshot gemeinsam gesehen hat, ist die Relay-Prüfung erfüllt.
+	# Er bleibt nur noch kurz online, damit der Gegenclient dasselbe prüfen kann.
+	if multiplayer_smoke_success_since > 0 and Time.get_ticks_msec() - multiplayer_smoke_success_since >= 2500:
+		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
+		get_tree().quit(0)
+		return
 	if multiplayer_smoke_deadline > 0 and Time.get_ticks_msec() > multiplayer_smoke_deadline:
 		print("MULTIPLAYER_SMOKE_FAIL name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size(), " chat=", saw_other_chat)
 		get_tree().quit(32)
