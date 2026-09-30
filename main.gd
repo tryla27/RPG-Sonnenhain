@@ -361,13 +361,18 @@ func detect_touch_capability() -> bool:
 	if not is_web_platform():
 		return DisplayServer.is_touchscreen_available()
 
-	# Web ist absichtlich deterministisch getrennt:
-	# /game/?mode=mobile = Touch-UI
-	# /game/?mode=desktop oder /game/ = PC-UI
-	# Keine automatische Geräteerkennung mehr, damit ein Touch-Laptop oder
-	# Browser niemals versehentlich die falsche Steuerung bekommt.
-	var forced_mode = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('mode') || 'desktop'")
-	return str(forced_mode) == "mobile"
+	# PC und Mobile bekommen getrennte öffentliche Start-URLs. Der jeweilige
+	# HTML-Shell setzt den Modus ausdrücklich, damit Browser-Erkennung,
+	# Touch-Laptops und Cache-Effekte die Steuerung nicht vermischen können.
+	var forced_mode = JavaScriptBridge.eval("String(window.SONNENHAIN_CONTROL_MODE || '')")
+	if str(forced_mode) == "mobile":
+		return true
+	if str(forced_mode) == "desktop":
+		return false
+
+	# Fallback nur für alte oder direkt aufgerufene Game-Links.
+	var auto_mobile = JavaScriptBridge.eval("Boolean(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ((navigator.maxTouchPoints||0)>0 && (!window.matchMedia || window.matchMedia('(pointer: coarse)').matches)))")
+	return bool(auto_mobile)
 
 func clear_touch_inputs() -> void:
 	touch_attack_ids.clear()
