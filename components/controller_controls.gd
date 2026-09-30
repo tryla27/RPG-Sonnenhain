@@ -11,6 +11,8 @@ var status := "Linker Stick: laufen · rechter Stick: zielen"
 var pointer := Vector2(576, 324)
 var used := false
 var held: Dictionary = {}
+var nav_held: Dictionary = {}
+var last_panel := ""
 
 func setup() -> void:
 	var cfg := ConfigFile.new()
@@ -61,6 +63,128 @@ func assign(action: String, code: int) -> void:
 	status = "Belegung gespeichert: " + label(code)
 	save()
 
+func panel_points(g) -> Array:
+	var points: Array = []
+	match g.panel:
+		"inventory":
+			points.append(Vector2(229,314))
+			points.append(Vector2(550,274))
+			points.append(Vector2(550,386))
+			points.append(Vector2(866,172))
+			points.append(Vector2(947,172))
+			for cell in 25:
+				var col := cell % 5
+				var row := int(cell / 5.0)
+				points.append(Vector2(668+col*65,224+row*55))
+			points.append(Vector2(803,559))
+			points.append(Vector2(986,109))
+		"shop":
+			if g.pending_purchase >= 0:
+				points.append(Vector2(454,414))
+				points.append(Vector2(680,414))
+			else:
+				points.append(Vector2(800,165))
+				points.append(Vector2(900,165))
+				for i in 3:
+					points.append(Vector2(291+i*258,273))
+				for i in mini(42,g.inventory.size()):
+					var col := i % 11
+					var row := int(i / 11.0)
+					points.append(Vector2(194+col*72,416+row*40))
+				points.append(Vector2(669,582))
+				if g.selected_item >= 0: points.append(Vector2(878,582))
+			points.append(Vector2(986,109))
+		"travel":
+			for i in range(1,g.WAYSTONES.size()):
+				var col := (i-1)%3
+				var row := int((i-1)/3.0)
+				points.append(Vector2(294+col*271,215+row*96))
+			points.append(Vector2(986,109))
+		"pause":
+			points = [Vector2(575,242),Vector2(925,242),Vector2(925,291),Vector2(925,340),Vector2(575,291),Vector2(575,453)]
+			if not g.creative_mode:
+				points.append(Vector2(430,499))
+				points.append(Vector2(720,499))
+			points.append(Vector2(575,580))
+		"controller":
+			points.append(Vector2(828,189))
+			points.append(Vector2(898,189))
+			for i in ACTIONS.size():
+				var x := 365.0 + int(i/8.0)*420.0
+				var y := 236.0 + (i%8)*37.0
+				points.append(Vector2(x,y))
+			points.append(Vector2(368,580))
+			points.append(Vector2(778,580))
+		"party":
+			if int(g.party_state.get("invite_from",0)) > 0:
+				points = [Vector2(373,309),Vector2(743,309),Vector2(830,567)]
+			else:
+				if not (g.party_state.get("members",[]) as Array).is_empty():
+					points.append(Vector2(373,533))
+				points.append(Vector2(830,567))
+		_:
+			if g.panel != "" and g.panel not in ["start","creation","multiplayer","arena_reward","victory"]:
+				points.append(Vector2(986,109))
+	return points
+
+func nearest_point_index(points: Array, origin: Vector2) -> int:
+	if points.is_empty(): return -1
+	var best := 0
+	var best_dist := INF
+	for i in points.size():
+		var d := origin.distance_squared_to(points[i])
+		if d < best_dist:
+			best_dist = d
+			best = i
+	return best
+
+func move_focus(g, direction: Vector2) -> void:
+	var points := panel_points(g)
+	if points.is_empty(): return
+	var current := nearest_point_index(points,pointer)
+	if current < 0:
+		pointer = points[0]
+		return
+	var origin: Vector2 = points[current]
+	var best := -1
+	var best_score := INF
+	for i in points.size():
+		if i == current: continue
+		var delta: Vector2 = points[i]-origin
+		if direction.dot(delta) <= 1.0: continue
+		var primary := absf(delta.x) if absf(direction.x)>0.5 else absf(delta.y)
+		var secondary := absf(delta.y) if absf(direction.x)>0.5 else absf(delta.x)
+		var score := primary + secondary*2.4
+		if score < best_score:
+			best_score = score
+			best = i
+	if best >= 0:
+		pointer = points[best]
+		used = true
+
+func nav_pressed(code: int) -> bool:
+	return code_pressed(code)
+
+func update_dpad_navigation(g) -> void:
+	var dirs := {
+		JOY_BUTTON_DPAD_UP:Vector2.UP,
+		JOY_BUTTON_DPAD_DOWN:Vector2.DOWN,
+		JOY_BUTTON_DPAD_LEFT:Vector2.LEFT,
+		JOY_BUTTON_DPAD_RIGHT:Vector2.RIGHT
+	}
+	for code in dirs:
+		var down := nav_pressed(int(code))
+		var edge := down and not bool(nav_held.get(code,false))
+		nav_held[code] = down
+		if edge: move_focus(g,dirs[code])
+
+func self_test() -> bool:
+	var a := filter_stick(Vector2(0.05,0.05))
+	var b := filter_stick(Vector2(1.0,0.0))
+	var pts := [Vector2(100,100),Vector2(200,100),Vector2(100,200)]
+	var nearest_ok := nearest_point_index(pts,Vector2(190,105)) == 1
+	return a == Vector2.ZERO and b.x > 0.9 and absf(b.y) < 0.01 and nearest_ok and label(102) == "RT / R2"
+
 func handle(g, event: InputEvent) -> bool:
 	if not (event is InputEventJoypadButton or event is InputEventJoypadMotion): return false
 	device = event.device
@@ -86,17 +210,23 @@ func update(g, delta: float) -> void:
 		device = int(pads[0]) if not pads.is_empty() else -1
 		if device < 0:
 			held.clear()
+			nav_held.clear()
 			used = false
+			last_panel = g.panel
 			return
 	var move := stick()
 	if move.length_squared() > 0.0 or stick(true).length_squared() > 0.0: used = true
+	if g.panel != last_panel:
+		last_panel = g.panel
+		if g.panel != "":
+			var points := panel_points(g)
+			if not points.is_empty(): pointer = points[0]
 	if g.panel != "":
+		# Analogstick bleibt ein freier Cursor; D-Pad springt präzise zwischen
+		# echten Bedienpunkten wie Inventarslots und Shopkarten.
 		pointer += move * delta * 650.0
 		pointer = pointer.clamp(Vector2(140, 90), Vector2(1005, 600))
-		if code_pressed(JOY_BUTTON_DPAD_UP): pointer.y -= delta * 400
-		if code_pressed(JOY_BUTTON_DPAD_DOWN): pointer.y += delta * 400
-		if code_pressed(JOY_BUTTON_DPAD_LEFT): pointer.x -= delta * 400
-		if code_pressed(JOY_BUTTON_DPAD_RIGHT): pointer.x += delta * 400
+		update_dpad_navigation(g)
 	for action in ACTIONS:
 		var down := pressed(action)
 		var edge := down and not bool(held.get(action, false))
