@@ -5868,7 +5868,7 @@ func draw_npc(npc: Dictionary) -> void:
 				elif baked_state == 3: text_at(p + Vector2(-72,-170),"ABGEBEN",11,Color("ffe18a"),HORIZONTAL_ALIGNMENT_CENTER,144)
 		return
 	draw_npc_sprite(p,kind,name)
-	var caption := name if kind == "quest" else "%s (%s)" % [name,npc["role"]]
+	var caption := name if kind == "quest" or (interior_id < 0 and region_at(p) == 0) else "%s (%s)" % [name,npc["role"]]
 	if interior_id < 0 and region_at(p)==0:
 		var label_width:float=clampf(font.get_string_size(caption,HORIZONTAL_ALIGNMENT_LEFT,-1,14).x+12,70,232)
 		draw_rect(Rect2(p+Vector2(-label_width/2,-63),Vector2(label_width,20)),Color("192d2a",0.86))
@@ -6809,7 +6809,11 @@ func draw_local_minimap(rect: Rect2) -> void:
 			var point := start + Vector2((gx + 0.5) * radius * 2.0 / 17.0, (gy + 0.5) * radius * 2.0 / 13.0)
 			var area := visual_region_at(point)
 			var tint: Color = [Color("699b73"), Color("7da66b"), Color("365b50"), Color("535b61"), Color("355a68"), Color("755045"), Color("b7a578"), Color("48415c"), Color("52696a"), Color("a48a52"), Color("477579"), Color("575b73"), Color("6e6384")][area]
-			if distance_to_trail(point) < 110: tint = Color("d2ba86")
+			if area == 0:
+				var ground_kind := StartTileMap32.kind_at(point)
+				if ground_kind == 2: tint = Color("a4aa91")
+				elif ground_kind == 1: tint = Color("a0b47d")
+			elif distance_to_trail(point) < 110: tint = Color("d2ba86")
 			draw_rect(Rect2(inset.position + Vector2(gx * inset.size.x / 17.0, gy * inset.size.y / 13.0), inset.size / Vector2(17, 13) + Vector2.ONE), tint)
 	for stone in WAYSTONES:
 		var p: Vector2 = inset.position + (stone - start) * scale_map

@@ -5,9 +5,11 @@ func _initialize()->void:
 	map.prepare(Callable(g,"distance_to_trail"))
 	assert(map.shared_tileset.tile_size==Vector2i(32,32))
 	assert(map.terrain.size()==4592)
-	assert(ResourceSaver.save(map.shared_tileset,"res://art/start32/start_tileset_32.tres")==OK)
-	for file in ["objects-faithful.png","props-faithful.png"]:
-		var im=Image.load_from_file("res://art/start32/"+file)
+	assert(map.shared_tileset.get_source_count()==5)
+	for file in ["objects-faithful.webp","props-faithful.webp"]:
+		var sprite:Texture2D=load("res://art/start32/"+file)
+		assert(sprite!=null)
+		var im=sprite.get_image()
 		assert(im.get_pixel(0,0).a<0.01,"Non-transparent sprite background")
 		assert(im.get_pixel(1535,1023).a<0.01,"Non-transparent sprite corner")
 	assert(not g.is_blocked(g.TAVERN_HOUSE+Vector2(126,180),g.TAVERN_HOUSE+Vector2(126,205)))
