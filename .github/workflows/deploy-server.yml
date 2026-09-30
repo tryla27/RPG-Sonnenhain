@@ -238,6 +238,39 @@ jobs:
           check_wss
           echo "Public WSS endpoint stayed alive after deploy."
 
+      - name: Public multiplayer integration smoke test
+        if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          client_a=""
+          client_b=""
+          cleanup() {
+            [ -z "$client_a" ] || kill "$client_a" 2>/dev/null || true
+            [ -z "$client_b" ] || kill "$client_b" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . --             --multiplayer-smoke-client --smoke-name=PublicA             --smoke-url=wss://multiplayer.sonnenhainrpg.de/             > /tmp/public-smoke-a.log 2>&1 &
+          client_a=$!
+          sleep 1
+          /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . --             --multiplayer-smoke-client --smoke-name=PublicB             --smoke-url=wss://multiplayer.sonnenhainrpg.de/             > /tmp/public-smoke-b.log 2>&1 &
+          client_b=$!
+
+          set +e
+          wait "$client_a"; status_a=$?
+          wait "$client_b"; status_b=$?
+          set -e
+
+          cat /tmp/public-smoke-a.log
+          cat /tmp/public-smoke-b.log
+
+          test "$status_a" = "0"
+          test "$status_b" = "0"
+          grep -q "MULTIPLAYER_SMOKE_OK" /tmp/public-smoke-a.log
+          grep -q "MULTIPLAYER_SMOKE_OK" /tmp/public-smoke-b.log
+          echo "PUBLIC MULTIPLAYER OK: TLS/WSS, two-player state relay, chat relay and world snapshot all passed."
+
       - name: VServer deploy not configured
         if: ${{ env.VSERVER_HOST == '' || env.VSERVER_USER == '' || env.VSERVER_SSH_KEY == '' }}
         run: echo "Server build is ready; VSERVER_HOST, VSERVER_USER and VSERVER_SSH_KEY are required for live deployment."
