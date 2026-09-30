@@ -372,6 +372,7 @@ var network_status := "Offline"
 var network_port := 27844
 var websocket_port := 27845
 const LIVE_MULTIPLAYER_URL := "wss://multiplayer.sonnenhainrpg.de/"
+const NETWORK_PROTOCOL_VERSION := 3
 var dedicated_server_mode := false
 var invite_code := ""
 var join_code := ""
@@ -379,6 +380,8 @@ var remote_players: Dictionary = {}
 var local_peer_id := 1
 var sync_timer := 0.0
 var server_spawn_timer := 0.0
+var server_status_timer := 0.0
+var server_next_mob_uid := 1
 var server_action_times: Dictionary = {}
 var live_reconnect_timer := 0.0
 var multiplayer_smoke_client_mode := false
@@ -386,6 +389,8 @@ var multiplayer_smoke_name := ""
 var multiplayer_smoke_deadline := 0
 var multiplayer_smoke_chat_timer := 0.0
 var multiplayer_smoke_success_since := 0
+var server_sync_status: Dictionary = {}
+var server_world_manifest: Dictionary = {}
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -568,8 +573,62 @@ func setup_multiplayer_signals() -> void:
 	if not multiplayer.connection_failed.is_connected(_on_connection_failed): multiplayer.connection_failed.connect(_on_connection_failed)
 	if not multiplayer.server_disconnected.is_connected(_on_server_disconnected): multiplayer.server_disconnected.connect(_on_server_disconnected)
 
+func multiplayer_context() -> String:
+	if arena_mode != "": return "arena"
+	if dungeon_id >= 0: return "dungeon"
+	if interior_id >= 0: return "tavern"
+	return "world"
+
+func multiplayer_instance_id() -> String:
+	match multiplayer_context():
+		"arena": return arena_mode
+		"dungeon": return str(dungeon_id)
+		"tavern": return str(interior_id)
+		_: return "world"
+
+func uses_server_world() -> bool:
+	return network_mode == "client" and multiplayer_context() == "world"
+
+func state_matches_local_context(state: Dictionary) -> bool:
+	return str(state.get("context","world")) == multiplayer_context() and str(state.get("instance_id","world")) == multiplayer_instance_id()
+
+func announce_multiplayer_context() -> void:
+	if network_mode != "client" or multiplayer.multiplayer_peer == null or not character_created: return
+	if multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED: return
+	rpc_player_presence.rpc_id(1, local_player_state())
+
+func build_world_manifest() -> Dictionary:
+	var entities: Array = []
+	for i in NPCS.size():
+		var npc: Dictionary = NPCS[i]
+		var quest_ids: Array = []
+		for q in QUESTS.size():
+			if str(QUESTS[q].get("npc","")) == str(npc.get("name","")):
+				quest_ids.append(q)
+		entities.append({
+			"id":"npc_%02d" % i,
+			"type":"npc",
+			"name":str(npc.get("name","")),
+			"role":str(npc.get("role","")),
+			"kind":str(npc.get("kind","")),
+			"pos":[npc["pos"].x,npc["pos"].y],
+			"quest_ids":quest_ids
+		})
+	for i in WORLD_EVENTS.size():
+		var event: Dictionary = WORLD_EVENTS[i]
+		entities.append({
+			"id":"event_%02d" % i,
+			"type":"quest_event",
+			"name":str(event.get("name","")),
+			"role":str(event.get("role","")),
+			"kind":"quest",
+			"pos":[event["pos"].x,event["pos"].y],
+			"region":int(event.get("region",0))
+		})
+	return {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","entities":entities,"npc_count":NPCS.size(),"event_count":WORLD_EVENTS.size(),"quest_count":QUESTS.size()}
+
 func local_player_state() -> Dictionary:
-	return {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 
 func ensure_live_multiplayer() -> void:
 	if not is_web_platform() or dedicated_server_mode or not character_created:
@@ -834,10 +893,19 @@ func rpc_player_presence(state: Dictionary) -> void:
 	var incoming_pos := Vector2(float(pos_data[0]), float(pos_data[1]))
 	if not incoming_pos.is_finite(): return
 	incoming_pos = incoming_pos.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
+	var protocol := int(state.get("protocol",-1))
+	if protocol != NETWORK_PROTOCOL_VERSION: return
+	var context := str(state.get("context","world"))
+	if context not in ["world","tavern","dungeon","arena"]: context = "world"
+	var instance_id := str(state.get("instance_id","world")).substr(0,24)
+	if context == "world": instance_id = "world"
 	var clean_facing := Vector2(float(facing_data[0]), float(facing_data[1]))
 	if not clean_facing.is_finite() or clean_facing.length_squared() < 0.01: clean_facing = Vector2.DOWN
 	clean_facing = clean_facing.normalized()
 	var clean := {
+		"protocol":NETWORK_PROTOCOL_VERSION,
+		"context":context,
+		"instance_id":instance_id,
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -852,12 +920,50 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"region":region_at(incoming_pos)
 	}
 	remote_players[sender] = clean
+	send_server_session_status(sender)
+	send_server_world_manifest(sender)
 	for peer_id in multiplayer.get_peers():
 		if int(peer_id) != sender:
 			rpc_receive_player_presence.rpc_id(int(peer_id), sender, clean)
 	for existing_id in remote_players.keys():
 		if int(existing_id) != sender:
 			rpc_receive_player_presence.rpc_id(sender, int(existing_id), remote_players[existing_id])
+
+func send_server_session_status(peer_id: int) -> void:
+	if network_mode != "host" or peer_id <= 0: return
+	var state: Dictionary = remote_players.get(peer_id,{})
+	rpc_server_session_status.rpc_id(peer_id,{
+		"protocol":NETWORK_PROTOCOL_VERSION,
+		"peer_id":peer_id,
+		"online":remote_players.size(),
+		"mobs":enemies.size(),
+		"context":str(state.get("context","world")),
+		"instance_id":str(state.get("instance_id","world")),
+		"npc_count":NPCS.size(),
+		"event_count":WORLD_EVENTS.size(),
+		"quest_count":QUESTS.size(),
+		"server_time":Time.get_ticks_msec()
+	})
+
+func send_server_world_manifest(peer_id: int) -> void:
+	if network_mode != "host" or peer_id <= 0: return
+	rpc_server_world_manifest.rpc_id(peer_id, build_world_manifest())
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_server_session_status(status: Dictionary) -> void:
+	server_sync_status = status.duplicate(true)
+	var protocol := int(status.get("protocol",-1))
+	if protocol != NETWORK_PROTOCOL_VERSION:
+		network_status = "Protokollfehler · Client v%d / Server v%d" % [NETWORK_PROTOCOL_VERSION,protocol]
+	else:
+		network_status = "Online · Peer %d · %s:%s · %d online" % [int(status.get("peer_id",local_peer_id)),str(status.get("context","world")),str(status.get("instance_id","world")),int(status.get("online",1))]
+	queue_redraw()
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_server_world_manifest(manifest: Dictionary) -> void:
+	if int(manifest.get("protocol",-1)) != NETWORK_PROTOCOL_VERSION: return
+	server_world_manifest = manifest.duplicate(true)
+	queue_redraw()
 
 @rpc("authority", "call_remote", "reliable")
 func rpc_receive_player_presence(peer_id: int, state: Dictionary) -> void:
@@ -875,7 +981,16 @@ func rpc_player_state(state: Dictionary) -> void:
 	var incoming_pos := Vector2(float(pos_data[0]), float(pos_data[1]))
 	if not incoming_pos.is_finite(): return
 	incoming_pos = incoming_pos.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
+	var protocol := int(state.get("protocol",-1))
+	if protocol != NETWORK_PROTOCOL_VERSION: return
+	var context := str(state.get("context","world"))
+	if context not in ["world","tavern","dungeon","arena"]: context = "world"
+	var instance_id := str(state.get("instance_id","world")).substr(0,24)
+	if context == "world": instance_id = "world"
+	var context_changed := false
 	if network_mode == "host" and remote_players.has(sender):
+		context_changed = str(remote_players[sender].get("context","world")) != context or str(remote_players[sender].get("instance_id","world")) != instance_id
+	if network_mode == "host" and remote_players.has(sender) and not context_changed:
 		var old_data: Array = remote_players[sender].get("pos", [incoming_pos.x, incoming_pos.y])
 		var old_pos := Vector2(float(old_data[0]), float(old_data[1]))
 		if incoming_pos.distance_to(old_pos) > 95.0:
@@ -884,6 +999,9 @@ func rpc_player_state(state: Dictionary) -> void:
 	if not clean_facing.is_finite() or clean_facing.length_squared() < 0.01: clean_facing = Vector2.DOWN
 	clean_facing = clean_facing.normalized()
 	var clean := {
+		"protocol":NETWORK_PROTOCOL_VERSION,
+		"context":context,
+		"instance_id":instance_id,
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -898,6 +1016,8 @@ func rpc_player_state(state: Dictionary) -> void:
 		"region":region_at(incoming_pos)
 	}
 	remote_players[sender] = clean
+	if context_changed:
+		send_server_session_status(sender)
 	if network_mode == "host":
 		for peer_id in multiplayer.get_peers():
 			if int(peer_id) != sender:
@@ -913,15 +1033,21 @@ func push_world_snapshot() -> void:
 	if network_mode != "host": return
 	var enemy_rows: Array = []
 	for enemy in enemies:
-		enemy_rows.append({"uid":enemy.get("uid",0), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0)})
+		enemy_rows.append({"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0)})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
 		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0)})
-	rpc_world_snapshot.rpc({"enemies":enemy_rows,"shots":shot_rows})
+	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows}
+	for peer_id in multiplayer.get_peers():
+		var state: Dictionary = remote_players.get(int(peer_id),{})
+		if str(state.get("context","world")) == "world":
+			rpc_world_snapshot.rpc_id(int(peer_id),snapshot)
 
 @rpc("authority", "call_remote", "unreliable", 1)
 func rpc_world_snapshot(snapshot: Dictionary) -> void:
-	if network_mode != "client": return
+	if network_mode != "client" or multiplayer_context() != "world": return
+	if int(snapshot.get("protocol",-1)) != NETWORK_PROTOCOL_VERSION: return
+	if str(snapshot.get("context","world")) != "world": return
 	var rebuilt: Array = []
 	for raw in snapshot.get("enemies", []):
 		if not raw is Dictionary: continue
@@ -1183,7 +1309,7 @@ func _process(delta: float) -> void:
 		update_battle_zones(delta)
 		update_impact_zones(delta)
 		update_poison_clouds(delta)
-		if network_mode != "client": update_enemies(delta)
+		if not uses_server_world(): update_enemies(delta)
 		if panel != "":
 			queue_redraw()
 			return
@@ -1194,7 +1320,7 @@ func _process(delta: float) -> void:
 			return
 		collect_drops()
 		if arena_mode == "" and dungeon_id < 0 and interior_id < 0:
-			if network_mode != "client":
+			if not uses_server_world():
 				spawn_nearby_boss()
 				spawn_timer += delta
 				if spawn_timer > 3.4 and enemies.size() < 10:
@@ -1257,6 +1383,8 @@ func nearest_network_player(origin: Vector2, max_distance: float = INF) -> Dicti
 	var best_distance := max_distance
 	for raw_peer in remote_players.keys():
 		var peer_id := int(raw_peer)
+		var state: Dictionary = remote_players[raw_peer]
+		if str(state.get("context","world")) != "world": continue
 		var pos := network_player_position(peer_id)
 		if pos.x < -9000.0: continue
 		var distance := origin.distance_to(pos)
@@ -1268,7 +1396,11 @@ func nearest_network_player(origin: Vector2, max_distance: float = INF) -> Dicti
 
 func spawn_dedicated_enemy() -> void:
 	if remote_players.is_empty(): return
-	var peers: Array = remote_players.keys()
+	var peers: Array = []
+	for raw_peer in remote_players.keys():
+		if str(remote_players[raw_peer].get("context","world")) == "world":
+			peers.append(raw_peer)
+	if peers.is_empty(): return
 	var peer_id := int(peers[randi() % peers.size()])
 	var center := network_player_position(peer_id)
 	if center.x < -9000.0: return
@@ -1284,7 +1416,12 @@ func spawn_dedicated_enemy() -> void:
 		var pos := center + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(470.0, 760.0)
 		if region_at(pos) == target_region and not terrain_blocked(pos) and pos.distance_to(center) >= 390.0:
 			var roll := randf()
-			enemies.append(make_enemy(type, pos, 2 if roll < 0.01 and target_region >= 3 else (1 if roll < 0.075 else 0)))
+			var mob := make_enemy(type, pos, 2 if roll < 0.01 and target_region >= 3 else (1 if roll < 0.075 else 0))
+			mob["uid"] = server_next_mob_uid
+			mob["context"] = "world"
+			mob["instance_id"] = "world"
+			server_next_mob_uid += 1
+			enemies.append(mob)
 			return
 
 func update_dedicated_enemies(delta: float) -> void:
@@ -1371,6 +1508,11 @@ func process_dedicated_server(delta: float) -> void:
 	world_time += delta
 	if network_mode != "host": return
 	server_spawn_timer += delta
+	server_status_timer += delta
+	if server_status_timer >= 1.0:
+		server_status_timer = 0.0
+		for peer_id in multiplayer.get_peers():
+			send_server_session_status(int(peer_id))
 	if server_spawn_timer >= 2.4:
 		server_spawn_timer = 0.0
 		if enemies.size() < mini(24, remote_players.size() * 8):
@@ -2031,7 +2173,7 @@ func normal_attack() -> void:
 	if rage_timer > 0: power = int(power * 1.45)
 	if class_id == 0 and standing_in_battle_zone(): power = int(power * 1.32)
 	var design := equipped_weapon_design()
-	if network_mode == "client":
+	if uses_server_world():
 		rpc_client_normal_attack.rpc_id(1, [player_pos.x,player_pos.y], [facing.x,facing.y], class_id, design, power, weapon_element())
 		if class_id != 0:
 			projectiles.append({"pos":player_pos,"dir":facing,"speed":790.0 if variant=="crossbow" else (650.0 if class_id==2 else 520.0),"life":1.2,"damage":0,"kind":3 if class_id==2 else 2,"element":weapon_element(),"hits":[],"network_visual":true})
@@ -2048,6 +2190,7 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 	if sender <= 0 or not remote_players.has(sender): return
 	if not server_action_allowed(sender, "normal", 140): return
 	var state: Dictionary = remote_players[sender]
+	if str(state.get("context","world")) != "world": return
 	var state_pos: Array = state.get("pos", [])
 	if state_pos.size() < 2: return
 	var requested_origin := Vector2(float(origin_data[0]),float(origin_data[1]))
@@ -2081,7 +2224,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	var enemy: Dictionary = enemies[index]
 	if source_peer > 0:
 		enemy["last_hit_peer"] = source_peer
-	if network_mode == "client":
+	if uses_server_world():
 		enemy["flash"] = 0.16
 		effect(enemy["pos"] + Vector2(0, -25), str(maxi(0, amount)), Color("fff1a1"), 0.55)
 		return
@@ -2127,6 +2270,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var server_cd_ms := maxi(250, int(float(ABILITIES[id]["cd"]) * 850.0))
 	if not server_action_allowed(sender, "ability_%d" % id, server_cd_ms): return
 	var state: Dictionary = remote_players[sender]
+	if str(state.get("context","world")) != "world": return
 	var state_pos: Array = state.get("pos", [])
 	if state_pos.size() < 2: return
 	var requested_origin := Vector2(float(pos_data[0]),float(pos_data[1]))
@@ -2164,7 +2308,7 @@ func use_ability(slot: int) -> void:
 	var power := int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012))
 	var cast_pos := player_pos
 	var cast_dir := facing
-	if network_mode == "client":
+	if uses_server_world():
 		rpc_client_ability.rpc_id(1, id, [cast_pos.x,cast_pos.y], [cast_dir.x,cast_dir.y], power, rank)
 	match id:
 		0:
@@ -2437,6 +2581,7 @@ func enter_arena(mode: String) -> void:
 	energy = max_energy()
 	message("%s · Die erste Welle naht!" % ("LETZTE WACHE" if mode == "final" else "ARENA DER EWIGEN WACHT"))
 	play_sound("level")
+	announce_multiplayer_context()
 
 func update_arena(delta: float) -> void:
 	if not enemies.is_empty(): return
@@ -2520,6 +2665,7 @@ func leave_arena() -> void:
 	previous_region = region_at(player_pos)
 	message("Sonnenhain jubelt dir zu! Die Reise geht im freien Modus weiter." if final_completed else "Du bist aus der Arena zurückgekehrt.")
 	save_game()
+	announce_multiplayer_context()
 
 func dungeon_blocked(pos: Vector2) -> bool:
 	if not Rect2(DUNGEON_CENTER - Vector2(660, 390), Vector2(1320, 780)).has_point(pos): return true
@@ -2559,6 +2705,7 @@ func enter_tavern() -> void:
 	battle_zones.clear()
 	message("Zur Steinrose · Alma schenkt Reisenden einen Platz am Feuer. E: ansprechen oder hinausgehen.")
 	play_sound("menu")
+	announce_multiplayer_context()
 
 func leave_tavern() -> void:
 	interior_id = -1
@@ -2567,6 +2714,7 @@ func leave_tavern() -> void:
 	message("Du trittst wieder auf die Gassen von Sonnenhain.")
 	play_sound("menu")
 	save_game()
+	announce_multiplayer_context()
 
 func enter_dungeon(index: int) -> void:
 	if dungeon_id >= 0 or arena_mode != "": return
@@ -2585,6 +2733,7 @@ func enter_dungeon(index: int) -> void:
 		enemies.append(make_enemy(int(DUNGEON_ENEMIES[index][i % 2]), position, 2 if i == 7 + index * 2 else (1 if i % 5 == 0 else 0)))
 	message("%s · Die Fackeln weisen dir den Weg. E an der Tür führt hinaus." % DUNGEON_NAMES[index])
 	play_sound("menu")
+	announce_multiplayer_context()
 
 func leave_dungeon() -> void:
 	dungeon_id = -1
@@ -2598,6 +2747,7 @@ func leave_dungeon() -> void:
 	message("Du kehrst ans Tageslicht zurück.")
 	play_sound("dodge")
 	save_game()
+	announce_multiplayer_context()
 
 func open_dungeon_chest() -> void:
 	if dungeon_id < 0 or dungeon_chests_opened[dungeon_id]: return
@@ -4167,6 +4317,7 @@ func draw_remote_players(only_peer: int=-1) -> void:
 	for peer_id in remote_players.keys():
 		if only_peer >= 0 and peer_id != only_peer: continue
 		var state: Dictionary = remote_players[peer_id]
+		if not state_matches_local_context(state): continue
 		var coords: Array = state.get("pos", [0.0,0.0])
 		if coords.size() < 2: continue
 		var rp := Vector2(float(coords[0]), float(coords[1]))
@@ -4198,16 +4349,18 @@ func draw_multiplayer_debug_overlay() -> void:
 		var remote_name := str(state.get("name", "Held")).strip_edges()
 		if remote_name == "": remote_name = "Held"
 		rows.append("#%d %s  (%.0f, %.0f)  %s" % [remote_id, remote_name, remote_pos.x, remote_pos.y, "SICHTBAR" if on_screen else "AUSSERHALB"])
-	var width := 390.0
+	var width := 430.0
 	var row_h := 18.0
-	var height := 58.0 + row_h * mini(rows.size(), 5)
+	var height := 94.0 + row_h * mini(rows.size(), 5)
 	var box := Rect2(VIEW.x - width - 12.0, 12.0, width, height)
 	draw_rect(box, Color(0.03, 0.07, 0.09, 0.82))
 	draw_rect(box, Color("78c7d9", 0.82), false, 1.0)
-	text_at(box.position + Vector2(10, 19), "MULTIPLAYER DEBUG", 12, Color("d9f7ff"))
-	text_at(box.position + Vector2(10, 38), "Peer #%d · Remotes %d · sichtbar %d" % [peer_id, remote_players.size(), visible_count], 12, Color("bfe7d4"))
+	text_at(box.position + Vector2(10, 19), "MULTIPLAYER DEBUG · PROTOKOLL v%d" % NETWORK_PROTOCOL_VERSION, 12, Color("d9f7ff"))
+	text_at(box.position + Vector2(10, 38), "Peer #%d · %s:%s · Remotes %d · sichtbar %d" % [peer_id,multiplayer_context(),multiplayer_instance_id(),remote_players.size(),visible_count], 12, Color("bfe7d4"))
+	text_at(box.position + Vector2(10, 57), "Server: %d online · %d Mobs · %d NPCs · %d Events · %d Quests" % [int(server_sync_status.get("online",0)),int(server_sync_status.get("mobs",enemies.size())),int(server_sync_status.get("npc_count",server_world_manifest.get("npc_count",0))),int(server_sync_status.get("event_count",server_world_manifest.get("event_count",0))),int(server_sync_status.get("quest_count",server_world_manifest.get("quest_count",0)))], 11, Color("f0d89a"))
+	text_at(box.position + Vector2(10, 75), "Manifest-Entitäten: %d" % int(server_world_manifest.get("entities",[]).size()), 11, Color("a9d9e5"))
 	for i in range(mini(rows.size(), 5)):
-		text_at(box.position + Vector2(10, 57 + i * row_h), rows[i], 11, Color("dbe8e8"))
+		text_at(box.position + Vector2(10, 94 + i * row_h), rows[i], 11, Color("dbe8e8"))
 
 func draw_online_list() -> void:
 	if not online_list_open: return
@@ -7486,6 +7639,8 @@ func draw_sorted_world_objects() -> void:
 	for enemy in enemies:
 		if visible_world(enemy["pos"],100): entries.append({"kind":"enemy","depth":enemy["pos"].y+24,"data":enemy})
 	for peer_id in remote_players:
+		var state: Dictionary = remote_players[peer_id]
+		if not state_matches_local_context(state): continue
 		var p := network_player_position(peer_id)
 		if visible_world(p,130): entries.append({"kind":"remote","depth":p.y+24,"peer":peer_id})
 	entries.append({"kind":"player","depth":player_pos.y+24})
