@@ -1,7 +1,20 @@
-<!doctype html>
-<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Sicherheit – Sonnenhain RPG</title><style>body{max-width:850px;margin:40px auto;padding:0 20px;font:16px/1.6 Arial,sans-serif;background:#101714;color:#edf1ec}a{color:#e0c07b}h1,h2{color:#ffe3a0}</style></head>
-<body><h1>Sicherheit</h1>
-<p>Der Browsermodus von Sonnenhain ist als private Singleplayer-Ausgabe ausgelegt und soll nur über Einladungslinks verwendet werden. Er benötigt keinen Login, keine Zahlungsdaten und keine Verbindung zu einem Spielserver.</p>
-<h2>Technische Schutzmaßnahmen</h2><ul><li>HTTPS über den Webhost.</li><li>Content-Security-Policy mit Verbindungen nur zur eigenen Website.</li><li>Keine Kamera-, Mikrofon-, Standort-, Zahlungs- oder USB-Berechtigungen.</li><li>Keine Einbettung der Spielseite in fremde Frames.</li><li>Keine externen Tracker oder Werbeskripte.</li><li>Privater Einladungslink vor dem Spielstart.</li><li>Zusätzliche lokale Mensch-Prüfung nach bestätigter Einladung.</li><li>Lokale Speicherung der Spielstände.</li></ul>
-<h2>Sicherheitsmeldungen</h2><p>Bitte keine vertraulichen Sicherheitsdetails öffentlich posten. Für allgemeine Hinweise steht das GitHub-Projekt zur Verfügung.</p>
-<p><a href="/">Zur Startseite</a> · <a href="/game/">Zum Spiel</a> · <a href="/datenschutz.html">Datenschutz</a> · <a href="/impressum.html">Impressum</a></p></body></html>
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Sicherheit – Sonnenhain RPG</title><style>
+:root{--bg:#081a2a;--panel:#10283c;--ink:#f5e8c8;--muted:#bacbd6;--gold:#e3c077;--warn:#ffcf7d;--line:#8e774c}
+*{box-sizing:border-box}body{max-width:920px;margin:0 auto;padding:38px 22px 70px;background:var(--bg);color:var(--ink);font:16px/1.65 Arial,sans-serif}
+a{color:var(--gold)}h1,h2,h3{color:#ffe3a0;line-height:1.2}h1{margin-top:0}.box{padding:14px 16px;border:1px solid var(--line);background:var(--panel);border-radius:0;margin:18px 0}.warn{border-color:#d2a95f;background:#10283c}.todo{color:var(--warn);font-weight:700}.meta{color:var(--muted);font-size:.92rem}nav{margin:28px 0 0;padding-top:18px;border-top:1px solid var(--line);display:flex;gap:14px;flex-wrap:wrap}code{background:#061321;padding:2px 5px;border-radius:0}
+</style></head><body>
+<h1>Sicherheit</h1>
+<h2>Technische Schutzmaßnahmen</h2><ul>
+<li>HTTPS für Website und verschlüsseltes WSS für den Multiplayer.</li>
+<li>Content-Security-Policy und eingeschränkte Browser-Berechtigungen.</li>
+<li>Keine Kamera-, Mikrofon-, Standort-, Zahlungs- oder USB-Berechtigungen für den Spielbetrieb.</li>
+<li>Keine externen Werbe- oder Analyse-Tracker nach aktuellem Stand.</li>
+<li>Serverseitige Validierung von Spielerzuständen, Kämpfen und Questfortschritt.</li>
+<li>Eindeutige Reward-/Quest-Transaktions-IDs, ACK-Bestätigungen und lokale Duplikatsperren.</li>
+<li>Lokale Browser-Spielstände mit Export-/Import-Backup.</li>
+</ul>
+<h2>Sicherheitsmeldungen</h2>
+<p>Bitte keine Zugangsdaten, privaten Schlüssel oder Exploit-Details öffentlich posten. Allgemeine Meldungen können über das GitHub-Projekt erfolgen. Für vertrauliche Sicherheitsmeldungen sollte eine eigene Mailbox eingerichtet werden: <span class="todo">[z. B. sicherheit@sonnenhainrpg.de]</span>.</p>
+<h2>Verantwortungsvolle Meldung</h2><p>Bitte beschreibe betroffene Funktion, reproduzierbare Schritte und mögliche Auswirkungen. Sicherheitslücken sollen nicht zur Manipulation anderer Spieler, zum Auslesen fremder Daten oder zur Duplikation von Gegenständen ausgenutzt werden.</p>
+<nav><a href="/">Startseite</a><a href="/impressum.html">Impressum</a><a href="/datenschutz.html">Datenschutz</a><a href="/nutzungsregeln.html">Nutzungsregeln</a><a href="/jugendschutz.html">Jugendschutz</a><a href="/lizenzen.html">Lizenzen</a></nav>
+</body></html>
