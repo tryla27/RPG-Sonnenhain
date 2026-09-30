@@ -489,10 +489,15 @@ func server_patch_notice_path() -> String:
 func server_check_patch_notice() -> void:
 	var path := server_patch_notice_path()
 	if not FileAccess.file_exists(path): return
-	if not patch_notice.consume(FileAccess.get_file_as_string(path)): return
-	add_chat_line("SERVER","Server wird gepatcht.")
-	for peer_id in multiplayer.get_peers(): rpc_chat_relay.rpc_id(int(peer_id),"SERVER","Server wird gepatcht.")
-	print("SERVER_PATCH_NOTICE_SENT ",patch_notice.last_token)
+	var raw := FileAccess.get_file_as_string(path).strip_edges().left(80)
+	if not patch_notice.consume(raw): return
+	var message_text := "Server wird gepatcht."
+	if raw.begins_with("done:"):
+		message_text = "Patch abgeschlossen. Bitte die Seite neu laden (Strg+F5)."
+	add_chat_line("SERVER",message_text)
+	for peer_id in multiplayer.get_peers():
+		rpc_chat_relay.rpc_id(int(peer_id),"SERVER",message_text)
+	print("SERVER_PATCH_NOTICE_SENT ",patch_notice.last_token," message=",message_text)
 
 func start_multiplayer_smoke_client() -> void:
 	multiplayer_smoke_client_mode = true
