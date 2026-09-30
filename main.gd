@@ -454,18 +454,30 @@ func process_multiplayer_smoke(delta: float) -> void:
 		if text_value.begins_with("SMOKE:") and text_value != "SMOKE:%s" % multiplayer_smoke_name:
 			saw_other_chat = true
 			break
-	if remote_players.size() >= 1 and enemies.size() >= 1 and saw_other_chat and multiplayer_smoke_success_since == 0:
+	var visible_remote_count := 0
+	var complete_remote_count := 0
+	for raw_peer_id in remote_players.keys():
+		var peer_id := int(raw_peer_id)
+		var remote_pos := network_player_position(peer_id)
+		if visible_world(remote_pos, 130):
+			visible_remote_count += 1
+		var remote_state: Dictionary = remote_players[raw_peer_id]
+		var pos_data: Array = remote_state.get("pos", [])
+		var facing_data: Array = remote_state.get("facing", [])
+		if pos_data.size() >= 2 and facing_data.size() >= 2 and remote_state.has("class") and remote_state.has("race") and str(remote_state.get("name", "")).strip_edges() != "":
+			complete_remote_count += 1
+	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and saw_other_chat and multiplayer_smoke_success_since == 0:
 		multiplayer_smoke_success_since = Time.get_ticks_msec()
-		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
+		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size())
 	# Sobald dieser Client den anderen Spieler, dessen Chat und den
 	# Server-Snapshot gemeinsam gesehen hat, ist die Relay-Prüfung erfüllt.
 	# Er bleibt nur noch kurz online, damit der Gegenclient dasselbe prüfen kann.
 	if multiplayer_smoke_success_since > 0 and Time.get_ticks_msec() - multiplayer_smoke_success_since >= 2500:
-		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
+		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size())
 		get_tree().quit(0)
 		return
 	if multiplayer_smoke_deadline > 0 and Time.get_ticks_msec() > multiplayer_smoke_deadline:
-		print("MULTIPLAYER_SMOKE_FAIL name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size(), " chat=", saw_other_chat)
+		print("MULTIPLAYER_SMOKE_FAIL name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " chat=", saw_other_chat)
 		get_tree().quit(32)
 
 func _ready() -> void:
@@ -4132,6 +4144,7 @@ func _draw() -> void:
 	character_canvas_offset = Vector2.ZERO
 	draw_chat_overlay()
 	draw_online_list()
+	draw_multiplayer_debug_overlay()
 	if rescue_intro_timer > 0.0 or reward_scene_timer > 0.0: draw_rescue_alert()
 	if panel != "": draw_panel()
 	performance_draw_us = Time.get_ticks_usec()-draw_started
@@ -4169,6 +4182,32 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)))
 		draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
 		text_at(rp + Vector2(-75,-57), "%s · LV %d" % [str(state.get("name","Freund")), int(state.get("level",1))], 13, Color('bfe7ff'), HORIZONTAL_ALIGNMENT_CENTER, 150)
+
+func draw_multiplayer_debug_overlay() -> void:
+	if not is_web_platform() or network_mode == "offline" or not character_created:
+		return
+	var peer_id := multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else local_peer_id
+	var rows: Array[String] = []
+	var visible_count := 0
+	for raw_peer_id in remote_players.keys():
+		var remote_id := int(raw_peer_id)
+		var remote_pos := network_player_position(remote_id)
+		var on_screen := visible_world(remote_pos, 130)
+		if on_screen: visible_count += 1
+		var state: Dictionary = remote_players[raw_peer_id]
+		var remote_name := str(state.get("name", "Held")).strip_edges()
+		if remote_name == "": remote_name = "Held"
+		rows.append("#%d %s  (%.0f, %.0f)  %s" % [remote_id, remote_name, remote_pos.x, remote_pos.y, "SICHTBAR" if on_screen else "AUSSERHALB"])
+	var width := 390.0
+	var row_h := 18.0
+	var height := 58.0 + row_h * mini(rows.size(), 5)
+	var box := Rect2(VIEW.x - width - 12.0, 12.0, width, height)
+	draw_rect(box, Color(0.03, 0.07, 0.09, 0.82))
+	draw_rect(box, Color("78c7d9", 0.82), false, 1.0)
+	text_at(box.position + Vector2(10, 19), "MULTIPLAYER DEBUG", 12, Color("d9f7ff"))
+	text_at(box.position + Vector2(10, 38), "Peer #%d · Remotes %d · sichtbar %d" % [peer_id, remote_players.size(), visible_count], 12, Color("bfe7d4"))
+	for i in range(mini(rows.size(), 5)):
+		text_at(box.position + Vector2(10, 57 + i * row_h), rows[i], 11, Color("dbe8e8"))
 
 func draw_online_list() -> void:
 	if not online_list_open: return
