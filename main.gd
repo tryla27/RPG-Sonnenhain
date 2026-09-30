@@ -1421,12 +1421,11 @@ func attack_input_active() -> bool:
 	return binding_pressed("attack")
 
 func touch_button_at(pos: Vector2) -> String:
-	if pos.y < 360.0: return ""
 	if pos.distance_to(Vector2(1032, 526)) <= 67.0: return "attack"
 	if pos.distance_to(Vector2(916, 550)) <= 43.0: return "dodge"
 	if pos.distance_to(Vector2(967, 447)) <= 43.0: return "interact"
-	if Rect2(866, 365, 86, 54).has_point(pos): return "chat"
-	if Rect2(960, 365, 86, 54).has_point(pos): return "online"
+	if Rect2(866, 300, 86, 50).has_point(pos): return "chat"
+	if Rect2(960, 300, 86, 50).has_point(pos): return "online"
 	for slot in 4:
 		if Rect2(424 + slot * 76, 548, 68, 70).has_point(pos): return "ability_%d" % (slot + 1)
 	if Rect2(735, 557, 66, 54).has_point(pos): return "heal"
@@ -5838,14 +5837,14 @@ func draw_touch_controls() -> void:
 		draw_arc(data["p"], data["r"], 0, TAU, 32, Color("f0daa3",0.82), 3)
 		text_at(data["p"] + Vector2(-45,5), data["label"], 11, Color("fff2cf"), HORIZONTAL_ALIGNMENT_CENTER, 90)
 
-	var chat_rect := Rect2(866, 365, 86, 54)
+	var chat_rect := Rect2(866, 300, 86, 50)
 	draw_rect(chat_rect, Color("223338",0.92))
 	draw_rect(chat_rect, Color("c7aa70",0.88), false, 2)
-	text_at(chat_rect.position + Vector2(5,34), "CHAT", 13, Color("fff0c8"), HORIZONTAL_ALIGNMENT_CENTER, int(chat_rect.size.x-10))
-	var online_rect := Rect2(960, 365, 86, 54)
+	text_at(chat_rect.position + Vector2(5,32), "CHAT", 13, Color("fff0c8"), HORIZONTAL_ALIGNMENT_CENTER, int(chat_rect.size.x-10))
+	var online_rect := Rect2(960, 300, 86, 50)
 	draw_rect(online_rect, Color("223338",0.92))
 	draw_rect(online_rect, Color("8eb6a5",0.88), false, 2)
-	text_at(online_rect.position + Vector2(5,34), "ONLINE", 11, Color("e1fff1"), HORIZONTAL_ALIGNMENT_CENTER, int(online_rect.size.x-10))
+	text_at(online_rect.position + Vector2(5,32), "ONLINE", 11, Color("e1fff1"), HORIZONTAL_ALIGNMENT_CENTER, int(online_rect.size.x-10))
 
 	for pair in [[Rect2(735,557,66,54),"HP"],[Rect2(807,557,66,54),"MANA" if class_id == 1 else "ENERGIE"]]:
 		draw_rect(pair[0], Color("223338",0.90))
