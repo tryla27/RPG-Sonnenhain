@@ -349,6 +349,10 @@ var local_peer_id := 1
 var sync_timer := 0.0
 var server_spawn_timer := 0.0
 var server_action_times: Dictionary = {}
+var multiplayer_smoke_client_mode := false
+var multiplayer_smoke_name := ""
+var multiplayer_smoke_deadline := 0
+var multiplayer_smoke_chat_timer := 0.0
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -379,9 +383,57 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and touch_enabled:
 		clear_touch_inputs()
 
+func command_arg_value(prefix: String, fallback: String = "") -> String:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with(prefix):
+			return arg.substr(prefix.length())
+	return fallback
+
+func start_multiplayer_smoke_client() -> void:
+	multiplayer_smoke_client_mode = true
+	multiplayer_smoke_name = command_arg_value("--smoke-name=", "Smoke")
+	hero_name = multiplayer_smoke_name
+	character_created = true
+	class_id = 0 if multiplayer_smoke_name.ends_with("A") else 2
+	player_pos = Vector2(560.0, 520.0) if class_id == 0 else Vector2(620.0, 520.0)
+	panel = ""
+	var peer := WebSocketMultiplayerPeer.new()
+	var err := peer.create_client("ws://127.0.0.1:27845")
+	if err != OK:
+		print("MULTIPLAYER_SMOKE_FAIL connect_error=", err)
+		get_tree().quit(31)
+		return
+	multiplayer.multiplayer_peer = peer
+	network_mode = "client"
+	multiplayer_smoke_deadline = Time.get_ticks_msec() + 15000
+	print("MULTIPLAYER_SMOKE_CONNECT ", multiplayer_smoke_name)
+
+func process_multiplayer_smoke(delta: float) -> void:
+	if not multiplayer_smoke_client_mode:
+		return
+	multiplayer_smoke_chat_timer -= delta
+	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer_smoke_chat_timer <= 0.0:
+		multiplayer_smoke_chat_timer = 0.7
+		send_chat_message("SMOKE:%s" % multiplayer_smoke_name)
+	var saw_other_chat := false
+	for entry in chat_messages:
+		var text_value := str(entry.get("text", ""))
+		if text_value.begins_with("SMOKE:") and text_value != "SMOKE:%s" % multiplayer_smoke_name:
+			saw_other_chat = true
+			break
+	if remote_players.size() >= 1 and enemies.size() >= 1 and saw_other_chat:
+		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
+		get_tree().quit(0)
+		return
+	if multiplayer_smoke_deadline > 0 and Time.get_ticks_msec() > multiplayer_smoke_deadline:
+		print("MULTIPLAYER_SMOKE_FAIL name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size(), " chat=", saw_other_chat)
+		get_tree().quit(32)
+
 func _ready() -> void:
 	setup_multiplayer_signals()
-	dedicated_server_mode = OS.has_feature("dedicated_server") or "--dedicated-server" in OS.get_cmdline_user_args()
+	var user_args := OS.get_cmdline_user_args()
+	dedicated_server_mode = OS.has_feature("dedicated_server") or "--dedicated-server" in user_args
+	multiplayer_smoke_client_mode = "--multiplayer-smoke-client" in user_args
 	if dedicated_server_mode:
 		reset_class_skills()
 		for i in QUESTS.size():
@@ -411,6 +463,8 @@ func _ready() -> void:
 	refresh_save_slot_labels()
 	refresh_shop_stock()
 	reset_class_skills()
+	if multiplayer_smoke_client_mode:
+		start_multiplayer_smoke_client()
 	for i in QUESTS.size():
 		quests.append({"state":0, "progress":0})
 	for i in WORLD_EVENTS.size():
@@ -887,6 +941,7 @@ func _process(delta: float) -> void:
 	if dedicated_server_mode:
 		process_dedicated_server(delta)
 		return
+	process_multiplayer_smoke(delta)
 	update_music(delta)
 	if panel == "pause":
 		queue_redraw()
