@@ -232,6 +232,8 @@ var equipped_ring_uid := -1
 var next_uid := 1
 var selected_item := -1
 var inventory_page := 0
+var last_inventory_click_uid := -1
+var last_inventory_click_msec := -10000
 var shop_page := 0
 var quests: Array = []
 var enemies: Array = []
@@ -396,6 +398,7 @@ var multiplayer_smoke_deadline := 0
 var multiplayer_smoke_chat_timer := 0.0
 var multiplayer_smoke_attack_timer := 0.0
 var multiplayer_smoke_party_timer := 0.0
+var multiplayer_smoke_inventory_checked := false
 var multiplayer_smoke_success_since := 0
 var server_sync_status: Dictionary = {}
 var server_world_manifest: Dictionary = {}
@@ -528,8 +531,52 @@ func command_arg_value(prefix: String, fallback: String = "") -> String:
 			return arg.substr(prefix.length())
 	return fallback
 
+func run_inventory_consistency_smoke() -> bool:
+	var old_inventory := inventory.duplicate(true)
+	var old_weapon := equipped_uid
+	var old_armor := equipped_armor_uid
+	var old_ring := equipped_ring_uid
+	var old_next := next_uid
+	inventory = []
+	equipped_uid = -1
+	equipped_armor_uid = -1
+	equipped_ring_uid = -1
+	next_uid = 1
+	var armor := make_item("Smoke Rüstung","armor",1,4,10)
+	var ring := make_item("Smoke Ring","ring",1,8,10)
+	var weapon := make_item("Smoke Waffe",class_weapon_icon(),1,7,10)
+	if not add_item(armor) or not add_item(ring) or not add_item(weapon):
+		return false
+	var armor_index := 0
+	toggle_equipment_item(armor_index)
+	if equipped_armor_uid != int(inventory[armor_index].get("uid",-1)): return false
+	toggle_equipment_item(armor_index)
+	if equipped_armor_uid != -1: return false
+	# Server-Loot mit absichtlich kollidierender UID muss lokal eine neue UID erhalten.
+	var fake_server := weapon.duplicate(true)
+	fake_server["uid"] = int(inventory[0].get("uid",-1))
+	var sanitized := sanitize_network_reward_item(fake_server)
+	if not add_item(sanitized): return false
+	var seen: Dictionary = {}
+	for item in inventory:
+		var uid := int(item.get("uid",-1))
+		if uid < 0 or seen.has(uid): return false
+		seen[uid] = true
+	inventory = old_inventory
+	equipped_uid = old_weapon
+	equipped_armor_uid = old_armor
+	equipped_ring_uid = old_ring
+	next_uid = old_next
+	validate_equipment_slots()
+	print("INVENTORY_SMOKE_OK unique_uids=true toggle_armor=true server_loot_local_uid=true")
+	return true
+
 func start_multiplayer_smoke_client() -> void:
 	multiplayer_smoke_client_mode = true
+	if not run_inventory_consistency_smoke():
+		print("INVENTORY_SMOKE_FAIL")
+		get_tree().quit(33)
+		return
 	multiplayer_smoke_name = command_arg_value("--smoke-name=", "Smoke")
 	hero_name = multiplayer_smoke_name
 	player_uuid = "smoke-%s" % multiplayer_smoke_name.to_lower()
@@ -1274,7 +1321,7 @@ func rpc_server_combat_reward(enemy_type: int, xp_reward: int, gold_reward: int,
 		gold += gold_reward
 	for raw_item in item_rewards:
 		if not raw_item is Dictionary: continue
-		var item: Dictionary = raw_item.duplicate(true)
+		var item: Dictionary = sanitize_network_reward_item(raw_item)
 		if not add_item(item):
 			var compensation := maxi(1, item_sale_value(item))
 			gold += compensation
@@ -3597,6 +3644,107 @@ func gain_xp(amount: int) -> void:
 func skill_rank_level(index: int, rank: int) -> int:
 	return int(ABILITIES[index]["req"]) + [0, 3, 8, 15, 24][clampi(rank - 1, 0, 4)]
 
+func inventory_uid_exists(uid: int) -> bool:
+	if uid < 0: return false
+	for owned in inventory:
+		if int(owned.get("uid",-1)) == uid:
+			return true
+	return false
+
+func assign_fresh_item_uid(item: Dictionary) -> void:
+	while inventory_uid_exists(next_uid):
+		next_uid += 1
+	item["uid"] = next_uid
+	next_uid += 1
+
+func item_icon_for_uid(uid: int) -> String:
+	if uid < 0: return ""
+	for item in inventory:
+		if int(item.get("uid",-1)) == uid:
+			return str(item.get("icon",""))
+	return ""
+
+func validate_equipment_slots() -> void:
+	var weapon_icon := item_icon_for_uid(equipped_uid)
+	if equipped_uid >= 0 and (weapon_icon == "" or weapon_icon != class_weapon_icon()):
+		equipped_uid = -1
+	if equipped_armor_uid >= 0 and item_icon_for_uid(equipped_armor_uid) != "armor":
+		equipped_armor_uid = -1
+	if equipped_ring_uid >= 0 and item_icon_for_uid(equipped_ring_uid) != "ring":
+		equipped_ring_uid = -1
+	hp = minf(hp,max_hp())
+
+func is_equipped_uid(uid: int) -> bool:
+	return uid >= 0 and uid in [equipped_uid,equipped_armor_uid,equipped_ring_uid]
+
+func toggle_equipment_item(index: int) -> bool:
+	if index < 0 or index >= inventory.size(): return false
+	var item: Dictionary = inventory[index]
+	var uid := int(item.get("uid",-1))
+	var icon := str(item.get("icon",""))
+	if icon in ["sword","staff","bow"]:
+		if icon != class_weapon_icon():
+			message("%s kann nur %s ausrüsten." % [CLASS_NAMES[class_id], {"sword":"Schwerter","staff":"Stäbe","bow":"Bögen"}[class_weapon_icon()]])
+			return true
+		if equipped_uid == uid:
+			equipped_uid = -1
+			message("Ausgezogen: %s" % str(item.get("name","Waffe")))
+		else:
+			equipped_uid = uid
+			message("Ausgerüstet: %s (+%d Schaden)" % [str(item.get("name","Waffe")),int(item.get("power",0))])
+		save_game()
+		announce_multiplayer_context()
+		return true
+	if icon == "armor":
+		if equipped_armor_uid == uid:
+			equipped_armor_uid = -1
+			message("Ausgezogen: %s" % str(item.get("name","Rüstung")))
+		else:
+			equipped_armor_uid = uid
+			message("Ausgerüstet: %s (%d Schutz)" % [str(item.get("name","Rüstung")),int(item.get("power",0))])
+		save_game()
+		announce_multiplayer_context()
+		return true
+	if icon == "ring":
+		if equipped_ring_uid == uid:
+			equipped_ring_uid = -1
+			hp = minf(hp,max_hp())
+			message("Ausgezogen: %s" % str(item.get("name","Ring")))
+		else:
+			var old_max := max_hp()
+			equipped_ring_uid = uid
+			var new_max := max_hp()
+			hp = minf(new_max,hp+maxf(0.0,new_max-old_max))
+			message("Ausgerüstet: %s (+%d maximales Leben)" % [str(item.get("name","Ring")),int(item.get("power",0))])
+		save_game()
+		announce_multiplayer_context()
+		return true
+	return false
+
+func unequip_slot(slot: String) -> void:
+	match slot:
+		"weapon": equipped_uid = -1
+		"armor": equipped_armor_uid = -1
+		"ring":
+			equipped_ring_uid = -1
+			hp = minf(hp,max_hp())
+	validate_equipment_slots()
+	save_game()
+	announce_multiplayer_context()
+
+func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
+	var item: Dictionary = raw.duplicate(true)
+	item.erase("uid")
+	var icon := str(item.get("icon","gem"))
+	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence"]:
+		item["icon"] = "gem"
+	item["rarity"] = clampi(int(item.get("rarity",0)),0,4)
+	item["power"] = clampi(int(item.get("power",0)),0,10000)
+	item["count"] = clampi(int(item.get("count",1)),1,stack_limit(item))
+	item["name"] = str(item.get("name","Fundstück")).substr(0,48)
+	item["element"] = str(item.get("element","")) if str(item.get("element","")) in ["","feuer","eis","blitz","gift"] else ""
+	return item
+
 func make_item(name: String, icon: String, rarity: int, power: int, value: int, element: String = "", item_level: int = -1) -> Dictionary:
 	var ilvl := maxi(1, level if item_level < 0 else item_level)
 	var bonus: int = maxi(0, rarity + int(ilvl / 9.0))
@@ -3649,6 +3797,11 @@ func add_item(item: Dictionary) -> bool:
 		var entry_value := int(round(float(remaining_value) * amount / remaining))
 		entry["count"] = amount
 		entry["stack_value"] = entry_value
+		var requested_uid := int(entry.get("uid",-1))
+		if requested_uid < 0 or inventory_uid_exists(requested_uid):
+			assign_fresh_item_uid(entry)
+		else:
+			next_uid = maxi(next_uid,requested_uid+1)
 		inventory.append(entry)
 		remaining -= amount
 		remaining_value -= entry_value
@@ -4108,6 +4261,7 @@ func load_game() -> void:
 		skill_levels[class_ultimate()] = mini(5, 1 + (level - 20) / 5)
 	hp = clampf(float(data.get("hp", 100)), 1, max_hp())
 	energy = clampf(float(data.get("energy", 100)), 0, max_energy())
+	validate_equipment_slots()
 
 func handle_panel_click(mouse: Vector2) -> void:
 	if panel == "start":
@@ -4533,6 +4687,15 @@ func upgrade_skill(index: int) -> void:
 	save_game()
 
 func click_inventory(mouse: Vector2) -> void:
+	if Rect2(180,275,98,77).has_point(mouse) and equipped_uid >= 0:
+		unequip_slot("weapon")
+		return
+	if Rect2(501,235,98,77).has_point(mouse) and equipped_armor_uid >= 0:
+		unequip_slot("armor")
+		return
+	if Rect2(501,347,98,77).has_point(mouse) and equipped_ring_uid >= 0:
+		unequip_slot("ring")
+		return
 	if Rect2(850, 157, 32, 30).has_point(mouse):
 		inventory_page = maxi(0, inventory_page - 1)
 		selected_item = -1
@@ -4547,6 +4710,16 @@ func click_inventory(mouse: Vector2) -> void:
 		if Rect2(641 + col * 65, 200 + row * 55, 54, 48).has_point(mouse):
 			var index := inventory_page * 25 + cell
 			selected_item = index if index < inventory.size() else -1
+			if selected_item >= 0:
+				var uid := int(inventory[selected_item].get("uid",-1))
+				var now := Time.get_ticks_msec()
+				if uid == last_inventory_click_uid and now-last_inventory_click_msec <= 420:
+					last_inventory_click_uid = -1
+					last_inventory_click_msec = -10000
+					use_item(selected_item)
+				else:
+					last_inventory_click_uid = uid
+					last_inventory_click_msec = now
 			return
 	if selected_item >= 0 and selected_item < inventory.size() and Rect2(643, 538, 320, 42).has_point(mouse):
 		use_item(selected_item)
@@ -4620,19 +4793,9 @@ func use_item(index: int) -> void:
 			inventory.remove_at(index)
 			selected_item = -1
 		message("%s verwendet" % name)
-	elif item["icon"] in ["sword", "staff", "bow"]:
-		if item["icon"] != class_weapon_icon():
-			message("%s kann nur %s ausrüsten." % [CLASS_NAMES[class_id], {"sword":"Schwerter", "staff":"Stäbe", "bow":"Bögen"}[class_weapon_icon()]])
-			return
-		equipped_uid = int(item["uid"])
-		message("Ausgerüstet: %s (+%d Schaden)" % [name, item["power"]])
-	elif item["icon"] == "armor":
-		equipped_armor_uid = int(item["uid"])
-		message("Ausgerüstet: %s (%d weniger Schaden)" % [name, item["power"]])
-	elif item["icon"] == "ring":
-		equipped_ring_uid = int(item["uid"])
-		hp = minf(max_hp(), hp + int(item["power"]))
-		message("Ausgerüstet: %s (+%d maximales Leben)" % [name, item["power"]])
+	elif item["icon"] in ["sword", "staff", "bow", "armor", "ring"]:
+		toggle_equipment_item(index)
+		return
 	else:
 		message("%s ist ein wertvoller Fund. Du kannst ihn verkaufen." % name)
 	save_game()
@@ -4694,11 +4857,9 @@ func buy_item(stock_item: Dictionary) -> void:
 func sell_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
 	var item: Dictionary = inventory[index]
-	if int(item["uid"]) == equipped_uid: equipped_uid = -1
-	if int(item["uid"]) == equipped_armor_uid: equipped_armor_uid = -1
-	if int(item["uid"]) == equipped_ring_uid:
-		equipped_ring_uid = -1
-		hp = minf(hp, max_hp())
+	if is_equipped_uid(int(item.get("uid",-1))):
+		message("Ausgerüstete Gegenstände können nicht verkauft werden. Erst ausziehen.")
+		return
 	var gain := int(round(float(item_sale_value(item)) / maxi(1, int(item.get("count", 1)))))
 	gold += gain
 	message("Verkauft: %s für %d Gold" % [item["name"], gain])
@@ -7594,7 +7755,7 @@ func draw_inventory_panel() -> void:
 	draw_equipment_slot(Vector2(501, 347), "RING", equipped_ring_uid, "ring")
 	text_at(Vector2(186, 534), "HP %d  ·  ANGRIFF %d  ·  SCHUTZ %d" % [int(max_hp()), normal_attack_power(), equipment_power(equipped_armor_uid)], 15, Color("e6efdd"))
 	ui_box(Rect2(625, 153, 352, 426), Color("365b5d"))
-	text_at(Vector2(644, 179), "TASCHE", 19, Color("ffeda9"))
+	text_at(Vector2(644, 179), "TASCHE · Doppelklick: benutzen / an- oder ausziehen", 12, Color("ffeda9"))
 	text_at(Vector2(807, 179), "%d/2" % (inventory_page + 1), 16)
 	ui_button(Rect2(850, 157, 32, 30), "<", inventory_page > 0)
 	ui_button(Rect2(931, 157, 32, 30), ">", inventory_page < 1)
@@ -7621,7 +7782,10 @@ func draw_inventory_panel() -> void:
 		var detail := "%s · %s · %d Gold" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), item_sale_value(item)]
 		if item["icon"] in ["sword", "staff", "bow", "armor", "ring"]: detail += " · +%d" % int(item["power"])
 		text_at(Vector2(643, 518), detail, 13, Color("e5eddd"), HORIZONTAL_ALIGNMENT_LEFT, 320)
-		ui_button(Rect2(643, 538, 320, 42), "BENUTZEN / AUSRÜSTEN", item["icon"] in ["potion", class_weapon_icon(), "armor", "ring"])
+		var action_label := "BENUTZEN"
+		if item["icon"] in ["sword","staff","bow","armor","ring"]:
+			action_label = "AUSZIEHEN" if is_equipped_uid(int(item.get("uid",-1))) else "AUSRÜSTEN"
+		ui_button(Rect2(643, 538, 320, 42), action_label, item["icon"] in ["potion", class_weapon_icon(), "armor", "ring"])
 	else:
 		text_at(Vector2(643, 508), "Wähle einen Gegenstand aus der Tasche.", 14, Color("dbe8d5"))
 	var mouse := get_viewport().get_mouse_position()
@@ -7685,7 +7849,8 @@ func draw_equipment_slot(p: Vector2, label: String, uid: int, icon: String) -> v
 			item = candidate
 			break
 	if not item.is_empty():
-		draw_item_icon(p + Vector2(33, 4), icon, RARITY_COLORS[int(item["rarity"])], 0.82, weapon_visual_stage(item), item_design(item))
+		var actual_icon := str(item.get("icon",icon))
+		draw_item_icon(p + Vector2(33, 4), actual_icon, RARITY_COLORS[int(item["rarity"])], 0.82, weapon_visual_stage(item), item_design(item))
 		text_at(p + Vector2(5, 52), String(item["name"]).substr(0, 13), 11, RARITY_COLORS[int(item["rarity"])])
 	else:
 		text_at(p + Vector2(36, 35), "–", 19, Color("b6c8b9"))
