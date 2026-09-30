@@ -39,7 +39,7 @@ gate_html = """
     <label><input id="human-confirm" type="checkbox"> Ich bin ein Mensch und möchte das Spiel starten.</label>
     <div id="human-error" aria-live="polite"></div>
     <button id="human-start" type="button" disabled>PRÜFEN &amp; SPIEL STARTEN</button>
-    <div id="human-links"><a href="/datenschutz.html">Datenschutz</a><a href="/impressum.html">Impressum</a><a href="/sicherheit.html">Sicherheit</a><a href="/">Startseite</a></div>
+    <div id="human-links"><a href="/datenschutz.html">Datenschutz</a><a href="/impressum.html">Impressum</a><a href="/nutzungsregeln.html">Regeln</a><a href="/jugendschutz.html">Jugendschutz</a><a href="/lizenzen.html">Lizenzen</a><a href="/sicherheit.html">Sicherheit</a><a href="/">Startseite</a></div>
   </div>
 </div>
 """
