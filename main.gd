@@ -7842,8 +7842,10 @@ func prop_cache_key(prop: Dictionary) -> String:
 	return "%s:%d:%d" % [prop["kind"],prop["point"].x,prop["point"].y]
 
 func update_foreground_cache() -> void:
-	if DisplayServer.get_name() == "headless": return
-	if not performance_cache_enabled or arena_mode != "" or interior_id >= 0 or dungeon_id >= 0: return
+	# Dorfobjekte werden direkt gezeichnet. Der frühere SubViewport-Cache konnte
+	# bei WebGL transparente/fehlende Texturen festhalten und dadurch Häuser,
+	# Händlerstände und weitere Props komplett verschwinden lassen.
+	return
 	var ahead := Rect2(camera_pos,VIEW).grow(200)
 	var created := 0
 	for prop in village_props():
@@ -7885,10 +7887,7 @@ func update_foreground_cache() -> void:
 		created += 1
 
 func draw_cached_prop(prop: Dictionary) -> void:
-	var key := prop_cache_key(prop)
-	if performance_cache_enabled and foreground_cache.has(key) and Engine.get_process_frames()-int(foreground_cache[key]["created"]) >= 2:
-		draw_texture_rect(foreground_cache[key]["texture"],foreground_cache[key]["bounds"],false)
-	else: paint_village_prop(prop)
+	paint_village_prop(prop)
 
 func draw_sorted_world_objects() -> void:
 	var entries: Array = []
