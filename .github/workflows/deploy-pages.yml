@@ -161,8 +161,8 @@ jobs:
           test -f build/site/mobile/index.pck
           test -f build/site/mobile/index.wasm
           grep -q "Eine Reise durch" build/site/index.html
-          grep -Fq '/game/?mode=desktop' build/site/index.html
-          grep -Fq '/game/?mode=mobile' build/site/index.html
+          grep -Fq 'href="/game/"' build/site/index.html
+          grep -Fq 'href="/mobile/"' build/site/index.html
           grep -q "Eine Reise durch" build/site/mobile-preview/index.html
           grep -q "human-gate" build/site/game/index.html
           grep -q "Cache-Control.*no-store" build/site/.htaccess
@@ -273,8 +273,8 @@ jobs:
 
           wait_for_200 "https://sonnenhainrpg.de/" /tmp/home.html
           grep -q "Eine Reise durch" /tmp/home.html
-          grep -Fq '/game/?mode=desktop' /tmp/home.html
-          grep -Fq '/game/?mode=mobile' /tmp/home.html
+          grep -Fq 'href="/game/"' /tmp/home.html
+          grep -Fq 'href="/mobile/"' /tmp/home.html
 
           wait_for_200 "https://sonnenhainrpg.de/mobile-preview/" /tmp/mobile-preview.html
           grep -q "MOBILE / TOUCH" /tmp/mobile-preview.html
@@ -301,13 +301,6 @@ jobs:
           cache_headers="$(curl -sSI --max-time 20 "https://sonnenhainrpg.de/game/index.pck" || true)"
           printf '%s\n' "$cache_headers"
           printf '%s\n' "$cache_headers" | grep -qiE '^Cache-Control:.*no-store'
-
-          for mode in desktop mobile; do
-            code="$(curl -L -sS -o /tmp/game-$mode.html -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de/game/?mode=$mode" || true)"
-            echo "/game/?mode=$mode => HTTP $code"
-            test "$code" = "200"
-            grep -q "human-gate" "/tmp/game-$mode.html"
-          done
 
           wss_ok=0
           for attempt in {1..12}; do
