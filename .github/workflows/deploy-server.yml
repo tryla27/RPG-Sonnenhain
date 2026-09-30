@@ -107,15 +107,34 @@ jobs:
           trap - EXIT
           echo "MULTIPLAYER INTEGRATION OK: state relay, chat relay and world snapshot passed with two clients."
 
-      - name: Upload server build
+      - name: Assemble dedicated server host package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf build/server-host
+          mkdir -p build/server-host
+          cp build/server/sonnenhain-server.x86_64 build/server-host/
+          cp build/server/sonnenhain-server.pck build/server-host/
+          cp server/start-server.sh build/server-host/start-server.sh
+          cp server/ensure-sonnenhain-server.sh build/server-host/ensure-sonnenhain-server.sh
+          cp server/sonnenhain.service build/server-host/sonnenhain.service
+          cp server/nginx-multiplayer.conf.example build/server-host/nginx-multiplayer.conf.example
+          cp server/SERVER_HOST.md build/server-host/README.md
+          chmod +x build/server-host/sonnenhain-server.x86_64
+          chmod +x build/server-host/start-server.sh
+          chmod +x build/server-host/ensure-sonnenhain-server.sh
+          printf '%s\n' "$GITHUB_SHA" > build/server-host/BUILD_COMMIT.txt
+          test -x build/server-host/sonnenhain-server.x86_64
+          test -f build/server-host/sonnenhain-server.pck
+          test -x build/server-host/start-server.sh
+
+      - name: Upload server host version
         uses: actions/upload-artifact@v4
         with:
-          name: sonnenhain-linux-server
-          path: |
-            build/server/sonnenhain-server.x86_64
-            build/server/sonnenhain-server.pck
+          name: sonnenhain-server-host
+          path: build/server-host/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
       - name: Deploy to VServer
         if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
@@ -168,7 +187,7 @@ jobs:
           }
 
           retry ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" 'mkdir -p ~/sonnenhain-server/releases/current ~/sonnenhain-server/data ~/.config/systemd/user'
-          retry rsync -az --partial -e "ssh $ssh_opts" build/server/ "$VSERVER_USER@$VSERVER_HOST:~/sonnenhain-server/releases/current/"
+          retry rsync -az --partial -e "ssh $ssh_opts" build/server-host/ "$VSERVER_USER@$VSERVER_HOST:~/sonnenhain-server/releases/current/"
           retry rsync -az --partial -e "ssh $ssh_opts" server/sonnenhain.service "$VSERVER_USER@$VSERVER_HOST:~/.config/systemd/user/sonnenhain.service"
 
           ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" 'bash -s' <<'REMOTE'
