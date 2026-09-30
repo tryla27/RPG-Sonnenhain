@@ -3956,7 +3956,7 @@ func draw_chat_overlay() -> void:
 		draw_rect(input_rect, Color('9cbeb5'), false, 1)
 		text_at(input_rect.position + Vector2(8,20), "> " + chat_input + "_", 14, Color('fff0ce'), HORIZONTAL_ALIGNMENT_LEFT, int(input_rect.size.x-16))
 	else:
-		text_at(box.position + Vector2(12, box.size.y-8), "ENTER oder T · Chat", 11, Color('a9beb7', fade_alpha))
+		text_at(box.position + Vector2(12, box.size.y-8), ("CHAT · Gruppenchat" if touch_enabled else "ENTER oder T · Chat"), 11, Color('a9beb7', fade_alpha))
 
 func draw_ground_gold(p: Vector2, amount: int) -> void:
 	var pieces := 1 if amount < 12 else (2 if amount < 45 else 5)
@@ -4533,7 +4533,7 @@ func draw_tavern_world() -> void:
 	draw_pixel_tile(20, INTERIOR_CENTER + Vector2(-24, 240))
 	draw_npc({"name":"Alma", "role":"Wirtin · Eintopf & Rast", "pos":INTERIOR_CENTER + Vector2(0, -105), "color":Color("ba795e"), "kind":"innkeeper"})
 	text_at(INTERIOR_CENTER + Vector2(-170, -269), "ZUR STEINROSE", 22, Color("fce5b2"), HORIZONTAL_ALIGNMENT_CENTER, 340)
-	text_at(INTERIOR_CENTER + Vector2(-110, 215), "E · ZURÜCK NACH SONNENHAIN", 14, Color("ffefd0"), HORIZONTAL_ALIGNMENT_CENTER, 220)
+	text_at(INTERIOR_CENTER + Vector2(-110, 215), ("%s · ZURÜCK NACH SONNENHAIN" % ("AKTION" if touch_enabled else binding_short("interact"))), 14, Color("ffefd0"), HORIZONTAL_ALIGNMENT_CENTER, 220)
 
 func draw_dungeon_world() -> void:
 	draw_rect(Rect2(camera_pos, VIEW), Color("101920"))
@@ -5084,7 +5084,7 @@ func draw_village() -> void:
 		if visible_world(h, 200): draw_house(h)
 	if visible_world(TAVERN_HOUSE, 200):
 		text_at(TAVERN_HOUSE + Vector2(-75, -43), "ZUR STEINROSE · TAVERNE", 15, Color("fff0bd"), HORIZONTAL_ALIGNMENT_CENTER, 330)
-		text_at(TAVERN_HOUSE + Vector2(12, 185), "E · EINTRETEN", 13, Color("fff2cd"), HORIZONTAL_ALIGNMENT_CENTER, 160)
+		text_at(TAVERN_HOUSE + Vector2(12, 185), "%s · EINTRETEN" % ("AKTION" if touch_enabled else binding_short("interact")), 13, Color("fff2cd"), HORIZONTAL_ALIGNMENT_CENTER, 160)
 	# Brunnen mit Wasser und Steinrand.
 	draw_rect(Rect2(890, 860, 105, 95), Color("9eaaa2"))
 	draw_rect(Rect2(900, 870, 85, 75), Color("77c8d7"))
@@ -5838,8 +5838,13 @@ func draw_hud() -> void:
 				nearest = "E  ·  %s betreten" % DUNGEON_NAMES[index]
 				break
 	if nearest != "":
-		ui_box(Rect2(610, 549, 520, 36), Color("587767"))
-		text_at(Vector2(623, 573), nearest.replace("E  ·", "%s  ·" % binding_short("interact")), 15, Color("fff4ca"))
+		if touch_enabled:
+			var mobile_hint := Rect2(386, 474, 380, 38)
+			ui_box(mobile_hint, Color("587767"))
+			text_at(Vector2(398, 500), nearest.replace("E  ·", "AKTION  ·"), 14, Color("fff4ca"), HORIZONTAL_ALIGNMENT_CENTER, 356)
+		else:
+			ui_box(Rect2(610, 549, 520, 36), Color("587767"))
+			text_at(Vector2(623, 573), nearest.replace("E  ·", "%s  ·" % binding_short("interact")), 15, Color("fff4ca"))
 	if touch_enabled:
 		draw_touch_controls()
 	else:
@@ -6096,7 +6101,7 @@ func draw_portal(p: Vector2, region: int) -> void:
 	draw_arc(p, 39, PI, TAU, 20, glow.darkened(0.45), 12)
 	draw_arc(p, 34, PI, TAU, 20, glow, 5)
 	draw_circle(p + Vector2(0, -14), 13 + sin(world_time * 2.0) * 2.0, Color(glow, 0.48))
-	text_at(p + Vector2(-93, -59), "E · %s · LV %d" % [region_name(region), region_level(region)], 13, Color("fff0c7"), HORIZONTAL_ALIGNMENT_CENTER, 186)
+	text_at(p + Vector2(-93, -59), "%s · %s · LV %d" % ["AKTION" if touch_enabled else binding_short("interact"), region_name(region), region_level(region)], 13, Color("fff0c7"), HORIZONTAL_ALIGNMENT_CENTER, 186)
 
 func draw_map_natural_edges(inset: Rect2, palette: Array) -> void:
 	var scale_map := inset.size / WORLD
