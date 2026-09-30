@@ -17,7 +17,7 @@ func run():
 	g.toggle_equipment_item(g.inventory.size()-2)
 	g.toggle_equipment_item(g.inventory.size()-1)
 	var peer := WebSocketMultiplayerPeer.new()
-	assert(peer.create_client("ws://127.0.0.1:31876") == OK)
+	assert(peer.create_client(g.command_arg_value("--save-test-url=","ws://127.0.0.1:31876")) == OK)
 	g.multiplayer.multiplayer_peer = peer
 	g.network_mode = "client"
 	var deadline := Time.get_ticks_msec()+12000
@@ -34,14 +34,23 @@ func run():
 		if Time.get_ticks_msec() > deadline:
 			push_error(g.server_save.status); quit(3); return
 		await process_frame
-	assert(g.gold == 34567 and g.equipped_ring2_uid >= 0)
+	assert(g.gold in [34567,34568] and g.equipped_ring2_uid >= 0)
 	var initial_revision: int = g.server_save.revision
+	# Every run must also persist a fresh revision, even if a previous test snapshot exists.
+	g.gold = 34568
+	g.server_save.latest = g.capture_save_data()
+	g.server_save.dirty = true
+	while g.server_save.revision <= initial_revision or g.server_save.dirty:
+		g.server_save.flush(g)
+		if Time.get_ticks_msec() > deadline: quit(6); return
+		await process_frame
+	initial_revision = g.server_save.revision
 	# Real connection loss; reopen against persisted snapshot and private capability.
 	peer.close()
 	g.server_save.disconnected()
 	await create_timer(0.4).timeout
 	peer = WebSocketMultiplayerPeer.new()
-	peer.create_client("ws://127.0.0.1:31876")
+	peer.create_client(g.command_arg_value("--save-test-url=","ws://127.0.0.1:31876"))
 	g.multiplayer.multiplayer_peer = peer
 	g.network_mode = "client"
 	while peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
@@ -55,7 +64,7 @@ func run():
 	while not g.server_save.ready:
 		if Time.get_ticks_msec() > deadline: quit(5); return
 		await process_frame
-	assert(g.gold == 34567 and g.equipped_ring2_uid >= 0 and g.server_save.revision == initial_revision)
+	assert(g.gold == 34568 and g.equipped_ring2_uid >= 0 and g.server_save.revision == initial_revision)
 	print("SERVER_SAVE_NETWORK_OK: real WebSocket upload/acknowledgment, reconnect, server download, two-ring restoration revision=",initial_revision)
 	peer.close()
 	g.queue_free()

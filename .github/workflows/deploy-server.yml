@@ -348,6 +348,7 @@ jobs:
           test "$status_b" = "0"
           grep -q "MULTIPLAYER_SMOKE_OK" /tmp/public-smoke-a.log
           grep -q "MULTIPLAYER_SMOKE_OK" /tmp/public-smoke-b.log
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_server_save_network.gd -- --save-test-url=wss://multiplayer.sonnenhainrpg.de/
           echo "PUBLIC MULTIPLAYER OK: TLS/WSS, two-player state relay, chat relay and world snapshot all passed."
 
       - name: VServer deploy not configured
