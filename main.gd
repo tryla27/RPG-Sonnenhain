@@ -438,6 +438,8 @@ var client_ping_timer := 0.0
 var server_last_reply_ms := 0
 var network_ping_ms := -1
 var processed_server_transactions: Array = []
+const FoodSystem = preload("res://components/food_system.gd")
+var food_system = FoodSystem.new()
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -1294,6 +1296,7 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 	return ExperienceRules.reward(base_xp, recipient_level, enemy_level(type))
 
 func _process(delta: float) -> void:
+	if not dedicated_server_mode: food_system.tick(self,delta)
 	update_connection_health(delta)
 	server_save.update(self)
 	if not dedicated_server_mode: controller.update(self, delta)
@@ -3223,11 +3226,15 @@ func make_item(name: String, icon: String, rarity: int, power: int, value: int, 
 	var intellect: int = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
 	var fair_value := value if icon == "potion" else 10 + ilvl * 4 + maxi(0, power) * (3 if icon in ["sword", "staff", "bow"] else 2) + rarity * rarity * 32 + (25 if element != "" else 0) + (strength + agility + intellect) * 5
 	var item := {"uid":next_uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4}
+	if icon == "food":
+		item["value"] = value
+		item["design"] = maxi(0,FoodSystem.index_for(name))
 	next_uid += 1
 	return item
 
 func stack_limit(item: Dictionary) -> int:
 	var icon: String = str(item.get("icon", ""))
+	if icon == "food": return 30
 	if icon == "potion": return 16
 	if icon in ["gem", "herb", "essence"]: return 1000000000
 	return 1
@@ -3417,7 +3424,9 @@ func interact() -> void:
 		if d < distance:
 			closest = npc
 			distance = d
-	if closest.is_empty(): return
+	if closest.is_empty():
+		food_system.harvest(self)
+		return
 	play_sound("menu")
 	if closest["kind"] == "quest":
 		quest_dialogue(String(closest["name"]))
@@ -3600,6 +3609,7 @@ func capture_save_data() -> Dictionary:
 	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
+	data["food_state"] = food_system.snapshot()
 	return data.duplicate(true)
 
 func save_game() -> void:
@@ -3651,6 +3661,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	invulnerable = 0.0
 	reset_class_skills()
 	inventory.clear()
+	food_system.restore({})
 	quests.clear()
 	for i in QUESTS.size(): quests.append({"state":0, "progress":0})
 	for i in WORLD_EVENTS.size():
@@ -3680,6 +3691,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	player_uuid = str(data.get("player_uuid",""))
 	ensure_player_uuid()
 	if not from_server and not creative_mode: server_save.restore(data)
+	food_system.restore(data.get("food_state",{}))
 	var stored_recent: Variant = data.get("recent_players",[])
 	recent_players = stored_recent if stored_recent is Array else []
 	while recent_players.size() > 12: recent_players.pop_back()
@@ -4320,6 +4332,8 @@ func sell_all_unequipped() -> void:
 	save_game()
 
 func use_item(index: int) -> void:
+	if index < 0 or index >= inventory.size(): return
+	if food_system.eat(self,index): return
 	var item: Dictionary = inventory[index]
 	var name: String = item["name"]
 	if item["icon"] == "potion":
@@ -4363,7 +4377,16 @@ func refresh_shop_stock() -> void:
 	}
 	append_new_equipment()
 
+func append_food_stock() -> void:
+	if not shop_stock.has("merchant"): shop_stock["merchant"]=[]
+	for nutrition in FoodSystem.FOODS.slice(11,23):
+		var exists:=false
+		for offer in shop_stock["merchant"]:
+			if offer.get("name")==nutrition["name"]: exists=true
+		if not exists: shop_stock["merchant"].append({"name":nutrition["name"],"icon":"food","power":0,"price":nutrition["price"],"rarity":0,"level":1})
+
 func append_new_equipment() -> void:
+	append_food_stock()
 	if not shop_stock.has("merchant"): return
 	for offer in [
 		{"name":"Reisendenleder", "icon":"armor", "power":2, "price":95, "rarity":0, "level":1},
@@ -4386,7 +4409,7 @@ func buy_item(stock_item: Dictionary) -> void:
 		message("Dafür fehlen dir %d Gold." % (price-gold))
 		return
 	var icon := str(stock_item.get("icon","gem"))
-	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence"]:
+	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food"]:
 		message("Dieses Angebot ist ungültig.")
 		return
 	var purchased := make_item(String(stock_item.get("name","Fundstück")), icon, clampi(int(stock_item.get("rarity",1)),0,4), maxi(0,int(stock_item.get("power",0))), int(price/2.0), String(stock_item.get("element","")), maxi(1,int(stock_item.get("level",level))))
@@ -5843,7 +5866,7 @@ func draw_village_ground_legacy() -> void:
 		if pos.x<=1010 and visible_world(pos,40): ReferenceScenery.flower(self,pos,i)
 
 func draw_village() -> void:
-	for prop in village_props():
+	for prop in village_props()+food_system.regional_props(self):
 		if visible_world(prop["point"],250): paint_village_prop(prop)
 
 func draw_house(p: Vector2) -> void:
@@ -6379,6 +6402,7 @@ func equipped_weapon_stage() -> int:
 	return 0
 
 func item_design(item: Dictionary) -> int:
+	if item.get("icon") == "food": return maxi(0,FoodSystem.index_for(str(item.get("name",""))))
 	return clampi(int(item.get("design", absi(hash(String(item.get("name", "Ausrüstung")))) % 12)), 0, 11)
 
 func equipped_item_design(uid: int) -> int:
@@ -6393,6 +6417,9 @@ func equipped_weapon_design() -> int:
 func draw_item_icon(origin: Vector2, kind: String, accent: Color, scale_factor: float = 1.0, stage: int = 0, design: int = 0) -> void:
 	var p := origin
 	var s := scale_factor
+	if kind == "food":
+		FoodSystem.icon(self,origin,design,scale_factor)
+		return
 	if kind in ["sword", "staff", "bow"] and weapon_sprites != null:
 		var family := ["sword", "staff", "bow"].find(kind)
 		var src := Rect2(Vector2(clampi(design,0,11) * 32, family * 32), Vector2(32,32))
@@ -6546,6 +6573,14 @@ func ui_button(rect: Rect2, label: String, enabled: bool = true, active: bool = 
 	text_at(rect.position + Vector2(11, rect.size.y * 0.67), label, 16, Color("fff1ce") if enabled else Color("b5b4a7"))
 
 func draw_hud() -> void:
+	var nearby_food := food_system.nearest(self)
+	if not nearby_food.is_empty():
+		var food_info:Dictionary=FoodSystem.FOODS[int(nearby_food["food"])]
+		var ripe:bool=food_system.ready_at(nearby_food["point"],Time.get_unix_time_from_system())
+		draw_ref_panel(Rect2(362,540,405,32))
+		text_at(Vector2(374,562),binding_short("interact")+" · "+(food_info["name"]+" pfluecken" if ripe else "Nachwachsen: %ds" % ceili(float(food_system.harvested.get(FoodSystem.key(nearby_food["point"]),0))-Time.get_unix_time_from_system())),14,Color(food_info["color"]))
+	if food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system():
+		text_at(Vector2(22,126),"NAHRUNG +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],12,Color("aed48c"))
 	draw_ref_panel(Rect2(10, 8, 348, 104))
 	draw_rect(Rect2(22, 16, 5, 17), [Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id])
 	text_at(Vector2(34, 32), "%s · %s · STUFE %d" % [hero_name if hero_name != "" else CLASS_NAMES[class_id].to_upper(), RACE_NAMES[hero_race], level], 15, Color("ffe9b8"))
@@ -7281,10 +7316,10 @@ func draw_inventory_panel() -> void:
 		var detail := "%s · %s · %d Gold" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), item_sale_value(item)]
 		if item["icon"] in ["sword", "staff", "bow", "armor", "ring"]: detail += " · +%d" % int(item["power"])
 		text_at(Vector2(643, 518), detail, 13, Color("e5eddd"), HORIZONTAL_ALIGNMENT_LEFT, 320)
-		var action_label := "BENUTZEN"
+		var action_label := "ESSEN" if item["icon"] == "food" else "BENUTZEN"
 		if item["icon"] in ["sword","staff","bow","armor","ring"]:
 			action_label = "AUSZIEHEN" if is_equipped_uid(int(item.get("uid",-1))) else "AUSRÜSTEN"
-		ui_button(Rect2(643, 538, 320, 42), action_label, item["icon"] in ["potion", class_weapon_icon(), "armor", "ring"])
+		ui_button(Rect2(643, 538, 320, 42), action_label, item["icon"] in ["potion", "food", class_weapon_icon(), "armor", "ring"])
 	else:
 		text_at(Vector2(643, 508), "Wähle einen Gegenstand aus der Tasche.", 14, Color("dbe8d5"))
 	var mouse := get_viewport().get_mouse_position()
@@ -7318,10 +7353,13 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var color := Color("83e4a0") if diff > 0 else (Color("ee8a86") if diff < 0 else Color("dfdcc3"))
 		var stat_name := "Schaden" if icon in ["sword", "staff", "bow"] else ("Schutz" if icon == "armor" else "Leben")
 		text_at(pos + Vector2(14, 93), "%s %d   %s%d" % [stat_name, int(item["power"]), "▲ +" if diff > 0 else ("▼ " if diff < 0 else "= "), diff], 14, color)
-	if icon in ["potion", "gem", "herb", "essence"]:
+	if icon in ["potion", "gem", "herb", "essence", "food"]:
 		var effect_name: String = "%s +65" % ("Mana" if class_id == 1 else "Energie") if String(item["name"]) in ["Energietrank", "Manatrank"] else ("HP +90" if String(item["name"]) == "Großer Heiltrank" else ("HP +45" if icon == "potion" else "Wertvolles Material"))
+		if icon == "food":
+			var nutrition := FoodSystem.by_name(str(item["name"]))
+			effect_name = "+%d HP, %.1f HP/s (%ds)" % [nutrition.get("heal",0),nutrition.get("regen",0),nutrition.get("duration",0)]
 		text_at(pos + Vector2(14, 120), effect_name, 14, Color("bfe4d8"))
-		text_at(pos + Vector2(14, 145), "Im Stapel: %d / %s" % [int(item.get("count", 1)), "16" if icon == "potion" else "∞"], 13, Color("dfdcc3"))
+		text_at(pos + Vector2(14, 145), "Im Stapel: %d / %s" % [int(item.get("count", 1)), "30" if icon == "food" else ("16" if icon == "potion" else "∞")], 13, Color("dfdcc3"))
 	else:
 		text_at(pos + Vector2(14, 120), "STÄ %d   BEW %d   INT %d" % [int(item.get("str", 0)), int(item.get("agi", 0)), int(item.get("int", 0))], 14, Color("bfe4d8"))
 		var primary_key: String = ["str", "int", "agi"][class_id]
@@ -7332,6 +7370,7 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 	text_at(pos + Vector2(14, 171), price_text, 13, Color("f0d69b"))
 
 func draw_item_signature(p: Vector2, item: Dictionary) -> void:
+	if item.get("icon") == "food": return
 	var signature := absi(String(item["name"]).hash())
 	var tint: Color = element_color(String(item.get("element", ""))) if str(item.get("element", "")) != "" else RARITY_COLORS[int(item["rarity"])]
 	var center := p + Vector2(27, 25)
@@ -7365,6 +7404,7 @@ func item_type(icon: String) -> String:
 		"sword": return "Waffe"
 		"staff": return "Stab"
 		"bow": return "Bogen"
+		"food": return "Nahrung"
 		"potion": return "Trank"
 		"gem": return "Kristall"
 		"ring": return "Schmuck"
@@ -7916,13 +7956,15 @@ func paint_village_prop(prop: Dictionary) -> void:
 			draw_house(p)
 			for shop in VillageLayout.SHOPS:
 				if shop["house"] == p: StartScenery32.sign(self,p,shop["sign"],font)
-		"tree": StartScenery32.tree(self,p,int(p.x+p.y))
+		"tree":
+			StartScenery32.tree(self,p,int(p.x+p.y))
+			food_system.fruit(self,p,true)
 		"well": StartScenery32.well(self,p)
 		"board": StartScenery32.board(self,p)
 		"lamp": StartScenery32.lamp(self,p)
 		"barrel": StartScenery32.barrel(self,p)
 		"fence": StartScenery32.fence(self,p,p+Vector2(100,0))
-		"bush": StartScenery32.bush(self,p,int(p.x+p.y))
+		"bush": food_system.bush(self,p)
 		"cart": StartScenery32.cart(self,p,prop["goods"])
 
 func prop_cache_key(prop: Dictionary) -> String:
@@ -9037,7 +9079,7 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	var item: Dictionary = raw.duplicate(true)
 	item.erase("uid")
 	var icon := str(item.get("icon","gem"))
-	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence"]:
+	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food"]:
 		item["icon"] = "gem"
 	item["rarity"] = clampi(int(item.get("rarity",0)),0,4)
 	item["power"] = clampi(int(item.get("power",0)),0,10000)

@@ -38,6 +38,15 @@ func run():
 	var initial_revision: int = g.server_save.revision
 	# Every run must also persist a fresh revision, even if a previous test snapshot exists.
 	g.gold = 34568
+	var has_food:=false
+	for owned in g.inventory:
+		if owned.get("name")=="Heidelbeeren":has_food=true
+	if not has_food: g.add_item(g.make_item("Heidelbeeren","food",0,0,4,"",1))
+	g.food_system.configure(g)
+	var food_plant:Vector2=g.food_system.plants[0]["point"]
+	g.food_system.harvested[g.FoodSystem.key(food_plant)]=Time.get_unix_time_from_system()+300
+	g.food_system.regen_rate=2.0
+	g.food_system.regen_until=Time.get_unix_time_from_system()+30
 	g.server_save.latest = g.capture_save_data()
 	g.server_save.dirty = true
 	while g.server_save.revision <= initial_revision or g.server_save.dirty:
@@ -65,7 +74,12 @@ func run():
 		if Time.get_ticks_msec() > deadline: quit(5); return
 		await process_frame
 	assert(g.gold == 34568 and g.equipped_ring2_uid >= 0 and g.server_save.revision == initial_revision)
-	print("SERVER_SAVE_NETWORK_OK: real WebSocket upload/acknowledgment, reconnect, server download, two-ring restoration revision=",initial_revision)
+	var found_food:=false
+	for owned in g.inventory:
+		if owned.get("name")=="Heidelbeeren" and owned.get("icon")=="food":found_food=true
+	assert(found_food and not g.food_system.ready_at(food_plant,Time.get_unix_time_from_system()))
+	assert(g.food_system.regen_rate==2.0)
+	print("SERVER_SAVE_NETWORK_OK: food, harvest timers, nutrition, real WebSocket upload/acknowledgment, reconnect, server download, two-ring restoration revision=",initial_revision)
 	peer.close()
 	g.queue_free()
 	await process_frame

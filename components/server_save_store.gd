@@ -54,7 +54,20 @@ func open(peer: int, token: String, uuid: String) -> Dictionary:
 	owners[key] = peer
 	return {"ok":true,"kind":"open","uuid":uuid,"revision":int(record.get("revision",0)),"request":record.get("request",""),"data":record.get("data",{})}
 
+func valid_food_state(raw:Variant)->bool:
+	if not raw is Dictionary or raw.size()>3:return false
+	var plants:Variant=raw.get("plants",{})
+	if not plants is Dictionary or plants.size()>64:return false
+	for key in plants:
+		var value:Variant=plants[key]
+		if not key is String or key.length()>32 or not (value is float or value is int) or not is_finite(float(value)) or float(value)<0:return false
+	for field in ["regen_rate","regen_until"]:
+		var value:Variant=raw.get(field,0)
+		if not (value is float or value is int) or not is_finite(float(value)) or float(value)<0:return false
+	return float(raw.get("regen_rate",0))<=3
+
 func valid_data(data: Dictionary, uuid: String) -> bool:
+	if not valid_food_state(data.get("food_state",{})):return false
 	if data.size() > 80: return false
 	if str(data.get("player_uuid","")) != uuid or not bool(data.get("character_created",false)): return false
 	if not data.get("inventory") is Array or data["inventory"].size() > 42: return false
@@ -74,7 +87,8 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 		if uid < 0 or uids.has(uid): return false
 		uids[uid] = true
 		if not item.get("name") is String or String(item["name"]).length() > 160: return false
-		if not item.get("icon") is String or String(item["icon"]) not in ["sword","staff","bow","armor","ring","potion","herb","essence","gem"]: return false
+		if not item.get("icon") is String or String(item["icon"]) not in ["sword","staff","bow","armor","ring","potion","herb","essence","gem","food"]: return false
+		if item["icon"]=="food" and preload("res://components/food_system.gd").by_name(item["name"]).is_empty():return false
 		for field in ["power","rarity","value","count","level","str","agi","int","design"]:
 			var value: Variant = item.get(field,1 if field == "count" else 0)
 			if not (value is int or value is float) or not is_finite(float(value)) or float(value) < 0 or float(value) > 2147483647: return false

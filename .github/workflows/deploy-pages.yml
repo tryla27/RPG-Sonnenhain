@@ -93,6 +93,7 @@ jobs:
           set -euo pipefail
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_map_logic.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_map0_transitions.gd
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_food_system.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_start32_assets.gd
 
       - name: Harden browser game shell
