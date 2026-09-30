@@ -510,8 +510,11 @@ func reset_class_skills() -> void:
 		cooldowns[i] = 0.0
 	slots = [-1, -1, -1]
 
+func class_weapon_icon_for(value: int) -> String:
+	return ["sword", "staff", "bow"][clampi(value, 0, 2)]
+
 func class_weapon_icon() -> String:
-	return ["sword", "staff", "bow"][class_id]
+	return class_weapon_icon_for(class_id)
 
 func class_ultimate() -> int:
 	return CLASS_ULTIMATES[class_id]
@@ -537,6 +540,10 @@ func _on_peer_connected(id: int) -> void:
 
 func _on_peer_disconnected(id: int) -> void:
 	remote_players.erase(id)
+	var action_prefix := "%d:" % id
+	for key in server_action_times.keys():
+		if str(key).begins_with(action_prefix):
+			server_action_times.erase(key)
 	add_chat_line("SYSTEM", "Spieler %d hat die Gruppe verlassen." % id)
 
 func _on_connected_to_server() -> void:
@@ -724,6 +731,8 @@ func rpc_server_combat_reward(enemy_type: int, xp_reward: int, gold_reward: int,
 
 func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
+	var player_state: Dictionary = remote_players[peer_id]
+	var reward_class := clampi(int(player_state.get("class", 0)), 0, 2)
 	var type := clampi(int(enemy.get("type", 0)), 0, ENEMY_TYPES.size() - 1)
 	var elite_kind := clampi(int(enemy.get("elite", 0)), 0, 2)
 	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
@@ -732,9 +741,9 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	var rewards: Array = []
 	if type in [12, 13, 14]:
 		var boss_element: String = ["blitz", "eis", "gift"][type - 12]
-		rewards.append(make_item("%s · %s" % [ENEMY_TYPES[type]["name"], String(boss_element).capitalize()], class_weapon_icon(), 3 + int(type == 14), 28 + (type - 12) * 8, 700 + type * 35, boss_element))
+		rewards.append(make_item("%s · %s" % [ENEMY_TYPES[type]["name"], String(boss_element).capitalize()], class_weapon_icon_for(reward_class), 3 + int(type == 14), 28 + (type - 12) * 8, 700 + type * 35, boss_element))
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
-		rewards.append(random_loot(type))
+		rewards.append(random_loot(type, reward_class))
 	if randf() < 0.03:
 		rewards.append(make_item("Heiltrank", "potion", 1, 0, 18))
 	rpc_server_combat_reward.rpc_id(peer_id, type, xp_reward, gold_reward, rewards)
@@ -859,20 +868,28 @@ func start_coop_world() -> void:
 func send_chat_message(value: String) -> void:
 	var clean := value.strip_edges().substr(0,120)
 	if clean == "": return
-	var author := hero_name if hero_name != "" else "Held"
+	var author := hero_name.strip_edges().substr(0,20) if hero_name.strip_edges() != "" else "Held"
 	add_chat_line(author, clean)
-	if network_mode != "offline": rpc_chat_message.rpc(author, clean)
+	if network_mode == "client":
+		rpc_chat_message.rpc_id(1, author, clean)
+	elif network_mode == "host":
+		for peer_id in multiplayer.get_peers():
+			rpc_chat_relay.rpc_id(int(peer_id), author, clean)
 
 @rpc("any_peer", "call_remote", "reliable")
-func rpc_chat_message(author: String, value: String) -> void:
+func rpc_chat_message(_author: String, value: String) -> void:
+	if network_mode != "host": return
 	var sender := multiplayer.get_remote_sender_id()
-	var safe_author := author.strip_edges().substr(0,20)
-	if network_mode == "host" and remote_players.has(sender):
+	if sender <= 0: return
+	var safe_author := "Held"
+	if remote_players.has(sender):
 		safe_author = str(remote_players[sender].get("name","Held")).strip_edges().substr(0,20)
-	add_chat_line(safe_author, value)
-	if network_mode == "host":
-		for peer_id in multiplayer.get_peers():
-			if int(peer_id) != sender: rpc_chat_relay.rpc_id(int(peer_id), safe_author, value)
+	var clean := value.strip_edges().substr(0,120)
+	if clean == "": return
+	add_chat_line(safe_author, clean)
+	for peer_id in multiplayer.get_peers():
+		if int(peer_id) != sender:
+			rpc_chat_relay.rpc_id(int(peer_id), safe_author, clean)
 
 @rpc("authority", "call_remote", "reliable")
 func rpc_chat_relay(author: String, value: String) -> void:
@@ -2754,7 +2771,7 @@ func add_item(item: Dictionary) -> bool:
 		remaining_value -= entry_value
 	return remaining == 0
 
-func random_loot(type: int) -> Dictionary:
+func random_loot(type: int, loot_class: int = -1) -> Dictionary:
 	var chance := randf()
 	var rarity := 0
 	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
@@ -2764,7 +2781,8 @@ func random_loot(type: int) -> Dictionary:
 	elif chance < 0.47: rarity = 1
 	var name: String = ENEMY_TYPES[type]["name"]
 	var rank: String = ["Alte", "Feine", "Seltene", "Epische", "Legendäre"][rarity]
-	var icon: String = [class_weapon_icon(), "gem", "ring", "armor", "herb"][randi_range(0, 4)]
+	var loot_weapon := class_weapon_icon_for(loot_class) if loot_class >= 0 else class_weapon_icon()
+	var icon: String = [loot_weapon, "gem", "ring", "armor", "herb"][randi_range(0, 4)]
 	var item_name: String = "%s %s" % [rank, {"sword":"Klinge", "staff":"Stab", "bow":"Bogen", "gem":"Essenz", "ring":"Ring", "armor":"Rüstung", "herb":"Kräuter"}[icon]]
 	if rarity >= 3: item_name = "%s des %s" % [item_name, name]
 	var strength: int = (3 + area_level * 2 + rarity * 5 if icon in ["sword", "staff", "bow"] else (1 + int(area_level / 5) + rarity * 2 if icon == "armor" else (8 + area_level + rarity * 4 if icon == "ring" else 0)))
