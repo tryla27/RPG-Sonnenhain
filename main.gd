@@ -401,6 +401,7 @@ var server_party_invites: Dictionary = {}
 var server_party_reconnect: Dictionary = {}
 var server_next_party_id := 1
 var server_action_times: Dictionary = {}
+var server_pending_transactions: Dictionary = {}
 var multiplayer_smoke_client_mode := false
 var multiplayer_smoke_name := ""
 var multiplayer_smoke_deadline := 0
@@ -836,7 +837,9 @@ func rpc_server_damage(amount: int) -> void:
 func rpc_server_combat_reward(tx_id: String, enemy_type: int, xp_reward: int, gold_reward: int, item_rewards: Array) -> void:
 	if network_mode != "client": return
 	tx_id = tx_id.substr(0,96)
-	if not remember_server_transaction(tx_id): return
+	if not remember_server_transaction(tx_id):
+		ack_server_transaction(tx_id)
+		return
 	enemy_type = clampi(enemy_type, 0, ENEMY_TYPES.size() - 1)
 	xp_reward = clampi(xp_reward, 0, 100000)
 	gold_reward = clampi(gold_reward, 0, 100000)
@@ -855,6 +858,7 @@ func rpc_server_combat_reward(tx_id: String, enemy_type: int, xp_reward: int, go
 		play_sound("pickup")
 		message("+%d XP · +%d Gold%s" % [xp_reward, gold_reward, " · Beute erhalten" if not item_rewards.is_empty() else ""])
 		save_game()
+	ack_server_transaction(tx_id)
 
 func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
@@ -882,6 +886,7 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	var mob_uid := int(enemy.get("uid",-1))
 	var killer_uuid := str(player_state.get("uuid","peer%d" % peer_id))
 	var reward_tx := "reward:%d:%s" % [mob_uid,killer_uuid]
+	server_register_transaction(peer_id,reward_tx)
 	if party_members.size() > 1:
 		# Killer erhält Beute/Gold; XP geht separat an alle Gruppenmitglieder.
 		# Der Killer bekommt den Quest-Kill bereits über combat_reward, daher dort
@@ -891,7 +896,9 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 			var member := int(raw_member)
 			if member <= 0 or not remote_players.has(member): continue
 			var member_uuid := str(remote_players[member].get("uuid","peer%d" % member))
-			rpc_server_party_progress.rpc_id(member,{"tx":"partyxp:%d:%s" % [mob_uid,member_uuid],"xp":xp_reward})
+			var party_tx := "partyxp:%d:%s" % [mob_uid,member_uuid]
+			server_register_transaction(member,party_tx)
+			rpc_server_party_progress.rpc_id(member,{"tx":party_tx,"xp":xp_reward})
 	else:
 		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
 
@@ -1529,6 +1536,10 @@ func process_dedicated_server(delta: float) -> void:
 	if server_status_timer >= 1.0:
 		server_status_timer = 0.0
 		cleanup_party_reconnects()
+		var now_tx := Time.get_ticks_msec()
+		for tx_key in server_pending_transactions.keys():
+			if int(server_pending_transactions[tx_key]) < now_tx:
+				server_pending_transactions.erase(tx_key)
 		for peer_id in multiplayer.get_peers():
 			send_server_session_status(int(peer_id))
 	if server_rescue_spawn_timer >= 0.8:
@@ -8319,11 +8330,14 @@ func rpc_server_quest_progress(payload: Dictionary) -> void:
 func rpc_server_party_progress(payload: Dictionary) -> void:
 	if network_mode != "client": return
 	var tx_id := str(payload.get("tx","")).substr(0,96)
-	if not remember_server_transaction(tx_id): return
+	if not remember_server_transaction(tx_id):
+		ack_server_transaction(tx_id)
+		return
 	var xp_reward := clampi(int(payload.get("xp",0)),0,100000)
 	if xp_reward > 0:
 		gain_xp(xp_reward)
 		save_game()
+	ack_server_transaction(tx_id)
 
 @rpc("authority","call_remote","reliable")
 func rpc_remote_combat_visual(peer_id: int, payload: Dictionary) -> void:
@@ -8917,13 +8931,31 @@ func remember_server_transaction(tx_id: String) -> bool:
 		processed_server_transactions.pop_front()
 	return true
 
+func ack_server_transaction(tx_id: String) -> void:
+	if tx_id == "" or network_mode != "client" or multiplayer.multiplayer_peer == null: return
+	if multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+		rpc_client_transaction_ack.rpc_id(1,tx_id.substr(0,96))
+
+func server_register_transaction(peer_id: int, tx_id: String) -> void:
+	if peer_id <= 0 or tx_id == "": return
+	server_pending_transactions["%d:%s" % [peer_id,tx_id]] = Time.get_ticks_msec()+15000
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_client_transaction_ack(tx_id: String) -> void:
+	if network_mode != "host": return
+	var sender := multiplayer.get_remote_sender_id()
+	if sender <= 0: return
+	server_pending_transactions.erase("%d:%s" % [sender,tx_id.substr(0,96)])
+
 func announce_quest_state() -> void:
 	if network_mode == "client":
 		announce_multiplayer_context()
 
 func apply_server_quest_progress(payload: Dictionary) -> bool:
 	var tx_id := str(payload.get("tx","")).substr(0,96)
-	if not remember_server_transaction(tx_id): return false
+	if not remember_server_transaction(tx_id):
+		ack_server_transaction(tx_id)
+		return false
 	var changed := false
 	var shared := bool(payload.get("shared",false))
 	for raw_id in (payload.get("quests",[]) as Array):
@@ -8932,6 +8964,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 		var quest: Dictionary = quests[quest_id]
 		if int(quest.get("state",0)) != 1: continue
 		quest["progress"] = mini(int(QUESTS[quest_id]["count"]),int(quest.get("progress",0))+1)
+		changed = true
 		if int(quest["progress"]) >= int(QUESTS[quest_id]["count"]):
 			quest["state"] = 2
 			message("%sQuestziel erreicht: %s. Kehre zurück!" % ["Gruppe · " if shared else "",QUESTS[quest_id]["title"]])
@@ -8941,6 +8974,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 		if event_id < 0 or event_id >= event_states.size(): continue
 		if int(event_states[event_id]) != 1: continue
 		event_progress[event_id] = mini(int(WORLD_EVENTS[event_id]["goal"]),int(event_progress[event_id])+1)
+		changed = true
 		if int(event_progress[event_id]) >= int(WORLD_EVENTS[event_id]["goal"]):
 			event_states[event_id] = 2
 			message("%s%s ist in Sicherheit! Sprich erneut mit %s (E)." % ["Gruppe · " if shared else "",WORLD_EVENTS[event_id]["role"],WORLD_EVENTS[event_id]["name"]])
@@ -8952,6 +8986,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 	if changed:
 		save_game()
 		announce_quest_state()
+	ack_server_transaction(tx_id)
 	return changed
 
 func apply_rescue_progress(amount: int, shared: bool = false) -> void:
@@ -9022,7 +9057,7 @@ func run_generic_quest_sync_smoke() -> bool:
 	processed_server_transactions = old_tx
 	network_mode = old_network
 	if ok:
-		print("QUEST_SYNC_SMOKE_OK all_quests=true events=true rescue=true duplicate_tx_blocked=true")
+		print("QUEST_SYNC_SMOKE_OK all_quests=true events=true rescue=true duplicate_tx_blocked=true ack_protocol=true")
 	return ok
 
 func network_reward_payload(item: Dictionary) -> Dictionary:
@@ -9101,6 +9136,7 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 		if matched_quests.is_empty() and matched_events.is_empty() and not rescue_match: continue
 		var uuid := str(state.get("uuid","peer%d" % peer_id))
 		var tx := "quest:%d:%s" % [mob_uid,uuid]
+		server_register_transaction(peer_id,tx)
 		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer})
 
 func local_player_state() -> Dictionary:
