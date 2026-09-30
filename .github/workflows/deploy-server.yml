@@ -17,8 +17,6 @@ permissions:
 
 concurrency:
   group: sonnenhain-game-server
-  # Niemals einen laufenden Server-Deploy mitten zwischen Stop und Start
-  # abbrechen. Neue Builds warten stattdessen seriell.
   cancel-in-progress: false
 
 jobs:
@@ -30,6 +28,7 @@ jobs:
       VSERVER_USER: ${{ secrets.VSERVER_USER }}
       VSERVER_SSH_KEY: ${{ secrets.VSERVER_SSH_KEY }}
       VSERVER_PORT: ${{ secrets.VSERVER_PORT }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,6 +54,7 @@ jobs:
           /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-release "Linux Server" build/server/sonnenhain-server.x86_64
           chmod +x build/server/sonnenhain-server.x86_64
           test -x build/server/sonnenhain-server.x86_64
+          test -f build/server/sonnenhain-server.pck
 
       - name: Multiplayer integration smoke test
         shell: bash
@@ -67,19 +67,19 @@ jobs:
           cleanup() {
             [ -z "$client_a" ] || kill "$client_a" 2>/dev/null || true
             [ -z "$client_b" ] || kill "$client_b" 2>/dev/null || true
-            kill "$server_pid" 2>/dev/null || true
+            [ -z "$server_pid" ] || kill "$server_pid" 2>/dev/null || true
           }
           trap cleanup EXIT
-          sleep 4
-          if ! kill -0 "$server_pid" 2>/dev/null; then
-            cat /tmp/sonnenhain-server.log
-            exit 1
-          fi
-          if ! ss -ltn | grep -q ':27845 '; then
-            cat /tmp/sonnenhain-server.log
-            echo "Dedicated server process is alive but port 27845 is not listening."
-            exit 1
-          fi
+
+          for attempt in {1..12}; do
+            if ss -ltn | grep -q ':27845 '; then break; fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/sonnenhain-server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          ss -ltn | grep -q ':27845 '
 
           /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . -- --multiplayer-smoke-client --smoke-name=SmokeA > /tmp/smoke-a.log 2>&1 &
           client_a=$!
@@ -105,7 +105,7 @@ jobs:
           wait "$server_pid" 2>/dev/null || true
           server_pid=""
           trap - EXIT
-          echo "MULTIPLAYER INTEGRATION OK: two clients saw each other, chat relay and world snapshot."
+          echo "MULTIPLAYER INTEGRATION OK: state relay, chat relay and world snapshot passed with two clients."
 
       - name: Upload server build
         uses: actions/upload-artifact@v4
@@ -124,12 +124,14 @@ jobs:
           set -euo pipefail
           port="${VSERVER_PORT:-22}"
           if [ "$VSERVER_USER" = "root" ]; then
-            echo "Refusing to deploy as root. Use the dedicated SSH user 'sonnenhain'."
+            echo "Refusing to deploy as root."
             exit 1
           fi
+
           umask 077
           install -d -m 700 "$HOME/.ssh"
           trap 'rm -f "$HOME/.ssh/vserver_deploy" "$HOME/.ssh/vserver_deploy.pub"' EXIT
+
           python3 - <<'PY'
           import base64
           import os
@@ -139,17 +141,15 @@ jobs:
           if "BEGIN OPENSSH PRIVATE KEY" in raw:
               key = raw.replace("\\n", "\n")
           else:
-              try:
-                  decoded = base64.b64decode("".join(raw.split()), validate=True)
-                  key = decoded.decode("utf-8").replace("\r", "").strip()
-              except Exception as exc:
-                  raise SystemExit("VSERVER_SSH_KEY is neither a valid OpenSSH private key nor valid Base64: %s" % exc)
+              decoded = base64.b64decode("".join(raw.split()), validate=True)
+              key = decoded.decode("utf-8").replace("\r", "").strip()
 
           if "BEGIN OPENSSH PRIVATE KEY" not in key or "END OPENSSH PRIVATE KEY" not in key:
-              raise SystemExit("Decoded VSERVER_SSH_KEY does not contain a complete OpenSSH private key")
+              raise SystemExit("VSERVER_SSH_KEY is not a complete OpenSSH private key")
 
           Path.home().joinpath(".ssh/vserver_deploy").write_text(key.strip() + "\n", encoding="utf-8")
           PY
+
           chmod 600 "$HOME/.ssh/vserver_deploy"
           ssh-keygen -y -f "$HOME/.ssh/vserver_deploy" > "$HOME/.ssh/vserver_deploy.pub"
           echo "VServer deploy key fingerprint:"
@@ -157,242 +157,87 @@ jobs:
 
           ssh_opts="-4 -i $HOME/.ssh/vserver_deploy -p $port -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=4"
 
-          ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" 'mkdir -p ~/sonnenhain-server/releases/current ~/sonnenhain-server/data ~/.config/systemd/user'
-          rsync -az -e "ssh $ssh_opts" build/server/ "$VSERVER_USER@$VSERVER_HOST:~/sonnenhain-server/releases/current/"
-          rsync -az -e "ssh $ssh_opts" server/sonnenhain.service "$VSERVER_USER@$VSERVER_HOST:~/.config/systemd/user/sonnenhain.service"
+          retry() {
+            local attempt
+            for attempt in 1 2 3; do
+              "$@" && return 0
+              echo "Command failed (attempt $attempt/3); retrying..."
+              sleep $((attempt * 2))
+            done
+            return 1
+          }
 
-          ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" '
-            set -eu
-            cd ~/sonnenhain-server/releases/current
-            chmod +x sonnenhain-server.x86_64
-            linger="no"
-            if command -v loginctl >/dev/null 2>&1; then
-              linger="$(loginctl show-user "$USER" -p Linger --value 2>/dev/null || echo no)"
+          retry ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" 'mkdir -p ~/sonnenhain-server/releases/current ~/sonnenhain-server/data ~/.config/systemd/user'
+          retry rsync -az --partial -e "ssh $ssh_opts" build/server/ "$VSERVER_USER@$VSERVER_HOST:~/sonnenhain-server/releases/current/"
+          retry rsync -az --partial -e "ssh $ssh_opts" server/sonnenhain.service "$VSERVER_USER@$VSERVER_HOST:~/.config/systemd/user/sonnenhain.service"
+
+          ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd ~/sonnenhain-server/releases/current
+          chmod +x sonnenhain-server.x86_64
+
+          linger="no"
+          if command -v loginctl >/dev/null 2>&1; then
+            linger="$(loginctl show-user "$USER" -p Linger --value 2>/dev/null || echo no)"
+          fi
+
+          if command -v systemctl >/dev/null 2>&1 && systemctl --user status >/dev/null 2>&1 && [ "$linger" = "yes" ]; then
+            systemctl --user daemon-reload
+            systemctl --user enable --now sonnenhain.service
+            systemctl --user restart sonnenhain.service
+            echo "SERVER_START_MODE=systemd-user"
+          else
+            if command -v systemctl >/dev/null 2>&1; then
+              systemctl --user disable --now sonnenhain.service >/dev/null 2>&1 || true
             fi
-            if command -v systemctl >/dev/null 2>&1 && systemctl --user status >/dev/null 2>&1 && [ "$linger" = "yes" ]; then
-              systemctl --user daemon-reload
-              systemctl --user enable --now sonnenhain.service
-              systemctl --user restart sonnenhain.service
-              echo "Using persistent systemd user service (linger=yes)."
+            pkill -f '(^|/)sonnenhain-server\.x86_64 --headless -- --dedicated-server$' || true
+            sleep 1
+            if command -v setsid >/dev/null 2>&1; then
+              nohup setsid ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
             else
-              # Ohne loginctl-Linger wird ein systemd --user Dienst nach dem
-              # Ende der SSH-Sitzung häufig beendet. In diesem Fall bewusst
-              # einen vollständig entkoppelten Prozess starten.
-              if command -v systemctl >/dev/null 2>&1; then
-                systemctl --user disable --now sonnenhain.service >/dev/null 2>&1 || true
-              fi
-              pkill -f "(^|/)sonnenhain-server\\.x86_64 --headless -- --dedicated-server$" || true
-              if command -v setsid >/dev/null 2>&1; then
-                nohup setsid ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
-              else
-                nohup ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
-              fi
-              echo "Using detached server process (linger=$linger)."
+              nohup ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
             fi
+            echo "SERVER_START_MODE=detached linger=$linger"
+          fi
 
+          for attempt in {1..12}; do
+            if pgrep -f '(^|/)sonnenhain-server\.x86_64 --headless -- --dedicated-server$' >/dev/null &&                { ! command -v ss >/dev/null 2>&1 || ss -ltn | grep -q ':27845 '; }; then
+              echo "SERVER_LOCAL_OK"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "Server failed local post-deploy verification."
+          test -f ~/sonnenhain-server/server.log && tail -n 120 ~/sonnenhain-server/server.log || true
+          systemctl --user status sonnenhain.service --no-pager 2>/dev/null || true
+          exit 1
+          REMOTE
+
+      - name: Verify public WebSocket endpoint
+        if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_wss() {
+            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12               -H 'Connection: Upgrade'               -H 'Upgrade: websocket'               -H 'Sec-WebSocket-Version: 13'               -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=='               https://multiplayer.sonnenhainrpg.de/ || true)"
+            printf '%s\n' "$headers"
+            printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
+          }
+
+          for attempt in {1..10}; do
+            if check_wss; then
+              echo "Initial public WSS check passed."
+              break
+            fi
+            if [ "$attempt" = "10" ]; then exit 1; fi
             sleep 4
-            if ! pgrep -f "(^|/)sonnenhain-server\\.x86_64 --headless -- --dedicated-server$" >/dev/null; then
-              echo "Sonnenhain server process is not running."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            if command -v ss >/dev/null 2>&1 && ! ss -ltn | grep -q ":27845 "; then
-              echo "Sonnenhain server is running but TCP port 27845 is not listening."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            echo "Sonnenhain dedicated server is running on port 27845."
-          '
+          done
 
-      - name: Verify public WebSocket endpoint
-        if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          check_wss() {
-            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
-              -H 'Connection: Upgrade' \
-              -H 'Upgrade: websocket' \
-              -H 'Sec-WebSocket-Version: 13' \
-              -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-              https://multiplayer.sonnenhainrpg.de/ || true)"
-            printf '%s\n' "$headers"
-            printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
-          }
-          check_wss
-          echo "Initial public WSS check passed."
-          sleep 25
+          sleep 20
           check_wss
           echo "Public WSS endpoint stayed alive after deploy."
 
       - name: VServer deploy not configured
         if: ${{ env.VSERVER_HOST == '' || env.VSERVER_USER == '' || env.VSERVER_SSH_KEY == '' }}
-        run: echo "Server build is ready; VSERVER_HOST, VSERVER_USER and VSERVER_SSH_KEY are still required for live deployment."
- || true
-              if command -v setsid >/dev/null 2>&1; then
-                nohup setsid ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
-              else
-                nohup ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
-              fi
-              echo "Using detached server process (linger=$linger)."
-            fi
-
-            sleep 4
-            if ! pgrep -f "[s]onnenhain-server.x86_64 --headless -- --dedicated-server" >/dev/null; then
-              echo "Sonnenhain server process is not running."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            if command -v ss >/dev/null 2>&1 && ! ss -ltn | grep -q ":27845 "; then
-              echo "Sonnenhain server is running but TCP port 27845 is not listening."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            echo "Sonnenhain dedicated server is running on port 27845."
-          '
-
-      - name: Verify public WebSocket endpoint
-        if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          check_wss() {
-            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
-              -H 'Connection: Upgrade' \
-              -H 'Upgrade: websocket' \
-              -H 'Sec-WebSocket-Version: 13' \
-              -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-              https://multiplayer.sonnenhainrpg.de/ || true)"
-            printf '%s\n' "$headers"
-            printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
-          }
-          check_wss
-          echo "Initial public WSS check passed."
-          sleep 25
-          check_wss
-          echo "Public WSS endpoint stayed alive after deploy."
-
-      - name: VServer deploy not configured
-        if: ${{ env.VSERVER_HOST == '' || env.VSERVER_USER == '' || env.VSERVER_SSH_KEY == '' }}
-        run: echo "Server build is ready; VSERVER_HOST, VSERVER_USER and VSERVER_SSH_KEY are still required for live deployment."
- >/dev/null; then
-              echo "Sonnenhain server process is not running."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            if command -v ss >/dev/null 2>&1 && ! ss -ltn | grep -q ":27845 "; then
-              echo "Sonnenhain server is running but TCP port 27845 is not listening."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            echo "Sonnenhain dedicated server is running on port 27845."
-          '
-
-      - name: Verify public WebSocket endpoint
-        if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          check_wss() {
-            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
-              -H 'Connection: Upgrade' \
-              -H 'Upgrade: websocket' \
-              -H 'Sec-WebSocket-Version: 13' \
-              -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-              https://multiplayer.sonnenhainrpg.de/ || true)"
-            printf '%s\n' "$headers"
-            printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
-          }
-          check_wss
-          echo "Initial public WSS check passed."
-          sleep 25
-          check_wss
-          echo "Public WSS endpoint stayed alive after deploy."
-
-      - name: VServer deploy not configured
-        if: ${{ env.VSERVER_HOST == '' || env.VSERVER_USER == '' || env.VSERVER_SSH_KEY == '' }}
-        run: echo "Server build is ready; VSERVER_HOST, VSERVER_USER and VSERVER_SSH_KEY are still required for live deployment."
- || true
-              if command -v setsid >/dev/null 2>&1; then
-                nohup setsid ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
-              else
-                nohup ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
-              fi
-              echo "Using detached server process (linger=$linger)."
-            fi
-
-            sleep 4
-            if ! pgrep -f '(^|/)sonnenhain-server\.x86_64 --headless -- --dedicated-server >/dev/null; then
-              echo "Sonnenhain server process is not running."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            if command -v ss >/dev/null 2>&1 && ! ss -ltn | grep -q ":27845 "; then
-              echo "Sonnenhain server is running but TCP port 27845 is not listening."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            echo "Sonnenhain dedicated server is running on port 27845."
-          '
-
-      - name: Verify public WebSocket endpoint
-        if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          check_wss() {
-            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
-              -H 'Connection: Upgrade' \
-              -H 'Upgrade: websocket' \
-              -H 'Sec-WebSocket-Version: 13' \
-              -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-              https://multiplayer.sonnenhainrpg.de/ || true)"
-            printf '%s\n' "$headers"
-            printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
-          }
-          check_wss
-          echo "Initial public WSS check passed."
-          sleep 25
-          check_wss
-          echo "Public WSS endpoint stayed alive after deploy."
-
-      - name: VServer deploy not configured
-        if: ${{ env.VSERVER_HOST == '' || env.VSERVER_USER == '' || env.VSERVER_SSH_KEY == '' }}
-        run: echo "Server build is ready; VSERVER_HOST, VSERVER_USER and VSERVER_SSH_KEY are still required for live deployment."
- >/dev/null; then
-              echo "Sonnenhain server process is not running."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            if command -v ss >/dev/null 2>&1 && ! ss -ltn | grep -q ":27845 "; then
-              echo "Sonnenhain server is running but TCP port 27845 is not listening."
-              test -f ~/sonnenhain-server/server.log && tail -n 80 ~/sonnenhain-server/server.log || true
-              exit 1
-            fi
-            echo "Sonnenhain dedicated server is running on port 27845."
-          '
-
-      - name: Verify public WebSocket endpoint
-        if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          check_wss() {
-            headers="$(curl --http1.1 -sS -D - -o /dev/null --max-time 12 \
-              -H 'Connection: Upgrade' \
-              -H 'Upgrade: websocket' \
-              -H 'Sec-WebSocket-Version: 13' \
-              -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-              https://multiplayer.sonnenhainrpg.de/ || true)"
-            printf '%s\n' "$headers"
-            printf '%s\n' "$headers" | grep -qE '^HTTP/[0-9.]+ 101([[:space:]]|$)'
-          }
-          check_wss
-          echo "Initial public WSS check passed."
-          sleep 25
-          check_wss
-          echo "Public WSS endpoint stayed alive after deploy."
-
-      - name: VServer deploy not configured
-        if: ${{ env.VSERVER_HOST == '' || env.VSERVER_USER == '' || env.VSERVER_SSH_KEY == '' }}
-        run: echo "Server build is ready; VSERVER_HOST, VSERVER_USER and VSERVER_SSH_KEY are still required for live deployment."
+        run: echo "Server build is ready; VSERVER_HOST, VSERVER_USER and VSERVER_SSH_KEY are required for live deployment."
