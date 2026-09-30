@@ -231,7 +231,7 @@ jobs:
           }
 
           retry ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" 'mkdir -p ~/sonnenhain-server/releases/current ~/sonnenhain-server/data ~/.config/systemd/user'
-          retry ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" "printf '%s\\n' '$GITHUB_SHA' > ~/sonnenhain-server/data/patch-notice.txt"
+          retry ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" "printf '%s\\n' 'start:$GITHUB_SHA' > ~/sonnenhain-server/data/patch-notice.txt"
           sleep 5
           retry rsync -az --partial -e "ssh $ssh_opts" build/server-host/ "$VSERVER_USER@$VSERVER_HOST:~/sonnenhain-server/releases/current/"
           retry rsync -az --partial -e "ssh $ssh_opts" server/sonnenhain.service "$VSERVER_USER@$VSERVER_HOST:~/.config/systemd/user/sonnenhain.service"
