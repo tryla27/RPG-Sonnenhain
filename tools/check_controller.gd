@@ -10,7 +10,7 @@ func _initialize() -> void:
 	var seen := {}
 	for action in controls.ACTIONS:
 		var code: int = controls.bindings[action]
-		if seen.has(code): failures += 1
+		if code >= 0 and seen.has(code): failures += 1
 		seen[code] = true
 		if controls.label(code).is_empty(): failures += 1
 	var old_file := FileAccess.get_file_as_bytes(controls.PATH) if FileAccess.file_exists(controls.PATH) else PackedByteArray()

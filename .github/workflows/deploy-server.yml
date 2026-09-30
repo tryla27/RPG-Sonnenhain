@@ -55,6 +55,7 @@ jobs:
           chmod +x build/server/sonnenhain-server.x86_64
           test -x build/server/sonnenhain-server.x86_64
           test -f build/server/sonnenhain-server.pck
+          timeout 180 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --editor --import --quit
 
       - name: Multiplayer integration smoke test
         shell: bash
@@ -136,6 +137,22 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Wait for matching website version
+        if: env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..60}; do
+            published=$(curl -fsS --max-time 10 "https://sonnenhainrpg.de/version.json?release=$GITHUB_SHA" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("commit",""))' || true)
+            if [ "$published" = "$GITHUB_SHA" ]; then
+              echo "Website and server release match: $GITHUB_SHA"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Matching website did not deploy; preserving the running server."
+          exit 1
+
       - name: Deploy to VServer
         if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
         shell: bash
@@ -187,6 +204,8 @@ jobs:
           }
 
           retry ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" 'mkdir -p ~/sonnenhain-server/releases/current ~/sonnenhain-server/data ~/.config/systemd/user'
+          retry ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" "printf '%s\\n' '$GITHUB_SHA' > ~/sonnenhain-server/data/patch-notice.txt"
+          sleep 5
           retry rsync -az --partial -e "ssh $ssh_opts" build/server-host/ "$VSERVER_USER@$VSERVER_HOST:~/sonnenhain-server/releases/current/"
           retry rsync -az --partial -e "ssh $ssh_opts" server/sonnenhain.service "$VSERVER_USER@$VSERVER_HOST:~/.config/systemd/user/sonnenhain.service"
 

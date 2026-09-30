@@ -176,22 +176,22 @@ func enter(g, pos: Vector2=CENTER, target_room: int=-1) -> void:
 	load_art()
 	announce_room(g)
 
-func leave(g) -> void:
+func leave(g, to_start: bool = false) -> void:
 	active = false
 	room = -1
 	shots.clear()
 	impacts.clear()
-	g.player_pos = return_position
+	g.player_pos = g.WAYSTONES[0]+Vector2(0,105) if to_start else return_position
 	g.hp = minf(g.max_hp(),maxf(1.0,hp_before))
 	g.energy = minf(g.max_energy(),energy_before)
 	g.panel = ""
 	g.camera_smooth = g.player_pos-g.VIEW*0.5
 	g.camera_pos = g.camera_smooth
-	announce_room(g)
+	announce_room(g, to_start)
 	g.save_game()
 
-func announce_room(g) -> void:
-	if g.network_mode=="client": g.rpc_konflux_room.rpc_id(1,active,room)
+func announce_room(g, to_start: bool = false) -> void:
+	if g.network_mode=="client": g.rpc_konflux_room.rpc_id(1,active,room,to_start)
 	elif g.network_mode=="host":
 		if active and fighter_stats.has(1): fighter_stats[1]["room"]=room
 		else: register_fighter(1,active,room)
@@ -208,6 +208,9 @@ func interact(g) -> void:
 	if room>=0:
 		if g.player_pos.distance_to(CENTER+Vector2(0,215))<110:
 			enter(g,outdoor_position, -1)
+		return
+	if g.player_pos.distance_to(CENTER)<185:
+		leave(g, true)
 		return
 	if g.player_pos.distance_to(CENTER+Vector2(0,360))<160:
 		leave(g)
@@ -614,6 +617,8 @@ func draw_outdoors(g) -> void:
 			if cover_allowed(p): entries.append({"y":p.y,"kind":"cover","p":p,"id":posmod(x+y*7,8)})
 	append_actors(g,entries)
 	if bounds.has_point(CENTER): entries.append({"y":CENTER.y-20,"kind":"spawn","p":CENTER})
+	if g.player_pos.distance_to(CENTER)<250 and bounds.has_point(CENTER):
+		g.text_at(CENTER+Vector2(-180,-130),g.binding_short("interact")+" / "+g.binding_short("waystone")+" · SONNENHAIN-SPAWN",14,Color("fff0c6"),HORIZONTAL_ALIGNMENT_CENTER,360)
 	entries.sort_custom(func(a,b): return float(a["y"])<float(b["y"]))
 	for entry in entries: draw_entry(g,entry)
 	if bounds.intersects(Rect2(CENTER-Vector2.ONE*1300,Vector2.ONE*2600)):
@@ -623,7 +628,7 @@ func draw_outdoors(g) -> void:
 			g.draw_rect(Rect2(p-Vector2(4,4),Vector2(8,8)),Color("ffe1a3"))
 	if bounds.has_point(CENTER+Vector2(0,360)):
 		g.StartScenery32.gate(g,CENTER+Vector2(0,360),false,g.camera_pos)
-		g.text_at(CENTER+Vector2(-150,420),"E · Zurück nach Himmelsgarten",14,Color("fff0c6"),HORIZONTAL_ALIGNMENT_CENTER,300)
+		g.text_at(CENTER+Vector2(-150,420),g.binding_short("interact")+" · Zurück nach Himmelsgarten",14,Color("fff0c6"),HORIZONTAL_ALIGNMENT_CENTER,300)
 
 func append_actors(g,entries: Array) -> void:
 	entries.append({"y":g.player_pos.y,"p":g.player_pos,"kind":"player"})
@@ -641,7 +646,7 @@ func draw_entry(g,e: Dictionary) -> void:
 		"building":
 			var index:=BUILDING_IDS.find(e["id"])
 			sprite(g,buildings,index,visual,Vector2(320,400))
-			g.text_at(visual+Vector2(-160,30),"E · "+NAMES[e["id"]],14,Color("fff0c6"),HORIZONTAL_ALIGNMENT_CENTER,320)
+			g.text_at(visual+Vector2(-160,30),g.binding_short("interact")+" · "+NAMES[e["id"]],14,Color("fff0c6"),HORIZONTAL_ALIGNMENT_CENTER,320)
 		"event":
 			var index: int=[0,1,0,5,2,3,0,2,4,5,0,4,6,7,0,1][int(e["id"])]
 			sprite(g,events,index,visual,Vector2(210,260))
@@ -673,6 +678,8 @@ func draw_interior(g) -> void:
 	g.text_at(CENTER+Vector2(-180,265),"E · Gebäude verlassen",14,Color("fff0c6"),HORIZONTAL_ALIGNMENT_CENTER,360)
 
 func draw_map(g,rect: Rect2,compact: bool=false) -> void:
+	var side := minf(rect.size.x, rect.size.y)
+	rect = Rect2(rect.get_center()-Vector2.ONE*side*0.5,Vector2.ONE*side)
 	g.draw_rect(rect,Color("192d36"))
 	var scale:=rect.size/SIZE
 	for i in 4:

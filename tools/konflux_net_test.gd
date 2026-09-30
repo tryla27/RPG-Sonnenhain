@@ -5,6 +5,7 @@ var sent:=false
 var saw_damage:=false
 var entered_at:=0.0
 var saw_peer:=false
+var returned := false
 func _ready() -> void:
 	super._ready()
 	creative_mode=true
@@ -31,6 +32,11 @@ func _process(delta: float) -> void:
 			print("KONFLUX_NET_ENTER ",hero_name)
 		if elapsed-entered_at<6.7:
 			move_with_collision(Vector2(205,0)*delta)
+		elif elapsed-entered_at>9.5 and elapsed-entered_at<16.3:
+			move_with_collision(Vector2(-205,0)*delta)
+		elif elapsed-entered_at>16.5 and not returned:
+			returned = true
+			rpc_konflux_room.rpc_id(1,false,-1,true)
 		elif hero_name=="A" and not sent:
 			sent=true
 			rpc_konflux_attack.rpc_id(1,0,[1.0,0.0]) # wrong class: must be denied
@@ -40,7 +46,7 @@ func _process(delta: float) -> void:
 		if hp<max_hp() and elapsed-entered_at>7.0:
 			saw_damage=true
 			print("KONFLUX_NET_DAMAGE ",hero_name," hp=",hp)
-		if elapsed>entered_at+6.8 and hero_name=="A":
+		if elapsed>entered_at+6.8 and elapsed<entered_at+9.4 and hero_name=="A":
 			attack_timer=maxf(0,attack_timer-delta)
 			if attack_timer<=0:
 				attack_timer=0.6
@@ -50,7 +56,7 @@ func _process(delta: float) -> void:
 		konflux.update(self,delta)
 	else:
 		push_player_state()
-	if elapsed>14:
-		var ok: bool=konflux.active and saw_peer and (hero_name=="A" or saw_damage)
+	if elapsed>20:
+		var ok: bool=returned and not konflux.active and player_pos.distance_to(WAYSTONES[0]+Vector2(0,105))<10 and saw_peer and (hero_name=="A" or saw_damage)
 		print("KONFLUX_NET_RESULT ",hero_name," peers=",remote_players.size()," active=",konflux.active," damaged=",saw_damage," ok=",ok)
 		get_tree().quit(0 if ok else 1)

@@ -30,4 +30,10 @@ Lokale Vorschau: `http://localhost:8787/konflux-game/index.html`. Sie startet ei
 - Native Bilder für Spawn, alle vier Gebäude, Fluss, Terrasse und alle Innenräume; zusätzlich Browser-Start und klickbare Karte.
 
 Dies ist die erste spielbare Konflux-Version. Langzeit-Balancing und Lasttests mit großen Spielergruppen sind durch diese Funktionsprüfungen nicht abgedeckt.
-`nController: linke/rechte Sticks, alle Spielaktionen belegbar (Buttons und Trigger), gespeicherte Profile, einstellbare Totzone, Menüzeiger mit A/B. Einstellungen unter ESC > CONTROLLER. Automatische Controller-Prüfung bestanden; physischer Controller noch nicht geprüft.
+## v29.1 – Synchronisierung und Controller
+
+Monster wählen ihre Ziele innerhalb des eigenen Kartenbereichs. Die Multiplayer-Prüfung verlangt nun tatsächlich bewegte Monster. Ausbleibende Serverantworten lösen nach zwölf Sekunden eine neue Verbindung aus, auch bei geöffnetem Pausenmenü. Website und Server werden vor dem Serverwechsel auf dieselbe Commit-Version geprüft.
+
+Controller: Öffnen/Interagieren liegt auf X/Quadrat und lässt sich umbelegen. Ein-/Ausschalten, Erkennen, Totzone, Trigger, Menüfokus und gespeicherte Belegung sind verfügbar. Automatische Prüfungen bestehen; ein physischer Controller wurde nicht angeschlossen.
+
+Der Spawnwegstein in Konflux führt zurück zum Map-0-Spawn. Monster-XP sinken mit zunehmendem Abstand unterhalb des Spielerlevels. Der Bogengriff sitzt an der Hand. Beim Patch wird einmal „Server wird gepatcht.“ in den Spielchat gesendet.

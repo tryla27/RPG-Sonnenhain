@@ -3,11 +3,15 @@ extends RefCounted
 static var objects:Texture2D
 static var props:Texture2D
 static var terrain:Texture2D
+static var art_initialized := false
 static func init_art()->void:
+	if art_initialized: return
+	art_initialized = true
 	if objects==null:objects=load("res://art/start32/objects-faithful.webp")
 	if props==null:props=load("res://art/start32/props-faithful.webp")
 	if terrain==null:terrain=load("res://art/start32/terrain_32.webp")
 static func sprite(c:CanvasItem,texture:Texture2D,source:Rect2,target:Rect2)->void:
+	if texture == null: return
 	c.draw_texture_rect_region(texture,target,source,Color.WHITE,false,true)
 static func house(c:CanvasItem,p:Vector2,kind:int=0)->void:
 	init_art()

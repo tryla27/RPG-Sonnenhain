@@ -1,4 +1,7 @@
 extends Node2D
+const PatchNotice = preload("res://components/patch_notice.gd")
+var patch_notice = PatchNotice.new()
+const ExperienceRules = preload("res://components/experience_rules.gd")
 const ControllerControls = preload("res://components/controller_controls.gd")
 var controller = ControllerControls.new()
 const KonfluxMap = preload("res://components/konflux_map.gd")
@@ -25,9 +28,9 @@ var opened_village_gates: Dictionary = {}
 const SAVE_PATH := "user://sonnenhain_save.json"
 const CREATIVE_SAVE_PATH := "user://sonnenhain_testmodus.json"
 const CONTROLS_PATH := "user://sonnenhain_tasten.json"
-const BIND_ACTIONS := ["move_up", "move_down", "move_left", "move_right", "attack", "dodge", "interact", "waystone", "heal", "resource", "ability_1", "ability_2", "ability_3", "ability_4", "skills", "inventory", "journal", "map", "pause"]
-const BIND_NAMES := ["Nach oben", "Nach unten", "Nach links", "Nach rechts", "Angriff", "Ausweichen", "Interagieren", "Wegstein", "Heiltrank", "Energie / Mana", "Fähigkeit 1", "Fähigkeit 2", "Fähigkeit 3", "Fähigkeit 4", "Skillbuch", "Inventar", "Questbuch", "Weltkarte", "Pause"]
-const DEFAULT_BINDINGS := {"move_up":KEY_W, "move_down":KEY_S, "move_left":KEY_A, "move_right":KEY_D, "attack":-MOUSE_BUTTON_LEFT, "dodge":KEY_SPACE, "interact":KEY_E, "waystone":KEY_F, "heal":KEY_Q, "resource":KEY_R, "ability_1":KEY_1, "ability_2":KEY_2, "ability_3":KEY_3, "ability_4":KEY_4, "skills":KEY_K, "inventory":KEY_I, "journal":KEY_J, "map":KEY_M, "pause":KEY_ESCAPE}
+const BIND_ACTIONS := ["move_up", "move_down", "move_left", "move_right", "attack", "dodge", "interact", "waystone", "heal", "resource", "ability_1", "ability_2", "ability_3", "ability_4", "skills", "inventory", "journal", "map", "pause", "chat", "mechanics", "online", "party"]
+const BIND_NAMES := ["Nach oben", "Nach unten", "Nach links", "Nach rechts", "Angriff", "Ausweichen", "Öffnen / Interagieren", "Wegstein", "Heiltrank", "Energie / Mana", "Fähigkeit 1", "Fähigkeit 2", "Fähigkeit 3", "Fähigkeit 4", "Skillbuch", "Inventar", "Questbuch", "Weltkarte", "Pause", "Chat", "Spielhilfe", "Spielerliste", "Gruppe"]
+const DEFAULT_BINDINGS := {"move_up":KEY_W, "move_down":KEY_S, "move_left":KEY_A, "move_right":KEY_D, "attack":-MOUSE_BUTTON_LEFT, "dodge":KEY_SPACE, "interact":KEY_E, "waystone":KEY_F, "heal":KEY_Q, "resource":KEY_R, "ability_1":KEY_1, "ability_2":KEY_2, "ability_3":KEY_3, "ability_4":KEY_4, "skills":KEY_K, "inventory":KEY_I, "journal":KEY_J, "map":KEY_M, "pause":KEY_ESCAPE, "chat":KEY_ENTER, "mechanics":KEY_H, "online":KEY_TAB, "party":KEY_P}
 const FONT_COLOR := Color("f7f0d0")
 const INK := Color("26383c")
 const RARITY_NAMES := ["Gewöhnlich", "Ungewöhnlich", "Selten", "Episch", "Legendär"]
@@ -411,6 +414,8 @@ var multiplayer_smoke_attack_timer := 0.0
 var multiplayer_smoke_party_timer := 0.0
 var multiplayer_smoke_inventory_checked := false
 var multiplayer_smoke_success_since := 0
+var multiplayer_smoke_mob_origins: Dictionary = {}
+var multiplayer_smoke_mobs_moved := false
 var server_sync_status: Dictionary = {}
 var server_world_manifest: Dictionary = {}
 var party_state: Dictionary = {}
@@ -422,6 +427,7 @@ var save_notice_timer := 0.0
 var save_notice_text := ""
 var last_save_unix := 0
 var client_ping_timer := 0.0
+var server_last_reply_ms := 0
 var network_ping_ms := -1
 var processed_server_transactions: Array = []
 const GENDER_NAMES := ["Mann", "Frau"]
@@ -450,6 +456,13 @@ func clear_touch_inputs() -> void:
 	reset_touch_aim()
 
 func _notification(what: int) -> void:
+	if controller != null:
+		if what == NOTIFICATION_APPLICATION_FOCUS_OUT: controller.focused = false
+		elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+			controller.focused = true
+			for action in controller.ACTIONS:
+				var code: int = int(controller.bindings[action])
+				if controller.code_pressed(code): controller.blocked_codes[code] = true
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if touch_enabled: clear_touch_inputs()
 		if not dedicated_server_mode and character_created and panel not in ["start","creation"]:
@@ -460,6 +473,18 @@ func command_arg_value(prefix: String, fallback: String = "") -> String:
 		if arg.begins_with(prefix):
 			return arg.substr(prefix.length())
 	return fallback
+
+func server_patch_notice_path() -> String:
+	var home_dir := OS.get_environment("HOME")
+	return command_arg_value("--patch-notice-path=",home_dir.path_join("sonnenhain-server/data/patch-notice.txt") if home_dir != "" else "user://server_patch_notice.txt")
+
+func server_check_patch_notice() -> void:
+	var path := server_patch_notice_path()
+	if not FileAccess.file_exists(path): return
+	if not patch_notice.consume(FileAccess.get_file_as_string(path)): return
+	add_chat_line("SERVER","Server wird gepatcht.")
+	for peer_id in multiplayer.get_peers(): rpc_chat_relay.rpc_id(int(peer_id),"SERVER","Server wird gepatcht.")
+	print("SERVER_PATCH_NOTICE_SENT ",patch_notice.last_token)
 
 func start_multiplayer_smoke_client() -> void:
 	multiplayer_smoke_client_mode = true
@@ -545,14 +570,19 @@ func process_multiplayer_smoke(delta: float) -> void:
 	var saw_remote_attack := remote_combat_visuals.size() >= 1
 	var party_ok := (party_state.get("members",[]) as Array).size() >= 2
 	var ping_ok := network_ping_ms >= 0
-	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and saw_other_chat and saw_remote_attack and party_ok and ping_ok and multiplayer_smoke_success_since == 0:
+	for enemy in enemies:
+		var uid := int(enemy.get("uid",-1))
+		var position: Vector2 = enemy["pos"]
+		if not multiplayer_smoke_mob_origins.has(uid): multiplayer_smoke_mob_origins[uid] = position
+		elif position.distance_to(multiplayer_smoke_mob_origins[uid]) > 4.0: multiplayer_smoke_mobs_moved = true
+	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and multiplayer_smoke_mobs_moved and saw_other_chat and saw_remote_attack and party_ok and ping_ok and multiplayer_smoke_success_since == 0:
 		multiplayer_smoke_success_since = Time.get_ticks_msec()
 		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack, " party=", party_ok, " ping=", network_ping_ms)
 	# Sobald dieser Client den anderen Spieler, dessen Chat und den
 	# Server-Snapshot gemeinsam gesehen hat, ist die Relay-Prüfung erfüllt.
 	# Er bleibt nur noch kurz online, damit der Gegenclient dasselbe prüfen kann.
 	if multiplayer_smoke_success_since > 0 and Time.get_ticks_msec() - multiplayer_smoke_success_since >= 2500:
-		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack, " party=", party_ok, " ping=", network_ping_ms)
+		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " moving=",multiplayer_smoke_mobs_moved, " combat=", saw_remote_attack, " party=", party_ok, " ping=", network_ping_ms)
 		get_tree().quit(0)
 		return
 	if multiplayer_smoke_deadline > 0 and Time.get_ticks_msec() > multiplayer_smoke_deadline:
@@ -566,6 +596,8 @@ func _ready() -> void:
 	dedicated_server_mode = OS.has_feature("dedicated_server") or "--dedicated-server" in user_args
 	multiplayer_smoke_client_mode = "--multiplayer-smoke-client" in user_args
 	if dedicated_server_mode:
+		var notice_path := server_patch_notice_path()
+		if FileAccess.file_exists(notice_path): patch_notice.last_token = FileAccess.get_file_as_string(notice_path).strip_edges().left(80)
 		reset_class_skills()
 		for i in QUESTS.size():
 			quests.append({"state":0, "progress":0})
@@ -675,6 +707,9 @@ func _on_peer_connected(id: int) -> void:
 				rpc_receive_player_state.rpc_id(id, int(peer_id), remote_players[peer_id])
 
 func _on_connected_to_server() -> void:
+	server_last_reply_ms = Time.get_ticks_msec()
+	server_sync_status.clear()
+	client_ping_timer = 0.0
 	if konflux.active:
 		konflux.active=false
 		player_pos=konflux.return_position
@@ -870,48 +905,6 @@ func rpc_server_combat_reward(tx_id: String, enemy_type: int, xp_reward: int, go
 		save_game()
 	ack_server_transaction(tx_id)
 
-func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
-	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
-	server_send_all_quest_progress(peer_id,enemy)
-	var player_state: Dictionary = remote_players[peer_id]
-	var reward_class := clampi(int(player_state.get("class", 0)), 0, 2)
-	var type := clampi(int(enemy.get("type", 0)), 0, ENEMY_TYPES.size() - 1)
-	var elite_kind := clampi(int(enemy.get("elite", 0)), 0, 2)
-	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
-	var xp_reward := int((int(ENEMY_TYPES[type]["xp"]) + area_level * 3 + int(area_level * area_level * 0.15)) * [1.0, 1.55, 2.4][elite_kind])
-	var gold_reward := randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
-	var rewards: Array = []
-	if type in [12, 13, 14]:
-		var boss_element: String = ["blitz", "eis", "gift"][type - 12]
-		rewards.append(make_item("%s · %s" % [ENEMY_TYPES[type]["name"], String(boss_element).capitalize()], class_weapon_icon_for(reward_class), 3 + int(type == 14), 28 + (type - 12) * 8, 700 + type * 35, boss_element))
-	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
-		rewards.append(random_loot(type, reward_class))
-	if randf() < 0.03:
-		rewards.append(make_item("Heiltrank", "potion", 1, 0, 18))
-	var network_rewards: Array = []
-	for reward in rewards:
-		if reward is Dictionary:
-			network_rewards.append(network_reward_payload(reward))
-	var party_members := server_party_members(peer_id)
-	var mob_uid := int(enemy.get("uid",-1))
-	var killer_uuid := str(player_state.get("uuid","peer%d" % peer_id))
-	var reward_tx := "reward:%d:%s" % [mob_uid,killer_uuid]
-	server_register_transaction(peer_id,reward_tx)
-	if party_members.size() > 1:
-		# Killer erhält Beute/Gold; XP geht separat an alle Gruppenmitglieder.
-		# Der Killer bekommt den Quest-Kill bereits über combat_reward, daher dort
-		# kein zweiter Questfortschritt im Gruppenpaket.
-		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,0,gold_reward,network_rewards)
-		for raw_member in party_members:
-			var member := int(raw_member)
-			if member <= 0 or not remote_players.has(member): continue
-			var member_uuid := str(remote_players[member].get("uuid","peer%d" % member))
-			var party_tx := "partyxp:%d:%s" % [mob_uid,member_uuid]
-			server_register_transaction(member,party_tx)
-			rpc_server_party_progress.rpc_id(member,{"tx":party_tx,"xp":xp_reward})
-	else:
-		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
-
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null or dedicated_server_mode: return
 	if not multiplayer_smoke_client_mode and (panel != "" or not character_created):
@@ -1030,6 +1023,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 	if network_mode != "client" or multiplayer_context() != "world": return
 	if int(snapshot.get("protocol",-1)) != NETWORK_PROTOCOL_VERSION: return
 	if str(snapshot.get("context","world")) != "world": return
+	server_last_reply_ms = Time.get_ticks_msec()
 	var previous_by_uid: Dictionary = {}
 	for existing in enemies:
 		previous_by_uid[int(existing.get("uid",-1))] = existing
@@ -1253,7 +1247,29 @@ func enemy_level(type: int) -> int:
 	var region: int = int(ENEMY_TYPES[type]["region"])
 	return region_level(region) + (2 if type in [12, 13, 14] else type % 3)
 
+func update_connection_health(delta: float) -> void:
+	if network_mode != "client" or multiplayer.multiplayer_peer == null: return
+	if multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED: return
+	client_ping_timer = maxf(0.0,client_ping_timer-delta)
+	if client_ping_timer <= 0.0:
+		client_ping_timer = 2.0
+		rpc_client_ping.rpc_id(1,Time.get_ticks_msec())
+	if server_last_reply_ms > 0 and Time.get_ticks_msec()-server_last_reply_ms > 12000:
+		disconnect_multiplayer(false)
+		server_sync_status.clear()
+		network_ping_ms = 0
+		network_status = "Keine Serverantwort · verbinde neu. Bei erneutem Fehler Spielseite aktualisieren."
+		add_chat_line("SYSTEM",network_status)
+		live_reconnect_timer = 1.0
+
+func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
+	type = clampi(type, 0, ENEMY_TYPES.size()-1)
+	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
+	var base_xp := float(int(ENEMY_TYPES[type]["xp"]) + area_level * 3 + int(area_level * area_level * 0.15)) * float([1.0,1.55,2.4][clampi(elite_kind,0,2)])
+	return ExperienceRules.reward(base_xp, recipient_level, enemy_level(type))
+
 func _process(delta: float) -> void:
+	update_connection_health(delta)
 	if not dedicated_server_mode: controller.update(self, delta)
 	if death_timer > 0.0:
 		death_timer = maxf(0.0,death_timer-delta)
@@ -1279,10 +1295,6 @@ func _process(delta: float) -> void:
 	world_time += delta
 	save_notice_timer = maxf(0.0,save_notice_timer-delta)
 	update_network_interpolation(delta)
-	client_ping_timer = maxf(0.0,client_ping_timer-delta)
-	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and client_ping_timer <= 0.0:
-		client_ping_timer = 2.0
-		rpc_client_ping.rpc_id(1,Time.get_ticks_msec())
 	if chat_open: chat_fade = 7.0
 	else: chat_fade = maxf(0.0, chat_fade - delta)
 	if is_web_platform() and character_created and network_mode == "offline" and panel not in ["start", "creation"]:
@@ -1446,7 +1458,7 @@ func update_dedicated_enemies(delta: float) -> void:
 		enemy["slow"] = maxf(0.0, float(enemy.get("slow",0.0)) - delta)
 		enemy["marked"] = maxf(0.0, float(enemy.get("marked",0.0)) - delta)
 		enemy["shot"] = maxf(0.0, float(enemy.get("shot",0.0)) - delta)
-		var target := nearest_network_player(enemy["pos"], 1300.0)
+		var target := nearest_network_player(enemy["pos"], 1300.0, region_at(enemy["pos"]))
 		var peer_id := int(target["peer"])
 		if peer_id <= 0:
 			continue
@@ -1544,6 +1556,7 @@ func process_dedicated_server(delta: float) -> void:
 	server_status_timer += delta
 	server_rescue_spawn_timer += delta
 	if server_status_timer >= 1.0:
+		server_check_patch_notice()
 		server_status_timer = 0.0
 		cleanup_party_reconnects()
 		var now_tx := Time.get_ticks_msec()
@@ -1581,18 +1594,18 @@ func update_player(delta: float) -> void:
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
 		play_sound("step")
 		step_timer = 0.43 if dash_timer <= 0 else 0.25
-	if touch_enabled:
+	if controller.used:
+		var stick_aim: Vector2 = controller.stick(true)
+		if stick_aim.length_squared() > 0.0: facing = stick_aim.normalized()
+		elif move.length_squared() > 0.0: facing = move.normalized()
+	elif touch_enabled:
 		if touch_aim_id >= 0 and touch_aim_vector.length_squared() > 0.01:
 			facing = facing.slerp(touch_aim_vector.normalized(), minf(1.0, delta * 18.0)).normalized()
 		elif move.length() > 0.15:
 			facing = facing.slerp(move.normalized(), minf(1.0, delta * 14.0)).normalized()
 	else:
 		var aim: Vector2 = get_global_mouse_position() + camera_pos - player_pos + Vector2(0,KonfluxMap.height_at(player_pos) if konflux.active and konflux.room<0 else 0.0)
-		if controller.used:
-			var stick_aim: Vector2 = controller.stick(true)
-			if stick_aim.length_squared() > 0.0: facing = stick_aim.normalized()
-			elif move.length_squared() > 0.0: facing = move.normalized()
-		elif aim.length() > 8: facing = aim.normalized()
+		if aim.length() > 8: facing = aim.normalized()
 	if konflux.active:
 		if panel=="" and attack_input_active() and attack_timer<=0: normal_attack()
 		return
@@ -1803,9 +1816,16 @@ func load_bindings() -> void:
 	var loaded: Variant = JSON.parse_string(FileAccess.get_file_as_string(CONTROLS_PATH))
 	if not loaded is Dictionary: return
 	for action in BIND_ACTIONS:
-		var value: Variant = loaded.get(action, 0)
+		var value: Variant = loaded.get(action, DEFAULT_BINDINGS[action])
 		if (value is int or value is float) and (int(value) >= 0 or int(value) in [-MOUSE_BUTTON_LEFT, -MOUSE_BUTTON_RIGHT, -MOUSE_BUTTON_MIDDLE]):
 			if int(value) != KEY_ESCAPE or action == "pause": bindings[action] = int(value)
+
+	var used_codes := {}
+	for action in BIND_ACTIONS:
+		var code: int = int(bindings[action])
+		if code == 0: continue
+		if used_codes.has(code): bindings[action] = 0
+		else: used_codes[code] = true
 
 func save_bindings() -> void:
 	invalidate_static_cache()
@@ -1823,6 +1843,7 @@ func binding_label(action: String) -> String:
 	return OS.get_keycode_string(code).to_upper()
 
 func binding_short(action: String) -> String:
+	if controller.used and controller.device >= 0 and controller.bindings.has(action): return controller.label(int(controller.bindings[action]))
 	var code: int = int(bindings.get(action, 0))
 	if code < 0: return "M%d" % -code
 	if code == KEY_SPACE: return "LEER"
@@ -1848,6 +1869,7 @@ func movement_vector() -> Vector2:
 	return direction.normalized() if direction.length() > 1.0 else direction
 
 func attack_input_active() -> bool:
+	if controller.used and controller.pressed("attack"): return true
 	# Mobile Browser erzeugen aus Touches oft zusätzlich synthetische
 	# Mausklicks. Deshalb darf auf Touch-Geräten ausschließlich der echte
 	# Angriffsbutton einen Angriff halten/auslösen.
@@ -2054,12 +2076,15 @@ func open_mobile_chat() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if controller.handle(self, event): return
 	if event is InputEventMouseMotion: controller.used = false
+	if panel == "controller" and event is InputEventKey and event.pressed and event.keycode == KEY_DELETE and controller.awaiting != "":
+		controller.assign(controller.awaiting,-1)
+		return
 	if panel == "controller" and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if controller.awaiting != "": controller.awaiting = ""
 		else: panel = "pause"
 		return
 	if death_timer > 0.0: return
-	if event is InputEventKey and event.keycode == KEY_TAB:
+	if awaiting_bind == "" and event_matches_binding(event, "online"):
 		online_list_open = event.pressed
 		queue_redraw()
 		return
@@ -2107,12 +2132,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			chat_input += String.chr(event.unicode)
 		queue_redraw()
 		return
-	if panel == "" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_ENTER, KEY_T]:
+	if panel == "" and event.is_pressed() and not (event is InputEventKey and event.echo) and event_matches_binding(event, "chat"):
 		chat_open = true
 		chat_input = ""
 		queue_redraw()
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_H:
+	if awaiting_bind == "" and event.is_pressed() and not (event is InputEventKey and event.echo) and event_matches_binding(event, "mechanics"):
 		if panel == "mechanics": panel = ""
 		elif panel == "": panel = "mechanics"
 		queue_redraw()
@@ -2166,7 +2191,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		else: panel = ""
 		return
 	if panel in ["pause", "start", "controls", "arena_reward", "victory"]: return
-	for action in ["skills", "inventory", "journal", "map"]:
+	for action in ["skills", "inventory", "journal", "map", "party"]:
 		if event_matches_binding(event, action):
 			toggle_panel(action)
 			return
@@ -3116,7 +3141,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 			message("Alle Siegel sind gefallen! In Kürze öffnet sich die Arena der letzten Wache.")
 	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
 	var elite_kind: int = int(enemy.get("elite", 0))
-	gain_xp(int((int(ENEMY_TYPES[type]["xp"]) + area_level * 3 + int(area_level * area_level * 0.15)) * [1.0, 1.55, 2.4][elite_kind]))
+	gain_xp(enemy_xp_reward(type, elite_kind, level))
 	var coins: int = randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
 	drops.append({"pos":pos + Vector2(8, 12), "gold":coins, "life":80.0})
 	for qindex in quests.size():
@@ -3253,62 +3278,6 @@ func collect_drops() -> void:
 			play_sound("pickup")
 			message("Gefunden: %s · %s" % [item["name"], RARITY_NAMES[int(item["rarity"])]] )
 			save_game()
-
-func can_enter_konflux() -> bool:
-	return creative_mode or level >= KONFLUX_MIN_LEVEL
-
-func safe_world_teleport_destination(base: Vector2, expected_region: int = -1) -> Vector2:
-	var region := expected_region if expected_region >= 0 else region_at(base)
-	var offsets := [
-		Vector2.ZERO,Vector2(0,70),Vector2(0,-70),Vector2(70,0),Vector2(-70,0),
-		Vector2(70,70),Vector2(-70,70),Vector2(70,-70),Vector2(-70,-70),
-		Vector2(0,140),Vector2(140,0),Vector2(-140,0),Vector2(0,-140)
-	]
-	for offset in offsets:
-		var candidate: Vector2 = (base+offset).clamp(Vector2(30,30),WORLD-Vector2(30,30))
-		if region_at(candidate) != region: continue
-		if terrain_blocked(candidate): continue
-		if blocked_by_region_wall(candidate): continue
-		var occupied := false
-		for stone in WAYSTONES:
-			if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).grow(18).has_point(candidate):
-				occupied = true
-				break
-		if occupied: continue
-		return candidate
-	return base.clamp(Vector2(30,30),WORLD-Vector2(30,30))
-
-func run_teleport_consistency_smoke() -> bool:
-	var old_level := level
-	var old_creative := creative_mode
-	creative_mode = false
-	level = KONFLUX_MIN_LEVEL-1
-	var low_blocked := not can_enter_konflux()
-	level = KONFLUX_MIN_LEVEL
-	var high_allowed := can_enter_konflux()
-	var entrance_target := safe_world_teleport_destination(KonfluxMap.ENTRANCE,region_at(KonfluxMap.ENTRANCE))
-	var entrance_ok := region_at(entrance_target) == region_at(KonfluxMap.ENTRANCE) and not terrain_blocked(entrance_target)
-	var center_ok := not KonfluxMap.blocked(KonfluxMap.CENTER,KonfluxMap.CENTER,-1,hero_collision_radius())
-	var rooms_ok := true
-	for room_id in range(KonfluxMap.BUILDING_IDS.size()):
-		var inside := KonfluxMap.CENTER+Vector2(0,190)
-		var outside: Vector2 = KonfluxMap.LOCATIONS[KonfluxMap.BUILDING_IDS[room_id]]+Vector2(0,110)
-		if KonfluxMap.blocked(inside,inside,room_id,hero_collision_radius()) or KonfluxMap.blocked(outside,outside,-1,hero_collision_radius()):
-			rooms_ok = false
-	var portals_ok := true
-	for portal in PORTALS:
-		var target_region := int(portal[2])
-		var forward := safe_world_teleport_destination(portal[1]+Vector2(0,110),target_region)
-		var back_region := region_at(portal[0])
-		var backward := safe_world_teleport_destination(portal[0]+Vector2(0,110),back_region)
-		if region_at(forward) != target_region or terrain_blocked(forward) or region_at(backward) != back_region or terrain_blocked(backward):
-			portals_ok = false
-	level = old_level
-	creative_mode = old_creative
-	var ok := low_blocked and high_allowed and entrance_ok and center_ok and rooms_ok and portals_ok
-	if ok:
-		print("TELEPORT_SMOKE_OK konflux_lv40=true entrance=true center=true rooms=true portals=true")
-	return ok
 
 func interact() -> void:
 	if konflux.active:
@@ -3486,7 +3455,8 @@ func open_chest(index: int) -> void:
 
 func use_waystone() -> void:
 	if konflux.active:
-		message("Verlasse Konflux durch das Tor am zentralen Spawn.")
+		if konflux.room<0 and player_pos.distance_to(KonfluxMap.CENTER)<185: konflux.leave(self, true)
+		else: message("Der Spawnwegstein im Zentrum bringt dich nach Sonnenhain zurück.")
 		return
 	for i in WAYSTONES.size():
 		if player_pos.distance_to(WAYSTONES[i]) < 185:
@@ -3586,7 +3556,7 @@ func refresh_save_slot_labels() -> void:
 		else: save_slot_labels.append("BESCHÄDIGT")
 
 func save_game() -> void:
-	if konflux_preview_mode: return
+	if konflux_preview_mode or multiplayer_smoke_client_mode: return
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
 	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
@@ -3922,9 +3892,9 @@ func handle_panel_click(mouse: Vector2) -> void:
 			awaiting_bind = ""
 			return
 		for index in BIND_ACTIONS.size():
-			var column := int(index / 10.0)
-			var row := index % 10
-			if Rect2(170 + column * 420, 195 + row * 34, 390, 30).has_point(mouse):
+			var column := int(index / 12.0)
+			var row := index % 12
+			if Rect2(170 + column * 420, 195 + row * 29, 390, 30).has_point(mouse):
 				awaiting_bind = BIND_ACTIONS[index]
 				controls_status = "%s: neue Taste oder Maustaste drücken · ESC bricht ab." % BIND_NAMES[index]
 				play_sound("menu")
@@ -4377,7 +4347,7 @@ func sell_item(index: int) -> void:
 	save_game()
 
 func _draw() -> void:
-	if dedicated_server_mode: return
+	if dedicated_server_mode or DisplayServer.get_name() == "headless": return
 	if konflux.active:
 		var started:=Time.get_ticks_usec()
 		konflux.draw(self)
@@ -5006,7 +4976,8 @@ func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scal
 			draw_line(center-side*20*scale_factor, center+side*20*scale_factor, Color('e7e2cf'), 1.5*scale_factor)
 			draw_colored_polygon(PackedVector2Array([hand+dir*38*scale_factor,hand+dir*30*scale_factor+side*4*scale_factor,hand+dir*30*scale_factor-side*4*scale_factor]),Color('edf1e6'))
 		else:
-			var center: Vector2 = hand + dir*16*scale_factor
+			# The midpoint of the wooden limbs is the same grip as the arm.
+			var center: Vector2 = hand - dir*18*scale_factor
 			var limb: float = (21.0 + float(variant % 3) * 2.0 + float(tier) * 2.0) * scale_factor
 			var upper := center + side*limb
 			var lower := center - side*limb
@@ -5015,6 +4986,7 @@ func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scal
 			var bow_points := PackedVector2Array([upper,outer_upper,center+dir*18.0*scale_factor,outer_lower,lower])
 			draw_polyline(bow_points,Color('332d34'),9.0*scale_factor,false)
 			draw_polyline(bow_points,wood,5.0*scale_factor,false)
+			draw_line(hand-side*5*scale_factor,hand+side*5*scale_factor,Color('654331'),6*scale_factor)
 			draw_line(upper,lower,Color('f2e8d1'),1.8*scale_factor)
 			var pull := 0.0
 			if attack_progress >= 0.0: pull = 14.0 * sin(clampf(attack_progress, 0.0, 1.0) * PI)
@@ -6222,6 +6194,10 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	draw_circle(arm_start, 3.8 * scale_factor, arm_color.lightened(0.06))
 	draw_line(arm_start.lerp(grip, 0.72) - side * 1.5 * scale_factor, grip, cuff_color, 4.0 * scale_factor)
 	draw_weapon_world(weapon_pos, weapon_family, design, base_look, scale_factor, progress)
+	if weapon_family == 2:
+		var hand_color: Color = [Color('e7b995'),Color('91a56d'),Color('a0bbc0')][clampi(use_race,0,2)]
+		draw_circle(grip,4.3*scale_factor,Color('493d45'))
+		draw_circle(grip,2.8*scale_factor,hand_color)
 	# Facing north: the body masks the rear arm and weapon across the head.
 	if base_look == Vector2.UP:
 		draw_character_sprite(p,visual_class,walking,look,scale_factor,attack_now,use_race,use_gender)
@@ -6567,8 +6543,8 @@ func draw_hud() -> void:
 		draw_touch_controls()
 	else:
 		draw_ref_panel(Rect2(9, 586, 1134, 53))
-		text_at(Vector2(22, 609), "LAUFEN: %s/%s/%s/%s  ·  ANGRIFF: %s  ·  AUSWEICHEN: %s" % [binding_short("move_up"), binding_short("move_left"), binding_short("move_down"), binding_short("move_right"), binding_short("attack"), binding_short("dodge")], 12, Color("f0e4c5"))
-		text_at(Vector2(22, 626), "%s Skills · %s Tasche · %s Quests · %s Karte · ENTER/T Chat" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map")], 11, Color("becfc6"))
+		text_at(Vector2(22, 609), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 11, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 655)
+		text_at(Vector2(22, 626), controller.label(int(controller.bindings["pause"]))+": Einstellungen / Belegung" if controller.used else "%s Skills · %s Tasche · %s Quests · %s Karte · %s Chat · %s Hilfe · %s Gruppe" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map"), binding_short("chat"), binding_short("mechanics"), binding_short("party")], 11, Color("becfc6"), HORIZONTAL_ALIGNMENT_LEFT, 655)
 		for slot in 4:
 			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
 			var x := 694 + slot * 81
@@ -6889,7 +6865,7 @@ func draw_panel() -> void:
 
 func draw_mechanics_panel() -> void:
 	text_at(Vector2(190,126), "MECHANIK-ÜBERSICHT", 28, Color('ffe1a0'))
-	text_at(Vector2(770,126), "H · öffnen/schließen", 12, Color('aebfb9'))
+	text_at(Vector2(770,126), binding_short("mechanics")+" · öffnen/schließen", 12, Color('aebfb9'))
 	var labels: Array[String] = ["REGIONEN","QUESTS","SKILLS","KOOP & CHAT"]
 	for tab in 4:
 		ui_button(Rect2(190 + tab*195,142,180,38), labels[tab], true, mechanics_page == tab)
@@ -7018,7 +6994,7 @@ func draw_multiplayer_panel() -> void:
 func draw_pause_panel() -> void:
 	ui_button(Rect2(860,319,130,42), "CONTROLLER")
 	ui_button(Rect2(300, 135, 550, 42), "PAUSE", true, true)
-	text_at(Vector2(302, 205), "Level %d · %s · %d Gold" % [level, region_name(region_at(player_pos)), gold], 17, Color("e6f0dc"))
+	text_at(Vector2(302, 205), "Level %d · %s · %d Gold" % [level, "Konflux" if konflux.active else region_name(region_at(player_pos)), gold], 17, Color("e6f0dc"))
 	ui_button(Rect2(300, 221, 550, 42), "FORTSETZEN")
 	ui_button(Rect2(860, 221, 130, 42), "TOUCH" if touch_enabled else "TASTEN")
 	ui_button(Rect2(860, 270, 130, 42), "MECHANIK")
@@ -7063,10 +7039,10 @@ func draw_controls_panel() -> void:
 	text_at(Vector2(170, 153), "TASTENBELEGUNG", 29, Color("ffdf9f"))
 	text_at(Vector2(172, 179), "Belegung anklicken · Taste oder Maustaste drücken · ESC bricht die Auswahl ab", 14, Color("e3e9d8"))
 	for index in BIND_ACTIONS.size():
-		var column := int(index / 10.0)
-		var row := index % 10
+		var column := int(index / 12.0)
+		var row := index % 12
 		var x := 170 + column * 420
-		var y := 195 + row * 34
+		var y := 195 + row * 29
 		var action: String = BIND_ACTIONS[index]
 		var active := awaiting_bind == action
 		draw_rect(Rect2(x, y, 390, 30), Color("607666") if active else (Color("354a4a") if row % 2 == 0 else Color("3c5250")))
@@ -7133,7 +7109,7 @@ func draw_intro_panel() -> void:
 	text_at(Vector2(230, 287), String(lines[page][0]), 34, Color("fff1c8"))
 	text_at(Vector2(230, 337), String(lines[page][1]), 18, Color("e4eadb"))
 	draw_rect(Rect2(230, 365, 675, 3), Color("c3a673"))
-	text_at(Vector2(230, 413), "E / Leertaste / Klick: Überspringen", 15, Color("c7d4ca"))
+	text_at(Vector2(230, 413), binding_short("interact")+" / Leertaste / Klick: Überspringen", 15, Color("c7d4ca"))
 
 func draw_skills_panel() -> void:
 	text_at(Vector2(165, 125), "%s · FÄHIGKEITEN" % CLASS_NAMES[class_id].to_upper(), 26, Color("ffeda9"))
@@ -7435,6 +7411,20 @@ func draw_journal_panel() -> void:
 	text_at(Vector2(170, 592), "Sprich mit dem Questgeber, um die nächste Aufgabe anzunehmen. Mausrad: scrollen.", 15, Color("d9e6d5"))
 
 func draw_map_panel() -> void:
+	if konflux.active:
+		text_at(Vector2(165,125),"KONFLUX · ARENAKARTE",24,Color("ffe0a4"))
+		konflux.draw_map(self,Rect2(170,148,420,420),true)
+		text_at(Vector2(610,175),"80.000 × 80.000 · vier Biome",17,Color("ffe0a4"))
+		text_at(Vector2(610,205),"Cyan: geschützter Spawn",14,Color("a8f0dc"))
+		text_at(Vector2(610,230),"Gold: betretbare Gebäude",14,Color("ffe4ad"))
+		text_at(Vector2(610,255),"Orange: aktive Runenpunkte",14,Color("ffbe67"))
+		text_at(Vector2(610,280),"Blau: Fluss · Linien: Brücken",14,Color("9bd0eb"))
+		text_at(Vector2(610,305),"Konturen: erhöhte Terrassen",14,Color("e6d697"))
+		for i in 4: text_at(Vector2(610,347+i*24),KonfluxMap.BIOMES[i]+" · "+KonfluxMap.NAMES[KonfluxMap.BUILDING_IDS[i]],12,KonfluxMap.COLORS[i].lightened(0.5))
+		text_at(Vector2(610,475),"Spawnwegstein: Map 0",16,Color("ffe0a4"))
+		text_at(Vector2(610,500),binding_short("interact")+" / "+binding_short("waystone")+": am Stein zurückreisen",12,Color("efe1bc"))
+		text_at(Vector2(170,584),"Weiß: deine Position · Innenräume gehören zur Konflux-Karte",13,Color("efe1bc"))
+		return
 	text_at(Vector2(165, 125), "%s · EINGANG MARKIERT" % DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "WELTKARTE · SONNENHAIN", 24, Color("ffe0a4"))
 	draw_world_atlas(Rect2(167, 148, 800, 405))
 	text_at(Vector2(168, 584), "◆ Du   ◆ Wegstein   ◇ Eingang / Gewölbe   ● Auftrag   ★ Boss   ·   Gold: offen / Rot: gesperrt", 14, Color("efe1bc"))
@@ -7750,6 +7740,7 @@ func static_chunk_keys(bounds: Rect2) -> Array:
 	return keys
 
 func update_static_cache() -> void:
+	if DisplayServer.get_name() == "headless": return
 	if not performance_cache_enabled or arena_mode != "" or interior_id >= 0 or dungeon_id >= 0: return
 	var needed := static_chunk_keys(Rect2(camera_pos,VIEW))
 	var ahead := static_chunk_keys(Rect2(camera_pos,VIEW).grow(160))
@@ -7851,6 +7842,7 @@ func prop_cache_key(prop: Dictionary) -> String:
 	return "%s:%d:%d" % [prop["kind"],prop["point"].x,prop["point"].y]
 
 func update_foreground_cache() -> void:
+	if DisplayServer.get_name() == "headless": return
 	if not performance_cache_enabled or arena_mode != "" or interior_id >= 0 or dungeon_id >= 0: return
 	var ahead := Rect2(camera_pos,VIEW).grow(200)
 	var created := 0
@@ -8014,7 +8006,7 @@ func rpc_receive_player_presence(peer_id: int, state: Dictionary) -> void:
 	queue_redraw()
 
 @rpc("any_peer","call_remote","reliable")
-func rpc_konflux_room(enabled: bool,target_room: int) -> void:
+func rpc_konflux_room(enabled: bool,target_room: int,to_start: bool = false) -> void:
 	if network_mode!="host": return
 	var peer:=multiplayer.get_remote_sender_id()
 	if not remote_players.has(peer) or target_room < -1 or target_room>3: return
@@ -8034,8 +8026,9 @@ func rpc_konflux_room(enabled: bool,target_room: int) -> void:
 			destination=KonfluxMap.LOCATIONS[KonfluxMap.BUILDING_IDS[old_room]]+Vector2(0,110)
 		elif was_in and not bool(konflux.fighter_stats[peer]["dead"]): return
 	else:
-		if not was_in or old_room>=0 or old.distance_to(KonfluxMap.CENTER+Vector2(0,360))>240: return
-		destination=safe_world_teleport_destination(KonfluxMap.ENTRANCE,region_at(KonfluxMap.ENTRANCE))
+		var exit_point := KonfluxMap.CENTER if to_start else KonfluxMap.CENTER+Vector2(0,360)
+		if not was_in or old_room>=0 or old.distance_to(exit_point)>(185.0 if to_start else 240.0): return
+		destination=WAYSTONES[0]+Vector2(0,105) if to_start else safe_world_teleport_destination(KonfluxMap.ENTRANCE,region_at(KonfluxMap.ENTRANCE))
 	if was_in and enabled:
 		konflux.fighter_stats[peer]["room"]=target_room
 	else: konflux.register_fighter(peer,enabled,target_room)
@@ -8401,11 +8394,6 @@ func rpc_party_notice(value: String) -> void:
 	message(value)
 
 @rpc("authority","call_remote","reliable")
-func rpc_server_quest_progress(payload: Dictionary) -> void:
-	if network_mode != "client": return
-	apply_server_quest_progress(payload)
-
-@rpc("authority","call_remote","reliable")
 func rpc_server_party_progress(payload: Dictionary) -> void:
 	if network_mode != "client": return
 	var tx_id := str(payload.get("tx","")).substr(0,96)
@@ -8469,6 +8457,7 @@ func send_server_world_manifest(peer_id: int) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func rpc_server_session_status(status: Dictionary) -> void:
+	server_last_reply_ms = Time.get_ticks_msec()
 	server_sync_status = status.duplicate(true)
 	var protocol := int(status.get("protocol",-1))
 	if protocol != NETWORK_PROTOCOL_VERSION:
@@ -8586,7 +8575,7 @@ func _on_peer_disconnected(id: int) -> void:
 			server_action_times.erase(key)
 	add_chat_line("SYSTEM", "Spieler %d hat die Gruppe verlassen." % id)
 
-func nearest_network_player(origin: Vector2, max_distance: float = INF) -> Dictionary:
+func nearest_network_player(origin: Vector2, max_distance: float = INF, required_region: int = -1) -> Dictionary:
 	var best_peer := 0
 	var best_pos := Vector2.ZERO
 	var best_distance := max_distance
@@ -8597,6 +8586,7 @@ func nearest_network_player(origin: Vector2, max_distance: float = INF) -> Dicti
 		if str(state.get("context","world")) != "world": continue
 		var pos := network_player_position(peer_id)
 		if pos.x < -9000.0: continue
+		if required_region >= 0 and region_at(pos) != required_region: continue
 		var distance := origin.distance_to(pos)
 		if distance < best_distance:
 			best_distance = distance
@@ -8837,6 +8827,7 @@ func rpc_client_ping(client_stamp: int) -> void:
 
 @rpc("authority","call_remote","unreliable")
 func rpc_server_pong(client_stamp: int) -> void:
+	server_last_reply_ms = Time.get_ticks_msec()
 	network_ping_ms = clampi(Time.get_ticks_msec()-client_stamp,0,9999)
 	queue_redraw()
 
@@ -8961,6 +8952,112 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	item["element"] = str(item.get("element","")) if str(item.get("element","")) in ["","feuer","eis","blitz","gift"] else ""
 	return item
 
+func apply_rescue_progress(amount: int, shared: bool = false) -> void:
+	if rescue_state != 1 or amount <= 0: return
+	rescue_kills = mini(RESCUE_GOAL,rescue_kills+amount)
+	if rescue_kills >= RESCUE_GOAL:
+		rescue_state = 2
+		rescue_banner_timer = 6.0
+		rescue_intro_timer = 5.0
+		effect(RESCUE_POS+Vector2(0,-210),"BLÜTENWEILER GERETTET",Color("a8edb5"),5.0)
+		message(("Gemeinsam gerettet! " if shared else "")+"Blütenweiler gerettet! Nela wartet am Dorfplatz auf dich (E).")
+		play_sound("level")
+	else:
+		message("%sBlütenweiler verteidigt: %d/%d Dornenwesen besiegt." % ["Gruppe · " if shared else "",rescue_kills,RESCUE_GOAL])
+	save_game()
+	if network_mode == "client":
+		announce_multiplayer_context()
+
+@rpc("authority","call_remote","reliable")
+func rpc_server_rescue_progress(amount: int, shared: bool) -> void:
+	if network_mode != "client": return
+	apply_rescue_progress(clampi(amount,0,RESCUE_GOAL),shared)
+
+func run_rescue_quest_consistency_smoke() -> bool:
+	var old_state := rescue_state
+	var old_kills := rescue_kills
+	var old_network := network_mode
+	rescue_state = 1
+	rescue_kills = RESCUE_GOAL-1
+	network_mode = "offline"
+	apply_rescue_progress(1,true)
+	var ok := rescue_state == 2 and rescue_kills == RESCUE_GOAL
+	rescue_state = old_state
+	rescue_kills = old_kills
+	network_mode = old_network
+	if ok:
+		print("RESCUE_SMOKE_OK transition=19_to_20 group_progress=true")
+	return ok
+
+func network_reward_payload(item: Dictionary) -> Dictionary:
+	var payload: Dictionary = item.duplicate(true)
+	payload.erase("uid")
+	# Identität eines Inventargegenstands gehört ausschließlich dem Browser-Save.
+	payload.erase("stack_value")
+	return payload
+
+func server_rescue_active_peers() -> Array:
+	var peers: Array = []
+	for raw_peer in remote_players.keys():
+		var peer_id := int(raw_peer)
+		var state: Dictionary = remote_players[raw_peer]
+		if str(state.get("context","world")) != "world": continue
+		if int(state.get("rescue_state",0)) != 1: continue
+		var pos := network_player_position(peer_id)
+		if pos.x < -9000.0 or pos.distance_to(RESCUE_POS) > 850.0: continue
+		peers.append(peer_id)
+	return peers
+
+func update_dedicated_rescue_spawns() -> void:
+	if network_mode != "host": return
+	var peers := server_rescue_active_peers()
+	if peers.is_empty(): return
+	var active := 0
+	for enemy in enemies:
+		if bool(enemy.get("invasion",false)): active += 1
+	if active >= 5: return
+	var min_kills := RESCUE_GOAL
+	for raw_peer in peers:
+		min_kills = mini(min_kills,int(remote_players[int(raw_peer)].get("rescue_kills",0)))
+	var needed := mini(5-active,maxi(0,RESCUE_GOAL-min_kills-active))
+	if needed <= 0: return
+	var positions := [Vector2(-250,-40),Vector2(230,-70),Vector2(-220,140),Vector2(240,130),Vector2(0,310)]
+	for n in needed:
+		var spot: Vector2 = RESCUE_POS+positions[(min_kills+active+n)%positions.size()]
+		if terrain_blocked(spot): continue
+		var kind := (min_kills+active+n)%2
+		var info: Dictionary = ENEMY_TYPES[kind]
+		var mob := make_enemy(kind,spot)
+		var enemy_hp := float(info["hp"])*1.4
+		mob["hp"] = enemy_hp
+		mob["max_hp"] = enemy_hp
+		mob["invasion"] = true
+		mob["context"] = "world"
+		mob["instance_id"] = "world"
+		mob["uid"] = server_next_mob_uid
+		server_next_mob_uid += 1
+		enemies.append(mob)
+
+func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
+	if not bool(enemy.get("invasion",false)) or killer_peer <= 0: return
+	var recipients := server_party_members(killer_peer)
+	for raw_peer in recipients:
+		var peer_id := int(raw_peer)
+		if not remote_players.has(peer_id): continue
+		var state: Dictionary = remote_players[peer_id]
+		if int(state.get("rescue_state",0)) != 1: continue
+		if str(state.get("context","world")) != "world": continue
+		rpc_server_rescue_progress.rpc_id(peer_id,1,peer_id != killer_peer)
+
+func local_player_state() -> Dictionary:
+	ensure_player_uuid()
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos), "konflux":konflux.active, "room":konflux.room}
+
+@rpc("authority","call_remote","reliable")
+func rpc_server_quest_progress(payload: Dictionary) -> void:
+	if network_mode != "client": return
+	apply_server_quest_progress(payload)
+
 func active_quest_sync_rows() -> Array:
 	var rows: Array = []
 	for i in mini(QUESTS.size(),quests.size()):
@@ -9068,43 +9165,6 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 	ack_server_transaction(tx_id)
 	return changed
 
-func apply_rescue_progress(amount: int, shared: bool = false) -> void:
-	if rescue_state != 1 or amount <= 0: return
-	rescue_kills = mini(RESCUE_GOAL,rescue_kills+amount)
-	if rescue_kills >= RESCUE_GOAL:
-		rescue_state = 2
-		rescue_banner_timer = 6.0
-		rescue_intro_timer = 5.0
-		effect(RESCUE_POS+Vector2(0,-210),"BLÜTENWEILER GERETTET",Color("a8edb5"),5.0)
-		message(("Gemeinsam gerettet! " if shared else "")+"Blütenweiler gerettet! Nela wartet am Dorfplatz auf dich (E).")
-		play_sound("level")
-	else:
-		message("%sBlütenweiler verteidigt: %d/%d Dornenwesen besiegt." % ["Gruppe · " if shared else "",rescue_kills,RESCUE_GOAL])
-	save_game()
-	if network_mode == "client":
-		announce_multiplayer_context()
-
-@rpc("authority","call_remote","reliable")
-func rpc_server_rescue_progress(amount: int, shared: bool) -> void:
-	if network_mode != "client": return
-	apply_rescue_progress(clampi(amount,0,RESCUE_GOAL),shared)
-
-func run_rescue_quest_consistency_smoke() -> bool:
-	var old_state := rescue_state
-	var old_kills := rescue_kills
-	var old_network := network_mode
-	rescue_state = 1
-	rescue_kills = RESCUE_GOAL-1
-	network_mode = "offline"
-	apply_rescue_progress(1,true)
-	var ok := rescue_state == 2 and rescue_kills == RESCUE_GOAL
-	rescue_state = old_state
-	rescue_kills = old_kills
-	network_mode = old_network
-	if ok:
-		print("RESCUE_SMOKE_OK transition=19_to_20 group_progress=true")
-	return ok
-
 func run_generic_quest_sync_smoke() -> bool:
 	if quests.is_empty() or event_states.is_empty(): return false
 	var old_quests := quests.duplicate(true)
@@ -9139,55 +9199,6 @@ func run_generic_quest_sync_smoke() -> bool:
 		print("QUEST_SYNC_SMOKE_OK all_quests=true events=true rescue=true duplicate_tx_blocked=true ack_protocol=true")
 	return ok
 
-func network_reward_payload(item: Dictionary) -> Dictionary:
-	var payload: Dictionary = item.duplicate(true)
-	payload.erase("uid")
-	# Identität eines Inventargegenstands gehört ausschließlich dem Browser-Save.
-	payload.erase("stack_value")
-	return payload
-
-func server_rescue_active_peers() -> Array:
-	var peers: Array = []
-	for raw_peer in remote_players.keys():
-		var peer_id := int(raw_peer)
-		var state: Dictionary = remote_players[raw_peer]
-		if str(state.get("context","world")) != "world": continue
-		if int(state.get("rescue_state",0)) != 1: continue
-		var pos := network_player_position(peer_id)
-		if pos.x < -9000.0 or pos.distance_to(RESCUE_POS) > 850.0: continue
-		peers.append(peer_id)
-	return peers
-
-func update_dedicated_rescue_spawns() -> void:
-	if network_mode != "host": return
-	var peers := server_rescue_active_peers()
-	if peers.is_empty(): return
-	var active := 0
-	for enemy in enemies:
-		if bool(enemy.get("invasion",false)): active += 1
-	if active >= 5: return
-	var min_kills := RESCUE_GOAL
-	for raw_peer in peers:
-		min_kills = mini(min_kills,int(remote_players[int(raw_peer)].get("rescue_kills",0)))
-	var needed := mini(5-active,maxi(0,RESCUE_GOAL-min_kills-active))
-	if needed <= 0: return
-	var positions := [Vector2(-250,-40),Vector2(230,-70),Vector2(-220,140),Vector2(240,130),Vector2(0,310)]
-	for n in needed:
-		var spot: Vector2 = RESCUE_POS+positions[(min_kills+active+n)%positions.size()]
-		if terrain_blocked(spot): continue
-		var kind := (min_kills+active+n)%2
-		var info: Dictionary = ENEMY_TYPES[kind]
-		var mob := make_enemy(kind,spot)
-		var enemy_hp := float(info["hp"])*1.4
-		mob["hp"] = enemy_hp
-		mob["max_hp"] = enemy_hp
-		mob["invasion"] = true
-		mob["context"] = "world"
-		mob["instance_id"] = "world"
-		mob["uid"] = server_next_mob_uid
-		server_next_mob_uid += 1
-		enemies.append(mob)
-
 func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void:
 	if killer_peer <= 0: return
 	var enemy_type := clampi(int(enemy.get("type",0)),0,ENEMY_TYPES.size()-1)
@@ -9218,7 +9229,102 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 		server_register_transaction(peer_id,tx)
 		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer})
 
-func local_player_state() -> Dictionary:
-	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos), "konflux":konflux.active, "room":konflux.room}
+func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
+	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
+	server_send_all_quest_progress(peer_id,enemy)
+	var player_state: Dictionary = remote_players[peer_id]
+	var reward_class := clampi(int(player_state.get("class", 0)), 0, 2)
+	var type := clampi(int(enemy.get("type", 0)), 0, ENEMY_TYPES.size() - 1)
+	var elite_kind := clampi(int(enemy.get("elite", 0)), 0, 2)
+	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
+	var xp_reward := enemy_xp_reward(type, elite_kind, int(player_state.get("level",1)))
+	var gold_reward := randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
+	var rewards: Array = []
+	if type in [12, 13, 14]:
+		var boss_element: String = ["blitz", "eis", "gift"][type - 12]
+		rewards.append(make_item("%s · %s" % [ENEMY_TYPES[type]["name"], String(boss_element).capitalize()], class_weapon_icon_for(reward_class), 3 + int(type == 14), 28 + (type - 12) * 8, 700 + type * 35, boss_element))
+	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
+		rewards.append(random_loot(type, reward_class))
+	if randf() < 0.03:
+		rewards.append(make_item("Heiltrank", "potion", 1, 0, 18))
+	var network_rewards: Array = []
+	for reward in rewards:
+		if reward is Dictionary:
+			network_rewards.append(network_reward_payload(reward))
+	var party_members := server_party_members(peer_id)
+	var mob_uid := int(enemy.get("uid",-1))
+	var killer_uuid := str(player_state.get("uuid","peer%d" % peer_id))
+	var reward_tx := "reward:%d:%s" % [mob_uid,killer_uuid]
+	server_register_transaction(peer_id,reward_tx)
+	if party_members.size() > 1:
+		# Killer erhält Beute/Gold; XP geht separat an alle Gruppenmitglieder.
+		# Der Killer bekommt den Quest-Kill bereits über combat_reward, daher dort
+		# kein zweiter Questfortschritt im Gruppenpaket.
+		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,0,gold_reward,network_rewards)
+		for raw_member in party_members:
+			var member := int(raw_member)
+			if member <= 0 or not remote_players.has(member): continue
+			var member_uuid := str(remote_players[member].get("uuid","peer%d" % member))
+			var party_tx := "partyxp:%d:%s" % [mob_uid,member_uuid]
+			server_register_transaction(member,party_tx)
+			var member_xp := enemy_xp_reward(type, elite_kind, int(remote_players[member].get("level",1)))
+			rpc_server_party_progress.rpc_id(member,{"tx":party_tx,"xp":member_xp})
+	else:
+		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
+
+func can_enter_konflux() -> bool:
+	return creative_mode or level >= KONFLUX_MIN_LEVEL
+
+func safe_world_teleport_destination(base: Vector2, expected_region: int = -1) -> Vector2:
+	var region := expected_region if expected_region >= 0 else region_at(base)
+	var offsets := [
+		Vector2.ZERO,Vector2(0,70),Vector2(0,-70),Vector2(70,0),Vector2(-70,0),
+		Vector2(70,70),Vector2(-70,70),Vector2(70,-70),Vector2(-70,-70),
+		Vector2(0,140),Vector2(140,0),Vector2(-140,0),Vector2(0,-140)
+	]
+	for offset in offsets:
+		var candidate: Vector2 = (base+offset).clamp(Vector2(30,30),WORLD-Vector2(30,30))
+		if region_at(candidate) != region: continue
+		if terrain_blocked(candidate): continue
+		if blocked_by_region_wall(candidate): continue
+		var occupied := false
+		for stone in WAYSTONES:
+			if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).grow(18).has_point(candidate):
+				occupied = true
+				break
+		if occupied: continue
+		return candidate
+	return base.clamp(Vector2(30,30),WORLD-Vector2(30,30))
+
+func run_teleport_consistency_smoke() -> bool:
+	var old_level := level
+	var old_creative := creative_mode
+	creative_mode = false
+	level = KONFLUX_MIN_LEVEL-1
+	var low_blocked := not can_enter_konflux()
+	level = KONFLUX_MIN_LEVEL
+	var high_allowed := can_enter_konflux()
+	var entrance_target := safe_world_teleport_destination(KonfluxMap.ENTRANCE,region_at(KonfluxMap.ENTRANCE))
+	var entrance_ok := region_at(entrance_target) == region_at(KonfluxMap.ENTRANCE) and not terrain_blocked(entrance_target)
+	var center_ok := not KonfluxMap.blocked(KonfluxMap.CENTER,KonfluxMap.CENTER,-1,hero_collision_radius())
+	var rooms_ok := true
+	for room_id in range(KonfluxMap.BUILDING_IDS.size()):
+		var inside := KonfluxMap.CENTER+Vector2(0,190)
+		var outside: Vector2 = KonfluxMap.LOCATIONS[KonfluxMap.BUILDING_IDS[room_id]]+Vector2(0,110)
+		if KonfluxMap.blocked(inside,inside,room_id,hero_collision_radius()) or KonfluxMap.blocked(outside,outside,-1,hero_collision_radius()):
+			rooms_ok = false
+	var portals_ok := true
+	for portal in PORTALS:
+		var target_region := int(portal[2])
+		var forward := safe_world_teleport_destination(portal[1]+Vector2(0,110),target_region)
+		var back_region := region_at(portal[0])
+		var backward := safe_world_teleport_destination(portal[0]+Vector2(0,110),back_region)
+		if region_at(forward) != target_region or terrain_blocked(forward) or region_at(backward) != back_region or terrain_blocked(backward):
+			portals_ok = false
+	level = old_level
+	creative_mode = old_creative
+	var ok := low_blocked and high_allowed and entrance_ok and center_ok and rooms_ok and portals_ok
+	if ok:
+		print("TELEPORT_SMOKE_OK konflux_lv40=true entrance=true center=true rooms=true portals=true")
+	return ok
 
