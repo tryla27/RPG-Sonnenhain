@@ -3265,7 +3265,7 @@ func safe_world_teleport_destination(base: Vector2, expected_region: int = -1) -
 		Vector2(0,140),Vector2(140,0),Vector2(-140,0),Vector2(0,-140)
 	]
 	for offset in offsets:
-		var candidate := (base+offset).clamp(Vector2(30,30),WORLD-Vector2(30,30))
+		var candidate: Vector2 = (base+offset).clamp(Vector2(30,30),WORLD-Vector2(30,30))
 		if region_at(candidate) != region: continue
 		if terrain_blocked(candidate): continue
 		if blocked_by_region_wall(candidate): continue
@@ -3292,7 +3292,7 @@ func run_teleport_consistency_smoke() -> bool:
 	var rooms_ok := true
 	for room_id in range(KonfluxMap.BUILDING_IDS.size()):
 		var inside := KonfluxMap.CENTER+Vector2(0,190)
-		var outside := KonfluxMap.LOCATIONS[KonfluxMap.BUILDING_IDS[room_id]]+Vector2(0,110)
+		var outside: Vector2 = KonfluxMap.LOCATIONS[KonfluxMap.BUILDING_IDS[room_id]]+Vector2(0,110)
 		if KonfluxMap.blocked(inside,inside,room_id,hero_collision_radius()) or KonfluxMap.blocked(outside,outside,-1,hero_collision_radius()):
 			rooms_ok = false
 	var portals_ok := true
@@ -3367,7 +3367,7 @@ func interact() -> void:
 			if near_old and not region_available(int(portal[2])):
 				message("%s öffnet sich ab Level %d." % [region_name(int(portal[2])), region_level(int(portal[2]))])
 				return
-			var desired := portal[1]+Vector2(0,110) if near_old else portal[0]+Vector2(0,110)
+			var desired: Vector2 = portal[1]+Vector2(0,110) if near_old else portal[0]+Vector2(0,110)
 			var expected_region := int(portal[2]) if near_old else region_at(portal[0])
 			player_pos = safe_world_teleport_destination(desired,expected_region)
 			enemies.clear()
