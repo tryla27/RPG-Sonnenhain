@@ -209,14 +209,28 @@ jobs:
             if command -v systemctl >/dev/null 2>&1; then
               systemctl --user disable --now sonnenhain.service >/dev/null 2>&1 || true
             fi
-            pkill -f '(^|/)sonnenhain-server\.x86_64 --headless -- --dedicated-server$' || true
-            sleep 1
-            if command -v setsid >/dev/null 2>&1; then
-              nohup setsid ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
+
+            # Ohne systemd-Linger: Watchdog dauerhaft über Cron installieren.
+            # Damit startet der Server nach einem Reboot erneut und wird auch
+            # nach einem Absturz spätestens innerhalb einer Minute repariert.
+            if command -v crontab >/dev/null 2>&1; then
+              watchdog="$HOME/sonnenhain-server/releases/current/ensure-sonnenhain-server.sh"
+              tmpcron="$(mktemp)"
+              crontab -l 2>/dev/null | grep -v 'SONNENHAIN_WATCHDOG' > "$tmpcron" || true
+              printf '%s\n' \
+                "@reboot sleep 20; $watchdog >/dev/null 2>&1 # SONNENHAIN_WATCHDOG" \
+                "* * * * * $watchdog >/dev/null 2>&1 # SONNENHAIN_WATCHDOG" \
+                >> "$tmpcron"
+              crontab "$tmpcron"
+              rm -f "$tmpcron"
+              echo "SERVER_WATCHDOG=cron"
             else
-              nohup ./sonnenhain-server.x86_64 --headless -- --dedicated-server > ~/sonnenhain-server/server.log 2>&1 </dev/null &
+              echo "Permanent hosting requires either systemd linger or crontab." >&2
+              exit 1
             fi
-            echo "SERVER_START_MODE=detached linger=$linger"
+
+            "$HOME/sonnenhain-server/releases/current/ensure-sonnenhain-server.sh"
+            echo "SERVER_START_MODE=watchdog linger=$linger"
           fi
 
           for attempt in {1..12}; do
