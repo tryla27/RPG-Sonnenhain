@@ -372,7 +372,7 @@ var network_status := "Offline"
 var network_port := 27844
 var websocket_port := 27845
 const LIVE_MULTIPLAYER_URL := "wss://multiplayer.sonnenhainrpg.de/"
-const NETWORK_PROTOCOL_VERSION := 4
+const NETWORK_PROTOCOL_VERSION := 5
 var dedicated_server_mode := false
 var invite_code := ""
 var join_code := ""
@@ -386,6 +386,7 @@ var server_moving_mobs := 0
 var server_party_of_peer: Dictionary = {}
 var server_parties: Dictionary = {}
 var server_party_invites: Dictionary = {}
+var server_party_reconnect: Dictionary = {}
 var server_next_party_id := 1
 var server_action_times: Dictionary = {}
 var live_reconnect_timer := 0.0
@@ -399,6 +400,14 @@ var server_sync_status: Dictionary = {}
 var server_world_manifest: Dictionary = {}
 var party_state: Dictionary = {}
 var remote_combat_visuals: Array = []
+var remote_player_render_positions: Dictionary = {}
+var player_uuid := ""
+var recent_players: Array = []
+var save_notice_timer := 0.0
+var save_notice_text := ""
+var last_save_unix := 0
+var client_ping_timer := 0.0
+var network_ping_ms := -1
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -419,14 +428,98 @@ func detect_touch_capability() -> bool:
 	var auto_mobile = JavaScriptBridge.eval("Boolean(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ((navigator.maxTouchPoints||0)>0 && (!window.matchMedia || window.matchMedia('(pointer: coarse)').matches)))")
 	return bool(auto_mobile)
 
+func ensure_player_uuid() -> void:
+	if player_uuid != "": return
+	player_uuid = "%08x-%08x-%08x" % [int(Time.get_unix_time_from_system()) & 0xffffffff, int(Time.get_ticks_usec()) & 0xffffffff, randi() & 0xffffffff]
+
+func remember_recent_player(state: Dictionary) -> void:
+	var uuid := str(state.get("uuid","")).strip_edges()
+	if uuid == "" or uuid == player_uuid: return
+	var row := {
+		"uuid":uuid,
+		"name":str(state.get("name","Held")).substr(0,16),
+		"class":clampi(int(state.get("class",0)),0,2),
+		"level":clampi(int(state.get("level",1)),1,99),
+		"seen":int(Time.get_unix_time_from_system())
+	}
+	for i in range(recent_players.size()-1,-1,-1):
+		if str(recent_players[i].get("uuid","")) == uuid:
+			recent_players.remove_at(i)
+	recent_players.push_front(row)
+	while recent_players.size() > 12:
+		recent_players.pop_back()
+
+func update_network_interpolation(delta: float) -> void:
+	if network_mode != "client": return
+	var blend := 1.0-exp(-18.0*delta)
+	for raw_peer in remote_players.keys():
+		var peer_id := int(raw_peer)
+		var state: Dictionary = remote_players[raw_peer]
+		var coords: Array = state.get("pos",[])
+		if coords.size() < 2: continue
+		var target := Vector2(float(coords[0]),float(coords[1]))
+		var current: Vector2 = remote_player_render_positions.get(peer_id,target)
+		current = target if current.distance_to(target) > 320.0 else current.lerp(target,blend)
+		remote_player_render_positions[peer_id] = current
+	if uses_server_world():
+		var mob_blend := 1.0-exp(-15.0*delta)
+		for enemy in enemies:
+			if not enemy.has("net_target_pos"): continue
+			var target: Vector2 = enemy["net_target_pos"]
+			var current: Vector2 = enemy["pos"]
+			enemy["pos"] = target if current.distance_to(target) > 360.0 else current.lerp(target,mob_blend)
+
+func export_save_backup() -> void:
+	if not character_created: return
+	save_game()
+	var path := slot_save_path(active_save_slot,creative_mode)
+	if not FileAccess.file_exists(path): return
+	var payload := FileAccess.get_file_as_string(path)
+	if is_web_platform():
+		var filename := "sonnenhain_slot%d%s.json" % [active_save_slot,"_test" if creative_mode else ""]
+		var script := "(function(){const d=%s;const b=new Blob([d],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=%s;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);})()" % [JSON.stringify(payload),JSON.stringify(filename)]
+		JavaScriptBridge.eval(script)
+		pause_status = "Backup heruntergeladen."
+	else:
+		DisplayServer.clipboard_set(payload)
+		pause_status = "Spielstand als JSON in die Zwischenablage kopiert."
+
+func import_save_backup() -> void:
+	if creative_mode:
+		pause_status = "Import im Testmodus deaktiviert."
+		return
+	var raw := ""
+	if is_web_platform():
+		var result = JavaScriptBridge.eval("window.prompt('Sonnenhain-Backup JSON hier einfügen:','')")
+		if result == null: return
+		raw = str(result).strip_edges()
+	else:
+		raw = DisplayServer.clipboard_get().strip_edges()
+	if raw == "": return
+	var parsed: Variant = JSON.parse_string(raw)
+	if not parsed is Dictionary or not parsed.has("class_id") or not parsed.has("hero_name"):
+		pause_status = "Ungültiges Sonnenhain-Backup."
+		return
+	var file := FileAccess.open(slot_save_path(active_save_slot),FileAccess.WRITE)
+	if file == null:
+		pause_status = "Backup konnte nicht importiert werden."
+		return
+	file.store_string(JSON.stringify(parsed))
+	file.close()
+	load_game()
+	pause_status = "Backup importiert · %s · LV %d" % [hero_name,level]
+	save_game()
+
 func clear_touch_inputs() -> void:
 	touch_attack_ids.clear()
 	reset_touch_joystick()
 	reset_touch_aim()
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and touch_enabled:
-		clear_touch_inputs()
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		if touch_enabled: clear_touch_inputs()
+		if not dedicated_server_mode and character_created and panel not in ["start","creation"]:
+			save_game()
 
 func command_arg_value(prefix: String, fallback: String = "") -> String:
 	for arg in OS.get_cmdline_user_args():
@@ -438,6 +531,7 @@ func start_multiplayer_smoke_client() -> void:
 	multiplayer_smoke_client_mode = true
 	multiplayer_smoke_name = command_arg_value("--smoke-name=", "Smoke")
 	hero_name = multiplayer_smoke_name
+	player_uuid = "smoke-%s" % multiplayer_smoke_name.to_lower()
 	character_created = true
 	class_id = 0 if multiplayer_smoke_name.ends_with("A") else 2
 	player_pos = Vector2(2200.0, 1000.0) if class_id == 0 else Vector2(2260.0, 1000.0)
@@ -538,6 +632,7 @@ func _ready() -> void:
 		event_states.append(0)
 		event_progress.append(0)
 	if FileAccess.file_exists(slot_save_path(1)): load_game()
+	ensure_player_uuid()
 	previous_region = region_at(player_pos)
 	for i in 4:
 		spawn_enemy()
@@ -640,6 +735,59 @@ func build_world_manifest() -> Dictionary:
 		})
 	return {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","entities":entities,"npc_count":NPCS.size(),"event_count":WORLD_EVENTS.size(),"quest_count":QUESTS.size()}
 
+func server_reserve_party_reconnect(peer_id: int) -> void:
+	if not server_party_of_peer.has(peer_id): return
+	var party_id := int(server_party_of_peer[peer_id])
+	var uuid := str(remote_players.get(peer_id,{}).get("uuid",""))
+	server_party_of_peer.erase(peer_id)
+	if server_parties.has(party_id):
+		var members: Array = server_parties[party_id]
+		members.erase(peer_id)
+		server_parties[party_id] = members
+	if uuid != "":
+		server_party_reconnect[uuid] = {"party_id":party_id,"expires":Time.get_ticks_msec()+45000}
+	if server_parties.has(party_id):
+		server_broadcast_party(party_id)
+
+func server_restore_party_reconnect(peer_id: int) -> void:
+	if not remote_players.has(peer_id): return
+	var uuid := str(remote_players[peer_id].get("uuid",""))
+	if uuid == "" or not server_party_reconnect.has(uuid): return
+	var reservation: Dictionary = server_party_reconnect[uuid]
+	if int(reservation.get("expires",0)) < Time.get_ticks_msec():
+		server_party_reconnect.erase(uuid)
+		return
+	var party_id := int(reservation.get("party_id",0))
+	if party_id <= 0 or not server_parties.has(party_id) or server_parties[party_id].size() >= 4:
+		server_party_reconnect.erase(uuid)
+		return
+	server_parties[party_id].append(peer_id)
+	server_party_of_peer[peer_id] = party_id
+	server_party_reconnect.erase(uuid)
+	server_party_notice(peer_id,"Gruppe nach Reconnect wiederhergestellt.")
+	server_broadcast_party(party_id)
+
+func cleanup_party_reconnects() -> void:
+	var now := Time.get_ticks_msec()
+	for uuid in server_party_reconnect.keys():
+		if int(server_party_reconnect[uuid].get("expires",0)) < now:
+			server_party_reconnect.erase(uuid)
+	for party_id in server_parties.keys():
+		var members: Array = server_parties[party_id]
+		var has_reservation := false
+		for reservation in server_party_reconnect.values():
+			if int(reservation.get("party_id",0)) == int(party_id):
+				has_reservation = true
+				break
+		if members.is_empty() and not has_reservation:
+			server_parties.erase(party_id)
+		elif members.size() == 1 and not has_reservation:
+			var remaining := int(members[0])
+			server_party_of_peer.erase(remaining)
+			server_parties.erase(party_id)
+			server_party_notice(remaining,"Gruppe aufgelöst.")
+			server_send_party_state(remaining)
+
 func server_party_members(peer_id: int) -> Array:
 	if server_party_of_peer.has(peer_id):
 		var party_id := int(server_party_of_peer[peer_id])
@@ -659,6 +807,10 @@ func server_party_member_rows(party_id: int) -> Array:
 			"name":str(state.get("name","Held")),
 			"class":int(state.get("class",0)),
 			"level":int(state.get("level",1)),
+			"uuid":str(state.get("uuid","")),
+			"pos":state.get("pos",[0.0,0.0]),
+			"hp":float(state.get("hp",1.0)),
+			"max_hp":float(state.get("max_hp",1.0)),
 			"context":str(state.get("context","world")),
 			"instance_id":str(state.get("instance_id","world"))
 		})
@@ -864,7 +1016,8 @@ func rpc_remote_combat_visual(peer_id: int, payload: Dictionary) -> void:
 	queue_redraw()
 
 func local_player_state() -> Dictionary:
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+	ensure_player_uuid()
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 
 func ensure_live_multiplayer() -> void:
 	if not is_web_platform() or dedicated_server_mode or not character_created:
@@ -887,12 +1040,13 @@ func _on_peer_connected(id: int) -> void:
 
 func _on_peer_disconnected(id: int) -> void:
 	if network_mode == "host":
-		server_remove_peer_from_party(id)
+		server_reserve_party_reconnect(id)
 		server_party_invites.erase(id)
 		for target in server_party_invites.keys():
 			if int(server_party_invites[target].get("from",0)) == id:
 				server_party_invites.erase(target)
 	remote_players.erase(id)
+	remote_player_render_positions.erase(id)
 	var action_prefix := "%d:" % id
 	for key in server_action_times.keys():
 		if str(key).begins_with(action_prefix):
@@ -921,6 +1075,38 @@ func _on_server_disconnected() -> void:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	if is_web_platform() and character_created:
 		live_reconnect_timer = 2.0
+
+@rpc("any_peer","call_remote","unreliable")
+func rpc_client_ping(client_stamp: int) -> void:
+	if network_mode != "host": return
+	var sender := multiplayer.get_remote_sender_id()
+	if sender > 0:
+		rpc_server_pong.rpc_id(sender,client_stamp)
+
+@rpc("authority","call_remote","unreliable")
+func rpc_server_pong(client_stamp: int) -> void:
+	network_ping_ms = clampi(Time.get_ticks_msec()-client_stamp,0,9999)
+	queue_redraw()
+
+@rpc("authority","call_remote","unreliable")
+func rpc_server_hit_confirm(payload: Dictionary) -> void:
+	var pos_data: Array = payload.get("pos",[])
+	if pos_data.size() < 2: return
+	var pos := Vector2(float(pos_data[0]),float(pos_data[1]))
+	var uid := int(payload.get("uid",-1))
+	for enemy in enemies:
+		if int(enemy.get("uid",-2)) == uid:
+			enemy["flash"] = 0.18
+			break
+	effect(pos+Vector2(0,-30),"-%d" % int(payload.get("damage",0)),Color("fff1a1"),0.55)
+
+func server_broadcast_hit_confirm(source_peer: int, enemy: Dictionary, damage: int) -> void:
+	if network_mode != "host" or source_peer <= 0: return
+	var payload := {"uid":int(enemy.get("uid",-1)),"pos":[enemy["pos"].x,enemy["pos"].y],"damage":damage,"hp":maxf(0.0,float(enemy.get("hp",0.0)))}
+	for raw_peer in multiplayer.get_peers():
+		var peer_id := int(raw_peer)
+		if remote_players.has(peer_id) and str(remote_players[peer_id].get("context","world")) == "world":
+			rpc_server_hit_confirm.rpc_id(peer_id,payload)
 
 func to_base36(value: int) -> String:
 	var chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -1157,6 +1343,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 	clean_facing = clean_facing.normalized()
 	var clean := {
 		"protocol":NETWORK_PROTOCOL_VERSION,
+		"uuid":str(state.get("uuid","")).strip_edges().substr(0,64),
 		"context":context,
 		"instance_id":instance_id,
 		"pos":[incoming_pos.x,incoming_pos.y],
@@ -1166,6 +1353,8 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"gender":clampi(int(state.get("gender",0)),0,1),
 		"name":str(state.get("name","Held")).strip_edges().substr(0,16),
 		"level":clampi(int(state.get("level",1)),1,99),
+		"hp":clampf(float(state.get("hp",1.0)),0.0,100000.0),
+		"max_hp":clampf(float(state.get("max_hp",1.0)),1.0,100000.0),
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
@@ -1173,6 +1362,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"region":region_at(incoming_pos)
 	}
 	remote_players[sender] = clean
+	server_restore_party_reconnect(sender)
 	send_server_session_status(sender)
 	send_server_world_manifest(sender)
 	for peer_id in multiplayer.get_peers():
@@ -1224,6 +1414,10 @@ func rpc_server_world_manifest(manifest: Dictionary) -> void:
 func rpc_receive_player_presence(peer_id: int, state: Dictionary) -> void:
 	if peer_id == multiplayer.get_unique_id(): return
 	remote_players[peer_id] = state
+	var coords: Array = state.get("pos",[])
+	if coords.size() >= 2 and not remote_player_render_positions.has(peer_id):
+		remote_player_render_positions[peer_id] = Vector2(float(coords[0]),float(coords[1]))
+	remember_recent_player(state)
 	queue_redraw()
 
 @rpc("any_peer", "call_remote", "unreliable", 0)
@@ -1255,6 +1449,7 @@ func rpc_player_state(state: Dictionary) -> void:
 	clean_facing = clean_facing.normalized()
 	var clean := {
 		"protocol":NETWORK_PROTOCOL_VERSION,
+		"uuid":str(state.get("uuid","")).strip_edges().substr(0,64),
 		"context":context,
 		"instance_id":instance_id,
 		"pos":[incoming_pos.x,incoming_pos.y],
@@ -1264,6 +1459,8 @@ func rpc_player_state(state: Dictionary) -> void:
 		"gender":clampi(int(state.get("gender",0)),0,1),
 		"name":str(state.get("name","Held")).strip_edges().substr(0,16),
 		"level":clampi(int(state.get("level",1)),1,99),
+		"hp":clampf(float(state.get("hp",1.0)),0.0,100000.0),
+		"max_hp":clampf(float(state.get("max_hp",1.0)),1.0,100000.0),
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
@@ -1282,6 +1479,9 @@ func rpc_player_state(state: Dictionary) -> void:
 func rpc_receive_player_state(peer_id: int, state: Dictionary) -> void:
 	if peer_id == multiplayer.get_unique_id(): return
 	remote_players[peer_id] = state
+	var coords: Array = state.get("pos",[])
+	if coords.size() >= 2 and not remote_player_render_positions.has(peer_id):
+		remote_player_render_positions[peer_id] = Vector2(float(coords[0]),float(coords[1]))
 	queue_redraw()
 
 func push_world_snapshot() -> void:
@@ -1303,12 +1503,22 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 	if network_mode != "client" or multiplayer_context() != "world": return
 	if int(snapshot.get("protocol",-1)) != NETWORK_PROTOCOL_VERSION: return
 	if str(snapshot.get("context","world")) != "world": return
+	var previous_by_uid: Dictionary = {}
+	for existing in enemies:
+		previous_by_uid[int(existing.get("uid",-1))] = existing
 	var rebuilt: Array = []
 	for raw in snapshot.get("enemies", []):
 		if not raw is Dictionary: continue
 		var copy: Dictionary = raw.duplicate()
 		var coords: Array = raw.get("pos", [0.0,0.0])
-		copy["pos"] = Vector2(float(coords[0]),float(coords[1]))
+		var target := Vector2(float(coords[0]),float(coords[1]))
+		var uid := int(raw.get("uid",-1))
+		copy["net_target_pos"] = target
+		if previous_by_uid.has(uid):
+			var old: Dictionary = previous_by_uid[uid]
+			copy["pos"] = old.get("pos",target)
+		else:
+			copy["pos"] = target
 		rebuilt.append(copy)
 	enemies = rebuilt
 	var rebuilt_shots: Array = []
@@ -1535,6 +1745,12 @@ func _process(delta: float) -> void:
 		intro_timer -= delta
 		if intro_timer <= 0.0: finish_intro()
 	world_time += delta
+	save_notice_timer = maxf(0.0,save_notice_timer-delta)
+	update_network_interpolation(delta)
+	client_ping_timer = maxf(0.0,client_ping_timer-delta)
+	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and client_ping_timer <= 0.0:
+		client_ping_timer = 2.0
+		rpc_client_ping.rpc_id(1,Time.get_ticks_msec())
 	if chat_open: chat_fade = 7.0
 	else: chat_fade = maxf(0.0, chat_fade - delta)
 	if is_web_platform() and character_created and network_mode == "offline" and panel not in ["start", "creation"]:
@@ -1650,6 +1866,8 @@ func network_player_position(peer_id: int) -> Vector2:
 	var row: Dictionary = remote_players[peer_id]
 	var coords: Array = row.get("pos", [])
 	if coords.size() < 2: return Vector2(-10000, -10000)
+	if network_mode == "client" and remote_player_render_positions.has(peer_id):
+		return remote_player_render_positions[peer_id]
 	return Vector2(float(coords[0]), float(coords[1]))
 
 func nearest_network_player(origin: Vector2, max_distance: float = INF) -> Dictionary:
@@ -1808,6 +2026,7 @@ func process_dedicated_server(delta: float) -> void:
 	server_status_timer += delta
 	if server_status_timer >= 1.0:
 		server_status_timer = 0.0
+		cleanup_party_reconnects()
 		for peer_id in multiplayer.get_peers():
 			send_server_session_status(int(peer_id))
 	if server_spawn_timer >= 2.4:
@@ -2564,6 +2783,8 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 			effect(enemy["pos"] + Vector2(0, -44), "GIFT", Color("b7e885"), 0.8)
 	enemy["hp"] = float(enemy["hp"]) - amount
 	enemy["flash"] = 0.16
+	if source_peer > 0 and network_mode == "host":
+		server_broadcast_hit_confirm(source_peer,enemy,amount)
 	enemy["pos"] = enemy["pos"] + push * 18.0
 	if stun: enemy["stun"] = 1.2
 	effect(enemy["pos"] + Vector2(0, -25), str(amount), Color("fff1a1"), 0.75)
@@ -3718,13 +3939,16 @@ func refresh_save_slot_labels() -> void:
 func save_game() -> void:
 	var safe_pos := arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos))
 	var safe_hp := max_hp() if arena_mode != "" else hp
-	var data := {"world_version":5, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":6, "player_uuid":player_uuid, "recent_players":recent_players, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	var file: FileAccess = FileAccess.open(slot_save_path(active_save_slot, creative_mode), FileAccess.WRITE)
 	data["arcane_step_learned"] = arcane_step_learned
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	if file != null:
 		file.store_string(JSON.stringify(data))
 		file.close()
+		last_save_unix = int(Time.get_unix_time_from_system())
+		save_notice_text = "GESPEICHERT ✓"
+		save_notice_timer = 2.8
 		if not creative_mode: refresh_save_slot_labels()
 
 func load_game() -> void:
@@ -3768,6 +3992,11 @@ func load_game() -> void:
 	hero_gender = clampi(int(data.get("hero_gender", 0)), 0, 1)
 	hero_race = clampi(int(data.get("hero_race", 0)), 0, 2)
 	character_created = bool(data.get("character_created", data.has("class_id")))
+	player_uuid = str(data.get("player_uuid",""))
+	ensure_player_uuid()
+	var stored_recent: Variant = data.get("recent_players",[])
+	recent_players = stored_recent if stored_recent is Array else []
+	while recent_players.size() > 12: recent_players.pop_back()
 	pending_gender = hero_gender
 	pending_race = hero_race
 	var found_regions: Array = data.get("discovered_regions", [])
@@ -3992,6 +4221,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(300, 432, 550, 42).has_point(mouse):
 			play_sound("menu")
 			toggle_creative_mode()
+		elif not creative_mode and Rect2(300,480,260,38).has_point(mouse):
+			export_save_backup()
+		elif not creative_mode and Rect2(590,480,260,38).has_point(mouse):
+			import_save_backup()
 		elif Rect2(300, 563, 550, 35).has_point(mouse):
 			if is_web_platform():
 				save_game()
@@ -4093,6 +4326,9 @@ func start_new_game() -> void:
 	dash_timer = 0.0
 	invulnerable = 0.0
 	hero_name = creation_name.strip_edges().substr(0, 16) if creation_name.strip_edges() != "" else "Held"
+	player_uuid = ""
+	ensure_player_uuid()
+	recent_players.clear()
 	hero_gender = pending_gender
 	hero_race = pending_race
 	character_created = true
@@ -4715,7 +4951,7 @@ func draw_multiplayer_debug_overlay() -> void:
 	var box := Rect2(VIEW.x-265.0,8.0,253.0,39.0)
 	draw_rect(box,Color(0.02,0.05,0.07,0.62))
 	draw_rect(box,Color("78c7d9",0.55),false,1.0)
-	text_at(box.position+Vector2(7,15),"NET v%d · #%d · %d online" % [NETWORK_PROTOCOL_VERSION,peer_id,int(server_sync_status.get("online",0))],10,Color("d9f7ff"))
+	text_at(box.position+Vector2(7,15),"NET v%d · #%d · %d online · %dms" % [NETWORK_PROTOCOL_VERSION,peer_id,int(server_sync_status.get("online",0)),maxi(0,network_ping_ms)],10,Color("d9f7ff"))
 	text_at(box.position+Vector2(7,31),"%d Mobs · %d bewegen · Remote %d" % [int(server_sync_status.get("mobs",enemies.size())),int(server_sync_status.get("moving_mobs",0)),remote_players.size()],10,Color("d5dfb8"))
 
 func draw_online_list() -> void:
@@ -6643,7 +6879,10 @@ func draw_hud() -> void:
 		draw_arc(map_center + Vector2(0, 76), 13, 0, TAU, 20, Color("c9a45e"), 2)
 		text_at(map_center + Vector2(-6, 81), "+", 14, Color("ffe9b0"))
 	if network_mode != "offline":
-		text_at(Vector2(925, 188), "KOOP %d/4" % (remote_players.size()+1), 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+		var ping_text := " · %d ms" % network_ping_ms if network_ping_ms >= 0 else ""
+		text_at(Vector2(925, 188), "KOOP %d/4%s" % [remote_players.size()+1,ping_text], 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+	if save_notice_timer > 0.0:
+		text_at(Vector2(925, 205), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, 180)
 	if notice_timer > 0:
 		ui_box(Rect2(12, 549, 510, 36), Color("415f59"))
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
@@ -6904,6 +7143,16 @@ func draw_local_minimap(rect: Rect2) -> void:
 	for enemy in enemies:
 		var p: Vector2 = inset.position + (enemy["pos"] - start) * scale_map
 		if p.distance_to(circle_center) < circle_radius - 4.0: draw_circle(p, 2, Color("ef8584"))
+	for member in (party_state.get("members",[]) as Array):
+		if not member is Dictionary or str(member.get("uuid","")) == player_uuid: continue
+		if str(member.get("context","world")) != "world": continue
+		var member_data: Array = member.get("pos",[])
+		if member_data.size() < 2: continue
+		var member_world := Vector2(float(member_data[0]),float(member_data[1]))
+		var member_mark := inset.position + (member_world-start)*scale_map
+		if member_mark.distance_to(circle_center) < circle_radius-4.0:
+			draw_circle(member_mark,4,Color("8ff1c1"))
+			draw_arc(member_mark,5,0.0,TAU,14,Color("eaffd9"),1)
 	draw_circle(rect.get_center(), 4, Color.WHITE)
 	draw_line(rect.get_center(), rect.get_center() + facing.normalized() * 10, Color("fff1ad"), 2)
 	draw_arc(circle_center, circle_radius + 3.0, 0.0, TAU, 64, Color("f0d393"), 3)
@@ -7009,13 +7258,19 @@ func draw_party_panel() -> void:
 			var y := 265.0+i*54.0
 			draw_rect(Rect2(205,y-25,705,43),Color("203239",0.88))
 			var cls := clampi(int(row.get("class",0)),0,2)
-			text_at(Vector2(220,y),"%s · %s · LV %d" % [str(row.get("name","Held")),CLASS_NAMES[cls],int(row.get("level",1))],15,Color("fff0ce"))
+			var mhp := maxf(1.0,float(row.get("max_hp",1.0)))
+			var hp_pct := int(clampf(float(row.get("hp",0.0))/mhp,0.0,1.0)*100.0)
+			text_at(Vector2(220,y),"%s · %s · LV %d · HP %d%%" % [str(row.get("name","Held")),CLASS_NAMES[cls],int(row.get("level",1)),hp_pct],15,Color("fff0ce"))
 			text_at(Vector2(650,y),"%s:%s" % [str(row.get("context","world")),str(row.get("instance_id","world"))],12,Color("a9beb7"),HORIZONTAL_ALIGNMENT_RIGHT,240)
 		if members.size() > 0:
 			ui_button(Rect2(205,510,335,46),"GRUPPE VERLASSEN")
 		else:
 			text_at(Vector2(205,285),"Im Chat: /invite Spielername",18,Color("dfe9dc"))
 			text_at(Vector2(205,316),"Alternativ: /accept · /decline · /leave",13,Color("a9beb7"))
+			text_at(Vector2(205,360),"ZULETZT GETROFFEN",14,Color("e9cc90"))
+			for i in mini(4,recent_players.size()):
+				var recent: Dictionary = recent_players[i]
+				text_at(Vector2(220,388+i*24),"%s · %s · LV %d" % [str(recent.get("name","Held")),CLASS_NAMES[clampi(int(recent.get("class",0)),0,2)],int(recent.get("level",1))],12,Color("cfe2d9"))
 	ui_button(Rect2(750,548,160,38),"SCHLIESSEN")
 
 func draw_mechanics_panel() -> void:
@@ -7156,12 +7411,15 @@ func draw_pause_panel() -> void:
 	draw_volume_slider(Vector2(300, 326), "MUSIK", music_volume, Color("d9b67b"))
 	draw_volume_slider(Vector2(300, 380), "EFFEKTE", effects_volume, Color("9bcfd0"))
 	ui_button(Rect2(300, 432, 550, 42), "TESTMODUS VERLASSEN" if creative_mode else "TESTMODUS STARTEN")
+	if not creative_mode:
+		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
+		ui_button(Rect2(590, 480, 260, 38), "BACKUP IMPORT")
 	if creative_mode:
 		text_at(Vector2(302, 504), "LEVEL %d · %d Skillpunkte" % [level, skill_points], 14, Color("fff0bd"))
 		for index in 4:
 			ui_button(Rect2(300 + index * 113, 510, 105, 38), ["-10", "-1", "+1", "+10"][index])
 		ui_button(Rect2(762, 510, 180, 38), "REISEN")
-	text_at(Vector2(302, 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
+	text_at(Vector2(302, 538 if not creative_mode else 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
 	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUR STARTSEITE" if is_web_platform() else "SPEICHERN & ZUM HAUPTMENÜ")
 
 func draw_controls_panel() -> void:
@@ -7552,7 +7810,8 @@ func draw_journal_panel() -> void:
 		var y := 226 + row * 57
 		ui_box(Rect2(165, y, 815, 53), Color("577b69") if state == 2 else Color("45665f"))
 		text_at(Vector2(180, y + 21), "%s  ·  %s" % [q["title"], q["npc"]], 17, Color("fff1bc"))
-		text_at(Vector2(180, y + 42), "%s %d/%d  ·  %d XP / %d Gold" % [ENEMY_TYPES[int(q["target"])]["name"], quests[id]["progress"], q["count"], q["xp"], q["gold"]], 14, Color("d8e6d3"))
+		var group_suffix := " · GRUPPE" if not (party_state.get("members",[]) as Array).is_empty() and state == 1 else ""
+		text_at(Vector2(180, y + 42), "%s %d/%d  ·  %d XP / %d Gold%s" % [ENEMY_TYPES[int(q["target"])]["name"], quests[id]["progress"], q["count"], q["xp"], q["gold"],group_suffix], 14, Color("d8e6d3"))
 		text_at(Vector2(867, y + 29), status, 14, Color("fff0ad"))
 	text_at(Vector2(170, 592), "Sprich mit dem Questgeber, um die nächste Aufgabe anzunehmen. Mausrad: scrollen.", 15, Color("d9e6d5"))
 
@@ -7645,6 +7904,17 @@ func draw_world_atlas(rect: Rect2) -> void:
 		var point: Vector2 = inset.position + npc["pos"] * map_scale
 		draw_circle(point, 5, Color("263038"))
 		text_at(point + Vector2(-5, 4), "!", 12, Color("ffda81"), HORIZONTAL_ALIGNMENT_CENTER, 10)
+	var party_members: Array = party_state.get("members",[])
+	for member in party_members:
+		if not member is Dictionary: continue
+		if str(member.get("uuid","")) == player_uuid: continue
+		if str(member.get("context","world")) != "world": continue
+		var member_pos_data: Array = member.get("pos",[])
+		if member_pos_data.size() < 2: continue
+		var member_pos := Vector2(float(member_pos_data[0]),float(member_pos_data[1]))
+		var party_marker := inset.position + member_pos*map_scale
+		draw_circle(party_marker,6,Color("273740"))
+		draw_arc(party_marker,5,0.0,TAU,16,Color("8ff1c1"),2)
 	var player_map := inset.position + (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)) * map_scale
 	draw_arc(player_map, 9.0 + sin(world_time * 3.0) * 1.0, 0.0, TAU, 24, Color("ffffff"), 3)
 	draw_colored_polygon(PackedVector2Array([player_map + Vector2(0,-7),player_map + Vector2(6,0),player_map + Vector2(0,7),player_map + Vector2(-6,0)]), Color("252b32"))
