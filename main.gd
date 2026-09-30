@@ -383,7 +383,7 @@ var network_status := "Offline"
 var network_port := 27844
 var websocket_port := 27845
 const LIVE_MULTIPLAYER_URL := "wss://multiplayer.sonnenhainrpg.de/"
-const NETWORK_PROTOCOL_VERSION := 6
+const NETWORK_PROTOCOL_VERSION := 7
 var dedicated_server_mode := false
 var invite_code := ""
 var join_code := ""
@@ -421,6 +421,7 @@ var save_notice_text := ""
 var last_save_unix := 0
 var client_ping_timer := 0.0
 var network_ping_ms := -1
+var processed_server_transactions: Array = []
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -467,6 +468,10 @@ func start_multiplayer_smoke_client() -> void:
 	if not run_rescue_quest_consistency_smoke():
 		print("RESCUE_SMOKE_FAIL")
 		get_tree().quit(34)
+		return
+	if not run_generic_quest_sync_smoke():
+		print("QUEST_SYNC_SMOKE_FAIL")
+		get_tree().quit(35)
 		return
 	multiplayer_smoke_name = command_arg_value("--smoke-name=", "Smoke")
 	hero_name = multiplayer_smoke_name
@@ -828,8 +833,10 @@ func rpc_server_damage(amount: int) -> void:
 		apply_player_damage(clampi(amount, 1, 500))
 
 @rpc("authority", "call_remote", "reliable")
-func rpc_server_combat_reward(enemy_type: int, xp_reward: int, gold_reward: int, item_rewards: Array) -> void:
+func rpc_server_combat_reward(tx_id: String, enemy_type: int, xp_reward: int, gold_reward: int, item_rewards: Array) -> void:
 	if network_mode != "client": return
+	tx_id = tx_id.substr(0,96)
+	if not remember_server_transaction(tx_id): return
 	enemy_type = clampi(enemy_type, 0, ENEMY_TYPES.size() - 1)
 	xp_reward = clampi(xp_reward, 0, 100000)
 	gold_reward = clampi(gold_reward, 0, 100000)
@@ -844,13 +851,6 @@ func rpc_server_combat_reward(enemy_type: int, xp_reward: int, gold_reward: int,
 			var compensation := maxi(1, item_sale_value(item))
 			gold += compensation
 			message("Inventar voll · Beute automatisch für %d Gold verkauft." % compensation)
-	for qindex in quests.size():
-		var quest: Dictionary = quests[qindex]
-		if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == enemy_type:
-			quest["progress"] = mini(int(QUESTS[qindex]["count"]), int(quest["progress"]) + 1)
-			if quest["progress"] >= QUESTS[qindex]["count"]:
-				quest["state"] = 2
-				message("Questziel erreicht: %s. Kehre zurück!" % QUESTS[qindex]["title"])
 	if xp_reward > 0 or gold_reward > 0 or not item_rewards.is_empty():
 		play_sound("pickup")
 		message("+%d XP · +%d Gold%s" % [xp_reward, gold_reward, " · Beute erhalten" if not item_rewards.is_empty() else ""])
@@ -858,7 +858,7 @@ func rpc_server_combat_reward(enemy_type: int, xp_reward: int, gold_reward: int,
 
 func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
-	server_send_rescue_progress(peer_id,enemy)
+	server_send_all_quest_progress(peer_id,enemy)
 	var player_state: Dictionary = remote_players[peer_id]
 	var reward_class := clampi(int(player_state.get("class", 0)), 0, 2)
 	var type := clampi(int(enemy.get("type", 0)), 0, ENEMY_TYPES.size() - 1)
@@ -879,17 +879,21 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 		if reward is Dictionary:
 			network_rewards.append(network_reward_payload(reward))
 	var party_members := server_party_members(peer_id)
+	var mob_uid := int(enemy.get("uid",-1))
+	var killer_uuid := str(player_state.get("uuid","peer%d" % peer_id))
+	var reward_tx := "reward:%d:%s" % [mob_uid,killer_uuid]
 	if party_members.size() > 1:
 		# Killer erhält Beute/Gold; XP geht separat an alle Gruppenmitglieder.
 		# Der Killer bekommt den Quest-Kill bereits über combat_reward, daher dort
 		# kein zweiter Questfortschritt im Gruppenpaket.
-		rpc_server_combat_reward.rpc_id(peer_id,type,0,gold_reward,network_rewards)
+		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,0,gold_reward,network_rewards)
 		for raw_member in party_members:
 			var member := int(raw_member)
 			if member <= 0 or not remote_players.has(member): continue
-			rpc_server_party_progress.rpc_id(member,{"enemy_type":type,"xp":xp_reward,"quest":member != peer_id})
+			var member_uuid := str(remote_players[member].get("uuid","peer%d" % member))
+			rpc_server_party_progress.rpc_id(member,{"tx":"partyxp:%d:%s" % [mob_uid,member_uuid],"xp":xp_reward})
 	else:
-		rpc_server_combat_reward.rpc_id(peer_id,type,xp_reward,gold_reward,network_rewards)
+		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
 
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null or dedicated_server_mode: return
@@ -954,6 +958,8 @@ func rpc_player_state(state: Dictionary) -> void:
 		"instance_id":instance_id,
 		"rescue_state":clampi(int(state.get("rescue_state",0)),0,3),
 		"rescue_kills":clampi(int(state.get("rescue_kills",0)),0,RESCUE_GOAL),
+		"active_quests":sanitize_active_quest_rows(state.get("active_quests",[])),
+		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -3302,6 +3308,7 @@ func interact() -> void:
 			play_sound("level")
 			message("Nela: Danke! Die Dornen kamen aus den Alten Ruinen. +160 XP, +80 Gold und eine seltene Klassenwaffe.")
 			save_game()
+			announce_quest_state()
 		else:
 			message("Nela: Hinter dem Turm in den Ruinen liegt die Quelle der Plage. Sei vorsichtig!")
 		return
@@ -3356,6 +3363,7 @@ func interact_world_event(index: int) -> void:
 	else:
 		message("%s: %s" % [encounter["name"], encounter["after"]])
 	save_game()
+	announce_quest_state()
 
 func healing_cost() -> int:
 	return 8 + level * 3 + int(max_hp() / 50.0)
@@ -3460,12 +3468,14 @@ func quest_dialogue(npc_name: String) -> void:
 			add_item(reward_item)
 			message("Quest abgeschlossen: %s! +%d XP, +%d Gold" % [QUESTS[i]["title"], QUESTS[i]["xp"], QUESTS[i]["gold"]])
 			save_game()
+			announce_quest_state()
 			return
 	for i in QUESTS.size():
 		if QUESTS[i]["npc"] == npc_name and quests[i]["state"] == 0 and level + 3 >= region_level(int(ENEMY_TYPES[int(QUESTS[i]["target"])]["region"])):
 			quests[i]["state"] = 1
 			message("%s: %s — besiege %d %s!" % [npc_name, QUESTS[i]["title"], QUESTS[i]["count"], ENEMY_TYPES[int(QUESTS[i]["target"])]["name"]])
 			save_game()
+			announce_quest_state()
 			return
 	message("%s: Deine Aufgaben stehen im Questbuch (J)." % npc_name)
 
@@ -3497,7 +3507,7 @@ func save_game() -> void:
 	if konflux_preview_mode: return
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":6, "player_uuid":player_uuid, "recent_players":recent_players, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	var file: FileAccess = FileAccess.open(slot_save_path(active_save_slot, creative_mode), FileAccess.WRITE)
 	data["arcane_step_learned"] = arcane_step_learned
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
@@ -3557,6 +3567,9 @@ func load_game() -> void:
 	var stored_recent: Variant = data.get("recent_players",[])
 	recent_players = stored_recent if stored_recent is Array else []
 	while recent_players.size() > 12: recent_players.pop_back()
+	var stored_transactions: Variant = data.get("processed_server_transactions",[])
+	processed_server_transactions = stored_transactions if stored_transactions is Array else []
+	while processed_server_transactions.size() > 256: processed_server_transactions.pop_front()
 	pending_gender = hero_gender
 	pending_race = hero_race
 	var found_regions: Array = data.get("discovered_regions", [])
@@ -7876,6 +7889,8 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"instance_id":instance_id,
 		"rescue_state":clampi(int(state.get("rescue_state",0)),0,3),
 		"rescue_kills":clampi(int(state.get("rescue_kills",0)),0,RESCUE_GOAL),
+		"active_quests":sanitize_active_quest_rows(state.get("active_quests",[])),
+		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -8296,21 +8311,18 @@ func rpc_party_notice(value: String) -> void:
 	message(value)
 
 @rpc("authority","call_remote","reliable")
+func rpc_server_quest_progress(payload: Dictionary) -> void:
+	if network_mode != "client": return
+	apply_server_quest_progress(payload)
+
+@rpc("authority","call_remote","reliable")
 func rpc_server_party_progress(payload: Dictionary) -> void:
 	if network_mode != "client": return
+	var tx_id := str(payload.get("tx","")).substr(0,96)
+	if not remember_server_transaction(tx_id): return
 	var xp_reward := clampi(int(payload.get("xp",0)),0,100000)
-	var enemy_type := clampi(int(payload.get("enemy_type",0)),0,ENEMY_TYPES.size()-1)
 	if xp_reward > 0:
 		gain_xp(xp_reward)
-	if bool(payload.get("quest",false)):
-		for qindex in quests.size():
-			var quest: Dictionary = quests[qindex]
-			if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == enemy_type:
-				quest["progress"] = mini(int(QUESTS[qindex]["count"]),int(quest["progress"])+1)
-				if quest["progress"] >= int(QUESTS[qindex]["count"]):
-					quest["state"] = 2
-					message("Gruppen-Questziel erreicht: %s" % QUESTS[qindex]["title"])
-	if xp_reward > 0 or bool(payload.get("quest",false)):
 		save_game()
 
 @rpc("authority","call_remote","reliable")
@@ -8667,7 +8679,7 @@ func run_inventory_consistency_smoke() -> bool:
 	equipped_ring_uid = old_ring
 	next_uid = old_next
 	validate_equipment_slots()
-	print("INVENTORY_SMOKE_OK unique_uids=true toggle_armor=true buy=true equipped_sell_block=true server_loot_local_uid=true loadout_state=true")
+	print("INVENTORY_SMOKE_OK unique_uids=true toggle_armor=true buy=true equipped_sell_block=true server_loot_local_uid=true loadout_state=true tx_dedupe=persistent")
 	return true
 
 func server_reserve_party_reconnect(peer_id: int) -> void:
@@ -8856,6 +8868,92 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	item["element"] = str(item.get("element","")) if str(item.get("element","")) in ["","feuer","eis","blitz","gift"] else ""
 	return item
 
+func active_quest_sync_rows() -> Array:
+	var rows: Array = []
+	for i in mini(QUESTS.size(),quests.size()):
+		var row: Dictionary = quests[i]
+		if int(row.get("state",0)) == 1:
+			rows.append([i,clampi(int(row.get("progress",0)),0,int(QUESTS[i]["count"]))])
+	return rows
+
+func active_event_sync_rows() -> Array:
+	var rows: Array = []
+	for i in mini(WORLD_EVENTS.size(),event_states.size()):
+		if int(event_states[i]) == 1:
+			rows.append([i,clampi(int(event_progress[i]),0,int(WORLD_EVENTS[i]["goal"]))])
+	return rows
+
+func sanitize_active_quest_rows(raw: Variant) -> Array:
+	var out: Array = []
+	if not raw is Array: return out
+	var seen: Dictionary = {}
+	for entry in raw:
+		if not entry is Array or entry.size() < 2: continue
+		var quest_id := int(entry[0])
+		if quest_id < 0 or quest_id >= QUESTS.size() or seen.has(quest_id): continue
+		seen[quest_id] = true
+		out.append([quest_id,clampi(int(entry[1]),0,int(QUESTS[quest_id]["count"]))])
+	return out
+
+func sanitize_active_event_rows(raw: Variant) -> Array:
+	var out: Array = []
+	if not raw is Array: return out
+	var seen: Dictionary = {}
+	for entry in raw:
+		if not entry is Array or entry.size() < 2: continue
+		var event_id := int(entry[0])
+		if event_id < 0 or event_id >= WORLD_EVENTS.size() or seen.has(event_id): continue
+		seen[event_id] = true
+		out.append([event_id,clampi(int(entry[1]),0,int(WORLD_EVENTS[event_id]["goal"]))])
+	return out
+
+func server_transaction_seen(tx_id: String) -> bool:
+	return tx_id != "" and tx_id in processed_server_transactions
+
+func remember_server_transaction(tx_id: String) -> bool:
+	if tx_id == "" or server_transaction_seen(tx_id): return false
+	processed_server_transactions.append(tx_id)
+	while processed_server_transactions.size() > 256:
+		processed_server_transactions.pop_front()
+	return true
+
+func announce_quest_state() -> void:
+	if network_mode == "client":
+		announce_multiplayer_context()
+
+func apply_server_quest_progress(payload: Dictionary) -> bool:
+	var tx_id := str(payload.get("tx","")).substr(0,96)
+	if not remember_server_transaction(tx_id): return false
+	var changed := false
+	var shared := bool(payload.get("shared",false))
+	for raw_id in (payload.get("quests",[]) as Array):
+		var quest_id := int(raw_id)
+		if quest_id < 0 or quest_id >= quests.size(): continue
+		var quest: Dictionary = quests[quest_id]
+		if int(quest.get("state",0)) != 1: continue
+		quest["progress"] = mini(int(QUESTS[quest_id]["count"]),int(quest.get("progress",0))+1)
+		if int(quest["progress"]) >= int(QUESTS[quest_id]["count"]):
+			quest["state"] = 2
+			message("%sQuestziel erreicht: %s. Kehre zurück!" % ["Gruppe · " if shared else "",QUESTS[quest_id]["title"]])
+		changed = true
+	for raw_id in (payload.get("events",[]) as Array):
+		var event_id := int(raw_id)
+		if event_id < 0 or event_id >= event_states.size(): continue
+		if int(event_states[event_id]) != 1: continue
+		event_progress[event_id] = mini(int(WORLD_EVENTS[event_id]["goal"]),int(event_progress[event_id])+1)
+		if int(event_progress[event_id]) >= int(WORLD_EVENTS[event_id]["goal"]):
+			event_states[event_id] = 2
+			message("%s%s ist in Sicherheit! Sprich erneut mit %s (E)." % ["Gruppe · " if shared else "",WORLD_EVENTS[event_id]["role"],WORLD_EVENTS[event_id]["name"]])
+			play_sound("level")
+		changed = true
+	if bool(payload.get("rescue",false)):
+		apply_rescue_progress(1,shared)
+		changed = true
+	if changed:
+		save_game()
+		announce_quest_state()
+	return changed
+
 func apply_rescue_progress(amount: int, shared: bool = false) -> void:
 	if rescue_state != 1 or amount <= 0: return
 	rescue_kills = mini(RESCUE_GOAL,rescue_kills+amount)
@@ -8891,6 +8989,40 @@ func run_rescue_quest_consistency_smoke() -> bool:
 	network_mode = old_network
 	if ok:
 		print("RESCUE_SMOKE_OK transition=19_to_20 group_progress=true")
+	return ok
+
+func run_generic_quest_sync_smoke() -> bool:
+	if quests.is_empty() or event_states.is_empty(): return false
+	var old_quests := quests.duplicate(true)
+	var old_event_states := event_states.duplicate()
+	var old_event_progress := event_progress.duplicate()
+	var old_rescue_state := rescue_state
+	var old_rescue_kills := rescue_kills
+	var old_tx := processed_server_transactions.duplicate()
+	var old_network := network_mode
+	network_mode = "offline"
+	quests[0] = {"state":1,"progress":0}
+	event_states[0] = 1
+	event_progress[0] = 0
+	rescue_state = 1
+	rescue_kills = 0
+	processed_server_transactions = []
+	var payload := {"tx":"smoke:quest:1","quests":[0],"events":[0],"rescue":true,"shared":true}
+	var first := apply_server_quest_progress(payload)
+	var q1 := int(quests[0]["progress"])
+	var e1 := int(event_progress[0])
+	var r1 := rescue_kills
+	var duplicate := apply_server_quest_progress(payload)
+	var ok := first and not duplicate and q1 == 1 and e1 == 1 and r1 == 1 and int(quests[0]["progress"]) == 1 and int(event_progress[0]) == 1 and rescue_kills == 1
+	quests = old_quests
+	event_states = old_event_states
+	event_progress = old_event_progress
+	rescue_state = old_rescue_state
+	rescue_kills = old_rescue_kills
+	processed_server_transactions = old_tx
+	network_mode = old_network
+	if ok:
+		print("QUEST_SYNC_SMOKE_OK all_quests=true events=true rescue=true duplicate_tx_blocked=true")
 	return ok
 
 func network_reward_payload(item: Dictionary) -> Dictionary:
@@ -8942,18 +9074,36 @@ func update_dedicated_rescue_spawns() -> void:
 		server_next_mob_uid += 1
 		enemies.append(mob)
 
-func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
-	if not bool(enemy.get("invasion",false)) or killer_peer <= 0: return
+func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void:
+	if killer_peer <= 0: return
+	var enemy_type := clampi(int(enemy.get("type",0)),0,ENEMY_TYPES.size()-1)
+	var enemy_pos: Vector2 = enemy.get("pos",Vector2.ZERO)
+	var mob_uid := int(enemy.get("uid",-1))
 	var recipients := server_party_members(killer_peer)
 	for raw_peer in recipients:
 		var peer_id := int(raw_peer)
 		if not remote_players.has(peer_id): continue
 		var state: Dictionary = remote_players[peer_id]
-		if int(state.get("rescue_state",0)) != 1: continue
 		if str(state.get("context","world")) != "world": continue
-		rpc_server_rescue_progress.rpc_id(peer_id,1,peer_id != killer_peer)
+		var matched_quests: Array = []
+		for entry in (state.get("active_quests",[]) as Array):
+			if not entry is Array or entry.size() < 1: continue
+			var quest_id := int(entry[0])
+			if quest_id >= 0 and quest_id < QUESTS.size() and int(QUESTS[quest_id]["target"]) == enemy_type:
+				matched_quests.append(quest_id)
+		var matched_events: Array = []
+		for entry in (state.get("active_events",[]) as Array):
+			if not entry is Array or entry.size() < 1: continue
+			var event_id := int(entry[0])
+			if event_id >= 0 and event_id < WORLD_EVENTS.size() and enemy_pos.distance_to(WORLD_EVENTS[event_id]["pos"]) <= 560.0:
+				matched_events.append(event_id)
+		var rescue_match := bool(enemy.get("invasion",false)) and int(state.get("rescue_state",0)) == 1
+		if matched_quests.is_empty() and matched_events.is_empty() and not rescue_match: continue
+		var uuid := str(state.get("uuid","peer%d" % peer_id))
+		var tx := "quest:%d:%s" % [mob_uid,uuid]
+		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer})
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos), "konflux":konflux.active, "room":konflux.room}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos), "konflux":konflux.active, "room":konflux.room}
 
