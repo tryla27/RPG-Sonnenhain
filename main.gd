@@ -374,7 +374,7 @@ var network_status := "Offline"
 var network_port := 27844
 var websocket_port := 27845
 const LIVE_MULTIPLAYER_URL := "wss://multiplayer.sonnenhainrpg.de/"
-const NETWORK_PROTOCOL_VERSION := 5
+const NETWORK_PROTOCOL_VERSION := 6
 var dedicated_server_mode := false
 var invite_code := ""
 var join_code := ""
@@ -383,6 +383,7 @@ var local_peer_id := 1
 var sync_timer := 0.0
 var server_spawn_timer := 0.0
 var server_status_timer := 0.0
+var server_rescue_spawn_timer := 0.0
 var server_next_mob_uid := 1
 var server_moving_mobs := 0
 var server_party_of_peer: Dictionary = {}
@@ -602,6 +603,10 @@ func start_multiplayer_smoke_client() -> void:
 	if not run_inventory_consistency_smoke():
 		print("INVENTORY_SMOKE_FAIL")
 		get_tree().quit(33)
+		return
+	if not run_rescue_quest_consistency_smoke():
+		print("RESCUE_SMOKE_FAIL")
+		get_tree().quit(34)
 		return
 	multiplayer_smoke_name = command_arg_value("--smoke-name=", "Smoke")
 	hero_name = multiplayer_smoke_name
@@ -1101,9 +1106,46 @@ func rpc_remote_combat_visual(peer_id: int, payload: Dictionary) -> void:
 	while remote_combat_visuals.size() > 40: remote_combat_visuals.pop_front()
 	queue_redraw()
 
+func apply_rescue_progress(amount: int, shared: bool = false) -> void:
+	if rescue_state != 1 or amount <= 0: return
+	rescue_kills = mini(RESCUE_GOAL,rescue_kills+amount)
+	if rescue_kills >= RESCUE_GOAL:
+		rescue_state = 2
+		rescue_banner_timer = 6.0
+		rescue_intro_timer = 5.0
+		effect(RESCUE_POS+Vector2(0,-210),"BLÜTENWEILER GERETTET",Color("a8edb5"),5.0)
+		message(("Gemeinsam gerettet! " if shared else "")+"Blütenweiler gerettet! Nela wartet am Dorfplatz auf dich (E).")
+		play_sound("level")
+	else:
+		message("%sBlütenweiler verteidigt: %d/%d Dornenwesen besiegt." % ["Gruppe · " if shared else "",rescue_kills,RESCUE_GOAL])
+	save_game()
+	if network_mode == "client":
+		announce_multiplayer_context()
+
+@rpc("authority","call_remote","reliable")
+func rpc_server_rescue_progress(amount: int, shared: bool) -> void:
+	if network_mode != "client": return
+	apply_rescue_progress(clampi(amount,0,RESCUE_GOAL),shared)
+
+func run_rescue_quest_consistency_smoke() -> bool:
+	var old_state := rescue_state
+	var old_kills := rescue_kills
+	var old_network := network_mode
+	rescue_state = 1
+	rescue_kills = RESCUE_GOAL-1
+	network_mode = "offline"
+	apply_rescue_progress(1,true)
+	var ok := rescue_state == 2 and rescue_kills == RESCUE_GOAL
+	rescue_state = old_state
+	rescue_kills = old_kills
+	network_mode = old_network
+	if ok:
+		print("RESCUE_SMOKE_OK transition=19_to_20 group_progress=true")
+	return ok
+
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 
 func ensure_live_multiplayer() -> void:
 	if not is_web_platform() or dedicated_server_mode or not character_created:
@@ -1373,6 +1415,7 @@ func network_reward_payload(item: Dictionary) -> Dictionary:
 
 func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
+	server_send_rescue_progress(peer_id,enemy)
 	var player_state: Dictionary = remote_players[peer_id]
 	var reward_class := clampi(int(player_state.get("class", 0)), 0, 2)
 	var type := clampi(int(enemy.get("type", 0)), 0, ENEMY_TYPES.size() - 1)
@@ -1443,6 +1486,8 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"uuid":str(state.get("uuid","")).strip_edges().substr(0,64),
 		"context":context,
 		"instance_id":instance_id,
+		"rescue_state":clampi(int(state.get("rescue_state",0)),0,3),
+		"rescue_kills":clampi(int(state.get("rescue_kills",0)),0,RESCUE_GOAL),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -1549,6 +1594,8 @@ func rpc_player_state(state: Dictionary) -> void:
 		"uuid":str(state.get("uuid","")).strip_edges().substr(0,64),
 		"context":context,
 		"instance_id":instance_id,
+		"rescue_state":clampi(int(state.get("rescue_state",0)),0,3),
+		"rescue_kills":clampi(int(state.get("rescue_kills",0)),0,RESCUE_GOAL),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -1984,6 +2031,59 @@ func nearest_network_player(origin: Vector2, max_distance: float = INF) -> Dicti
 			best_pos = pos
 	return {"peer":best_peer, "pos":best_pos, "distance":best_distance}
 
+func server_rescue_active_peers() -> Array:
+	var peers: Array = []
+	for raw_peer in remote_players.keys():
+		var peer_id := int(raw_peer)
+		var state: Dictionary = remote_players[raw_peer]
+		if str(state.get("context","world")) != "world": continue
+		if int(state.get("rescue_state",0)) != 1: continue
+		var pos := network_player_position(peer_id)
+		if pos.x < -9000.0 or pos.distance_to(RESCUE_POS) > 850.0: continue
+		peers.append(peer_id)
+	return peers
+
+func update_dedicated_rescue_spawns() -> void:
+	if network_mode != "host": return
+	var peers := server_rescue_active_peers()
+	if peers.is_empty(): return
+	var active := 0
+	for enemy in enemies:
+		if bool(enemy.get("invasion",false)): active += 1
+	if active >= 5: return
+	var min_kills := RESCUE_GOAL
+	for raw_peer in peers:
+		min_kills = mini(min_kills,int(remote_players[int(raw_peer)].get("rescue_kills",0)))
+	var needed := mini(5-active,maxi(0,RESCUE_GOAL-min_kills-active))
+	if needed <= 0: return
+	var positions := [Vector2(-250,-40),Vector2(230,-70),Vector2(-220,140),Vector2(240,130),Vector2(0,310)]
+	for n in needed:
+		var spot := RESCUE_POS+positions[(min_kills+active+n)%positions.size()]
+		if terrain_blocked(spot): continue
+		var kind := (min_kills+active+n)%2
+		var info: Dictionary = ENEMY_TYPES[kind]
+		var mob := make_enemy(kind,spot)
+		var enemy_hp := float(info["hp"])*1.4
+		mob["hp"] = enemy_hp
+		mob["max_hp"] = enemy_hp
+		mob["invasion"] = true
+		mob["context"] = "world"
+		mob["instance_id"] = "world"
+		mob["uid"] = server_next_mob_uid
+		server_next_mob_uid += 1
+		enemies.append(mob)
+
+func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
+	if not bool(enemy.get("invasion",false)) or killer_peer <= 0: return
+	var recipients := server_party_members(killer_peer)
+	for raw_peer in recipients:
+		var peer_id := int(raw_peer)
+		if not remote_players.has(peer_id): continue
+		var state: Dictionary = remote_players[peer_id]
+		if int(state.get("rescue_state",0)) != 1: continue
+		if str(state.get("context","world")) != "world": continue
+		rpc_server_rescue_progress.rpc_id(peer_id,1,peer_id != killer_peer)
+
 func spawn_dedicated_enemy() -> void:
 	if remote_players.is_empty(): return
 	var peers: Array = []
@@ -2121,11 +2221,15 @@ func process_dedicated_server(delta: float) -> void:
 	if network_mode != "host": return
 	server_spawn_timer += delta
 	server_status_timer += delta
+	server_rescue_spawn_timer += delta
 	if server_status_timer >= 1.0:
 		server_status_timer = 0.0
 		cleanup_party_reconnects()
 		for peer_id in multiplayer.get_peers():
 			send_server_session_status(int(peer_id))
+	if server_rescue_spawn_timer >= 0.8:
+		server_rescue_spawn_timer = 0.0
+		update_dedicated_rescue_spawns()
 	if server_spawn_timer >= 2.4:
 		server_spawn_timer = 0.0
 		if enemies.size() < mini(24, remote_players.size() * 8):
@@ -3474,7 +3578,12 @@ func update_rescue() -> void:
 		message("Alarm! Blütenweiler wird angegriffen. Die Bewohner rufen um Hilfe!")
 		play_sound("menu")
 		save_game()
+		if uses_server_world():
+			announce_multiplayer_context()
 	if rescue_state != 1: return
+	# Im Live-Multiplayer gehören die Verteidigungsgegner dem Dedicated Server.
+	# Lokales Spawnen würde beim nächsten World-Snapshot überschrieben.
+	if uses_server_world(): return
 	var active := 0
 	for enemy in enemies:
 		if bool(enemy.get("invasion", false)): active += 1
@@ -3623,17 +3732,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 			message("%s ist in Sicherheit! Sprich erneut mit %s (E)." % [WORLD_EVENTS[event_index]["role"], WORLD_EVENTS[event_index]["name"]])
 			play_sound("level")
 	if invasion and rescue_state == 1:
-		rescue_kills += 1
-		if rescue_kills >= RESCUE_GOAL:
-			rescue_state = 2
-			rescue_banner_timer = 6.0
-			rescue_intro_timer = 5.0
-			effect(RESCUE_POS + Vector2(0, -210), "BLÜTENWEILER GERETTET", Color("a8edb5"), 5.0)
-			message("Blütenweiler gerettet! Nela wartet am Dorfplatz auf dich (E).")
-			play_sound("level")
-			save_game()
-		else:
-			message("Blütenweiler verteidigt: %d/%d Dornenwesen besiegt." % [rescue_kills, RESCUE_GOAL])
+		apply_rescue_progress(1,false)
 	if type in [12, 13, 14]:
 		boss_cooldowns[type - 12] = 90.0
 		bosses_defeated[type - 12] = true
