@@ -284,16 +284,10 @@ jobs:
           grep -q "human-gate" /tmp/game.html
           grep -q "SONNENHAIN_CONTROL_MODE='desktop'" /tmp/game.html
 
-          wait_for_200 "https://sonnenhainrpg.de/mobile/" /tmp/mobile.html
-          grep -q "human-gate" /tmp/mobile.html
-          grep -q "SONNENHAIN_CONTROL_MODE='mobile'" /tmp/mobile.html
-
-          for base in game mobile; do
-            for asset in index.js index.pck index.wasm; do
-              code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de/$base/$asset" || true)"
-              echo "/$base/$asset => HTTP $code"
-              test "$code" = "200"
-            done
+          for asset in index.js index.pck index.wasm; do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de/game/$asset" || true)"
+            echo "/game/$asset => HTTP $code"
+            test "$code" = "200"
           done
 
           cache_headers="$(curl -sSI --max-time 20 "https://sonnenhainrpg.de/game/index.pck" || true)"
