@@ -18,6 +18,7 @@ const REFERENCE_WELL := Vector2(1030, 840)
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
 const VIEW := Vector2(1152, 648)
 const WORLD := Vector2(16000, 9600)
+const KONFLUX_MIN_LEVEL := 40
 const GATE_HALF_WIDTH := 175.0
 const VILLAGE_GATES := [Vector2(1780,1120), Vector2(875,2600)]
 var opened_village_gates: Dictionary = {}
@@ -467,6 +468,10 @@ func start_multiplayer_smoke_client() -> void:
 		get_tree().quit(36)
 		return
 	print("CONTROLLER_SMOKE_OK deadzone=true trigger=true menu_focus=true")
+	if not run_teleport_consistency_smoke():
+		print("TELEPORT_SMOKE_FAIL")
+		get_tree().quit(37)
+		return
 	if not run_inventory_consistency_smoke():
 		print("INVENTORY_SMOKE_FAIL")
 		get_tree().quit(33)
@@ -3249,11 +3254,70 @@ func collect_drops() -> void:
 			message("Gefunden: %s · %s" % [item["name"], RARITY_NAMES[int(item["rarity"])]] )
 			save_game()
 
+func can_enter_konflux() -> bool:
+	return creative_mode or level >= KONFLUX_MIN_LEVEL
+
+func safe_world_teleport_destination(base: Vector2, expected_region: int = -1) -> Vector2:
+	var region := expected_region if expected_region >= 0 else region_at(base)
+	var offsets := [
+		Vector2.ZERO,Vector2(0,70),Vector2(0,-70),Vector2(70,0),Vector2(-70,0),
+		Vector2(70,70),Vector2(-70,70),Vector2(70,-70),Vector2(-70,-70),
+		Vector2(0,140),Vector2(140,0),Vector2(-140,0),Vector2(0,-140)
+	]
+	for offset in offsets:
+		var candidate := (base+offset).clamp(Vector2(30,30),WORLD-Vector2(30,30))
+		if region_at(candidate) != region: continue
+		if terrain_blocked(candidate): continue
+		if blocked_by_region_wall(candidate): continue
+		var occupied := false
+		for stone in WAYSTONES:
+			if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).grow(18).has_point(candidate):
+				occupied = true
+				break
+		if occupied: continue
+		return candidate
+	return base.clamp(Vector2(30,30),WORLD-Vector2(30,30))
+
+func run_teleport_consistency_smoke() -> bool:
+	var old_level := level
+	var old_creative := creative_mode
+	creative_mode = false
+	level = KONFLUX_MIN_LEVEL-1
+	var low_blocked := not can_enter_konflux()
+	level = KONFLUX_MIN_LEVEL
+	var high_allowed := can_enter_konflux()
+	var entrance_target := safe_world_teleport_destination(KonfluxMap.ENTRANCE,region_at(KonfluxMap.ENTRANCE))
+	var entrance_ok := region_at(entrance_target) == region_at(KonfluxMap.ENTRANCE) and not terrain_blocked(entrance_target)
+	var center_ok := not KonfluxMap.blocked(KonfluxMap.CENTER,KonfluxMap.CENTER,-1,hero_collision_radius())
+	var rooms_ok := true
+	for room_id in range(KonfluxMap.BUILDING_IDS.size()):
+		var inside := KonfluxMap.CENTER+Vector2(0,190)
+		var outside := KonfluxMap.LOCATIONS[KonfluxMap.BUILDING_IDS[room_id]]+Vector2(0,110)
+		if KonfluxMap.blocked(inside,inside,room_id,hero_collision_radius()) or KonfluxMap.blocked(outside,outside,-1,hero_collision_radius()):
+			rooms_ok = false
+	var portals_ok := true
+	for portal in PORTALS:
+		var target_region := int(portal[2])
+		var forward := safe_world_teleport_destination(portal[1]+Vector2(0,110),target_region)
+		var back_region := region_at(portal[0])
+		var backward := safe_world_teleport_destination(portal[0]+Vector2(0,110),back_region)
+		if region_at(forward) != target_region or terrain_blocked(forward) or region_at(backward) != back_region or terrain_blocked(backward):
+			portals_ok = false
+	level = old_level
+	creative_mode = old_creative
+	var ok := low_blocked and high_allowed and entrance_ok and center_ok and rooms_ok and portals_ok
+	if ok:
+		print("TELEPORT_SMOKE_OK konflux_lv40=true entrance=true center=true rooms=true portals=true")
+	return ok
+
 func interact() -> void:
 	if konflux.active:
 		konflux.interact(self)
 		return
 	if arena_mode=="" and dungeon_id<0 and interior_id<0 and player_pos.distance_to(KonfluxMap.ENTRANCE)<170:
+		if not can_enter_konflux():
+			message("KONFLUX öffnet sich ab Level %d." % KONFLUX_MIN_LEVEL)
+			return
 		konflux.enter(self)
 		return
 	if interior_id < 0 and dungeon_id < 0 and arena_mode == "":
@@ -3303,7 +3367,9 @@ func interact() -> void:
 			if near_old and not region_available(int(portal[2])):
 				message("%s öffnet sich ab Level %d." % [region_name(int(portal[2])), region_level(int(portal[2]))])
 				return
-			player_pos = portal[1] + Vector2(0, 110) if near_old else portal[0] + Vector2(0, 110)
+			var desired := portal[1]+Vector2(0,110) if near_old else portal[0]+Vector2(0,110)
+			var expected_region := int(portal[2]) if near_old else region_at(portal[0])
+			player_pos = safe_world_teleport_destination(desired,expected_region)
 			enemies.clear()
 			enemy_projectiles.clear()
 			message("Der alte Torbogen führt nach %s." % region_name(region_at(player_pos)))
@@ -4323,7 +4389,8 @@ func _draw() -> void:
 	draw_world()
 	if arena_mode=="" and dungeon_id<0 and interior_id<0 and visible_world(KonfluxMap.ENTRANCE,260):
 		StartScenery32.gate(self,KonfluxMap.ENTRANCE,false,camera_pos)
-		text_at(KonfluxMap.ENTRANCE+Vector2(-230,55),"E · KONFLUX · PvP-Welt",20,Color("ffe2a3"),HORIZONTAL_ALIGNMENT_CENTER,460)
+		var konflux_gate_text := "E · KONFLUX · PvP-Welt · LV %d" % KONFLUX_MIN_LEVEL
+		text_at(KonfluxMap.ENTRANCE+Vector2(-230,55),konflux_gate_text,20,Color("ffe2a3") if can_enter_konflux() else Color("c89b8d"),HORIZONTAL_ALIGNMENT_CENTER,460)
 	for drop in drops:
 		if visible_world(drop["pos"], 45):
 			var p: Vector2 = drop["pos"]
@@ -7957,6 +8024,7 @@ func rpc_konflux_room(enabled: bool,target_room: int) -> void:
 	var old_room: int=int(konflux.fighter_stats[peer]["room"]) if was_in else -1
 	var destination:=KonfluxMap.CENTER
 	if enabled:
+		if not was_in and int(existing.get("level",1)) < KONFLUX_MIN_LEVEL: return
 		if not was_in and old.distance_to(KonfluxMap.ENTRANCE)>240: return
 		if target_room>=0:
 			if not was_in or old_room>=0 or old.distance_to(KonfluxMap.LOCATIONS[KonfluxMap.BUILDING_IDS[target_room]]+Vector2(0,50))>200: return
@@ -7967,7 +8035,7 @@ func rpc_konflux_room(enabled: bool,target_room: int) -> void:
 		elif was_in and not bool(konflux.fighter_stats[peer]["dead"]): return
 	else:
 		if not was_in or old_room>=0 or old.distance_to(KonfluxMap.CENTER+Vector2(0,360))>240: return
-		destination=KonfluxMap.ENTRANCE
+		destination=safe_world_teleport_destination(KonfluxMap.ENTRANCE,region_at(KonfluxMap.ENTRANCE))
 	if was_in and enabled:
 		konflux.fighter_stats[peer]["room"]=target_room
 	else: konflux.register_fighter(peer,enabled,target_room)
@@ -7983,14 +8051,20 @@ func rpc_konflux_room(enabled: bool,target_room: int) -> void:
 
 @rpc("authority","call_remote","reliable")
 func rpc_konflux_transition(enabled: bool,target_room: int,coords: Array) -> void:
-	if coords.size()!=2: return
+	if coords.size()!=2 or target_room < -1 or target_room >= KonfluxMap.BUILDING_IDS.size(): return
+	var destination := Vector2(float(coords[0]),float(coords[1]))
+	if not destination.is_finite(): return
+	if enabled:
+		if destination.x < 20 or destination.y < 20 or destination.x > KonfluxMap.SIZE.x-20 or destination.y > KonfluxMap.SIZE.y-20: return
+	else:
+		if destination.x < 20 or destination.y < 20 or destination.x > WORLD.x-20 or destination.y > WORLD.y-20: return
 	if enabled and not konflux.active:
 		konflux.return_position=player_pos
 		hp=max_hp()
 		energy=max_energy()
 	konflux.active=enabled
 	konflux.room=target_room
-	player_pos=Vector2(coords[0],coords[1])
+	player_pos=destination
 	camera_smooth=player_pos-VIEW*0.5
 	camera_pos=camera_smooth
 	push_player_state()
