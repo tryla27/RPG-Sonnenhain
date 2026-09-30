@@ -5511,89 +5511,104 @@ func draw_region_gates() -> void:
 	draw_gate_wall(Vector2(8500, 4200), Vector2(11000, 4200), Vector2(9750, 4200), 36)
 
 func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_level: int, boss_index: int = -1) -> void:
-	var reference_wall: bool = (start.x == 1780 and finish.y == 2600) or (start.y == 2600 and finish.x == 1780)
 	var vertical := is_equal_approx(start.x, finish.x)
 	var first := start.y if vertical else start.x
 	var last := finish.y if vertical else finish.x
 	var gap := gate.y if vertical else gate.x
-	var dark := Color('3e4a4e')
-	var mid := Color('65756f')
-	var top := Color('98a297')
-	var moss := Color('5f8b6d')
-	var thickness := 82.0
-	for part_value in [Vector2(first, gap-GATE_HALF_WIDTH), Vector2(gap+GATE_HALF_WIDTH,last)]:
+	var dark := Color("354346")
+	var mid := Color("66776f")
+	var light := Color("aab09c")
+	var mortar := Color("495956")
+	var moss := Color("5f8f69")
+	var thickness := 92.0
+
+	for part_value in [Vector2(first,gap-GATE_HALF_WIDTH),Vector2(gap+GATE_HALF_WIDTH,last)]:
 		var part: Vector2 = part_value
-		var length: float = part.y - part.x
+		var length := part.y-part.x
 		if length <= 0.0: continue
-		var face := Rect2(start.x-thickness*0.5, part.x, thickness, length) if vertical else Rect2(part.x,start.y-thickness*0.5,length,thickness)
-		if not face.grow(90).intersects(current_static_bounds()): continue
-		if reference_wall:
-			StartScenery32.wall(self, face)
-			continue
-		draw_rect(face, dark)
-		# breite sichtbare Oberseite + Vorderkante statt dünner Linie
-		var crown := Rect2(face.position + (Vector2(8,0) if vertical else Vector2(0,8)), face.size - (Vector2(16,0) if vertical else Vector2(0,16)))
-		draw_rect(crown, mid)
-		var lip := Rect2(face.position + (Vector2(5,0) if vertical else Vector2(0,5)), Vector2(face.size.x-10,13) if vertical else Vector2(13,face.size.y-10))
-		draw_rect(lip, top)
-		# Die Textur liegt lückenlos über die komplette sichtbare Mauerbreite.
-		var tile_count := ceili(length / 32.0)
-		for tile_i in range(tile_count):
-			var axis_tile: float = part.x + float(tile_i) * 32.0
-			# 3 ganzzahlige Pixelstreifen decken 84 px Mauer ab (82 px Grundfläche).
-			var strip := 28.0
-			for band in 3:
+		var face := Rect2(start.x-thickness*0.5,part.x,thickness,length) if vertical else Rect2(part.x,start.y-thickness*0.5,length,thickness)
+		if not face.grow(120).intersects(current_static_bounds()): continue
+
+		# Solider, texturunabhängiger Mauerkörper.
+		draw_rect(face,dark)
+		var inset := Rect2(face.position+(Vector2(8,0) if vertical else Vector2(0,8)),face.size-(Vector2(16,0) if vertical else Vector2(0,16)))
+		draw_rect(inset,mid)
+		# Helle Mauerkrone auf der dem Dorf zugewandten Seite.
+		var crown := Rect2(face.position+(Vector2(7,0) if vertical else Vector2(0,7)),Vector2(face.size.x-14,15) if vertical else Vector2(15,face.size.y-14))
+		draw_rect(crown,light)
+
+		# Versetzte Steinblöcke, vollständig prozedural.
+		var stone_len := 44.0
+		var rows := 3
+		var count := ceili(length/stone_len)+1
+		for row in rows:
+			for stone in count:
+				var stagger := stone_len*0.5 if row%2==1 else 0.0
+				var axis := part.x+stone*stone_len-stagger
+				if axis >= part.y: continue
+				var axis_end := minf(axis+stone_len-3.0,part.y)
+				if axis_end <= part.x: continue
 				if vertical:
-					draw_structure_tile((tile_i + band + required_level) % 4, Vector2(start.x - thickness * 0.5 + band * strip, axis_tile), strip)
+					var band_x := start.x-thickness*0.5+10.0+row*24.0
+					draw_rect(Rect2(Vector2(band_x,maxf(axis,part.x)+2),Vector2(20,axis_end-maxf(axis,part.x)-3)),mid.lightened(0.04 if (stone+row)%2==0 else -0.02))
+					draw_line(Vector2(band_x,maxf(axis,part.x)),Vector2(band_x+20,maxf(axis,part.x)),mortar,2)
 				else:
-					draw_structure_tile(4 + ((tile_i + band) % 4), Vector2(axis_tile, start.y - thickness * 0.5 + band * strip), strip)
-		var blocks := ceili(length/46.0)
-		for step in range(blocks+1):
-			var axis := minf(part.y-4, part.x+float(step)*46.0)
-			if vertical:
-				draw_line(Vector2(start.x-thickness*.37,axis),Vector2(start.x+thickness*.37,axis),Color('4d5b59'),3)
-			else:
-				draw_line(Vector2(axis,start.y-thickness*.37),Vector2(axis,start.y+thickness*.37),Color('4d5b59'),3)
-			if step % 3 == 0:
-				var mp := Vector2(start.x+thickness*.25,axis+7) if vertical else Vector2(axis+7,start.y+thickness*.25)
-				draw_rect(Rect2(mp-Vector2(5,3),Vector2(10,6)),moss)
-	# massives Tor mit Säulen
+					var band_y := start.y-thickness*0.5+10.0+row*24.0
+					draw_rect(Rect2(Vector2(maxf(axis,part.x)+2,band_y),Vector2(axis_end-maxf(axis,part.x)-3,20)),mid.lightened(0.04 if (stone+row)%2==0 else -0.02))
+					draw_line(Vector2(maxf(axis,part.x),band_y),Vector2(maxf(axis,part.x),band_y+20),mortar,2)
+
+		# Moos und kleine Schäden, damit die Mauer wieder lesbar und lebendig wirkt.
+		var marks := ceili(length/72.0)
+		for mark in marks:
+			var axis := part.x+20.0+mark*72.0
+			if axis >= part.y-8.0: continue
+			if mark%3==0:
+				var mp := Vector2(start.x+thickness*0.22,axis) if vertical else Vector2(axis,start.y+thickness*0.22)
+				draw_rect(Rect2(mp-Vector2(7,3),Vector2(14,6)),moss)
+			if mark%4==1:
+				if vertical:
+					draw_line(Vector2(start.x-17,axis),Vector2(start.x+9,axis+14),Color("2f3b3c"),2)
+				else:
+					draw_line(Vector2(axis,start.y-17),Vector2(axis+14,start.y+9),Color("2f3b3c"),2)
+
+	# Massive Torpfeiler sind immer sichtbar, unabhängig vom Torzustand.
 	for side in [-1.0,1.0]:
-		var post := gate + (Vector2(0,side*GATE_HALF_WIDTH) if vertical else Vector2(side*GATE_HALF_WIDTH,0))
-		if reference_wall:
-			if not opened_village_gates.has(gate): continue
-			StartScenery32.gatepost(self,post)
-			continue
-		draw_rect(Rect2(post-Vector2(39,39),Vector2(78,78)),dark)
-		draw_rect(Rect2(post-Vector2(30,30),Vector2(60,60)),mid)
-		draw_rect(Rect2(post-Vector2(24,28),Vector2(48,13)),top)
-		draw_rect(Rect2(post+Vector2(-9,8),Vector2(18,14)),Color('d8bb74'))
-	if gate in VILLAGE_GATES:
-		if not opened_village_gates.has(gate):
-			var door := Rect2(gate + (Vector2(-18,-150) if vertical else Vector2(-150,-18)), Vector2(36,300) if vertical else Vector2(300,36))
-			if reference_wall:
-				StartScenery32.gate(self,gate,vertical,camera_pos)
+		var post := gate+(Vector2(0,side*GATE_HALF_WIDTH) if vertical else Vector2(side*GATE_HALF_WIDTH,0))
+		draw_rect(Rect2(post-Vector2(43,43),Vector2(86,86)),dark)
+		draw_rect(Rect2(post-Vector2(34,34),Vector2(68,68)),mid)
+		draw_rect(Rect2(post-Vector2(38,39),Vector2(76,15)),light)
+		draw_rect(Rect2(post+Vector2(-11,7),Vector2(22,16)),Color("d8bb74"))
+
+	var village_gate := gate in VILLAGE_GATES
+	var gate_open := village_gate and opened_village_gates.has(gate)
+	if village_gate:
+		if not gate_open:
+			var door := Rect2(gate+(Vector2(-24,-150) if vertical else Vector2(-150,-24)),Vector2(48,300) if vertical else Vector2(300,48))
+			draw_rect(door,Color("3f2d24"))
+			for n in range(15):
+				var plank := Rect2(door.position+(Vector2(5,n*20+2) if vertical else Vector2(n*20+2,5)),Vector2(38,16) if vertical else Vector2(16,38))
+				draw_rect(plank,Color("9a7148") if n%2 else Color("805a3b"))
+			if vertical:
+				draw_line(gate+Vector2(-29,-142),gate+Vector2(29,142),Color("c3a06c"),6)
+				draw_line(gate+Vector2(29,-142),gate+Vector2(-29,142),Color("c3a06c"),6)
 			else:
-				draw_rect(door,Color("493226"))
-				for n in range(15):
-					var plank := Rect2(door.position + (Vector2(3,n*20+2) if vertical else Vector2(n*20+2,3)), Vector2(30,16) if vertical else Vector2(16,30))
-					draw_rect(plank,Color("987047") if n%2 else Color("855c3b"))
+				draw_line(gate+Vector2(-142,-29),gate+Vector2(142,29),Color("c3a06c"),6)
+				draw_line(gate+Vector2(-142,29),gate+Vector2(142,-29),Color("c3a06c"),6)
 			text_at(gate+Vector2(-105,-82),"E · TOR ÖFFNEN",16,Color("fff0bc"))
 		else:
 			text_at(gate+Vector2(-85,-82),"TOR OFFEN",14,Color("fff0bc"))
+
 	var level_locked := level < required_level
-	var boss_locked: bool = boss_index >= 0 and not bosses_defeated[boss_index]
+	var boss_locked := boss_index >= 0 and not bosses_defeated[boss_index]
 	if level_locked or boss_locked:
-		var seal := Rect2(gate + (Vector2(-26,-GATE_HALF_WIDTH+39) if vertical else Vector2(-GATE_HALF_WIDTH+39,-26)), Vector2(52,GATE_HALF_WIDTH*2-78) if vertical else Vector2(GATE_HALF_WIDTH*2-78,52))
-		if reference_wall:
-			draw_circle(gate,21,Color('294b64',0.9))
-			draw_arc(gate,21,0,TAU,24,Color('e4ba62'),3)
-		else:
-			draw_rect(seal,Color('6e405b',0.94))
-			draw_rect(seal.grow(-7),Color('b66486',0.84),false,4)
-		text_at(gate+Vector2(-105,-52), "AB LEVEL %d" % required_level if level_locked else "BOSS-SIEG NÖTIG",16,Color('fff0bc'))
-	else:
-		text_at(gate+Vector2(-85,-52),"DURCHGANG",14,Color('fff0bc'))
+		var seal := Rect2(gate+(Vector2(-28,-GATE_HALF_WIDTH+39) if vertical else Vector2(-GATE_HALF_WIDTH+39,-28)),Vector2(56,GATE_HALF_WIDTH*2-78) if vertical else Vector2(GATE_HALF_WIDTH*2-78,56))
+		draw_rect(seal,Color("6e405b",0.94))
+		draw_rect(seal.grow(-8),Color("c37598",0.9),false,4)
+		draw_line(seal.position,seal.end,Color("e3a1bf",0.7),3)
+		draw_line(Vector2(seal.end.x,seal.position.y),Vector2(seal.position.x,seal.end.y),Color("e3a1bf",0.7),3)
+		text_at(gate+Vector2(-105,-52),"AB LEVEL %d" % required_level if level_locked else "BOSS-SIEG NÖTIG",16,Color("fff0bc"))
+	elif not village_gate or gate_open:
+		text_at(gate+Vector2(-85,-52),"DURCHGANG",14,Color("fff0bc"))
 
 func draw_grass(p: Vector2) -> void:
 	if region_at(p) == 0:
