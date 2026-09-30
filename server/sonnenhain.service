@@ -1,14 +1,17 @@
 [Unit]
-Description=Sonnenhain dedicated Godot server
+Description=Sonnenhain dedicated Godot multiplayer server
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 WorkingDirectory=%h/sonnenhain-server/releases/current
 ExecStart=%h/sonnenhain-server/releases/current/sonnenhain-server.x86_64 --headless -- --dedicated-server
 Restart=always
-RestartSec=3
+RestartSec=2
+TimeoutStopSec=15
+KillSignal=SIGINT
 NoNewPrivileges=true
 PrivateTmp=true
 
