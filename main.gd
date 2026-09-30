@@ -6134,7 +6134,7 @@ func draw_mechanics_panel() -> void:
 		text_at(Vector2(190,211), "Online: 2–4 Spieler · Browser und Desktop verbinden sich mit dem gemeinsamen Live-Server.", 16, Color('e9cc90'))
 		text_at(Vector2(190,250), "Status: %s" % network_status, 14, Color('bfe7d4'), HORIZONTAL_ALIGNMENT_LEFT, 750)
 		text_at(Vector2(190,286), "CHAT", 17, Color('ffe0a1'))
-		text_at(Vector2(190,315), "ENTER oder T öffnet den Gruppenchat. ENTER sendet, ESC bricht ab.", 14, Color('e5ecd9'))
+		text_at(Vector2(190,315), ("CHAT antippen öffnet die Smartphone-Tastatur." if touch_enabled else "ENTER oder T öffnet den Gruppenchat. ENTER sendet, ESC bricht ab."), 14, Color('e5ecd9'))
 		text_at(Vector2(190,343), "Nachrichten zeigen den gespeicherten Charakternamen und werden an die Koop-Gruppe verteilt.", 13, Color('aebfb9'))
 		text_at(Vector2(190,390), "SICHERHEITSZONE", 17, Color('ffe0a1'))
 		text_at(Vector2(190,419), "Sonnenhain: keine normalen Spawns. Verfolgte Gegner ziehen sich zurück und verschwinden außerhalb.", 13, Color('dfe9dc'))
@@ -6146,7 +6146,7 @@ func draw_mechanics_panel() -> void:
 func draw_start_panel() -> void:
 	text_at(Vector2(291, 151), "SONNENHAIN", 39, Color("ffe2aa"))
 	text_at(Vector2(900, 148), "v27.5 · %s" % ("MOBILE" if touch_enabled else "PC"), 16, Color("f4d7a3"))
-	ui_button(Rect2(855, 158, 130, 33), "TASTEN")
+	ui_button(Rect2(855, 158, 130, 33), "TOUCH" if touch_enabled else "TASTEN")
 	text_at(Vector2(295, 184), "Eine Reise durch die alten Reiche  ·  Wähle deinen Helden", 18, Color("dce7d8"))
 	for i in 3:
 		var card := Rect2(168 + i * 273, 202, 260, 170)
@@ -6216,7 +6216,7 @@ func draw_pause_panel() -> void:
 	ui_button(Rect2(300, 135, 550, 42), "PAUSE", true, true)
 	text_at(Vector2(302, 205), "Level %d · %s · %d Gold" % [level, region_name(region_at(player_pos)), gold], 17, Color("e6f0dc"))
 	ui_button(Rect2(300, 221, 550, 42), "FORTSETZEN")
-	ui_button(Rect2(860, 221, 130, 42), "TASTEN")
+	ui_button(Rect2(860, 221, 130, 42), "TOUCH" if touch_enabled else "TASTEN")
 	ui_button(Rect2(860, 270, 130, 42), "MECHANIK")
 	ui_button(Rect2(300, 270, 550, 42), "TESTSTAND SPEICHERN" if creative_mode else "SPIEL SPEICHERN")
 	draw_volume_slider(Vector2(300, 326), "MUSIK", music_volume, Color("d9b67b"))
@@ -6231,6 +6231,28 @@ func draw_pause_panel() -> void:
 	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUR STARTSEITE" if is_web_platform() else "SPEICHERN & ZUM HAUPTMENÜ")
 
 func draw_controls_panel() -> void:
+	if touch_enabled:
+		text_at(Vector2(185, 153), "MOBILE STEUERUNG", 29, Color("ffdf9f"))
+		text_at(Vector2(187, 184), "Touch-Version · keine Tastaturbelegung nötig", 14, Color("b9cbc3"))
+		var rows := [
+			["BEWEGEN", "Linke Bildschirmseite antippen und ziehen · Floating-Joystick"],
+			["ZIELEN & ANGRIFF", "Rechten Angriffsstick halten und intuitiv in Angriffsrichtung ziehen"],
+			["ROLLE", "ROLLE antippen · Richtung kommt vom linken Bewegungsstick"],
+			["AKTION", "AKTION für NPCs, Türen, Wegsteine und Interaktionen"],
+			["SKILLS", "Die vier Skillfelder unten direkt antippen"],
+			["HEILUNG", "HP sowie MANA/ENERGIE unten rechts direkt antippen"],
+			["CHAT", "CHAT öffnet die Smartphone-Tastatur"],
+			["ONLINE", "ONLINE zeigt die aktuell verbundenen Spielernamen"]
+		]
+		for i in rows.size():
+			var y := 225.0 + i * 39.0
+			draw_rect(Rect2(185, y - 23, 780, 33), Color("354a4a") if i % 2 == 0 else Color("3c5250"))
+			text_at(Vector2(198, y), str(rows[i][0]), 14, Color("ffe6b1"), HORIZONTAL_ALIGNMENT_LEFT, 175)
+			text_at(Vector2(385, y), str(rows[i][1]), 13, Color("dbe9d5"), HORIZONTAL_ALIGNMENT_LEFT, 560)
+		text_at(Vector2(187, 548), "PC-Tasten werden in der Mobile-Version bewusst nicht eingeblendet.", 13, Color("aebfb9"))
+		ui_button(Rect2(585, 562, 385, 36), "ZURÜCK")
+		return
+
 	text_at(Vector2(170, 153), "TASTENBELEGUNG", 29, Color("ffdf9f"))
 	text_at(Vector2(172, 179), "Belegung anklicken · Taste oder Maustaste drücken · ESC bricht die Auswahl ab", 14, Color("e3e9d8"))
 	for index in BIND_ACTIONS.size():
