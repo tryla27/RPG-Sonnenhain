@@ -1439,7 +1439,6 @@ func update_dedicated_enemies(delta: float) -> void:
 		var target := nearest_network_player(enemy["pos"], 1300.0)
 		var peer_id := int(target["peer"])
 		if peer_id <= 0:
-			enemies.remove_at(i)
 			continue
 		var target_pos: Vector2 = target["pos"]
 		if region_at(target_pos) == 0:
@@ -1477,6 +1476,8 @@ func update_dedicated_enemy_projectiles(delta: float) -> void:
 			enemy_projectiles.remove_at(i)
 			continue
 		var peer_id := int(shot.get("target_peer",0))
+		if peer_id > 0 and remote_players.has(peer_id) and str(remote_players[peer_id].get("context","world")) != "world":
+			peer_id = 0
 		if peer_id <= 0 or not remote_players.has(peer_id):
 			var target := nearest_network_player(shot["pos"], 460.0)
 			peer_id = int(target["peer"])
@@ -4343,12 +4344,14 @@ func draw_multiplayer_debug_overlay() -> void:
 	for raw_peer_id in remote_players.keys():
 		var remote_id := int(raw_peer_id)
 		var remote_pos := network_player_position(remote_id)
-		var on_screen := visible_world(remote_pos, 130)
-		if on_screen: visible_count += 1
 		var state: Dictionary = remote_players[raw_peer_id]
+		var same_context := state_matches_local_context(state)
+		var on_screen := same_context and visible_world(remote_pos, 130)
+		if on_screen: visible_count += 1
 		var remote_name := str(state.get("name", "Held")).strip_edges()
 		if remote_name == "": remote_name = "Held"
-		rows.append("#%d %s  (%.0f, %.0f)  %s" % [remote_id, remote_name, remote_pos.x, remote_pos.y, "SICHTBAR" if on_screen else "AUSSERHALB"])
+		var remote_context := "%s:%s" % [str(state.get("context","world")),str(state.get("instance_id","world"))]
+		rows.append("#%d %s · %s · (%.0f, %.0f) · %s" % [remote_id, remote_name, remote_context, remote_pos.x, remote_pos.y, "SICHTBAR" if on_screen else ("ANDERE INSTANZ" if not same_context else "AUSSERHALB")])
 	var width := 430.0
 	var row_h := 18.0
 	var height := 94.0 + row_h * mini(rows.size(), 5)
