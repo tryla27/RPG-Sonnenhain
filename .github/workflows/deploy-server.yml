@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: sonnenhain-game-server
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   server:

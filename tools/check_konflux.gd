@@ -62,6 +62,10 @@ func _initialize() -> void:
 		check(g.player_pos.x<r.position.x,"Swept dodge cannot cross cliff")
 	for path in ["buildings","events","props"]:
 		var img:=Image.load_from_file("res://art/konflux/"+path+".webp")
+		if img == null:
+			check(false,"Cannot decode asset "+path)
+			quit(1)
+			return
 		check(not img.is_empty() and img.get_pixel(0,0).a<0.01,"Transparent asset "+path)
 	a.load_art()
 	for x in 100: a.make_chunk(Vector2i(x,0))
