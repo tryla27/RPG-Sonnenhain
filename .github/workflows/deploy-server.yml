@@ -351,6 +351,29 @@ jobs:
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_server_save_network.gd -- --save-test-url=wss://multiplayer.sonnenhainrpg.de/
           echo "PUBLIC MULTIPLAYER OK: TLS/WSS, two-player state relay, chat relay and world snapshot all passed."
 
+      - name: Announce completed patch
+        if: ${{ env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          port="${VSERVER_PORT:-22}"
+          umask 077
+          install -d -m 700 "$HOME/.ssh"
+          trap 'rm -f "$HOME/.ssh/vserver_patch_done"' EXIT
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          raw=os.environ["VSERVER_SSH_KEY"].replace("\r","").strip()
+          if "BEGIN OPENSSH PRIVATE KEY" in raw:
+              key=raw.replace("\\n","\n")
+          else:
+              key=base64.b64decode("".join(raw.split()), validate=True).decode("utf-8").replace("\r","").strip()
+          Path.home().joinpath(".ssh/vserver_patch_done").write_text(key.strip()+"\n",encoding="utf-8")
+          PY
+          chmod 600 "$HOME/.ssh/vserver_patch_done"
+          ssh -4 -i "$HOME/.ssh/vserver_patch_done" -p "$port"             -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15             "$VSERVER_USER@$VSERVER_HOST"             "printf '%s\\n' 'done:$GITHUB_SHA' > ~/sonnenhain-server/data/patch-notice.txt"
+          echo "PATCH_COMPLETE_NOTICE_WRITTEN"
+
       - name: VServer deploy not configured
         if: ${{ env.VSERVER_HOST == '' || env.VSERVER_USER == '' || env.VSERVER_SSH_KEY == '' }}
         run: echo "Server build is ready; VSERVER_HOST, VSERVER_USER and VSERVER_SSH_KEY are required for live deployment."
