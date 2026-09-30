@@ -382,6 +382,7 @@ var sync_timer := 0.0
 var server_spawn_timer := 0.0
 var server_status_timer := 0.0
 var server_next_mob_uid := 1
+var server_moving_mobs := 0
 var server_action_times: Dictionary = {}
 var live_reconnect_timer := 0.0
 var multiplayer_smoke_client_mode := false
@@ -937,6 +938,7 @@ func send_server_session_status(peer_id: int) -> void:
 		"peer_id":peer_id,
 		"online":remote_players.size(),
 		"mobs":enemies.size(),
+		"moving_mobs":server_moving_mobs,
 		"context":str(state.get("context","world")),
 		"instance_id":str(state.get("instance_id","world")),
 		"npc_count":NPCS.size(),
@@ -1425,6 +1427,7 @@ func spawn_dedicated_enemy() -> void:
 			return
 
 func update_dedicated_enemies(delta: float) -> void:
+	var moved_count := 0
 	for i in range(enemies.size() - 1, -1, -1):
 		var enemy: Dictionary = enemies[i]
 		if float(enemy.get("hp", 0.0)) <= 0.0:
@@ -1446,11 +1449,21 @@ func update_dedicated_enemies(delta: float) -> void:
 		var offset := target_pos - Vector2(enemy["pos"])
 		var distance := offset.length()
 		var info: Dictionary = ENEMY_TYPES[int(enemy["type"])]
-		if enemy["stun"] <= 0.0 and distance > 34.0 and distance < 500.0:
-			var speed := float(info["speed"]) * (0.45 if enemy["slow"] > 0.0 else 1.0) * delta
-			var next_pos := Vector2(enemy["pos"]) + offset.normalized() * speed
-			if region_at(next_pos) == region_at(enemy["pos"]) and not terrain_blocked(next_pos):
-				enemy["pos"] = next_pos
+		if enemy["stun"] <= 0.0 and distance > 34.0 and distance < 720.0:
+			var speed := float(info["speed"]) * (0.45 if enemy["slow"] > 0.0 else 1.0) * (1.08 if int(enemy.get("elite",0)) > 0 else 1.0) * delta
+			var origin: Vector2 = enemy["pos"]
+			var desired := offset.normalized()
+			var moved := false
+			# Dedicated-Server-Steering: nicht an einem Baum/Haus auf der direkten
+			# Linie hängen bleiben, sondern wie der lokale Gegnercode ausweichen.
+			for angle in [0.0, 0.52, -0.52, 0.92, -0.92, 1.35, -1.35, PI]:
+				var next_pos := origin + desired.rotated(angle) * speed
+				if region_at(next_pos) == region_at(origin) and not terrain_blocked(next_pos):
+					enemy["pos"] = next_pos
+					moved = true
+					break
+			if moved:
+				moved_count += 1
 		if distance < 42.0 and float(enemy["hit"]) <= 0.0:
 			enemy["hit"] = 0.75
 			rpc_server_damage.rpc_id(peer_id, enemy_damage(int(enemy["type"])))
@@ -1466,6 +1479,7 @@ func update_dedicated_enemies(delta: float) -> void:
 				"type":enemy_type,
 				"target_peer":peer_id
 			})
+	server_moving_mobs = moved_count
 
 func update_dedicated_enemy_projectiles(delta: float) -> void:
 	for i in range(enemy_projectiles.size() - 1, -1, -1):
@@ -4360,7 +4374,7 @@ func draw_multiplayer_debug_overlay() -> void:
 	draw_rect(box, Color("78c7d9", 0.82), false, 1.0)
 	text_at(box.position + Vector2(10, 19), "MULTIPLAYER DEBUG · PROTOKOLL v%d" % NETWORK_PROTOCOL_VERSION, 12, Color("d9f7ff"))
 	text_at(box.position + Vector2(10, 38), "Peer #%d · %s:%s · Remotes %d · sichtbar %d" % [peer_id,multiplayer_context(),multiplayer_instance_id(),remote_players.size(),visible_count], 12, Color("bfe7d4"))
-	text_at(box.position + Vector2(10, 57), "Server: %d online · %d Mobs · %d NPCs · %d Events · %d Quests" % [int(server_sync_status.get("online",0)),int(server_sync_status.get("mobs",enemies.size())),int(server_sync_status.get("npc_count",server_world_manifest.get("npc_count",0))),int(server_sync_status.get("event_count",server_world_manifest.get("event_count",0))),int(server_sync_status.get("quest_count",server_world_manifest.get("quest_count",0)))], 11, Color("f0d89a"))
+	text_at(box.position + Vector2(10, 57), "Server: %d online · %d Mobs (%d bewegt) · %d NPCs · %d Events · %d Quests" % [int(server_sync_status.get("online",0)),int(server_sync_status.get("mobs",enemies.size())),int(server_sync_status.get("moving_mobs",0)),int(server_sync_status.get("npc_count",server_world_manifest.get("npc_count",0))),int(server_sync_status.get("event_count",server_world_manifest.get("event_count",0))),int(server_sync_status.get("quest_count",server_world_manifest.get("quest_count",0)))], 11, Color("f0d89a"))
 	text_at(box.position + Vector2(10, 75), "Manifest-Entitäten: %d" % int(server_world_manifest.get("entities",[]).size()), 11, Color("a9d9e5"))
 	for i in range(mini(rows.size(), 5)):
 		text_at(box.position + Vector2(10, 94 + i * row_h), rows[i], 11, Color("dbe8e8"))
