@@ -102,7 +102,19 @@ Die mitgelieferte Inhaltsprüfung unter `tools/check_content.py` kontrolliert Ge
 
 ### Prüfung v26
 
-`python3 tools/check_content.py` prüft weiterhin Regionen, Gegner, Quests, Fähigkeiten, Dungeons, Taverne, Eingaben, Musik, Audio und den Pixelatlas. Zusätzlich wurde vor dem Packen nach doppelten Top-Level-Funktionen und fehlenden Projektdateien gesucht. In der Erstellungsumgebung ist kein Godot-Executable installiert; deshalb konnte kein echter Godot-Laufzeit- oder Spieltest durchgeführt werden.
+`python3 tools/check_content.py` prüft Regionen, Gegner, Quests, Fähigkeiten, Dungeons, Taverne, Eingaben, Musik, Audio und den Pixelatlas. Die ausführbaren Godot-Regressionschecks liegen unter `tools/check_*.gd` und decken unter anderem Controller, Kartenlogik, Fortschritt, Zauber, Ausrüstung, Quests, Koop und Server-Speicherstände ab.
+
+Die GitHub-Actions-Workflowdatei `.github/workflows/ci.yml` führt diese Checks bei jedem Pull Request und jedem Push auf `main` aus. Zusätzlich wird das Projekt mit Godot 4.7.2 importiert, als Web-Spiel und dedizierter Linux-Server exportiert und der Server headless gestartet. Die erzeugten CI-Builds werden als Artifact gespeichert. Die Workflows `deploy-pages.yml` und `deploy-server.yml` übernehmen danach die eigentliche Veröffentlichung beziehungsweise den Server-Deploy auf `main`.
+
+Die wichtigsten lokalen Prüfungen lassen sich mit einer installierten Godot-4.7.2-Version ausführen:
+
+```sh
+python3 tools/check_content.py
+godot --headless --path . --editor --import --quit
+for test in tools/check_*.gd; do godot --headless --path . --script "$test" || exit 1; done
+```
+
+`check_server_save_network.gd` benötigt dafür zusätzlich einen dedizierten Testserver auf Port `31876`; der vollständige Ablauf ist in der CI-Workflowdatei hinterlegt.
 
 ## Pixelwelt v27 – Charaktere, Koop und Pixel-Art
 

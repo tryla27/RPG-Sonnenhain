@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonnenhain-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_BIN: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+
+jobs:
+  test-and-build:
+    name: Tests and exports
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Godot cache
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/godot
+            /tmp/templates
+            ~/.local/share/godot/export_templates/4.7.2.stable
+          key: godot-${{ env.GODOT_VERSION }}-${{ runner.os }}
+
+      - name: Install Godot and export templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 8 --retry-all-errors \
+            -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x "$GODOT_BIN"
+          curl -fL --retry 8 --retry-all-errors \
+            -o /tmp/templates.tpz \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          cp -R /tmp/templates/templates/* \
+            "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+
+      - name: Validate content
+        run: python3 tools/check_content.py
+
+      - name: Import project and validate GDScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BIN" --headless --path . --editor --import --quit
+
+      - name: Run gameplay regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r test_script; do
+            echo "::group::${test_script}"
+            "$GODOT_BIN" --headless --path . --script "$test_script"
+            echo "::endgroup::"
+          done < <(find tools -maxdepth 1 -name 'check_*.gd' \
+            ! -name 'check_party_xp_network.gd' \
+            ! -name 'check_server_save_network.gd' | sort)
+          "$GODOT_BIN" --headless --path . --script tools/check_party_xp_network.gd
+
+      - name: Export web and dedicated server
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf build/ci
+          mkdir -p build/ci/web build/ci/server
+          "$GODOT_BIN" --headless --path . --export-release Web build/ci/web/index.html
+          "$GODOT_BIN" --headless --path . --export-release "Linux Server" \
+            build/ci/server/sonnenhain-server.x86_64
+          test -f build/ci/web/index.html
+          test -f build/ci/web/index.pck
+          test -f build/ci/web/index.wasm
+          test -x build/ci/server/sonnenhain-server.x86_64
+          test -f build/ci/server/sonnenhain-server.pck
+
+      - name: Run dedicated server smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          build/ci/server/sonnenhain-server.x86_64 --headless -- \
+            --dedicated-server > /tmp/sonnenhain-ci-server.log 2>&1 &
+          server_pid=$!
+          save_dir="$(mktemp -d /tmp/sonnenhain-ci-save.XXXXXX)"
+          build/ci/server/sonnenhain-server.x86_64 --headless -- \
+            --dedicated-server --server-port=31876 --save-dir="$save_dir" \
+            > /tmp/sonnenhain-ci-save-server.log 2>&1 &
+          save_server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+            kill "$save_server_pid" 2>/dev/null || true
+            wait "$save_server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in {1..20}; do
+            if ss -ltn | grep -q ':27845 ' && ss -ltn | grep -q ':31876 '; then break; fi
+            if ! kill -0 "$server_pid" 2>/dev/null || ! kill -0 "$save_server_pid" 2>/dev/null; then
+              cat /tmp/sonnenhain-ci-server.log
+              cat /tmp/sonnenhain-ci-save-server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          ss -ltn | grep -q ':27845 '
+          ss -ltn | grep -q ':31876 '
+          "$GODOT_BIN" --headless --path . --script tools/check_server_save_network.gd \
+            -- --save-test-url=ws://127.0.0.1:31876
+
+      - name: Upload CI builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonnenhain-ci-builds
+          path: build/ci
+          if-no-files-found: error
+          retention-days: 14
