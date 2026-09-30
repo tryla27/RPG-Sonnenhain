@@ -4671,7 +4671,7 @@ func draw_remote_combat_visuals() -> void:
 		var max_life := maxf(0.01,float(visual.get("max",0.42)))
 		var progress := 1.0-clampf(life/max_life,0.0,1.0)
 		var cls := clampi(int(visual.get("class",0)),0,2)
-		var accent := [Color("ffd18a"),Color("b9b4ff"),Color("bce89e")][cls]
+		var accent: Color = [Color("ffd18a"),Color("b9b4ff"),Color("bce89e")][cls]
 		var element := str(visual.get("element",""))
 		if element != "": accent = element_color(element)
 		if str(visual.get("kind","normal")) == "normal":
