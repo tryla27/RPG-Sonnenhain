@@ -29,23 +29,23 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      GODOT_VERSION: "4.3"
+      GODOT_VERSION: "4.7.2"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Godot 4.3 and export templates
+      - name: Install Godot 4.7.2 and export templates
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 8 --retry-all-errors -o /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip"
+          curl -fL --retry 8 --retry-all-errors -o /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
           unzip -q /tmp/godot.zip -d /tmp/godot
-          chmod +x /tmp/godot/Godot_v4.3-stable_linux.x86_64
+          chmod +x /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
 
-          curl -fL --retry 8 --retry-all-errors -o /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz"
-          mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
+          curl -fL --retry 8 --retry-all-errors -o /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
           unzip -q /tmp/templates.tpz -d /tmp/templates
-          cp -R /tmp/templates/templates/* "$HOME/.local/share/godot/export_templates/4.3.stable/"
+          cp -R /tmp/templates/templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
 
       - name: Export web game
         shell: bash
@@ -53,7 +53,7 @@ jobs:
           set -euo pipefail
           rm -rf build/site
           mkdir -p build/site/game
-          /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-release "Web" build/site/game/index.html
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --export-release "Web" build/site/game/index.html
 
       - name: Export dedicated Linux server
         shell: bash
@@ -61,7 +61,7 @@ jobs:
           set -euo pipefail
           rm -rf build/server
           mkdir -p build/server
-          /tmp/godot/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-release "Linux Server" build/server/sonnenhain-server.x86_64
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --export-release "Linux Server" build/server/sonnenhain-server.x86_64
           chmod +x build/server/sonnenhain-server.x86_64
           test -x build/server/sonnenhain-server.x86_64
 
@@ -128,6 +128,7 @@ jobs:
           cp website/site.css build/site/site.css
           cp -R website/mobile-preview build/site/mobile-preview
           cp CNAME build/site/CNAME
+          printf '{"version":"v28.2","commit":"%s"}\n' "$GITHUB_SHA" > build/site/version.json
           cp web-legal/datenschutz.html build/site/datenschutz.html
           cp web-legal/impressum.html build/site/impressum.html
           cp web-legal/sicherheit.html build/site/sicherheit.html

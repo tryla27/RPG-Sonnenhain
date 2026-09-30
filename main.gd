@@ -1,9 +1,17 @@
 extends Node2D
+const ReferenceHouse = preload("res://components/reference_house.gd")
+const USE_VILLAGE_REFERENCE_BACKGROUND := false
+const ReferenceScenery = preload("res://components/reference_scenery.gd")
+const VillageLayout = preload("res://components/village_layout.gd")
+const REFERENCE_TREES := [Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680),Vector2(190,1590),Vector2(1170,1880),Vector2(120,1910),Vector2(650,1930),Vector2(180,2240),Vector2(1600,2510)]
+const REFERENCE_WELL := Vector2(1030, 840)
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
 const VIEW := Vector2(1152, 648)
 const WORLD := Vector2(16000, 9600)
 const GATE_HALF_WIDTH := 175.0
+const VILLAGE_GATES := [Vector2(1780,1120), Vector2(875,2600)]
+var opened_village_gates: Dictionary = {}
 const SAVE_PATH := "user://sonnenhain_save.json"
 const CREATIVE_SAVE_PATH := "user://sonnenhain_testmodus.json"
 const CONTROLS_PATH := "user://sonnenhain_tasten.json"
@@ -77,7 +85,7 @@ const ABILITIES := [
 	{"name":"Feuerball", "desc":"Feuerprojektil mit Explosion", "cost":23, "cd":4.0, "req":3, "kind":16},
 	{"name":"Frostnova", "desc":"Eiskreis verlangsamt Gegner", "cost":29, "cd":8.0, "req":8, "kind":17},
 	{"name":"Blitzlanze", "desc":"Blitz durch mehrere Ziele", "cost":34, "cd":7.0, "req":12, "kind":18},
-	{"name":"Arkaner Schritt", "desc":"Kurzer Teleport und Schutz", "cost":25, "cd":10.0, "req":15, "kind":19},
+	{"name":"Arkaner Sprung", "desc":"Weiter arkaner Sprung und Schutz", "cost":25, "cd":10.0, "req":15, "kind":19},
 	{"name":"Sternenfunken", "desc":"Drei magische Geschosse", "cost":32, "cd":8.0, "req":18, "kind":20},
 	{"name":"Eisschild", "desc":"Schützt und friert Angreifer", "cost":30, "cd":15.0, "req":23, "kind":21},
 	{"name":"Meteorschauer", "desc":"Feuer trifft eine Fläche", "cost":44, "cd":18.0, "req":28, "kind":22},
@@ -124,21 +132,21 @@ const QUESTS := [
 	{"title":"Die letzte Wache", "npc":"Borin", "target":26, "count":13, "xp":2100, "gold":1750, "reward":"Sternenring"}
 ]
 const NPCS := [
-	{"name":"Mira", "role":"Älteste · Quests", "pos":Vector2(1010, 1070), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Wächter · Quests", "pos":Vector2(1230, 890), "color":Color("6783bd"), "kind":"quest"},
-	{"name":"Liora", "role":"Forscherin · Quests", "pos":Vector2(690, 1280), "color":Color("6bbba4"), "kind":"quest"},
-	{"name":"Torvald", "role":"Schmied", "pos":Vector2(490, 930), "color":Color("ab6e60"), "kind":"smith"},
-	{"name":"Fenna", "role":"Händlerin", "pos":Vector2(1080, 460), "color":Color("87a66b"), "kind":"merchant"},
-	{"name":"Pip", "role":"Alchemist", "pos":Vector2(1360, 580), "color":Color("d3aa65"), "kind":"alchemy"},
-	{"name":"Elara", "role":"Heilerin · Vollheilung", "pos":Vector2(830, 940), "color":Color("e2bc91"), "kind":"healer"},
-	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1240, 1290), "color":Color("a48cbd"), "kind":"arena"}
+	{"name":"Mira", "role":"Älteste · Quests", "pos":Vector2(316, 830), "color":Color("a77ccb"), "kind":"quest"},
+	{"name":"Borin", "role":"Wächter · Quests", "pos":Vector2(1486, 1970), "color":Color("6783bd"), "kind":"quest"},
+	{"name":"Liora", "role":"Forscherin · Quests", "pos":Vector2(636, 640), "color":Color("6bbba4"), "kind":"quest"},
+	{"name":"Torvald", "role":"Schmied", "pos":Vector2(316, 1420), "color":Color("ab6e60"), "kind":"smith"},
+	{"name":"Fenna", "role":"Händlerin", "pos":Vector2(596, 1610), "color":Color("87a66b"), "kind":"merchant"},
+	{"name":"Pip", "role":"Alchemist", "pos":Vector2(1206, 1560), "color":Color("d3aa65"), "kind":"alchemy"},
+	{"name":"Elara", "role":"Heilerin · Vollheilung", "pos":Vector2(1536, 1480), "color":Color("e2bc91"), "kind":"healer"},
+	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1196, 630), "color":Color("a48cbd"), "kind":"arena"}
 ]
 const SHOPS := {
 	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
 	"alchemy": [{"name":"Heiltrank", "icon":"potion", "power":0, "price":35}, {"name":"Großer Heiltrank", "icon":"potion", "power":0, "price":85}, {"name":"Energietrank", "icon":"potion", "power":0, "price":45}],
 	"merchant": [{"name":"Reisenderumhang", "icon":"armor", "power":4, "price":125}, {"name":"Wächterrüstung", "icon":"armor", "power":9, "price":520}, {"name":"Glücksring", "icon":"ring", "power":15, "price":240}]
 }
-const WAYSTONES := [Vector2(880, 1300), Vector2(3300, 1900), Vector2(3200, 6200), Vector2(6700, 1950), Vector2(6700, 6250), Vector2(9750, 3900), Vector2(1000, 6100), Vector2(13500, 950), Vector2(13500, 2850), Vector2(13500, 4750), Vector2(13500, 6650), Vector2(13500, 8550)]
+const WAYSTONES := [Vector2(825, 915), Vector2(3300, 1900), Vector2(3200, 6200), Vector2(6700, 1950), Vector2(6700, 6250), Vector2(9750, 3900), Vector2(1000, 6100), Vector2(13500, 950), Vector2(13500, 2850), Vector2(13500, 4750), Vector2(13500, 6650), Vector2(13500, 8550)]
 const RESCUE_POS := Vector2(3150, 2350)
 const RESCUE_GOAL := 20
 const ARENA_CENTER := Vector2(8000, 4800)
@@ -147,7 +155,10 @@ const DUNGEON_CENTER := Vector2(8000, 4800)
 const DUNGEON_ENTRANCES := [2, 3, 8]
 const DUNGEON_NAMES := ["Turmgewölbe", "Kristallgruft", "Versunkene Krypta"]
 const DUNGEON_ENEMIES := [[4, 5], [6, 7], [21, 22]]
-const TAVERN_HOUSE := Vector2(1180, 1510)
+const TAVERN_HOUSE := Vector2(1380, 700)
+const VILLAGE_REF_ORIGIN := Vector2(0, 550)
+const VILLAGE_REF_RECT := Rect2(0, 550, 1672, 840)
+const VILLAGE_REF_SOLIDS := [Rect2(-40, 548, 1752, 112), Rect2(15, 805, 310, 140), Rect2(305, 1025, 310, 145), Rect2(1295, 1015, 365, 145), Rect2(12, 1012, 95, 95), Rect2(325, 825, 345, 30), Rect2(995, 825, 350, 30), Rect2(890, 870, 105, 45), Rect2(1625, 950, 50, 250)]
 const INTERIOR_CENTER := Vector2(8000, 4800)
 const WORLD_EVENTS := [
 	{"name":"Tessa", "role":"Botenläuferin", "pos":Vector2(2470, 1630), "region":1, "goal":3, "xp":90, "gold":40, "story":"Die Dornen folgen dem Rauch aus Blütenweiler. Halte den Weg frei!", "after":"Der Weg ist frei. Ich läute die Glocke im Dorf!"},
@@ -182,9 +193,22 @@ const TRAILS := [
 	[Vector2(11850,8500),Vector2(12500,8270),Vector2(13200,8860),Vector2(13500,8550),Vector2(14400,8710),Vector2(15200,8460)]
 ]
 
-var player_pos := Vector2(900, 1050)
+var player_pos := Vector2(825, 1020)
 var facing := Vector2.RIGHT
 var camera_pos := Vector2.ZERO
+var camera_smooth := Vector2.ZERO
+var camera_context := ""
+const STATIC_CHUNK_SIZE := 512
+const STATIC_CACHE_LIMIT := 32
+var static_chunks: Dictionary = {}
+var foreground_cache: Dictionary = {}
+var static_renderer_script: Script
+var static_draw_bounds := Rect2()
+var performance_cache_enabled := true
+var performance_draw_us := 0
+var performance_draw_samples: Array = []
+var performance_last_frame_ms := 0.0
+var character_canvas_offset := Vector2.ZERO
 var hp := 100.0
 var energy := 100.0
 var level := 1
@@ -201,10 +225,14 @@ var cooldowns: Array = []
 var inventory: Array = []
 var equipped_uid := -1
 var equipped_armor_uid := -1
+var death_timer := 0.0
+var arcane_step_learned := false
+const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
 var next_uid := 1
 var selected_item := -1
 var inventory_page := 0
+var shop_page := 0
 var quests: Array = []
 var enemies: Array = []
 var drops: Array = []
@@ -250,6 +278,7 @@ var npc_sprites: Texture2D
 var vfx_sprites: Texture2D
 var structure_tiles: Texture2D
 var house_tiles: Texture2D
+var village_bg: Texture2D
 var dungeon_chests_opened: Array = [false, false, false]
 var battle_zones: Array = []
 var active_save_slot := 1
@@ -263,6 +292,8 @@ var reward_scene_timer := 0.0
 var attack_timer := 0.0
 var swing_timer := 0.0
 var dash_timer := 0.0
+var dodge_duration := 0.22
+var dodge_start := Vector2.ZERO
 var dash_cooldown := 0.0
 var invulnerable := 0.0
 var shield_timer := 0.0
@@ -501,6 +532,7 @@ func _ready() -> void:
 		start_multiplayer_smoke_client()
 
 func reset_class_skills() -> void:
+	arcane_step_learned = false
 	learned.resize(ABILITIES.size())
 	skill_levels.resize(ABILITIES.size())
 	cooldowns.resize(ABILITIES.size())
@@ -509,9 +541,6 @@ func reset_class_skills() -> void:
 		skill_levels[i] = 0
 		cooldowns[i] = 0.0
 	slots = [-1, -1, -1]
-
-func class_weapon_icon_for(value: int) -> String:
-	return ["sword", "staff", "bow"][clampi(value, 0, 2)]
 
 func class_weapon_icon() -> String:
 	return class_weapon_icon_for(class_id)
@@ -532,7 +561,7 @@ func _on_peer_connected(id: int) -> void:
 	if network_mode == "host":
 		push_world_snapshot()
 		if not dedicated_server_mode:
-			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "element":weapon_element(), "region":region_at(player_pos)}
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
@@ -754,7 +783,7 @@ func push_player_state() -> void:
 		return
 	if network_mode == "client" and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
-	var state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "element":weapon_element(), "region":region_at(player_pos)}
+	var state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 	if network_mode == "client":
 		rpc_player_state.rpc_id(1, state)
 	elif network_mode == "host":
@@ -1015,6 +1044,13 @@ func enemy_level(type: int) -> int:
 	return region_level(region) + (2 if type in [12, 13, 14] else type % 3)
 
 func _process(delta: float) -> void:
+	if death_timer > 0.0:
+		death_timer = maxf(0.0,death_timer-delta)
+		if death_timer <= 0.0:
+			panel = ""
+			respawn()
+		queue_redraw()
+		return
 	if dedicated_server_mode:
 		process_dedicated_server(delta)
 		return
@@ -1089,6 +1125,9 @@ func _process(delta: float) -> void:
 				if final_countdown <= 0.0: enter_arena("final")
 		elif arena_mode != "":
 			update_arena(delta)
+	while effects.size() > (24 if mobile_performance_mode else 80): effects.pop_front()
+	while spell_visuals.size() > (18 if mobile_performance_mode else 48): spell_visuals.pop_front()
+	while lightning_lines.size() > (12 if mobile_performance_mode else 32): lightning_lines.pop_front()
 	if mobile_performance_mode:
 		# Rein visuelle Effekte dürfen auf Mobilgeräten begrenzt werden. Das
 		# verändert keine Trefferlogik, Gegner oder Projektile.
@@ -1107,7 +1146,17 @@ func _process(delta: float) -> void:
 		if lightning_lines[i]["life"] <= 0: lightning_lines.remove_at(i)
 	# Der Arenarand liegt außerhalb eines einzelnen Bildschirms; die Kamera begleitet den Helden.
 	var camera_focus: Vector2 = ARENA_CENTER + (player_pos - ARENA_CENTER) * 0.88 if arena_mode != "" else player_pos
-	camera_pos = camera_focus - VIEW * 0.5 if arena_mode != "" else (INTERIOR_CENTER - VIEW * 0.5 if interior_id >= 0 else (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW))
+	var target_camera: Vector2 = camera_focus - VIEW * 0.5 if arena_mode != "" else (INTERIOR_CENTER - VIEW * 0.5 if interior_id >= 0 else (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW))
+	var context := "%s:%d:%d" % [arena_mode,interior_id,dungeon_id]
+	if context != camera_context or camera_smooth.distance_to(target_camera) > 450.0:
+		camera_smooth = target_camera
+		camera_context = context
+	else:
+		camera_smooth = camera_smooth.lerp(target_camera,1.0-exp(-14.0*delta))
+	camera_pos = camera_smooth.round()
+	performance_last_frame_ms = delta*1000.0
+	update_static_cache()
+	update_foreground_cache()
 	save_timer += delta
 	var autosave_interval := 30.0 if mobile_performance_mode else 15.0
 	if save_timer > autosave_interval and arena_mode == "" and panel != "start":
@@ -1262,14 +1311,8 @@ func update_player(delta: float) -> void:
 	var move := movement_vector()
 	is_walking = move.length_squared() > 0.01 or dash_timer > 0
 	if is_walking: walk_phase += delta * (19.0 if dash_timer > 0 else 11.0)
-	var target_pos := player_pos + (dash_dir * 580.0 if dash_timer > 0 else move * 205.0) * delta
-	if not is_blocked(target_pos):
-		player_pos = target_pos.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
-	else:
-		var axis_x := Vector2(target_pos.x, player_pos.y)
-		var axis_y := Vector2(player_pos.x, target_pos.y)
-		if not is_blocked(axis_x): player_pos.x = axis_x.x
-		if not is_blocked(axis_y): player_pos.y = axis_y.y
+	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0)*delta
+	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
 		play_sound("step")
 		step_timer = 0.43 if dash_timer <= 0 else 0.25
@@ -1305,6 +1348,23 @@ func update_player(delta: float) -> void:
 	if panel == "" and attack_input_active() and attack_timer <= 0:
 		normal_attack()
 
+func move_with_collision(displacement: Vector2) -> void:
+	# Sweep in small steps so a slow frame cannot jump over a wall or facade.
+	var steps := maxi(1,ceili(displacement.length()/12.0))
+	var step := displacement/steps
+	for i in steps:
+		var origin := player_pos
+		var target := origin+step
+		if not is_blocked(target,origin): player_pos = target.clamp(Vector2(30,30),WORLD-Vector2(30,30))
+		else:
+			var axis_x := Vector2(target.x,player_pos.y)
+			if not is_blocked(axis_x,player_pos): player_pos.x = axis_x.x
+			var axis_y := Vector2(player_pos.x,target.y)
+			if not is_blocked(axis_y,player_pos): player_pos.y = axis_y.y
+
+func hero_collision_radius() -> float:
+	return [15.0,18.0,16.0][clampi(hero_race,0,2)]-(1.0 if hero_gender==1 else 0.0)
+
 func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	if arena_mode != "": return pos.distance_to(ARENA_CENTER) > ARENA_RADIUS - 22.0
 	if interior_id >= 0: return tavern_blocked(pos)
@@ -1323,10 +1383,23 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	var to_region := region_at(pos)
 	if from_region != to_region and not can_cross_gate(from_region, to_region, from_pos, pos):
 		return true
+	for stone in WAYSTONES:
+		if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).grow(12).has_point(pos): return true
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
+	for shop in VillageLayout.SHOPS:
+		if Rect2(shop["cart"]+Vector2(-45,-24),Vector2(110,49)).grow(10).has_point(pos): return true
+	for tree in REFERENCE_TREES:
+		if pos.distance_to(tree) < 18.0: return true
+	if Rect2(REFERENCE_WELL + Vector2(-44, -22), Vector2(88, 54)).grow(12).has_point(pos): return true
+	if Rect2(Vector2(596,1248),Vector2(74,22)).grow(10).has_point(pos):return true
+	for origin in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]:
+		if Rect2(origin+Vector2(-6,-4),Vector2(112,12)).grow(12).has_point(pos):return true
 	for house in house_positions():
-		if Rect2(house + Vector2(9, 36), Vector2(160, 105)).grow(15).has_point(pos):
+		if Rect2(house + Vector2(8, 73), Vector2(176, 75)).grow(hero_collision_radius()).has_point(pos):
+			return true
+	for solid in (VILLAGE_REF_SOLIDS if USE_VILLAGE_REFERENCE_BACKGROUND else []):
+		if solid.has_point(pos):
 			return true
 	return false
 
@@ -1349,6 +1422,8 @@ func blocked_by_region_wall(pos: Vector2) -> bool:
 		if along < float(wall["from"]) - 20.0 or along > float(wall["to"]) + 20.0: continue
 		if absf(across - float(wall["axis"])) > 51.0: continue
 		var gate_open: bool = creative_mode or (level >= int(wall["level"]) and (int(wall["boss"]) < 0 or bosses_defeated[int(wall["boss"])]))
+		if wall["vertical"] and float(wall["axis"]) == 1780.0 and float(wall["gate"]) == 1120.0: gate_open = gate_open and opened_village_gates.has(Vector2(1780,1120))
+		if not wall["vertical"] and float(wall["axis"]) == 2600.0: gate_open = gate_open and opened_village_gates.has(Vector2(875,2600))
 		if gate_open and absf(along - float(wall["gate"])) < GATE_HALF_WIDTH - 24.0: continue
 		return true
 	return false
@@ -1380,6 +1455,7 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	var zone := region_at(p)
 	if zone == 0: return {}
 	var radius := 43.0 + float(key % 4) * 9.0
+	if not region_rect(zone).grow(-52).encloses(Rect2(p-Vector2(radius*1.4,radius*1.8),Vector2(radius*2.8,radius*2.8))): return {}
 	if distance_to_trail(p) < radius + 115.0: return {}
 	for landmark in LANDMARKS:
 		if p.distance_to(landmark["pos"]) < radius + 180.0: return {}
@@ -1398,7 +1474,7 @@ func terrain_blocked(p: Vector2) -> bool:
 	for x in range(cx - 1, cx + 2):
 		for y in range(cy - 1, cy + 2):
 			var obstacle := obstacle_in_cell(x, y)
-			if not obstacle.is_empty() and p.distance_to(obstacle["pos"]) < float(obstacle["radius"]) + 17.0:
+			if not obstacle.is_empty() and p.distance_to(obstacle["pos"]) < float(obstacle["radius"]) + hero_collision_radius()+2.0:
 				return true
 	return false
 
@@ -1421,6 +1497,7 @@ func can_cross_gate(from_region: int, to_region: int, start: Vector2, end: Vecto
 		Vector2i(4, 7): center = Vector2(8500, 6350); needed_boss = 1
 		Vector2i(5, 7): center = Vector2(9750, 4200)
 		_: return false
+	if center in VILLAGE_GATES and not opened_village_gates.has(center): return false
 	var vertical := Vector2i(a, b) in [Vector2i(0, 1), Vector2i(1, 3), Vector2i(2, 4), Vector2i(2, 6), Vector2i(3, 5), Vector2i(4, 7)]
 	if vertical:
 		var span_x := end.x - start.x
@@ -1443,7 +1520,9 @@ func can_cross_gate(from_region: int, to_region: int, start: Vector2, end: Vecto
 	return true
 
 func house_positions() -> Array:
-	return [Vector2(220, 260), Vector2(495, 280), Vector2(1100, 240), Vector2(1440, 280), Vector2(210, 700), Vector2(1420, 890), Vector2(260, 1320), Vector2(590, 1570), Vector2(1180, 1510), Vector2(1460, 1760), Vector2(470, 2020), Vector2(990, 2100), Vector2(80, 1850), Vector2(360, 2250), Vector2(805, 2320), Vector2(1320, 2180)]
+	var homes: Array = [Vector2(220,260),Vector2(700,200),Vector2(1440,280),TAVERN_HOUSE,Vector2(250,1760),Vector2(450,2020),Vector2(1100,2110),Vector2(340,2280),Vector2(1370,2300)]
+	for shop in VillageLayout.SHOPS: homes.append(shop["house"])
+	return homes
 
 func load_bindings() -> void:
 	bindings = DEFAULT_BINDINGS.duplicate()
@@ -1456,6 +1535,7 @@ func load_bindings() -> void:
 			if int(value) != KEY_ESCAPE or action == "pause": bindings[action] = int(value)
 
 func save_bindings() -> void:
+	invalidate_static_cache()
 	var file: FileAccess = FileAccess.open(CONTROLS_PATH, FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify(bindings))
@@ -1691,6 +1771,7 @@ func open_mobile_chat() -> void:
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if death_timer > 0.0: return
 	if event is InputEventKey and event.keycode == KEY_TAB:
 		online_list_open = event.pressed
 		queue_redraw()
@@ -1772,6 +1853,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey: triggered = event.pressed and not event.echo
 	elif event is InputEventMouseButton: triggered = event.pressed
 	if not triggered: return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and (event.position.distance_to(Vector2(1035,116)) <= 90.0 or (touch_enabled and Rect2(984,16,145,105).has_point(event.position))):
+		panel = "map"
+		menu_scroll = 0
+		return
 	if event is InputEventMouseButton and panel != "":
 		if event.button_index == MOUSE_BUTTON_LEFT: handle_panel_click(event.position)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "journal"]:
@@ -1811,13 +1896,26 @@ func toggle_panel(which: String) -> void:
 	inventory_page = 0
 	sell_all_confirm = false
 
+func learn_arcane_step() -> bool:
+	if class_id != 1 or level < 4 or skill_points <= 0 or arcane_step_learned: return false
+	arcane_step_learned = true
+	skill_points -= 1
+	save_game()
+	return true
+
 func dodge() -> void:
+	if class_id == 1 and (level < 4 or not arcane_step_learned):
+		message("Arkaner Schritt: ab Level 4 im Fähigkeitenmenü erlernen (1 Skillpunkt).")
+		return
 	var dir := movement_vector()
-	dash_dir = dir.normalized() if dir.length() > 0 else facing
-	dash_timer = 0.22
+	dash_dir = dir.normalized() if dir.length() > 0 else facing.normalized()
+	if dash_dir.length_squared() < 0.01: dash_dir = Vector2.DOWN
+	dodge_start = player_pos
+	dodge_duration = 0.20 if class_id == 1 else (0.24 if class_id == 0 else 0.22)
+	dash_timer = dodge_duration
 	dash_cooldown = 1.25
 	invulnerable = 0.38
-	effect(player_pos, "ROLLE", Color("d8f3ff"), 0.65)
+	effect(player_pos+Vector2(0,-60), "ARKANER SCHRITT" if class_id == 1 else "ROLLE", Color("c7b5ff") if class_id == 1 else Color("d8f3ff"), 0.65)
 	play_sound("dodge")
 
 func weapon_power() -> int:
@@ -1978,6 +2076,7 @@ func use_ability(slot: int) -> void:
 	var id: int = class_ultimate() if slot == 3 else int(slots[slot])
 	if id < 0 or id >= ABILITIES.size() or not learned[id]: return
 	var ability: Dictionary = ABILITIES[id]
+	if float(ability["cd"]) <= 0.0: return
 	if float(cooldowns[id]) > 0 or energy < float(ability["cost"]): return
 	energy -= float(ability["cost"])
 	var rank: int = int(skill_levels[id])
@@ -1999,7 +2098,7 @@ func use_ability(slot: int) -> void:
 			effect(player_pos, "SCHILDWALL", Color("b5e6fb"), 0.8)
 		2:
 			var destination := player_pos + facing * (215 + (rank - 1) * 25)
-			if not is_blocked(destination): player_pos = destination.clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
+			move_with_collision(destination-player_pos)
 			invulnerable = 0.5
 			hit_arc(player_pos, facing, 100, -0.3, power + 12, true)
 		3:
@@ -2084,7 +2183,7 @@ func use_ability(slot: int) -> void:
 		19, 27:
 			var direction := facing if id == 19 else -facing
 			var destination := player_pos + direction * (210 + (rank - 1) * 15)
-			if not is_blocked(destination): player_pos = destination
+			move_with_collision(destination-player_pos)
 			invulnerable = 0.5
 		21:
 			shield_timer = 4.0 + rank * 0.5
@@ -2583,7 +2682,7 @@ func update_enemies(delta: float) -> void:
 				if panel == "arena_reward" or (arena_mode == "" and enemies.is_empty()): return
 
 func apply_player_damage(raw: int) -> void:
-	if creative_mode: return
+	if creative_mode or death_timer > 0.0: return
 	var dealt := maxi(1, raw - equipment_power(equipped_armor_uid))
 	if shield_timer > 0: dealt = maxi(1, int(dealt * 0.35))
 	if class_id == 0 and standing_in_battle_zone(): dealt = maxi(1, int(dealt * 0.78))
@@ -2596,7 +2695,14 @@ func apply_player_damage(raw: int) -> void:
 	invulnerable = 0.5
 	effect(player_pos + Vector2(0, -30), "-%d" % dealt, Color("ff888d"), 0.75)
 	play_sound("hit")
-	if hp <= 0: respawn()
+	if hp <= 0:
+		hp = 0
+		death_timer = DEATH_DURATION
+		panel = "death"
+		dash_timer = 0.0
+		attack_anim = 0.0
+		swing_timer = 0.0
+		is_walking = false
 
 func update_enemy_projectiles(delta: float) -> void:
 	for i in range(enemy_projectiles.size() - 1, -1, -1):
@@ -2606,18 +2712,21 @@ func update_enemy_projectiles(delta: float) -> void:
 		if shot["life"] <= 0 or (arena_mode == "" and region_at(shot["pos"]) == 0):
 			enemy_projectiles.remove_at(i)
 			continue
-		if shot["pos"].distance_to(player_pos) < 25:
+		if shot["pos"].distance_to(player_pos) < hero_collision_radius()+10.0:
 			if invulnerable <= 0: apply_player_damage(int(shot["damage"]))
 			if panel == "arena_reward" or enemy_projectiles.is_empty(): return
 			enemy_projectiles.remove_at(i)
 
 func respawn() -> void:
+	death_timer = 0.0
+	dash_timer = 0.0
+	invulnerable = 1.0
 	if arena_mode == "survival":
 		finish_survival_run()
 		return
 	if arena_mode == "final":
 		arena_mode = ""
-		player_pos = Vector2(900, 1050)
+		player_pos = Vector2(825, 1020)
 		enemies.clear()
 		message("Die letzte Wache hält noch stand. Sprich mit Arven, um es erneut zu versuchen.")
 		hp = max_hp()
@@ -2629,7 +2738,7 @@ func respawn() -> void:
 		enemies.clear()
 		enemy_projectiles.clear()
 		drops.clear()
-	player_pos = Vector2(900, 1050)
+	player_pos = Vector2(825, 1020)
 	hp = max_hp()
 	energy = max_energy()
 	gold = maxi(0, gold - 20)
@@ -2813,6 +2922,17 @@ func collect_drops() -> void:
 			save_game()
 
 func interact() -> void:
+	if interior_id < 0 and dungeon_id < 0 and arena_mode == "":
+		for gate in VILLAGE_GATES:
+			if player_pos.distance_to(gate) < 245:
+				var required: int = 1 if gate.x == 1780 else 5
+				if not creative_mode and level < required:
+					message("Dieses Tor öffnet sich ab Level %d." % required)
+				else:
+					opened_village_gates[gate] = true
+					message("Tor geöffnet.")
+					save_game()
+				return
 	if arena_mode != "": return
 	if interior_id >= 0:
 		if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95:
@@ -2897,7 +3017,8 @@ func interact() -> void:
 	elif closest["kind"] == "arena":
 		panel = "arena_entry"
 	else:
-		merchant_kind = String(closest["kind"])
+		merchant_kind = String(closest["kind"] )
+		shop_page = 0
 		panel = "shop"
 		selected_item = -1
 		menu_scroll = 0
@@ -2963,14 +3084,14 @@ func open_chest(index: int) -> void:
 
 func use_waystone() -> void:
 	for i in WAYSTONES.size():
-		if player_pos.distance_to(WAYSTONES[i]) < 105:
+		if player_pos.distance_to(WAYSTONES[i]) < 185:
 			if i == 0:
 				panel = "travel"
 				message("Wähle ein freigeschaltetes Ziel.")
 			else:
 				waystone_unlocked[i] = true
 				last_waystone = i
-				player_pos = WAYSTONES[0] + Vector2(0, 88)
+				player_pos = WAYSTONES[0] + Vector2(0, 180)
 				message("Wegstein %s aktiviert. Reise vom Dorf aus jederzeit zurück." % region_name(region_at(WAYSTONES[i])))
 			enemy_projectiles.clear()
 			save_game()
@@ -2985,7 +3106,7 @@ func click_travel(mouse: Vector2) -> void:
 				message("Diesen Wegstein musst du zunächst vor Ort aktivieren.")
 				return
 			if dungeon_id >= 0: dungeon_id = -1
-			player_pos = WAYSTONES[i] + Vector2(0, 112)
+			player_pos = WAYSTONES[i] + Vector2(0, 180)
 			last_waystone = i
 			panel = ""
 			enemies.clear()
@@ -3059,6 +3180,8 @@ func save_game() -> void:
 	var safe_hp := max_hp() if arena_mode != "" else hp
 	var data := {"world_version":5, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	var file: FileAccess = FileAccess.open(slot_save_path(active_save_slot, creative_mode), FileAccess.WRITE)
+	data["arcane_step_learned"] = arcane_step_learned
+	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	if file != null:
 		file.store_string(JSON.stringify(data))
 		file.close()
@@ -3071,6 +3194,12 @@ func load_game() -> void:
 	if file == null: return
 	var data: Variant = JSON.parse_string(file.get_as_text())
 	if not data is Dictionary: return
+	opened_village_gates.clear()
+	var saved_gates: Array = data.get("village_gates",[])
+	for gate_index in mini(saved_gates.size(),VILLAGE_GATES.size()):
+		if bool(saved_gates[gate_index]): opened_village_gates[VILLAGE_GATES[gate_index]] = true
+	dash_timer = 0.0
+	invulnerable = 0.0
 	reset_class_skills()
 	inventory.clear()
 	quests.clear()
@@ -3110,7 +3239,7 @@ func load_game() -> void:
 		player_pos = Vector2(float(coords[0]), float(coords[1])).clamp(Vector2(30, 30), WORLD - Vector2(30, 30))
 	# Alte Kartenkoordinaten passen nicht zu den neuen Gebietsgrenzen.
 	if int(data.get("world_version", 1)) < 2 and region_at(player_pos) != 0:
-		player_pos = Vector2(900, 1050)
+		player_pos = Vector2(825, 1020)
 	level = maxi(1, int(data.get("level", 1)))
 	xp = maxi(0, int(data.get("xp", 0)))
 	gold = maxi(0, int(data.get("gold", 55)))
@@ -3158,6 +3287,7 @@ func load_game() -> void:
 				add_item(make_item(old_name, old_icon, clampi(int(raw_item.get("rarity", 0)), 0, 4), 5 if old_icon == "sword" else 0, 20))
 	equipped_uid = int(data.get("equipped_uid", -1))
 	equipped_armor_uid = int(data.get("equipped_armor_uid", -1))
+	arcane_step_learned = bool(data.get("arcane_step_learned", false))
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
 	last_waystone = clampi(int(data.get("last_waystone", 1)), 1, WAYSTONES.size() - 1)
 	var stored_stones: Array = data.get("waystone_unlocked", [])
@@ -3166,6 +3296,7 @@ func load_game() -> void:
 	shop_timer = clampf(float(data.get("shop_timer", 0.0)), 0.0, 419.0)
 	var stored_shop: Variant = data.get("shop_stock", {})
 	if stored_shop is Dictionary and stored_shop.has("smith"): shop_stock = stored_shop
+	append_new_equipment()
 	var stored_chests: Array = data.get("opened_chests", [])
 	for i in mini(stored_chests.size(), LANDMARKS.size()): opened_chests[i] = bool(stored_chests[i])
 	var stored_dungeon_chests: Array = data.get("dungeon_chests_opened", [])
@@ -3188,7 +3319,7 @@ func load_game() -> void:
 		quests[0]["state"] = clampi(int(data["quest_state"]), 0, 3)
 		quests[0]["progress"] = clampi(int(data.get("quest_kills", 0)), 0, 5)
 	if is_blocked(player_pos) or (not creative_mode and level < region_level(region_at(player_pos))):
-		player_pos = Vector2(900, 1050)
+		player_pos = Vector2(825, 1020)
 	if level < region_level(region_at(WAYSTONES[last_waystone])): last_waystone = 1
 	if level >= 20:
 		learned[class_ultimate()] = true
@@ -3242,7 +3373,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		return
 	if panel == "creation":
 		if Rect2(300, 228, 550, 48).has_point(mouse):
-			creation_name = mobile_text_prompt("Name deines Helden", creation_name, 16)
+			if touch_enabled: creation_name = mobile_text_prompt("Name deines Helden", creation_name, 16)
 			queue_redraw()
 			return
 		for i in 2:
@@ -3401,6 +3532,9 @@ func begin_character_creation() -> void:
 
 func start_new_game() -> void:
 	creative_mode = false
+	opened_village_gates.clear()
+	dash_timer = 0.0
+	invulnerable = 0.0
 	hero_name = creation_name.strip_edges().substr(0, 16) if creation_name.strip_edges() != "" else "Held"
 	hero_gender = pending_gender
 	hero_race = pending_race
@@ -3420,7 +3554,7 @@ func start_new_game() -> void:
 	arena_best = 0
 	arena_pending_loaded = false
 	arena_leaderboard.clear()
-	player_pos = Vector2(900, 1050)
+	player_pos = Vector2(825, 1020)
 	class_id = pending_class
 	rescue_state = 0
 	rescue_kills = 0
@@ -3545,6 +3679,9 @@ func set_creative_level(target: int) -> void:
 	save_game()
 
 func click_skills(mouse: Vector2) -> void:
+	if class_id == 1 and Rect2(165,532,815,32).has_point(mouse):
+		learn_arcane_step()
+		return
 	for slot in 3:
 		if Rect2(165 + slot * 204, 148, 193, 44).has_point(mouse):
 			selected_slot = slot
@@ -3613,7 +3750,13 @@ func click_shop(mouse: Vector2) -> void:
 			pending_purchase = -1
 			pending_purchase_item = {}
 		return
-	var stock: Array = shop_stock[merchant_kind]
+	if Rect2(760,145,80,40).has_point(mouse):
+		shop_page = maxi(0,shop_page-1)
+		return
+	if Rect2(850,145,100,40).has_point(mouse):
+		shop_page = mini(int((shop_stock[merchant_kind].size()-1)/3),shop_page+1)
+		return
+	var stock: Array = shop_stock[merchant_kind].slice(shop_page*3,shop_page*3+3)
 	for i in stock.size():
 		if Rect2(168 + i * 258, 210, 245, 125).has_point(mouse):
 			sell_all_confirm = false
@@ -3705,6 +3848,24 @@ func refresh_shop_stock() -> void:
 			{"name":"Umhang %s" % suffix, "icon":"armor", "power":1 + int(tier / 4.0), "price":65 + tier * 14, "rarity":rarity, "level":tier},
 			{"name":"Meister-%s %s" % [weapon_word, suffix], "icon":weapon, "power":10 + tier * 3, "price":680 + tier * 83, "rarity":mini(3, rarity + 1), "level":tier, "element":shop_element}]
 	}
+	append_new_equipment()
+
+func append_new_equipment() -> void:
+	if not shop_stock.has("merchant"): return
+	for offer in [
+		{"name":"Reisendenleder", "icon":"armor", "power":2, "price":95, "rarity":0, "level":1},
+		{"name":"Wachtpanzer", "icon":"armor", "power":5, "price":230, "rarity":1, "level":3},
+		{"name":"Arkanrobe", "icon":"armor", "power":4, "price":220, "rarity":1, "level":3},
+		{"name":"Waldläufermantel", "icon":"armor", "power":4, "price":210, "rarity":1, "level":3},
+		{"name":"Sonnenrüstung", "icon":"armor", "power":9, "price":580, "rarity":2, "level":8},
+		{"name":"Kristallharnisch", "icon":"armor", "power":13, "price":960, "rarity":3, "level":12},
+		{"name":"Bernsteinring", "icon":"ring", "power":10, "price":165, "rarity":1, "level":2},
+		{"name":"Runenring", "icon":"ring", "power":20, "price":390, "rarity":2, "level":6}
+	]:
+		var exists := false
+		for old in shop_stock["merchant"]:
+			if old["name"] == offer["name"]: exists = true
+		if not exists: shop_stock["merchant"].append(offer)
 
 func buy_item(stock_item: Dictionary) -> void:
 	if gold < int(stock_item["price"]):
@@ -3740,10 +3901,10 @@ func sell_item(index: int) -> void:
 
 func _draw() -> void:
 	if dedicated_server_mode: return
+	var draw_started := Time.get_ticks_usec()
+	character_canvas_offset = -camera_pos
 	draw_set_transform(-camera_pos)
 	draw_world()
-	if arena_mode == "" and dungeon_id < 0 and interior_id < 0:
-		draw_day_night_overlay()
 	for drop in drops:
 		if visible_world(drop["pos"], 45):
 			var p: Vector2 = drop["pos"]
@@ -3757,8 +3918,7 @@ func _draw() -> void:
 				draw_item_icon(p + Vector2(-15, -19), String(item["icon"]), rarity_color, 1.0, weapon_visual_stage(item), item_design(item))
 				if int(item["rarity"]) >= 2 and int(world_time * 2.0) % 2 == 0:
 					draw_rect(Rect2(p + Vector2(17, -24), Vector2(4, 4)), rarity_color.lightened(0.3))
-	for enemy in enemies:
-		if visible_world(enemy["pos"], 55): draw_enemy(enemy)
+	draw_sorted_world_objects()
 	for cloud in poison_clouds:
 		if visible_world(cloud["pos"], 110):
 			var center: Vector2 = cloud["pos"]
@@ -3784,15 +3944,9 @@ func _draw() -> void:
 			if visible_world(WORLD_EVENTS[event_index]["pos"], 180): draw_event_scene(event_index)
 		for i in LANDMARKS.size():
 			if visible_world(chest_position(i), 80): draw_chest(chest_position(i), opened_chests[i])
-		for i in WAYSTONES.size():
-			if visible_world(WAYSTONES[i], 100): draw_waystone(WAYSTONES[i])
 		for portal in PORTALS:
 			if visible_world(portal[0], 100): draw_portal(portal[0], int(portal[2]))
 			if visible_world(portal[1], 100): draw_portal(portal[1], int(portal[2]))
-		for npc in NPCS:
-			if visible_world(npc["pos"], 70): draw_npc(npc)
-		if rescue_state >= 2 and visible_world(RESCUE_POS, 190):
-			draw_npc({"name":"Nela", "role":"Bewohnerin", "pos":RESCUE_POS + Vector2(0, 120), "color":Color("bd8774"), "kind":"rescued"})
 	for projectile in projectiles:
 		if visible_world(projectile["pos"], 40):
 			var p: Vector2 = projectile["pos"]
@@ -3883,6 +4037,7 @@ func _draw() -> void:
 			draw_rect(Rect2(center + offset - Vector2(ember * 0.5, ember * 0.5), Vector2(ember, ember)), tint.lightened(0.28))
 	for arc_line in lightning_lines:
 		var a: Vector2 = arc_line["from"]
+		if not Rect2(a.min(arc_line["to"])-Vector2(32,32),(arc_line["to"]-a).abs()+Vector2(64,64)).intersects(Rect2(camera_pos,VIEW)): continue
 		var b: Vector2 = arc_line["to"]
 		var middle := a.lerp(b, 0.5) + (b - a).normalized().rotated(PI * 0.5) * 17
 		draw_line(a, middle, Color("fff2a3", 0.55), 13)
@@ -3893,17 +4048,21 @@ func _draw() -> void:
 		if visible_world(visual["pos"], 210) or visible_world(visual["end"], 210): draw_spell_visual(visual)
 	if dungeon_id >= 0: draw_dungeon_atmosphere()
 	elif arena_mode == "" and interior_id < 0: draw_overworld_atmosphere()
-	draw_remote_players()
-	draw_player()
 	for e in effects:
+		if not visible_world(e["pos"],180): continue
 		var p: Vector2 = e["pos"] + Vector2(0, (float(e["max"]) - float(e["life"])) * -40)
 		text_at(p, String(e["text"]), 18, e["color"], HORIZONTAL_ALIGNMENT_CENTER, 180)
+	if arena_mode == "" and dungeon_id < 0 and interior_id < 0: draw_day_night_overlay()
 	draw_set_transform(Vector2.ZERO)
 	draw_hud()
+	character_canvas_offset = Vector2.ZERO
 	draw_chat_overlay()
 	draw_online_list()
 	if rescue_intro_timer > 0.0 or reward_scene_timer > 0.0: draw_rescue_alert()
 	if panel != "": draw_panel()
+	performance_draw_us = Time.get_ticks_usec()-draw_started
+	performance_draw_samples.append(performance_draw_us)
+	if performance_draw_samples.size()>180: performance_draw_samples.pop_front()
 
 func draw_day_night_overlay() -> void:
 	# Ein ruhiger 12-Minuten-Rhythmus: warme Dämmerung, kühle Nacht, lesbarer Tag.
@@ -3916,9 +4075,10 @@ func draw_day_night_overlay() -> void:
 	if dusk > 0.01:
 		draw_rect(Rect2(camera_pos, VIEW), Color("df895b", 0.055 * dusk))
 
-func draw_remote_players() -> void:
+func draw_remote_players(only_peer: int=-1) -> void:
 	if remote_players.is_empty(): return
 	for peer_id in remote_players.keys():
+		if only_peer >= 0 and peer_id != only_peer: continue
 		var state: Dictionary = remote_players[peer_id]
 		var coords: Array = state.get("pos", [0.0,0.0])
 		if coords.size() < 2: continue
@@ -3930,7 +4090,7 @@ func draw_remote_players() -> void:
 		var gender := clampi(int(state.get("gender",0)),0,1)
 		var cls := clampi(int(state.get("class",0)),0,2)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
-		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender)
+		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)))
 		draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
 		text_at(rp + Vector2(-75,-57), "%s · LV %d" % [str(state.get("name","Freund")), int(state.get("level",1))], 13, Color('bfe7ff'), HORIZONTAL_ALIGNMENT_CENTER, 150)
 
@@ -4158,7 +4318,11 @@ func draw_spell_visual(visual: Dictionary) -> void:
 				draw_line(source, target, Color(hue, alpha), 3)
 				draw_circle(target, 4 + 4 * alpha, Color("fff7e8", alpha))
 
+func current_static_bounds() -> Rect2:
+	return static_draw_bounds if static_draw_bounds.has_area() else Rect2(camera_pos,VIEW)
+
 func visible_world(pos: Vector2, margin: float = 100.0) -> bool:
+	if static_draw_bounds.has_area(): return static_draw_bounds.grow(margin).has_point(pos)
 	return pos.x > camera_pos.x - margin and pos.x < camera_pos.x + VIEW.x + margin and pos.y > camera_pos.y - margin and pos.y < camera_pos.y + VIEW.y + margin
 
 func hash_cell(x: int, y: int) -> int:
@@ -4166,9 +4330,7 @@ func hash_cell(x: int, y: int) -> int:
 	return absi(n ^ (n >> 11)) % 997
 
 func visual_region_at(p: Vector2) -> int:
-	if p.x < 1580 and p.y < 2400: return region_at(p)
-	var shifted := p + Vector2(sin(p.y / 290.0) * 92.0 + sin(p.y / 110.0) * 34.0, sin(p.x / 330.0) * 88.0 + sin(p.x / 145.0) * 30.0)
-	return region_at(shifted.clamp(Vector2.ZERO, WORLD - Vector2.ONE))
+	return region_at(p)
 
 func draw_pixel_tile(index: int, pos: Vector2, size: float = 48.0, tint: Color = Color.WHITE) -> void:
 	if environment_tiles == null: return
@@ -4194,17 +4356,22 @@ func cardinal_direction_index(dir: Vector2) -> int:
 	if absf(dir.x) > absf(dir.y): return 2 if dir.x > 0.0 else 1
 	return 0 if dir.y > 0.0 else 3
 
-func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, attack: bool = false, race_override: int = -1, gender_override: int = -1) -> void:
-	if character_sprites == null: return
-	var use_race := hero_race if race_override < 0 else race_override
-	var use_gender := hero_gender if gender_override < 0 else gender_override
-	var combo := ((clampi(use_race,0,2) * 2 + clampi(use_gender,0,1)) * 3 + clampi(visual_class,0,2))
-	var direction := cardinal_direction_index(look)
-	var frame := 3 if attack else (1 + int(world_time * 7.0) % 2 if walking else 0)
-	var src := Rect2(Vector2(frame * 32, (combo * 4 + direction) * 32), Vector2(32,32))
-	var size := Vector2(70,70) * scale_factor
-	draw_texture_rect_region(character_sprites, Rect2(p - size * 0.5 + Vector2(0,-14*scale_factor), size), src)
-	draw_character_detail_overlay(p, visual_class, look, scale_factor, use_race, use_gender)
+func armor_visual() -> int:
+	for item in inventory:
+		if int(item.get("uid",-1)) == equipped_armor_uid:
+			var title := str(item.get("name","")).to_lower()
+			for key in ["reis", "wacht", "arkan", "wald", "sonnen", "kristall"]:
+				if key in title: return ["reis", "wacht", "arkan", "wald", "sonnen", "kristall"].find(key)
+			return clampi(int(item.get("design",0)),0,5)
+	return -1
+
+func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0) -> void:
+	var local := race_override < 0 or (p == player_pos and scale_factor == 1.0)
+	var roll := 1.0-dash_timer/dodge_duration if local and dash_timer > 0 else -1.0
+	var death := 1.0-death_timer/DEATH_DURATION if local and death_timer > 0 else death_override
+	var outfit := armor_visual() if armor_override == -2 else armor_override
+	if panel == "creation": outfit = -1
+	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death)
 
 func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2, scale_factor: float, race: int, gender: int) -> void:
 	var accent: Color = [Color('e5bd77'),Color('8fcde6'),Color('91c787')][clampi(visual_class,0,2)]
@@ -4279,19 +4446,14 @@ func npc_sprite_row(kind: String, name: String) -> int:
 		_: return 11
 
 func draw_npc_sprite(p: Vector2, kind: String, name: String) -> void:
-	if npc_sprites == null: return
-	var row := npc_sprite_row(kind,name)
-	var frame := int(world_time * 2.2 + float(absi(hash(name)) % 13)) % 3
-	var src := Rect2(Vector2(frame*32,row*32),Vector2(32,32))
-	draw_rect(Rect2(p+Vector2(-18,25),Vector2(36,5)),Color(0.10,0.16,0.17,0.22))
-	draw_texture_rect_region(npc_sprites,Rect2(p-Vector2(32,44),Vector2(64,64)),src)
+	ReferenceScenery.person(self,p,npc_sprite_row(kind,name),0,1 if name in ["Mira","Liora","Fenna","Elara"] else 0,Vector2.DOWN,0.0,1.0,-camera_pos)
 
 func draw_weapon_world(p: Vector2, family: int, design: int, look: Vector2, scale_factor: float = 1.0, attack_progress: float = -1.0) -> void:
 	var base_dir: Vector2 = look.normalized() if look.length() > 0.01 else Vector2.DOWN
 	var dir: Vector2 = weapon_attack_look(base_dir, family, design, attack_progress)
 	var side: Vector2 = dir.rotated(PI * 0.5)
 	var hand_side: Vector2 = base_dir.rotated(-PI * 0.5)
-	var hand: Vector2 = p + dir * 7.0 * scale_factor + hand_side * 7.0 * scale_factor
+	var hand: Vector2 = p + (weapon_hand_offset(base_dir)+dir*3.0)*scale_factor
 	var variant: int = clampi(design, 0, 11) % 4
 	var tier: int = clampi(int(design / 4.0), 0, 2)
 	if family == 0:
@@ -4447,11 +4609,16 @@ func draw_world() -> void:
 	if dungeon_id >= 0:
 		draw_dungeon_world()
 		return
+	if not draw_cached_overworld():
+		draw_static_overworld(Rect2(camera_pos,VIEW))
+	draw_region_gates()
+
+func draw_static_overworld(bounds: Rect2) -> void:
 	# Alle Regionen werden über dasselbe 16px-Raster aufgebaut und nur farblich variiert.
-	var start_x := maxi(0, int(camera_pos.x / 64) - 2)
-	var end_x := mini(int(WORLD.x / 64) + 1, int((camera_pos.x + VIEW.x) / 64) + 2)
-	var start_y := maxi(0, int(camera_pos.y / 64) - 2)
-	var end_y := mini(int(WORLD.y / 64) + 1, int((camera_pos.y + VIEW.y) / 64) + 2)
+	var start_x := maxi(0, int(bounds.position.x / 64) - 2)
+	var end_x := mini(int(WORLD.x / 64) + 1, int((bounds.end.x) / 64) + 2)
+	var start_y := maxi(0, int(bounds.position.y / 64) - 2)
+	var end_y := mini(int(WORLD.y / 64) + 1, int((bounds.end.y) / 64) + 2)
 	for tx in range(start_x, end_x):
 		for ty in range(start_y, end_y):
 			var key := hash_cell(tx, ty)
@@ -4459,12 +4626,29 @@ func draw_world() -> void:
 			var center := tile_origin + Vector2(32, 32)
 			var zone := visual_region_at(center)
 			var wet := zone == 6 and center.y > 6850 + sin(center.x / 220.0) * 125.0
-			draw_rect(Rect2(tile_origin, Vector2(64, 64)), region_ground_color(zone, key, wet))
+			var tile_rect := Rect2(tile_origin,Vector2(64,64))
+			if not region_rect(zone).encloses(tile_rect):
+				for border_zone in 13:
+					var part := region_rect(border_zone).intersection(tile_rect)
+					if part.has_area(): draw_rect(part,Color("659349") if border_zone == 0 else region_ground_color(border_zone,key,border_zone == 6 and wet))
+				continue
+			if USE_VILLAGE_REFERENCE_BACKGROUND and VILLAGE_REF_RECT.grow(150).has_point(center):
+				draw_rect(Rect2(tile_origin, Vector2(64, 64)), Color("6d8043"))
+				if VILLAGE_REF_RECT.grow(20).has_point(center):
+					continue
+				if key % 9 == 0:
+					draw_flower(tile_origin + Vector2(14, 20), key)
+				continue
+			if zone == 0:
+				ReferenceScenery.ground(self, tile_origin, key)
+			else:
+				draw_rect(Rect2(tile_origin, Vector2(64, 64)), region_ground_color(zone, key, wet))
 			if zone in [4, 7, 10, 12] and key % 9 == 0:
 				draw_rect(Rect2(tile_origin + Vector2(13, 17), Vector2(39, 21)), Color('edfaff', 0.12))
 			elif zone == 5 and key % 8 == 0:
 				draw_rect(Rect2(tile_origin + Vector2(8, 41), Vector2(44, 7)), Color('f0af71', 0.18))
 			var p := Vector2(tx * 64 + (key % 23), ty * 64 + ((key / 23) % 25))
+			if not region_rect(zone).grow(-45).encloses(Rect2(p-Vector2(100,160),Vector2(200,210))): continue
 			if distance_to_trail(p) < 120.0: continue
 			if zone == 0:
 				if key % 6 == 0: draw_flower(p, key)
@@ -4509,16 +4693,16 @@ func draw_world() -> void:
 				elif key % 3 == 0: draw_flower(p, key)
 				else: draw_grass(p)
 	draw_trails()
-	var cell_min_x := maxi(0, int(camera_pos.x / 250) - 2)
-	var cell_max_x := mini(int(WORLD.x / 250) + 1, int((camera_pos.x + VIEW.x) / 250) + 2)
-	var cell_min_y := maxi(0, int(camera_pos.y / 250) - 2)
-	var cell_max_y := mini(int(WORLD.y / 250) + 1, int((camera_pos.y + VIEW.y) / 250) + 2)
+	var cell_min_x := maxi(0, int(bounds.position.x / 250) - 2)
+	var cell_max_x := mini(int(WORLD.x / 250) + 1, int((bounds.end.x) / 250) + 2)
+	var cell_min_y := maxi(0, int(bounds.position.y / 250) - 2)
+	var cell_max_y := mini(int(WORLD.y / 250) + 1, int((bounds.end.y) / 250) + 2)
 	for cx in range(cell_min_x, cell_max_x):
 		for cy in range(cell_min_y, cell_max_y):
 			var obstacle := obstacle_in_cell(cx, cy)
 			if not obstacle.is_empty() and visible_world(obstacle['pos'], 110): draw_obstacle(obstacle)
-	draw_village()
-	draw_region_gates()
+	if current_static_bounds().intersects(Rect2(480,680,690,650)): VillageLayout.plaza(self)
+	draw_village_ground()
 	draw_rect(Rect2(Vector2.ZERO, WORLD), Color('45726d'), false, 7)
 
 func draw_tavern_world() -> void:
@@ -4713,9 +4897,9 @@ func _trail_theme(region: int) -> int:
 func draw_trails() -> void:
 	# Drei zusammenhängende Pixel-Farbflächen statt vieler gedrehter Texturquadrate.
 	# Das vermeidet schwebende Kacheln, harte Kachelenden und unnötige Draw Calls.
-	var edge_colors := [Color("665541"), Color("4e4a45"), Color("624d3b"), Color("45414f")]
+	var edge_colors := [Color("7b6443"), Color("4e4a45"), Color("624d3b"), Color("45414f")]
 	var mid_colors := [Color("927453"), Color("77736b"), Color("927555"), Color("716b7b")]
-	var road_colors := [Color("b49a6b"), Color("a49b8c"), Color("b69b73"), Color("91899a")]
+	var road_colors := [Color("c6aa73"), Color("a49b8c"), Color("b69b73"), Color("91899a")]
 	for trail_index in TRAILS.size():
 		var trail: Array = TRAILS[trail_index]
 		var theme_for_trail := 0
@@ -4729,7 +4913,7 @@ func draw_trails() -> void:
 		for i in range(trail.size() - 1):
 			var a: Vector2 = trail[i]
 			var b: Vector2 = trail[i + 1]
-			if not Rect2(a.min(b) - Vector2(140,140), (b-a).abs() + Vector2(280,280)).intersects(Rect2(camera_pos, VIEW)): continue
+			if not Rect2(a.min(b) - Vector2(140,140), (b-a).abs() + Vector2(280,280)).intersects(current_static_bounds()): continue
 			var region := region_at(a.lerp(b, 0.5))
 			var theme := _trail_theme(region)
 			var direction := (b-a).normalized()
@@ -4866,6 +5050,7 @@ func draw_region_gates() -> void:
 	draw_gate_wall(Vector2(8500, 4200), Vector2(11000, 4200), Vector2(9750, 4200), 36)
 
 func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_level: int, boss_index: int = -1) -> void:
+	var reference_wall: bool = (start.x == 1780 and finish.y == 2600) or (start.y == 2600 and finish.x == 1780)
 	var vertical := is_equal_approx(start.x, finish.x)
 	var first := start.y if vertical else start.x
 	var last := finish.y if vertical else finish.x
@@ -4880,7 +5065,10 @@ func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_lev
 		var length: float = part.y - part.x
 		if length <= 0.0: continue
 		var face := Rect2(start.x-thickness*0.5, part.x, thickness, length) if vertical else Rect2(part.x,start.y-thickness*0.5,length,thickness)
-		if not face.grow(90).intersects(Rect2(camera_pos,VIEW)): continue
+		if not face.grow(90).intersects(current_static_bounds()): continue
+		if reference_wall:
+			ReferenceScenery.wall(self, face)
+			continue
 		draw_rect(face, dark)
 		# breite sichtbare Oberseite + Vorderkante statt dünner Linie
 		var crown := Rect2(face.position + (Vector2(8,0) if vertical else Vector2(0,8)), face.size - (Vector2(16,0) if vertical else Vector2(0,16)))
@@ -4911,10 +5099,23 @@ func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_lev
 	# massives Tor mit Säulen
 	for side in [-1.0,1.0]:
 		var post := gate + (Vector2(0,side*GATE_HALF_WIDTH) if vertical else Vector2(side*GATE_HALF_WIDTH,0))
+		if reference_wall:
+			ReferenceScenery.gatepost(self,post)
+			continue
 		draw_rect(Rect2(post-Vector2(39,39),Vector2(78,78)),dark)
 		draw_rect(Rect2(post-Vector2(30,30),Vector2(60,60)),mid)
 		draw_rect(Rect2(post-Vector2(24,28),Vector2(48,13)),top)
 		draw_rect(Rect2(post+Vector2(-9,8),Vector2(18,14)),Color('d8bb74'))
+	if gate in VILLAGE_GATES:
+		if not opened_village_gates.has(gate):
+			var door := Rect2(gate + (Vector2(-18,-150) if vertical else Vector2(-150,-18)), Vector2(36,300) if vertical else Vector2(300,36))
+			draw_rect(door,Color("493226"))
+			for n in range(15):
+				var plank := Rect2(door.position + (Vector2(3,n*20+2) if vertical else Vector2(n*20+2,3)), Vector2(30,16) if vertical else Vector2(16,30))
+				draw_rect(plank,Color("987047") if n%2 else Color("855c3b"))
+			text_at(gate+Vector2(-105,-82),"E · TOR ÖFFNEN",16,Color("fff0bc"))
+		else:
+			text_at(gate+Vector2(-85,-82),"TOR OFFEN",14,Color("fff0bc"))
 	var level_locked := level < required_level
 	var boss_locked: bool = boss_index >= 0 and not bosses_defeated[boss_index]
 	if level_locked or boss_locked:
@@ -4926,6 +5127,9 @@ func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_lev
 		text_at(gate+Vector2(-85,-52),"DURCHGANG",14,Color('fff0bc'))
 
 func draw_grass(p: Vector2) -> void:
+	if region_at(p) == 0:
+		ReferenceScenery.grass(self, p, int(p.x+p.y))
+		return
 	draw_rect(Rect2(p + Vector2(1, 8), Vector2(3, 8)), Color('5f9d67'))
 	draw_rect(Rect2(p + Vector2(6, 4), Vector2(3, 12)), Color('72b670'))
 	draw_rect(Rect2(p + Vector2(10, 7), Vector2(4, 10)), Color('80bf73'))
@@ -4933,6 +5137,9 @@ func draw_grass(p: Vector2) -> void:
 	draw_rect(Rect2(p + Vector2(18, 9), Vector2(2, 7)), Color('8cca7b'))
 
 func draw_flower(p: Vector2, key: int) -> void:
+	if region_at(p) == 0:
+		ReferenceScenery.flower(self, p, key)
+		return
 	var petals: Color = [Color('fff3a6'), Color('f5a4b9'), Color('c8b2f2'), Color('e8f5e6')][key % 4]
 	draw_rect(Rect2(p + Vector2(9, 10), Vector2(3, 10)), Color('569a60'))
 	for offset in [Vector2(-6, 0), Vector2(6, 0), Vector2(0, -6), Vector2(0, 6), Vector2(-4, -4), Vector2(4, 4)]:
@@ -4941,6 +5148,9 @@ func draw_flower(p: Vector2, key: int) -> void:
 	draw_rect(Rect2(p + Vector2(9, 9), Vector2(3, 3)), Color('fff7d0'))
 
 func draw_bush_cluster(p: Vector2, zone: int, key: int) -> void:
+	if zone == 0:
+		ReferenceScenery.bush(self, p, key)
+		return
 	var leaf := Color("559668")
 	if zone in [2, 8]: leaf = Color("486f68")
 	elif zone in [3, 11]: leaf = Color("73876f")
@@ -4958,6 +5168,9 @@ func draw_bush_cluster(p: Vector2, zone: int, key: int) -> void:
 			draw_rect(Rect2(b, Vector2(4, 4)), Color("e7aa79") if zone != 12 else Color("d4c4ff"))
 
 func draw_tree(p: Vector2, zone: int) -> void:
+	if zone == 0:
+		ReferenceScenery.tree(self, p, int(p.x+p.y))
+		return
 	var seed := int(p.x * 0.17 + p.y * 0.11)
 	var leaf := Color('5da875')
 	var bark := Color('705a4e')
@@ -5040,6 +5253,9 @@ func draw_lava(p: Vector2) -> void:
 	draw_rect(Rect2(p + Vector2(33, 6), Vector2(8, 4)), Color('ffcf88'))
 
 func draw_rock(p: Vector2) -> void:
+	if region_at(p) == 0:
+		ReferenceScenery.rock(self,p)
+		return
 	draw_colored_polygon(PackedVector2Array([p + Vector2(2, 24), p + Vector2(15, 6), p + Vector2(31, 0), p + Vector2(45, 11), p + Vector2(47, 28), p + Vector2(19, 30)]), Color('6c6a6f'))
 	draw_colored_polygon(PackedVector2Array([p + Vector2(15, 8), p + Vector2(29, 3), p + Vector2(36, 16), p + Vector2(22, 18)]), Color('97908a'))
 	draw_rect(Rect2(p + Vector2(12, 19), Vector2(15, 4)), Color('b4a99a'))
@@ -5060,96 +5276,42 @@ func draw_shell(p: Vector2) -> void:
 	draw_rect(Rect2(p + Vector2(12, 7), Vector2(8, 5)), Color('eebfad'))
 	draw_rect(Rect2(p + Vector2(14, 14), Vector2(4, 4)), Color('fff7e8'))
 
+func draw_village_ground() -> void:
+	for i in range(16):
+		var pos := Vector2(660+(i%8)*42,1200+(i/8)*140)
+		if pos.x<=1010 and visible_world(pos,40): ReferenceScenery.flower(self,pos,i)
+
 func draw_village() -> void:
-	if not Rect2(0, 0, 1780, 2600).intersects(Rect2(camera_pos, VIEW)): return
-	# Handgezeichnete Pflasterkacheln bilden den Dorfplatz.
-	draw_rect(Rect2(670, 780, 454, 444), Color("806a52"))
-	for column in 9:
-		for row in 9:
-			var code := hash_cell(column + 80, row + 60)
-			draw_pixel_tile(3 if code % 4 == 0 else 2, Vector2(681 + column * 48, 790 + row * 48))
-	# Am Spawn: Steinrose, Himmelsrichtungen, ein kleines Willkommensschild.
-	var arrival := Vector2(900, 1050)
-	draw_circle(arrival, 78, Color("7f897c"))
-	draw_circle(arrival, 70, Color("ead5a0"))
-	draw_circle(arrival, 58, Color("aec4af"))
-	for spoke in 8:
-		var ray := Vector2.RIGHT.rotated(float(spoke) * TAU / 8.0)
-		draw_line(arrival + ray * 23, arrival + ray * 54, Color("658e8a"), 5)
-		draw_rect(Rect2(arrival + ray * 60 - Vector2(4, 4), Vector2(8, 8)), Color("f7e8bb"))
-	draw_colored_polygon(PackedVector2Array([arrival + Vector2(0,-30),arrival + Vector2(14,0),arrival + Vector2(0,30),arrival + Vector2(-14,0)]), Color("487c79"))
-	draw_rect(Rect2(arrival + Vector2(-33, -108), Vector2(66, 7)), Color("735b49"))
-	text_at(arrival + Vector2(-94, -125), "WILLKOMMEN", 15, Color("385653"), HORIZONTAL_ALIGNMENT_CENTER, 188)
-	for flower in 12:
-		var petal := arrival + Vector2.RIGHT.rotated(float(flower) * TAU / 12.0) * 108
-		draw_flower(petal, flower)
-	# Kleine Verkaufsstände und Wäscheleinen geben den Gebäuden einen Zweck.
-	for stall in [Vector2(425, 820), Vector2(1190, 710), Vector2(1340, 1280)]:
-		draw_rect(Rect2(stall, Vector2(126, 13)), Color("795a46"))
-		for post in [0, 116]: draw_rect(Rect2(stall + Vector2(post, -42), Vector2(9, 47)), Color("695648"))
-		for stripe in 5:
-			draw_rect(Rect2(stall + Vector2(stripe * 25, -52), Vector2(25, 16)), Color("e6ae79") if stripe % 2 == 0 else Color("fff0c1"))
-		for basket in 4: draw_circle(stall + Vector2(18 + basket * 27, -7), 6, Color("a7bb72") if basket % 2 == 0 else Color("e1aa69"))
-	for lantern in [Vector2(760, 705), Vector2(1055, 675), Vector2(625, 1150), Vector2(1250, 1160)]:
-		draw_rect(Rect2(lantern, Vector2(8, 75)), Color("71584c"))
-		draw_rect(Rect2(lantern + Vector2(-7, -11), Vector2(23, 20)), Color("625251"))
-		draw_rect(Rect2(lantern + Vector2(-2, -7), Vector2(12, 12)), Color("f7d48c"))
-		draw_circle(lantern + Vector2(4, 0), 19, Color(0.98, 0.80, 0.43, 0.11 + sin(world_time * 2.0) * 0.025))
-	for i in 9:
-		var x := 600 + i * 110
-		for y in [580, 1370, 1900]:
-			draw_rect(Rect2(x, y, 8, 28), Color("c5a977"))
-			draw_rect(Rect2(x, y + 9, 90, 7), Color("dec58d"))
-	for p in [Vector2(360, 1190), Vector2(1290, 1200), Vector2(390, 1830), Vector2(1260, 1980)]:
-		draw_rect(Rect2(p, Vector2(150, 90)), Color("806e57"))
-		for i in 5:
-			draw_flower(p + Vector2(12 + i * 27, 25), i * 7)
-	for h in house_positions():
-		if visible_world(h, 200): draw_house(h)
-	if visible_world(TAVERN_HOUSE, 200):
-		text_at(TAVERN_HOUSE + Vector2(-75, -43), "ZUR STEINROSE · TAVERNE", 15, Color("fff0bd"), HORIZONTAL_ALIGNMENT_CENTER, 330)
-		text_at(TAVERN_HOUSE + Vector2(12, 185), "%s · EINTRETEN" % ("AKTION" if touch_enabled else binding_short("interact")), 13, Color("fff2cd"), HORIZONTAL_ALIGNMENT_CENTER, 160)
-	# Brunnen mit Wasser und Steinrand.
-	draw_rect(Rect2(890, 860, 105, 95), Color("9eaaa2"))
-	draw_rect(Rect2(900, 870, 85, 75), Color("77c8d7"))
-	draw_rect(Rect2(925, 884, 29, 8), Color("c6eff0"))
-	for p in [Vector2(685, 850), Vector2(1110, 900), Vector2(700, 1200), Vector2(1130, 1220)]:
-		draw_rect(Rect2(p, Vector2(7, 38)), Color("6b5d52"))
-		draw_rect(Rect2(p + Vector2(-8, -11), Vector2(23, 14)), Color("f4d58c"))
-		for i in 2: draw_rect(Rect2(p + Vector2(-4 + i * 9, -6), Vector2(5, 5)), Color("fff3be"))
-	if final_completed:
-		for index in 10:
-			var angle := TAU * float(index) / 10.0
-			var citizen := arrival + Vector2(cos(angle) * 185, sin(angle) * 150)
-			var coat: Color = [Color("9bc1a2"), Color("c8a1ad"), Color("95b8ca"), Color("e1bc87")][index % 4]
-			draw_rect(Rect2(citizen + Vector2(-7, -18), Vector2(14, 22)), coat)
-			draw_circle(citizen + Vector2(0, -24), 7, Color("eed0a3"))
-			draw_line(citizen + Vector2(-6, -14), citizen + Vector2(-14, -27 - sin(world_time * 5 + index) * 6), coat.lightened(0.26), 3)
-			draw_line(citizen + Vector2(6, -14), citizen + Vector2(14, -27 + sin(world_time * 5 + index) * 6), coat.lightened(0.26), 3)
-			var spark := citizen + Vector2(12, -51 + fmod(world_time * 21 + index * 9, 46))
-			draw_rect(Rect2(spark, Vector2(5, 5)), Color("f9e09d") if index % 2 == 0 else Color("b9e8d5"))
-		for x in [710, 870, 1030]:
-			draw_line(Vector2(x, 745), Vector2(x + 70, 745), Color("d2a96c"), 3)
-			draw_colored_polygon(PackedVector2Array([Vector2(x + 18, 745), Vector2(x + 29, 768), Vector2(x + 40, 745)]), Color("edbd85"))
-			draw_colored_polygon(PackedVector2Array([Vector2(x + 47, 745), Vector2(x + 58, 768), Vector2(x + 69, 745)]), Color("94c8b9"))
-	text_at(Vector2(850, 750), "SONNENHAIN", 24, Color("415d55"), HORIZONTAL_ALIGNMENT_CENTER, 280)
+	for prop in village_props():
+		if visible_world(prop["point"],250): paint_village_prop(prop)
 
 func draw_house(p: Vector2) -> void:
-	if house_tiles == null: return
-	var design := posmod(int(p.x / 40.0) + int(p.y / 70.0), 4)
-	var is_tavern := p == TAVERN_HOUSE
-	var source := Rect2(Vector2(design * 192, 0), Vector2(192, 160))
-	draw_texture_rect_region(house_tiles, Rect2(p + Vector2(-4, -2), Vector2(192, 160)), source)
-	if is_tavern:
-		for x in [3, 166]: draw_pixel_tile(29, p + Vector2(x, 110), 24.0)
-		draw_rect(Rect2(p + Vector2(24, 37), Vector2(136, 20)), Color("493b36"))
-		draw_rect(Rect2(p + Vector2(31, 41), Vector2(122, 12)), Color("725445"))
-		text_at(p + Vector2(34, 52), "STEINROSE", 12, Color("ffe2a0"), HORIZONTAL_ALIGNMENT_CENTER, 116)
+	var variation: int = posmod(int(p.x/100+p.y/100),3)
+	var roof: Color = Color("47744a") if p == TAVERN_HOUSE else [Color("a7422d"),Color("af5336"),Color("975344")][variation]
+	ReferenceHouse.paint(self, p, roof)
+	if p == TAVERN_HOUSE:
+		draw_rect(Rect2(p+Vector2(63,84),Vector2(66,11)),Color("67432c"))
+		text_at(p+Vector2(66,93),"STEINROSE",8,Color("f6d497"))
+	elif variation == 1:
+		for i in range(6):
+			draw_rect(Rect2(p+Vector2(27+i*23,87),Vector2(23,8)),Color("caac6e") if i%2==0 else Color("728767"))
+		ReferenceScenery.barrel(self,p+Vector2(181,139))
 
 func draw_npc(npc: Dictionary) -> void:
 	var p: Vector2 = npc["pos"]
 	var kind: String = str(npc["kind"])
 	var name: String = str(npc["name"])
+	var baked := USE_VILLAGE_REFERENCE_BACKGROUND and panel == "" and VILLAGE_REF_RECT.has_point(p) and (name == "Mira" or name == "Liora" or name == "Arven")
+	if baked:
+		if kind == "quest":
+			var baked_state := quest_marker_state(name)
+			if baked_state != 0:
+				var baked_marker := "!" if baked_state == 1 else "?"
+				var baked_color := Color("f6ce65") if baked_state in [1,3] else Color("a9b1ad")
+				text_at(p + Vector2(-15,-152),baked_marker,34,baked_color,HORIZONTAL_ALIGNMENT_CENTER,34)
+				if baked_state == 2: text_at(p + Vector2(-62,-170),"OFFEN",11,Color("d2d8d1"),HORIZONTAL_ALIGNMENT_CENTER,124)
+				elif baked_state == 3: text_at(p + Vector2(-72,-170),"ABGEBEN",11,Color("ffe18a"),HORIZONTAL_ALIGNMENT_CENTER,144)
+		return
 	draw_npc_sprite(p,kind,name)
 	var caption := name if kind == "quest" else "%s (%s)" % [name,npc["role"]]
 	text_at(p + Vector2(-116,-47),caption,16,Color("ffebbb") if interior_id >= 0 else Color("253e3c"),HORIZONTAL_ALIGNMENT_CENTER,232)
@@ -5509,7 +5671,12 @@ func draw_shadow(p: Vector2) -> void:
 
 func draw_player() -> void:
 	draw_shadow(player_pos)
-	if invulnerable > 0 and Engine.get_process_frames() % 6 < 3: return
+	if invulnerable > 0: draw_arc(player_pos+Vector2(0,12),31,0,TAU,16,Color("b7e5ee",0.35),2)
+	if dash_timer > 0 and class_id == 1:
+		var progress := 1.0-dash_timer/dodge_duration
+		draw_line(dodge_start+Vector2(0,10),player_pos+Vector2(0,10),Color("a491e4",0.3),18)
+		for ring in 2:
+			draw_arc(player_pos+Vector2(0,10),25+ring*13,progress*TAU+ring*PI,progress*TAU+ring*PI+PI,16,Color("d9caff",0.8),3)
 	draw_hero(player_pos, 1.0, is_walking, facing, true)
 	if swing_timer > 0 and class_id == 0:
 		var swing_progress := clampf(1.0 - swing_timer / maxf(0.01, swing_duration), 0.0, 1.0)
@@ -5527,6 +5694,7 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	var use_gender := pending_gender if panel == "creation" and preview_class >= 0 else hero_gender
 	var attack_now := swing_timer > 0.0 and preview_class < 0
 	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender)
+	if in_world and (death_timer > 0 or (dash_timer > 0 and class_id != 1)): return
 	# Arm, Hand und Waffe folgen während des Angriffs derselben Bewegung.
 	var design := equipped_weapon_design() if preview_class < 0 else visual_class * 4
 	var weapon_family := visual_class
@@ -5543,8 +5711,9 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	# Feste Waffenhand: Schulter und Griff bleiben während des gesamten Schlages
 	# auf derselben Körperseite. Nur Unterarm und Waffe schwingen.
 	var hand_side := base_look.rotated(-PI * 0.5)
-	var arm_start := p + (hand_side * 13.0 + Vector2(0, -17.0)) * scale_factor
-	var grip := weapon_pos + weapon_look * 7.0 * scale_factor + hand_side * 7.0 * scale_factor
+	var hand_offset := weapon_hand_offset(base_look)
+	var arm_start := p + Vector2(signf(hand_offset.x)*18.0,-5.0)*scale_factor
+	var grip := weapon_pos + (hand_offset + weapon_look*3.0)*scale_factor
 	var side := weapon_look.rotated(PI * 0.5)
 	var arm_color: Color = [Color('6d8292'), Color('695b91'), Color('65775b')][clampi(visual_class, 0, 2)]
 	var cuff_color: Color = [Color('c0c8c4'), Color('d4c1e8'), Color('ae9b70')][clampi(visual_class, 0, 2)]
@@ -5554,6 +5723,9 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	draw_circle(arm_start, 3.8 * scale_factor, arm_color.lightened(0.06))
 	draw_line(arm_start.lerp(grip, 0.72) - side * 1.5 * scale_factor, grip, cuff_color, 4.0 * scale_factor)
 	draw_weapon_world(weapon_pos, weapon_family, design, base_look, scale_factor, progress)
+	# Facing north: the body masks the rear arm and weapon across the head.
+	if base_look == Vector2.UP:
+		draw_character_sprite(p,visual_class,walking,look,scale_factor,attack_now,use_race,use_gender)
 	if equipped_ring_uid >= 0 and preview_class < 0:
 		draw_rect(Rect2(p + Vector2(-23,-2) * scale_factor, Vector2(5,3) * scale_factor), Color('f8d982'))
 
@@ -5570,6 +5742,9 @@ func weapon_attack_look(look: Vector2, family: int, design: int, progress: float
 	if design % 4 == 3:
 		return look.rotated(lerpf(-0.16, 0.10, eased)).normalized()
 	return look.rotated(-0.08 * sin(t * PI)).normalized()
+
+func weapon_hand_offset(look: Vector2) -> Vector2:
+	return Vector2(-22,6) if look.x < -0.5 or look.y < -0.5 else Vector2(22,6)
 
 func equipped_armor_stage() -> int:
 	for item in inventory:
@@ -5781,6 +5956,14 @@ func bar(rect: Rect2, value: float, maximum: float, foreground: Color, label: St
 	draw_rect(Rect2(rect.position + Vector2(3, 3), Vector2(filled, maxf(2.0, (rect.size.y - 6) * 0.35))), foreground.lightened(0.16))
 	text_at(rect.position + Vector2(9, rect.size.y - 6), label, 14, Color("fff7e4"))
 
+func draw_ref_panel(rect: Rect2) -> void:
+	draw_rect(rect, Color("0e1626"))
+	draw_rect(rect.grow(-2), Color("c9a45e"))
+	draw_rect(rect.grow(-4), Color("131e2e"))
+	draw_rect(Rect2(rect.position + Vector2(9, 6), Vector2(maxf(0.0, rect.size.x - 18), 2)), Color("e6c87a", 0.6))
+	for corner in [rect.position + Vector2(4,4), rect.position + Vector2(rect.size.x-9,4), rect.position + Vector2(4,rect.size.y-9), rect.position + rect.size - Vector2(9,9)]:
+		draw_rect(Rect2(corner, Vector2(5, 5)), Color("d8b96f"))
+
 func ui_box(rect: Rect2, fill: Color = Color("304a4b")) -> void:
 	draw_rect(rect, Color("1e272c"))
 	draw_rect(rect.grow(-2), Color("b69a65"))
@@ -5799,19 +5982,18 @@ func ui_button(rect: Rect2, label: String, enabled: bool = true, active: bool = 
 	text_at(rect.position + Vector2(11, rect.size.y * 0.67), label, 16, Color("fff1ce") if enabled else Color("b5b4a7"))
 
 func draw_hud() -> void:
-	ui_box(Rect2(12, 10, 354, 112), Color("334a4b"))
-	draw_rect(Rect2(24, 18, 5, 17), [Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id])
-	text_at(Vector2(36, 34), "%s · %s · STUFE %d" % [hero_name if hero_name != "" else CLASS_NAMES[class_id].to_upper(), RACE_NAMES[hero_race], level], 15, Color("fff0c6"))
+	draw_ref_panel(Rect2(10, 8, 348, 104))
+	draw_rect(Rect2(22, 16, 5, 17), [Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id])
+	text_at(Vector2(34, 32), "%s · %s · STUFE %d" % [hero_name if hero_name != "" else CLASS_NAMES[class_id].to_upper(), RACE_NAMES[hero_race], level], 15, Color("ffe9b8"))
 	if creative_mode:
-		draw_rect(Rect2(303, 19, 46, 17), Color("806a4e"))
-		text_at(Vector2(306, 32), "TEST", 12, Color("fff1cb"))
-	bar(Rect2(25, 43, 325, 23), hp, max_hp(), Color("e9797a"), "HP  %d / %d" % [ceili(hp), ceili(max_hp())])
-	bar(Rect2(25, 69, 325, 19), energy, max_energy(), Color("82b8e8") if class_id == 1 else Color("79caad"), "%s  %d / %d" % ["MANA" if class_id == 1 else "ENERGIE", ceili(energy), ceili(max_energy())])
-	bar(Rect2(25, 92, 325, 16), float(xp), float(xp_required()), Color("dfc17b"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
-	ui_box(Rect2(12, 126, 354, 47), Color("3c5551"))
-	text_at(Vector2(25, 146), "◆  AKTUELLES ZIEL", 13, Color("f4d59e"))
-	text_at(Vector2(25, 163), tracked_quest().substr(0, 42), 14, Color("fff2d9"))
-	draw_circle(Vector2(1040, 105), 88, Color("35494b"))
+		draw_rect(Rect2(301, 17, 46, 17), Color("806a4e"))
+		text_at(Vector2(304, 30), "TEST", 12, Color("fff1cb"))
+	bar(Rect2(23, 40, 324, 21), hp, max_hp(), Color("d94f4f"), "HP  %d / %d" % [ceili(hp), ceili(max_hp())])
+	bar(Rect2(23, 65, 324, 17), energy, max_energy(), Color("3f7fd9") if class_id == 1 else Color("35b381"), "%s  %d / %d" % ["MANA" if class_id == 1 else "ENERGIE", ceili(energy), ceili(max_energy())])
+	bar(Rect2(23, 86, 324, 14), float(xp), float(xp_required()), Color("d9932e"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
+	draw_ref_panel(Rect2(10, 118, 348, 46))
+	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL", 13, Color("f0cf92"))
+	text_at(Vector2(23, 155), tracked_quest().substr(0, 44), 14, Color("fff2d9"))
 	for enemy in enemies:
 		if int(enemy["type"]) in [12, 13, 14] and enemy["pos"].distance_to(player_pos) < 620:
 			ui_box(Rect2(430, 10, 480, 64), Color("5b4547"))
@@ -5824,8 +6006,18 @@ func draw_hud() -> void:
 		text_at(Vector2(966, 98), "WELLE %d%s" % [arena_wave, "/10" if arena_mode == "final" else ""], 19, Color("ffecbc"), HORIZONTAL_ALIGNMENT_CENTER, 150)
 		text_at(Vector2(970, 126), "%d Gegner" % enemies.size(), 15, Color("e4d3b0"), HORIZONTAL_ALIGNMENT_CENTER, 140)
 	else:
-		draw_minimap(Rect2(970, 35, 140, 140), true)
-	text_at(Vector2(955, 31), ("LETZTE WACHE" if arena_mode == "final" else "ENDLOSE ARENA") if arena_mode != "" else ("ZUR STEINROSE" if interior_id >= 0 else (DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "%s · LV %d" % [region_name(region_at(player_pos)), region_level(region_at(player_pos))])), 13, Color("fff0bf"))
+		var map_center := Vector2(1035, 116)
+		draw_ref_panel(Rect2(918, 8, 234, 30))
+		text_at(Vector2(935, 29), ("LETZTE WACHE" if arena_mode == "final" else "ENDLOSE ARENA") if arena_mode != "" else ("ZUR STEINROSE" if interior_id >= 0 else (DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "%s · LV %d" % [region_name(region_at(player_pos)), region_level(region_at(player_pos))])), 13, Color("fff0bf"), HORIZONTAL_ALIGNMENT_CENTER, 200)
+		draw_minimap(Rect2(980, 61, 110, 110), true)
+		draw_arc(map_center, 70, 0, TAU, 64, Color("0b1220"), 16)
+		draw_arc(map_center, 70, 0, TAU, 64, Color("c9a45e"), 4)
+		draw_circle(map_center + Vector2(0, -76), 13, Color("0e1626"))
+		draw_arc(map_center + Vector2(0, -76), 13, 0, TAU, 20, Color("c9a45e"), 2)
+		text_at(map_center + Vector2(-8, -69), "N", 13, Color("ffe9b0"))
+		draw_circle(map_center + Vector2(0, 76), 13, Color("0e1626"))
+		draw_arc(map_center + Vector2(0, 76), 13, 0, TAU, 20, Color("c9a45e"), 2)
+		text_at(map_center + Vector2(-6, 81), "+", 14, Color("ffe9b0"))
 	if network_mode != "offline":
 		text_at(Vector2(925, 188), "KOOP %d/4" % (remote_players.size()+1), 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, 180)
 	if notice_timer > 0:
@@ -5834,7 +6026,7 @@ func draw_hud() -> void:
 		text_at(Vector2(23, 573), short_notice, 15, Color("fff3c3"))
 	var nearest := ""
 	for i in WAYSTONES.size():
-		if player_pos.distance_to(WAYSTONES[i]) < 105:
+		if player_pos.distance_to(WAYSTONES[i]) < 185:
 			nearest = "F  ·  Wegstein: %s" % ("Reiseziele wählen" if i == 0 else ("zurück ins Dorf · aktiviert" if waystone_unlocked[i] else "aktivieren und zurück ins Dorf"))
 			break
 	for portal in PORTALS:
@@ -5872,13 +6064,13 @@ func draw_hud() -> void:
 	if touch_enabled:
 		draw_touch_controls()
 	else:
-		ui_box(Rect2(9, 592, 1134, 47), Color("354747"))
-		text_at(Vector2(22, 615), "LAUFEN: %s/%s/%s/%s  ·  ANGRIFF: %s  ·  ROLLE: %s" % [binding_short("move_up"), binding_short("move_left"), binding_short("move_down"), binding_short("move_right"), binding_short("attack"), binding_short("dodge")], 12, Color("f0e4c5"))
-		text_at(Vector2(22, 631), "%s Skills · %s Tasche · %s Quests · %s Karte · ENTER/T Chat" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map")], 11, Color("becfc6"))
+		draw_ref_panel(Rect2(9, 586, 1134, 53))
+		text_at(Vector2(22, 609), "LAUFEN: %s/%s/%s/%s  ·  ANGRIFF: %s  ·  AUSWEICHEN: %s" % [binding_short("move_up"), binding_short("move_left"), binding_short("move_down"), binding_short("move_right"), binding_short("attack"), binding_short("dodge")], 12, Color("f0e4c5"))
+		text_at(Vector2(22, 626), "%s Skills · %s Tasche · %s Quests · %s Karte · ENTER/T Chat" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map")], 11, Color("becfc6"))
 		for slot in 4:
 			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
 			var x := 694 + slot * 81
-			ui_button(Rect2(x, 593, 75, 44), "", id >= 0, selected_slot == slot and panel == "skills")
+			draw_rect(Rect2(x,593,75,44),Color("d0b67d",0.45 if id>=0 else 0.18),false,1)
 			text_at(Vector2(x + 8, 629), binding_short("ability_%d" % (slot + 1)), 11, Color("ffe2a3") if id >= 0 else Color("a9aa9c"))
 			if id >= 0:
 				draw_skill_icon(Vector2(x + 24, 598), id, 30)
@@ -5922,7 +6114,7 @@ func draw_touch_controls() -> void:
 	text_at(attack_base + Vector2(-48, 5), "ANGRIFF", 11, Color("fff2cf"), HORIZONTAL_ALIGNMENT_CENTER, 96)
 
 	for data in [
-		{"p":Vector2(916,550),"r":39.0,"label":"ROLLE","fill":Color("3f5c62",0.90)},
+		{"p":Vector2(916,550),"r":39.0,"label":("SCHRITT" if class_id == 1 else "ROLLE"),"fill":Color("3f5c62",0.90)},
 		{"p":Vector2(967,447),"r":39.0,"label":"AKTION","fill":Color("556b4f",0.90)}
 	]:
 		draw_circle(data["p"], data["r"], data["fill"])
@@ -6237,7 +6429,7 @@ func draw_mechanics_panel() -> void:
 
 func draw_start_panel() -> void:
 	text_at(Vector2(291, 151), "SONNENHAIN", 39, Color("ffe2aa"))
-	text_at(Vector2(900, 148), "v27.5 · %s" % ("MOBILE" if touch_enabled else "PC"), 16, Color("f4d7a3"))
+	text_at(Vector2(900, 148), "v28 · ELEMENTTEST · %s" % ("MOBILE" if touch_enabled else "PC"), 16, Color("f4d7a3"))
 	ui_button(Rect2(855, 158, 130, 33), "TOUCH" if touch_enabled else "TASTEN")
 	text_at(Vector2(295, 184), "Eine Reise durch die alten Reiche  ·  Wähle deinen Helden", 18, Color("dce7d8"))
 	for i in 3:
@@ -6428,6 +6620,10 @@ func draw_skills_panel() -> void:
 		var name := "Frei" if id < 0 else String(ABILITIES[id]["name"])
 		ui_button(Rect2(165 + slot * 204, 148, 193, 44), "%d: %s" % [slot + 1, name], true, selected_slot == slot)
 	text_at(Vector2(169, 205), "Links: Fähigkeit ausrüsten · Rechts: Rang mit Skillpunkt verbessern (max. 5)", 15, Color("daebce"))
+	if class_id == 1:
+		ui_button(Rect2(165,532,815,32),"ARKANER SCHRITT · "+binding_short("dodge")+" · "+("GELERNT · 1,25s Abklingzeit" if arcane_step_learned else "AB LEVEL 4 · LERNEN: 1 SKILLPUNKT"),not arcane_step_learned and level>=4 and skill_points>0)
+	else:
+		text_at(Vector2(172,551),binding_short("dodge")+" · AUSWEICHROLLE · 1,25s Abklingzeit",14,Color("e6d49e"))
 	for row in 7:
 		var class_list: Array = CLASS_SKILLS[class_id]
 		if row + menu_scroll >= class_list.size(): break
@@ -6597,20 +6793,21 @@ func element_color(element: String) -> Color:
 
 func draw_skill_icon(p: Vector2, id: int, size: float) -> void:
 	var box := Rect2(p, Vector2(size,size))
-	draw_rect(box, Color('253b46'))
 	if skill_sprites != null:
 		draw_skill_sprite(id, p + Vector2(2,2), size - 4.0)
 	else:
 		draw_rect(box.grow(-3), Color('6b8190'))
 	var border := Color('f2cf83') if id == class_ultimate() else Color('8fa7a3')
-	draw_rect(box, border, false, 2)
+	draw_rect(box, Color(border,0.35), false, 1)
 
 func draw_shop_panel() -> void:
 	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("PIP (ALCHEMIST)" if merchant_kind == "alchemy" else "FENNA (HÄNDLERIN)")
 	text_at(Vector2(165, 125), shop_name, 25, Color("ffeda9"))
 	text_at(Vector2(804, 126), "%d GOLD" % gold, 17, Color("f9dba0"))
 	text_at(Vector2(169, 174), "KAUFEN · Neues Angebot in %d:%02d" % [int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 17, Color("e8f2de"))
-	var stock: Array = shop_stock[merchant_kind]
+	ui_button(Rect2(760,145,80,40),"<",shop_page>0)
+	ui_button(Rect2(850,145,100,40),str(shop_page+1)+" / "+str(int((shop_stock[merchant_kind].size()+2)/3)),(shop_page+1)*3 < shop_stock[merchant_kind].size())
+	var stock: Array = shop_stock[merchant_kind].slice(shop_page*3,shop_page*3+3)
 	for i in stock.size():
 		var item: Dictionary = stock[i]
 		var pos := Vector2(168 + i * 258, 210)
@@ -6820,7 +7017,19 @@ func draw_atlas_crystal(point: Vector2) -> void:
 func draw_waystone(p: Vector2) -> void:
 	var active := false
 	for i in WAYSTONES.size():
-		if p == WAYSTONES[i]:
+		if p == WAYSTONES[i]: active = bool(waystone_unlocked[i])
+	draw_set_transform(p-camera_pos,0,Vector2.ONE*1.65)
+	if p == WAYSTONES[0]:
+		ReferenceScenery.waystone(self,Vector2.ZERO,active)
+	else:
+		draw_waystone_model(Vector2.ZERO,p)
+	draw_set_transform(-camera_pos)
+	text_at(p+Vector2(-140,-166),"SPAWNSTEIN · SONNENHAIN" if p == WAYSTONES[0] else "WEGSTEIN",16,Color("fff1c9"),HORIZONTAL_ALIGNMENT_CENTER,280)
+
+func draw_waystone_model(p: Vector2, stone_position: Vector2) -> void:
+	var active := false
+	for i in WAYSTONES.size():
+		if stone_position == WAYSTONES[i]:
 			active = bool(waystone_unlocked[i])
 			break
 	var shimmer := 0.58 + sin(world_time * 2.6 + p.x) * 0.18
@@ -6844,7 +7053,6 @@ func draw_waystone(p: Vector2) -> void:
 		draw_rect(Rect2(column, Vector2(7, 60)), Color("735e52"))
 		draw_colored_polygon(PackedVector2Array([column + Vector2(7,-48),column + Vector2(-9,-31),column + Vector2(7,-15)]), Color("e4b478"))
 		draw_circle(column + Vector2(3, -31), 5, Color("fbe1a2", shimmer))
-	text_at(p + Vector2(-79, -67), "WEGSTEIN", 16, Color("fff1c9"), HORIZONTAL_ALIGNMENT_CENTER, 158)
 
 func draw_landmark(landmark: Dictionary) -> void:
 	var p: Vector2 = landmark["pos"]
@@ -6990,3 +7198,192 @@ func draw_chest(p: Vector2, opened: bool) -> void:
 		text_at(p + Vector2(-50, -46), "SCHATZ", 15, Color("ffe9a2"), HORIZONTAL_ALIGNMENT_CENTER, 100)
 	else:
 		draw_rect(Rect2(p + Vector2(-16, -8), Vector2(32, 8)), Color("423747"))
+
+func static_chunk_keys(bounds: Rect2) -> Array:
+	var keys: Array = []
+	var first := Vector2i(floori(bounds.position.x/STATIC_CHUNK_SIZE),floori(bounds.position.y/STATIC_CHUNK_SIZE))
+	var last := Vector2i(floori((bounds.end.x-1)/STATIC_CHUNK_SIZE),floori((bounds.end.y-1)/STATIC_CHUNK_SIZE))
+	for x in range(maxi(0,first.x),last.x+1):
+		for y in range(maxi(0,first.y),last.y+1): keys.append(Vector2i(x,y))
+	return keys
+
+func update_static_cache() -> void:
+	if not performance_cache_enabled or arena_mode != "" or interior_id >= 0 or dungeon_id >= 0: return
+	var needed := static_chunk_keys(Rect2(camera_pos,VIEW))
+	var ahead := static_chunk_keys(Rect2(camera_pos,VIEW).grow(160))
+	for key in ahead:
+		if not needed.has(key): needed.append(key)
+	var created := 0
+	for key in needed:
+		if static_chunks.has(key):
+			static_chunks[key]["used"] = Engine.get_process_frames()
+			continue
+		if created >= 1: break
+		if static_renderer_script == null: static_renderer_script = load("res://components/static_world_renderer.gd")
+		var viewport := SubViewport.new()
+		viewport.size = Vector2i(STATIC_CHUNK_SIZE,STATIC_CHUNK_SIZE)
+		viewport.disable_3d = true
+		viewport.gui_disable_input = true
+		viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+		var renderer = static_renderer_script.new()
+		renderer.static_draw_bounds = Rect2(Vector2(key)*STATIC_CHUNK_SIZE,Vector2.ONE*STATIC_CHUNK_SIZE)
+		renderer.camera_pos = renderer.static_draw_bounds.position
+		renderer.font = font
+		renderer.environment_tiles = environment_tiles
+		renderer.region_tiles = region_tiles
+		renderer.structure_tiles = structure_tiles
+		renderer.touch_enabled = touch_enabled
+		renderer.bindings = bindings.duplicate()
+		viewport.add_child(renderer)
+		add_child(viewport)
+		static_chunks[key] = {"viewport":viewport,"texture":viewport.get_texture(),"created":Engine.get_process_frames(),"used":Engine.get_process_frames()}
+		created += 1
+	while static_chunks.size() > STATIC_CACHE_LIMIT:
+		var oldest = null
+		for key in static_chunks:
+			if needed.has(key): continue
+			if oldest == null or static_chunks[key]["used"] < static_chunks[oldest]["used"]: oldest = key
+		if oldest == null: break
+		static_chunks[oldest]["viewport"].queue_free()
+		static_chunks.erase(oldest)
+
+func draw_cached_overworld() -> bool:
+	if not performance_cache_enabled: return false
+	var keys := static_chunk_keys(Rect2(camera_pos,VIEW))
+	for key in keys:
+		if not static_chunks.has(key) or Engine.get_process_frames()-int(static_chunks[key]["created"]) < 2: return false
+	for key in keys:
+		draw_texture_rect(static_chunks[key]["texture"],Rect2(Vector2(key)*STATIC_CHUNK_SIZE,Vector2.ONE*STATIC_CHUNK_SIZE),false)
+	return true
+
+func invalidate_static_cache() -> void:
+	for entry in static_chunks.values(): entry["viewport"].queue_free()
+	static_chunks.clear()
+	for entry in foreground_cache.values(): entry["viewport"].queue_free()
+	for entry in foreground_cache.values(): entry["source"].queue_free()
+	foreground_cache.clear()
+
+func village_props() -> Array:
+	var props: Array = []
+	for house in house_positions(): props.append({"kind":"house","point":house,"depth":house.y+155})
+	for tree in REFERENCE_TREES: props.append({"kind":"tree","point":tree,"depth":tree.y+9})
+	props.append({"kind":"well","point":REFERENCE_WELL,"depth":REFERENCE_WELL.y+32})
+	props.append({"kind":"board","point":Vector2(630,1250),"depth":1272.0})
+	for p in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]: props.append({"kind":"fence","point":p,"depth":p.y+12})
+	for p in [Vector2(690,980),Vector2(1010,970),Vector2(1305,1200),Vector2(1430,1200),Vector2(480,1530)]: props.append({"kind":"lamp","point":p,"depth":p.y+8})
+	for p in [Vector2(460,940),Vector2(1220,1290),Vector2(520,1660),Vector2(1470,1215)]: props.append({"kind":"barrel","point":p,"depth":p.y+17})
+	for p in [Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]: props.append({"kind":"bush","point":p,"depth":p.y+28})
+	for shop in VillageLayout.SHOPS: props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
+	return props
+
+func prop_bounds(prop: Dictionary) -> Rect2:
+	var p: Vector2 = prop["point"]
+	match prop["kind"]:
+		"house": return Rect2(p+Vector2(-16,-8),Vector2(224,192))
+		"tree": return Rect2(p+Vector2(-88,-176),Vector2(176,208))
+		"lamp": return Rect2(p+Vector2(-20,-88),Vector2(40,112))
+		"barrel": return Rect2(p+Vector2(-24,-40),Vector2(48,80))
+		"cart": return Rect2(p+Vector2(-52,-68),Vector2(132,108))
+		"fence": return Rect2(p+Vector2(-16,-48),Vector2(144,80))
+		"board": return Rect2(p+Vector2(-48,-94),Vector2(96,128))
+		"well": return Rect2(p+Vector2(-64,-96),Vector2(128,144))
+		_: return Rect2(p+Vector2(-64,-48),Vector2(128,96))
+
+func paint_village_prop(prop: Dictionary) -> void:
+	var p: Vector2 = prop["point"]
+	match prop["kind"]:
+		"house":
+			draw_house(p)
+			for shop in VillageLayout.SHOPS:
+				if shop["house"] == p: VillageLayout.details(self,shop,font,false)
+		"tree": ReferenceScenery.tree(self,p,int(p.x+p.y))
+		"well": ReferenceScenery.well(self,p)
+		"board": ReferenceScenery.board(self,p)
+		"lamp": ReferenceScenery.lamp(self,p)
+		"barrel": ReferenceScenery.barrel(self,p)
+		"fence": ReferenceScenery.fence(self,p,p+Vector2(100,0))
+		"bush": ReferenceScenery.bush(self,p,int(p.x+p.y))
+		"cart": VillageLayout.cart(self,p,prop["goods"])
+
+func prop_cache_key(prop: Dictionary) -> String:
+	return "%s:%d:%d" % [prop["kind"],prop["point"].x,prop["point"].y]
+
+func update_foreground_cache() -> void:
+	if not performance_cache_enabled or arena_mode != "" or interior_id >= 0 or dungeon_id >= 0: return
+	var ahead := Rect2(camera_pos,VIEW).grow(200)
+	var created := 0
+	for prop in village_props():
+		var bounds := prop_bounds(prop)
+		if not bounds.intersects(ahead): continue
+		var key := prop_cache_key(prop)
+		if foreground_cache.has(key): continue
+		if created >= 1: break
+		if static_renderer_script == null: static_renderer_script = load("res://components/static_world_renderer.gd")
+		var viewport := SubViewport.new()
+		viewport.size = Vector2i(bounds.size)
+		viewport.disable_3d = true
+		viewport.gui_disable_input = true
+		viewport.transparent_bg = true
+		viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+		var renderer = static_renderer_script.new()
+		renderer.static_draw_bounds = bounds
+		renderer.camera_pos = bounds.position
+		renderer.font = font
+		renderer.prop = prop
+		viewport.add_child(renderer)
+		add_child(viewport)
+		var converted := SubViewport.new()
+		converted.size = viewport.size
+		converted.disable_3d = true
+		converted.gui_disable_input = true
+		converted.transparent_bg = true
+		converted.render_target_update_mode = SubViewport.UPDATE_ONCE
+		var sprite := Sprite2D.new()
+		sprite.centered = false
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.texture = viewport.get_texture()
+		var material := ShaderMaterial.new()
+		material.shader = preload("res://components/cache_unpremultiply.gdshader")
+		sprite.material = material
+		converted.add_child(sprite)
+		add_child(converted)
+		foreground_cache[key] = {"source":viewport,"viewport":converted,"texture":converted.get_texture(),"bounds":bounds,"created":Engine.get_process_frames()}
+		created += 1
+
+func draw_cached_prop(prop: Dictionary) -> void:
+	var key := prop_cache_key(prop)
+	if performance_cache_enabled and foreground_cache.has(key) and Engine.get_process_frames()-int(foreground_cache[key]["created"]) >= 2:
+		draw_texture_rect(foreground_cache[key]["texture"],foreground_cache[key]["bounds"],false)
+	else: paint_village_prop(prop)
+
+func draw_sorted_world_objects() -> void:
+	var entries: Array = []
+	if arena_mode == "" and dungeon_id < 0 and interior_id < 0:
+		for prop in village_props():
+			if prop_bounds(prop).intersects(current_static_bounds()): entries.append({"kind":"prop","depth":prop["depth"],"data":prop})
+		for npc in NPCS:
+			if visible_world(npc["pos"],130): entries.append({"kind":"npc","depth":npc["pos"].y+24,"data":npc})
+		for stone in WAYSTONES:
+			if visible_world(stone,220): entries.append({"kind":"stone","depth":stone.y+70,"point":stone})
+		if rescue_state >= 2:
+			var p := RESCUE_POS+Vector2(0,120)
+			if visible_world(p,130): entries.append({"kind":"npc","depth":p.y+24,"data":{"name":"Nela","role":"Bewohnerin","pos":p,"color":Color("bd8774"),"kind":"rescued"}})
+	for enemy in enemies:
+		if visible_world(enemy["pos"],100): entries.append({"kind":"enemy","depth":enemy["pos"].y+24,"data":enemy})
+	for peer_id in remote_players:
+		var p := network_player_position(peer_id)
+		if visible_world(p,130): entries.append({"kind":"remote","depth":p.y+24,"peer":peer_id})
+	entries.append({"kind":"player","depth":player_pos.y+24})
+	entries.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return float(a["depth"])<float(b["depth"]))
+	for entry in entries:
+		match entry["kind"]:
+			"prop": draw_cached_prop(entry["data"])
+			"npc": draw_npc(entry["data"])
+			"stone": draw_waystone(entry["point"])
+			"enemy": draw_enemy(entry["data"])
+			"remote": draw_remote_players(entry["peer"])
+			"player": draw_player()
+
+func class_weapon_icon_for(value: int) -> String:
+	return ["sword", "staff", "bow"][clampi(value, 0, 2)]
+
