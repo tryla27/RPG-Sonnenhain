@@ -5,6 +5,7 @@ ROOT="$HOME/sonnenhain-server"
 BIN="$ROOT/releases/current/sonnenhain-server.x86_64"
 LOG="$ROOT/server.log"
 LOCKDIR="$ROOT/.watchdog-lock"
+FORCE_RESTART="${1:-}"
 
 mkdir -p "$ROOT/data"
 
@@ -29,8 +30,12 @@ server_port_alive() {
   return 0
 }
 
-if server_process_alive && server_port_alive; then
+if [ "$FORCE_RESTART" != "--restart" ] && server_process_alive && server_port_alive; then
   exit 0
+fi
+
+if [ "$FORCE_RESTART" = "--restart" ]; then
+  echo "$(date -Is) deploy: forcing dedicated server restart" >> "$LOG"
 fi
 
 pkill -f "[s]onnenhain-server.x86_64 --headless -- --dedicated-server" >/dev/null 2>&1 || true
