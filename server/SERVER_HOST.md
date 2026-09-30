@@ -17,9 +17,23 @@ Für den öffentlichen Livebetrieb wird der Dienst über Nginx als
 
 ## Dauerbetrieb
 
-Bevorzugt wird `sonnenhain.service` mit systemd und `Restart=always`.
-Falls für den Deploy-Benutzer kein systemd-Linger verfügbar ist, kann
-`ensure-sonnenhain-server.sh` als Watchdog verwendet werden.
+Der Produktionsbetrieb ist auf zwei Ebenen abgesichert:
+
+1. **systemd user service** (bevorzugt): `sonnenhain.service` läuft mit
+   `Restart=always`. Mit aktiviertem systemd-Linger startet der Dienst auch
+   nach einem VServer-Reboot ohne Benutzer-Login.
+2. **Cron-Watchdog als Fallback**: Falls Linger nicht verfügbar ist, installiert
+   der Deploy automatisch `ensure-sonnenhain-server.sh` als `@reboot`-Job
+   und als minütlichen Health-/Restart-Check.
+
+Zusätzlich prüft GitHub Actions den öffentlichen Endpunkt
+`wss://multiplayer.sonnenhainrpg.de/` regelmäßig. Bei einem Ausfall wird der
+Watchdog per SSH angestoßen und der öffentliche WebSocket-Endpunkt erneut
+verifiziert.
+
+Der Godot-Prozess lauscht nur lokal auf `127.0.0.1:27845`; Nginx übernimmt
+TLS/WSS. Dadurch müssen Browser und Mobile-Clients ausschließlich
+`wss://multiplayer.sonnenhainrpg.de/` verwenden.
 
 Die Serverhost-Version wird bei jedem Server-Build als eigenes GitHub-Artefakt
 `sonnenhain-server-host` erzeugt.
