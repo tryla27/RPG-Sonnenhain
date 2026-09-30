@@ -47,6 +47,14 @@ jobs:
           unzip -q /tmp/templates.tpz -d /tmp/templates
           cp -R /tmp/templates/templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
 
+      - name: Check arena and controller controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --editor --import --quit
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_konflux.gd
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_controller.gd
+
       - name: Export web game
         shell: bash
         run: |
@@ -127,8 +135,9 @@ jobs:
           cp website/index.html build/site/index.html
           cp website/site.css build/site/site.css
           cp -R website/mobile-preview build/site/mobile-preview
+          cp -R website/konflux-gallery build/site/konflux-gallery
           cp CNAME build/site/CNAME
-          printf '{"version":"v28.2","commit":"%s"}\n' "$GITHUB_SHA" > build/site/version.json
+          printf '{"version":"v29","commit":"%s"}\n' "$GITHUB_SHA" > build/site/version.json
           cp web-legal/datenschutz.html build/site/datenschutz.html
           cp web-legal/impressum.html build/site/impressum.html
           cp web-legal/sicherheit.html build/site/sicherheit.html
