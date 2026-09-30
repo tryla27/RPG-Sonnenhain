@@ -10,3 +10,21 @@
 .version-badge{display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border:1px solid var(--gold);color:var(--gold2);font-size:.72rem;font-weight:900;letter-spacing:.12em}
 .version-note{margin:22px 0 0;color:#90a49a;font-size:.88rem}
 @media(max-width:850px){.version-section{padding:24px 18px}.version-grid{grid-template-columns:1fr}.version-card{min-height:0}.version-card .button{width:100%;min-height:54px}}
+
+/* Sonnenhain: Dunkelblau und Gold, identisch zur Spieloberfläche. */
+:root{--bg:#081a2a;--panel:#10283c;--panel2:#1b3b54;--ink:#f5e8c8;--muted:#bacbd6;--gold:#c9a45e;--gold2:#e3c077;--line:#8e774c}
+body{background:radial-gradient(ellipse at 70% 0%,#18344b,#081a2a 55%,#061321);color:var(--ink)}
+.site-header{border-bottom:2px solid var(--gold);gap:20px}.site-header nav{flex-wrap:wrap;justify-content:flex-end;gap:12px 20px}
+.hero h1,.section h2,.version-section h2,.version-card h3,.card h3{color:var(--ink)}.lead{color:#cbd9e2}.micro,.version-note,footer{color:#aebfcd}
+.hero-art,.card,.version-section,.version-card,.invite-panel,.game-section{position:relative;background:#10283c;border:2px solid var(--gold);box-shadow:inset 0 0 0 4px #061321,inset 0 0 0 5px #54616a,0 12px 28px #0003}
+.hero-art:before,.card:before,.version-section:before,.version-card:before{content:"";position:absolute;pointer-events:none;inset:5px;border-top:2px solid var(--gold2);border-left:2px solid var(--gold2);width:18px;height:18px;z-index:1}
+.hero-art:after,.card:after,.version-section:after,.version-card:after{content:"";position:absolute;pointer-events:none;right:5px;bottom:5px;border-bottom:2px solid var(--gold2);border-right:2px solid var(--gold2);width:18px;height:18px}
+.hero-art{height:auto;padding:10px;margin:0;overflow:visible}.hero-art img{display:block;width:100%;height:auto;image-rendering:pixelated}.hero-art figcaption{padding:12px 6px 4px;color:var(--gold2);font-size:.84rem}
+.button{border-radius:0;border:2px solid var(--gold);box-shadow:inset 0 0 0 2px #081a2a}.button.primary{background:#203c53;color:#ffe3a0}.button.primary:hover{background:#2b4e65}.button.ghost{background:#10283c}.button.ghost:hover{background:#203c53}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #ffe3a0;outline-offset:4px}.invite-row input{background:#081a2a}.version-badge{background:#0b2033}.footer-links{flex-wrap:wrap}
+@media(max-width:850px){.site-header{flex-direction:column;padding:20px}.site-header nav{display:flex;justify-content:flex-start;font-size:.8rem;gap:10px 16px}main{padding:0 18px}.hero{gap:26px}.hero h1{font-size:clamp(2.6rem,10vw,4rem)}.hero-art{height:auto}.version-section{padding:24px 16px}.version-card,.card{padding:24px}.brand{letter-spacing:.1em}.actions .button{width:100%}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+.app-coming{background:linear-gradient(145deg,#10283c,#0b2033)}
+.app-coming .version-badge{font-size:.78rem}
+.app-coming .button{cursor:default}
