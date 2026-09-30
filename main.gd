@@ -395,6 +395,7 @@ var multiplayer_smoke_name := ""
 var multiplayer_smoke_deadline := 0
 var multiplayer_smoke_chat_timer := 0.0
 var multiplayer_smoke_attack_timer := 0.0
+var multiplayer_smoke_party_timer := 0.0
 var multiplayer_smoke_success_since := 0
 var server_sync_status: Dictionary = {}
 var server_world_manifest: Dictionary = {}
@@ -553,6 +554,16 @@ func process_multiplayer_smoke(delta: float) -> void:
 		return
 	multiplayer_smoke_chat_timer -= delta
 	multiplayer_smoke_attack_timer -= delta
+	multiplayer_smoke_party_timer -= delta
+	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer_smoke_party_timer <= 0.0:
+		multiplayer_smoke_party_timer = 0.9
+		var party_members: Array = party_state.get("members",[])
+		if party_members.size() < 2:
+			if multiplayer_smoke_name.ends_with("A"):
+				var target_name := multiplayer_smoke_name.left(multiplayer_smoke_name.length()-1)+"B"
+				rpc_party_command.rpc_id(1,{"action":"invite","name":target_name})
+			elif int(party_state.get("invite_from",0)) > 0:
+				rpc_party_command.rpc_id(1,{"action":"accept"})
 	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer_smoke_attack_timer <= 0.0:
 		multiplayer_smoke_attack_timer = 0.85
 		rpc_client_normal_attack.rpc_id(1,[player_pos.x,player_pos.y],[facing.x,facing.y],class_id,equipped_weapon_design(),5,weapon_element())
@@ -578,18 +589,20 @@ func process_multiplayer_smoke(delta: float) -> void:
 		if pos_data.size() >= 2 and facing_data.size() >= 2 and remote_state.has("class") and remote_state.has("race") and str(remote_state.get("name", "")).strip_edges() != "":
 			complete_remote_count += 1
 	var saw_remote_attack := remote_combat_visuals.size() >= 1
-	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and saw_other_chat and saw_remote_attack and multiplayer_smoke_success_since == 0:
+	var party_ok := (party_state.get("members",[]) as Array).size() >= 2
+	var ping_ok := network_ping_ms >= 0
+	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and saw_other_chat and saw_remote_attack and party_ok and ping_ok and multiplayer_smoke_success_since == 0:
 		multiplayer_smoke_success_since = Time.get_ticks_msec()
-		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack)
+		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack, " party=", party_ok, " ping=", network_ping_ms)
 	# Sobald dieser Client den anderen Spieler, dessen Chat und den
 	# Server-Snapshot gemeinsam gesehen hat, ist die Relay-Prüfung erfüllt.
 	# Er bleibt nur noch kurz online, damit der Gegenclient dasselbe prüfen kann.
 	if multiplayer_smoke_success_since > 0 and Time.get_ticks_msec() - multiplayer_smoke_success_since >= 2500:
-		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack)
+		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack, " party=", party_ok, " ping=", network_ping_ms)
 		get_tree().quit(0)
 		return
 	if multiplayer_smoke_deadline > 0 and Time.get_ticks_msec() > multiplayer_smoke_deadline:
-		print("MULTIPLAYER_SMOKE_FAIL name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " chat=", saw_other_chat, " combat=", saw_remote_attack)
+		print("MULTIPLAYER_SMOKE_FAIL name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " chat=", saw_other_chat, " combat=", saw_remote_attack, " party=", party_ok, " ping=", network_ping_ms)
 		get_tree().quit(32)
 
 func _ready() -> void:
