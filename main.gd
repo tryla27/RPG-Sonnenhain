@@ -687,6 +687,52 @@ func rpc_server_damage(amount: int) -> void:
 	if invulnerable <= 0.0:
 		apply_player_damage(clampi(amount, 1, 500))
 
+@rpc("authority", "call_remote", "reliable")
+func rpc_server_combat_reward(enemy_type: int, xp_reward: int, gold_reward: int, item_rewards: Array) -> void:
+	if network_mode != "client": return
+	enemy_type = clampi(enemy_type, 0, ENEMY_TYPES.size() - 1)
+	xp_reward = clampi(xp_reward, 0, 100000)
+	gold_reward = clampi(gold_reward, 0, 100000)
+	if xp_reward > 0:
+		gain_xp(xp_reward)
+	if gold_reward > 0:
+		gold += gold_reward
+	for raw_item in item_rewards:
+		if not raw_item is Dictionary: continue
+		var item: Dictionary = raw_item.duplicate(true)
+		if not add_item(item):
+			var compensation := maxi(1, item_sale_value(item))
+			gold += compensation
+			message("Inventar voll · Beute automatisch für %d Gold verkauft." % compensation)
+	for qindex in quests.size():
+		var quest: Dictionary = quests[qindex]
+		if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == enemy_type:
+			quest["progress"] = mini(int(QUESTS[qindex]["count"]), int(quest["progress"]) + 1)
+			if quest["progress"] >= QUESTS[qindex]["count"]:
+				quest["state"] = 2
+				message("Questziel erreicht: %s. Kehre zurück!" % QUESTS[qindex]["title"])
+	if xp_reward > 0 or gold_reward > 0 or not item_rewards.is_empty():
+		play_sound("pickup")
+		message("+%d XP · +%d Gold%s" % [xp_reward, gold_reward, " · Beute erhalten" if not item_rewards.is_empty() else ""])
+		save_game()
+
+func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
+	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
+	var type := clampi(int(enemy.get("type", 0)), 0, ENEMY_TYPES.size() - 1)
+	var elite_kind := clampi(int(enemy.get("elite", 0)), 0, 2)
+	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
+	var xp_reward := int((int(ENEMY_TYPES[type]["xp"]) + area_level * 3 + int(area_level * area_level * 0.15)) * [1.0, 1.55, 2.4][elite_kind])
+	var gold_reward := randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
+	var rewards: Array = []
+	if type in [12, 13, 14]:
+		var boss_element: String = ["blitz", "eis", "gift"][type - 12]
+		rewards.append(make_item("%s · %s" % [ENEMY_TYPES[type]["name"], String(boss_element).capitalize()], class_weapon_icon(), 3 + int(type == 14), 28 + (type - 12) * 8, 700 + type * 35, boss_element))
+	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
+		rewards.append(random_loot(type))
+	if randf() < 0.03:
+		rewards.append(make_item("Heiltrank", "potion", 1, 0, 18))
+	rpc_server_combat_reward.rpc_id(peer_id, type, xp_reward, gold_reward, rewards)
+
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null or dedicated_server_mode: return
 	if not multiplayer_smoke_client_mode and (panel != "" or not character_created):
@@ -1093,7 +1139,7 @@ func update_dedicated_enemies(delta: float) -> void:
 	for i in range(enemies.size() - 1, -1, -1):
 		var enemy: Dictionary = enemies[i]
 		if float(enemy.get("hp", 0.0)) <= 0.0:
-			enemies.remove_at(i)
+			defeat_enemy(i, int(enemy.get("last_hit_peer", 0)))
 			continue
 		enemy["flash"] = maxf(0.0, float(enemy.get("flash",0.0)) - delta)
 		enemy["hit"] = maxf(0.0, float(enemy.get("hit",0.0)) - delta)
@@ -1163,7 +1209,7 @@ func update_dedicated_player_projectiles(delta: float) -> void:
 		var consumed := false
 		for e in range(enemies.size() - 1, -1, -1):
 			if Vector2(shot["pos"]).distance_to(Vector2(enemies[e]["pos"])) < 30.0:
-				damage_enemy(e, int(shot.get("damage",1)), Vector2(shot["dir"]), false, str(shot.get("element","")))
+				damage_enemy(e, int(shot.get("damage",1)), Vector2(shot["dir"]), false, str(shot.get("element","")), int(shot.get("owner_peer",0)))
 				consumed = true
 				break
 		if consumed:
@@ -1816,22 +1862,24 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 	power = clampi(power,1,80 + level_cap * 20)
 	if remote_class == 0:
 		var axe := design % 3 == 2
-		hit_arc(origin,dir,116.0 if axe else 100.0,0.08 if axe else 0.13,power,false,element)
+		hit_arc(origin,dir,116.0 if axe else 100.0,0.08 if axe else 0.13,power,false,element,sender)
 	else:
 		var crossbow := remote_class == 2 and design % 4 == 3
-		projectiles.append({"pos":origin,"dir":dir,"speed":790.0 if crossbow else (650.0 if remote_class==2 else 520.0),"life":1.2,"damage":power,"kind":3 if remote_class==2 else 2,"element":element,"hits":[]})
+		projectiles.append({"pos":origin,"dir":dir,"speed":790.0 if crossbow else (650.0 if remote_class==2 else 520.0),"life":1.2,"damage":power,"kind":3 if remote_class==2 else 2,"element":element,"hits":[],"owner_peer":sender})
 
-func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float, damage: int, stun: bool, element: String = "") -> void:
+func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float, damage: int, stun: bool, element: String = "", source_peer: int = 0) -> void:
 	for i in range(enemies.size() - 1, -1, -1):
 		var enemy: Dictionary = enemies[i]
 		var offset: Vector2 = enemy["pos"] - origin
 		if offset.length() <= reach and (offset.length() < 25 or direction.dot(offset.normalized()) > threshold):
-			damage_enemy(i, damage, direction, stun, element)
+			damage_enemy(i, damage, direction, stun, element, source_peer)
 
-func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "") -> void:
+func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0) -> void:
 	if index < 0 or index >= enemies.size(): return
 	play_sound("hit")
 	var enemy: Dictionary = enemies[index]
+	if source_peer > 0:
+		enemy["last_hit_peer"] = source_peer
 	if network_mode == "client":
 		enemy["flash"] = 0.16
 		effect(enemy["pos"] + Vector2(0, -25), str(maxi(0, amount)), Color("fff1a1"), 0.55)
@@ -1854,6 +1902,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 			for j in enemies.size():
 				if j != index and enemies[j]["pos"].distance_to(enemy["pos"]) < 105:
 					enemies[j]["hp"] = float(enemies[j]["hp"]) - 7
+					if source_peer > 0: enemies[j]["last_hit_peer"] = source_peer
 					lightning_lines.append({"from":enemy["pos"], "to":enemies[j]["pos"], "life":0.25})
 					break
 		"gift":
@@ -1866,7 +1915,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	if stun: enemy["stun"] = 1.2
 	effect(enemy["pos"] + Vector2(0, -25), str(amount), Color("fff1a1"), 0.75)
 	if drain_timer > 0: hp = minf(max_hp(), hp + minf(8.0, amount * 0.2))
-	if enemy["hp"] <= 0: defeat_enemy(index)
+	if enemy["hp"] <= 0: defeat_enemy(index, int(enemy.get("last_hit_peer", source_peer)))
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, rank: int) -> void:
@@ -1897,9 +1946,9 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	if id in radial_ids:
 		var radius := 165.0 + rank * 12.0
 		for i in range(enemies.size()-1,-1,-1):
-			if enemies[i]["pos"].distance_to(origin) <= radius: damage_enemy(i,power+10,dir,false)
+			if enemies[i]["pos"].distance_to(origin) <= radius: damage_enemy(i,power+10,dir,false,"",sender)
 	else:
-		hit_arc(origin,dir,190.0,-0.15,power+8,false)
+		hit_arc(origin,dir,190.0,-0.15,power+8,false,"",sender)
 
 func use_ability(slot: int) -> void:
 	if slot < 0 or slot > 3: return
@@ -2565,12 +2614,15 @@ func respawn() -> void:
 	message("Du wurdest im Dorf wiederbelebt. -20 Gold")
 	save_game()
 
-func defeat_enemy(index: int) -> void:
+func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var enemy: Dictionary = enemies[index]
 	var invasion: bool = bool(enemy.get("invasion", false))
 	var type: int = int(enemy["type"])
 	var pos: Vector2 = enemy["pos"]
 	enemies.remove_at(index)
+	if dedicated_server_mode:
+		send_server_enemy_reward(source_peer, enemy)
+		return
 	if arena_mode != "": return # Arenagegner geben weder Beute noch Erfahrung.
 	for event_index in WORLD_EVENTS.size():
 		if int(event_states[event_index]) != 1: continue
