@@ -353,6 +353,7 @@ var multiplayer_smoke_client_mode := false
 var multiplayer_smoke_name := ""
 var multiplayer_smoke_deadline := 0
 var multiplayer_smoke_chat_timer := 0.0
+var multiplayer_smoke_success_since := 0
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -416,9 +417,15 @@ func process_multiplayer_smoke(delta: float) -> void:
 			saw_other_chat = true
 			break
 	if remote_players.size() >= 1 and enemies.size() >= 1 and saw_other_chat:
-		print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
-		get_tree().quit(0)
-		return
+		if multiplayer_smoke_success_since == 0:
+			multiplayer_smoke_success_since = Time.get_ticks_msec()
+			print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
+		# Kurz verbunden bleiben, damit der zweite Test-Client denselben
+		# bidirektionalen Zustand und Chat ebenfalls sicher empfangen kann.
+		if Time.get_ticks_msec() - multiplayer_smoke_success_since >= 2500:
+			print("MULTIPLAYER_SMOKE_OK name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size())
+			get_tree().quit(0)
+			return
 	if multiplayer_smoke_deadline > 0 and Time.get_ticks_msec() > multiplayer_smoke_deadline:
 		print("MULTIPLAYER_SMOKE_FAIL name=", multiplayer_smoke_name, " peers=", remote_players.size(), " enemies=", enemies.size(), " chat=", saw_other_chat)
 		get_tree().quit(32)
