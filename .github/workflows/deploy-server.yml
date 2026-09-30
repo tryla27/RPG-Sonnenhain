@@ -229,7 +229,7 @@ jobs:
               exit 1
             fi
 
-            "$HOME/sonnenhain-server/releases/current/ensure-sonnenhain-server.sh"
+            "$HOME/sonnenhain-server/releases/current/ensure-sonnenhain-server.sh" --restart
             echo "SERVER_START_MODE=watchdog linger=$linger"
           fi
 
