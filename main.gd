@@ -6525,18 +6525,18 @@ func draw_ref_panel(rect: Rect2) -> void:
 
 func ui_box(rect: Rect2, fill: Color = Color("304a4b")) -> void:
 	draw_rect(rect, Color("1e272c"))
-	draw_rect(rect.grow(-2), Color("b69a65"))
-	draw_rect(rect.grow(-4), fill.darkened(0.30))
+	draw_rect(rect.grow(-2), Color("c9a45e"))
+	draw_rect(rect.grow(-4), Color("0b2033").lerp(Color("1b3b54"),fill.get_luminance()*0.45))
 	draw_rect(Rect2(rect.position + Vector2(9, 7), Vector2(maxf(0.0, rect.size.x - 18), 2)), Color("e0c58b", 0.72))
 	for corner in [rect.position + Vector2(4,4), rect.position + Vector2(rect.size.x-9,4), rect.position + Vector2(4,rect.size.y-9), rect.position + rect.size - Vector2(9,9)]:
-		draw_rect(Rect2(corner, Vector2(5, 5)), Color("d4b777"))
+		draw_rect(Rect2(corner, Vector2(5, 5)), Color("e3c077"))
 
 func ui_button(rect: Rect2, label: String, enabled: bool = true, active: bool = false) -> void:
 	var hovering := enabled and rect.has_point(get_viewport().get_mouse_position())
-	var border := Color("ffe0a0") if active or hovering else Color("a78a59")
+	var border := Color("ffe0a0") if active or hovering else Color("c9a45e")
 	draw_rect(rect, Color("18252e"))
 	draw_rect(rect.grow(-2), border)
-	draw_rect(rect.grow(-4), Color("657359") if active else (Color("586c63") if hovering else (Color("364f52") if enabled else Color("364145"))))
+	draw_rect(rect.grow(-4), Color("25475c") if active else (Color("203c53") if hovering else (Color("10283c") if enabled else Color("14202c"))))
 	draw_rect(Rect2(rect.position + Vector2(8, 6), Vector2(maxf(0.0, rect.size.x - 16), 2)), Color("dbc58d", 0.52))
 	text_at(rect.position + Vector2(11, rect.size.y * 0.67), label, 16, Color("fff1ce") if enabled else Color("b5b4a7"))
 
@@ -6905,7 +6905,7 @@ func npc_position(name: String) -> Vector2:
 
 func draw_panel() -> void:
 	draw_rect(Rect2(Vector2.ZERO, VIEW), Color(0.06, 0.11, 0.15, 0.76))
-	draw_rect(Rect2(128, 72, 896, 544), Color("151e28"))
+	draw_rect(Rect2(128, 72, 896, 544), Color("061525"))
 	ui_box(Rect2(135, 79, 882, 530), Color("40514d"))
 	draw_rect(Rect2(164, 94, 824, 3), Color("c6a66e"))
 	draw_rect(Rect2(164, 598, 824, 2), Color("9d845e"))
@@ -7232,11 +7232,11 @@ func draw_skill_star(center: Vector2, tint: Color, lit: bool) -> void:
 func draw_inventory_panel() -> void:
 	text_at(Vector2(165, 125), "INVENTAR", 26, Color("ffeda9"))
 	text_at(Vector2(758, 125), "%d / 42  ·  %d GOLD" % [inventory.size(), gold], 17, Color("f6dc9a"))
-	ui_box(Rect2(165, 153, 450, 426), Color("365b5d"))
+	ui_box(Rect2(165, 153, 450, 426), Color("16344b"))
 	text_at(Vector2(183, 180), "DEIN HELD · LEVEL %d" % level, 19, Color("ffeda9"))
 	# Die Figur steht groß zwischen genau drei Ausrüstungsplätzen.
-	draw_rect(Rect2(296, 211, 195, 288), Color("294b52"))
-	draw_rect(Rect2(302, 217, 183, 276), Color("55746c"))
+	draw_rect(Rect2(296, 211, 195, 288), Color("16344b"))
+	draw_rect(Rect2(302, 217, 183, 276), Color("16344b"))
 	draw_rect(Rect2(337, 457, 113, 12), Color("1f3d43", 0.5))
 	draw_hero(Vector2(395, 370), 2.0, false, Vector2.DOWN)
 	draw_equipment_slot(Vector2(180, 275), "WAFFE", equipped_uid, class_weapon_icon())
@@ -7244,8 +7244,8 @@ func draw_inventory_panel() -> void:
 	draw_equipment_slot(Vector2(501, 347), "RING 1" if class_id == 1 else "RING", equipped_ring_uid, "ring")
 	if class_id == 1: draw_equipment_slot(Vector2(180,395),"RING 2",equipped_ring2_uid,"ring")
 	text_at(Vector2(186, 534), "HP %d  ·  ANGRIFF %d  ·  SCHUTZ %d" % [int(max_hp()), normal_attack_power(), equipment_power(equipped_armor_uid)], 15, Color("e6efdd"))
-	ui_box(Rect2(625, 153, 352, 426), Color("365b5d"))
-	text_at(Vector2(644, 179), "TASCHE · Doppelklick: benutzen / an- oder ausziehen", 12, Color("ffeda9"))
+	ui_box(Rect2(625, 153, 352, 426), Color("16344b"))
+	text_at(Vector2(644, 179), "TASCHE · Doppelklick", 12, Color("ffeda9"))
 	text_at(Vector2(807, 179), "%d/2" % (inventory_page + 1), 16)
 	ui_button(Rect2(850, 157, 32, 30), "<", inventory_page > 0)
 	ui_button(Rect2(931, 157, 32, 30), ">", inventory_page < 1)
@@ -7255,8 +7255,8 @@ func draw_inventory_panel() -> void:
 		var row := cell / 5
 		var pos := Vector2(641 + col * 65, 200 + row * 55)
 		var is_equipped := i < inventory.size() and int(inventory[i]["uid"]) in equipped_item_uids()
-		draw_rect(Rect2(pos, Vector2(54, 48)), Color("ffdda0") if is_equipped else (Color("e3c78c") if i == selected_item else Color("263f43")))
-		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("496b62"))
+		draw_rect(Rect2(pos, Vector2(54, 48)), Color("ffdda0") if is_equipped else (Color("e3c78c") if i == selected_item else Color("16344b")))
+		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("16344b"))
 		if i < inventory.size():
 			var item: Dictionary = inventory[i]
 			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 4)), RARITY_COLORS[int(item["rarity"])])
@@ -7335,8 +7335,8 @@ func draw_item_signature(p: Vector2, item: Dictionary) -> void:
 		3: draw_arc(center, 5, 0, TAU, 12, tint, 3)
 
 func draw_equipment_slot(p: Vector2, label: String, uid: int, icon: String) -> void:
-	draw_rect(Rect2(p, Vector2(98, 77)), Color("e9cd90") if uid >= 0 else Color("294a4c"))
-	draw_rect(Rect2(p + Vector2(3, 3), Vector2(92, 71)), Color("52756b"))
+	draw_rect(Rect2(p, Vector2(98, 77)), Color("e9cd90") if uid >= 0 else Color("8e774c"))
+	draw_rect(Rect2(p + Vector2(3, 3), Vector2(92, 71)), Color("203c53"))
 	var item: Dictionary = {}
 	for candidate in inventory:
 		if int(candidate.get("uid", -1)) == uid:
@@ -7347,8 +7347,8 @@ func draw_equipment_slot(p: Vector2, label: String, uid: int, icon: String) -> v
 		draw_item_icon(p + Vector2(33, 4), actual_icon, RARITY_COLORS[int(item["rarity"])], 0.82, weapon_visual_stage(item), item_design(item))
 		text_at(p + Vector2(5, 52), String(item["name"]).substr(0, 13), 11, RARITY_COLORS[int(item["rarity"])])
 	else:
-		text_at(p + Vector2(36, 35), "–", 19, Color("b6c8b9"))
-		text_at(p + Vector2(8, 52), "Leer", 11, Color("b6c8b9"))
+		text_at(p + Vector2(36, 35), "–", 19, Color("bacbd6"))
+		text_at(p + Vector2(8, 52), "Leer", 11, Color("bacbd6"))
 	text_at(p + Vector2(9, 66), label, 12, Color("fff0c3"))
 
 func item_type(icon: String) -> String:

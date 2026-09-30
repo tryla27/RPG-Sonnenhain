@@ -16,12 +16,12 @@ security_meta = """		<meta name="referrer" content="no-referrer">
 
 gate_style = """
 <style>
-#human-gate{position:fixed;inset:0;z-index:99999;background:#101714;color:#f4ecd5;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
-#human-card{width:min(520px,calc(100% - 32px));background:#1a2722;border:1px solid #6f8c7f;border-radius:14px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+#human-gate{position:fixed;inset:0;z-index:99999;background:#081a2a;color:#f4ecd5;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+#human-card{width:min(520px,calc(100% - 32px));background:#10283c;border:2px solid #c9a45e;border-radius:0;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
 #human-card h1{margin:0 0 8px;font-size:28px}
-#human-card p{line-height:1.45;color:#cfdbd4}
-#human-card input[type=number]{width:100%;box-sizing:border-box;padding:12px;margin:8px 0 12px;background:#0e1713;color:#fff;border:1px solid #698477;border-radius:8px;font-size:18px}
-#human-card button{width:100%;padding:12px;border:0;border-radius:8px;background:#d4b06a;color:#1a1a16;font-weight:700;font-size:16px;cursor:pointer}
+#human-card p{line-height:1.45;color:#bacbd6}
+#human-card input[type=number]{width:100%;box-sizing:border-box;padding:12px;margin:8px 0 12px;background:#0b2033;color:#fff;border:2px solid #c9a45e;border-radius:0;font-size:18px}
+#human-card button{width:100%;padding:12px;border:0;border-radius:0;background:#d4b06a;color:#1a1a16;font-weight:700;font-size:16px;cursor:pointer}
 #human-card button:disabled{opacity:.45;cursor:not-allowed}
 #human-links{margin-top:16px;text-align:center;font-size:13px}
 #human-links a{color:#d9c18a;margin:0 7px}

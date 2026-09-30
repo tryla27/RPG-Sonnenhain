@@ -126,6 +126,7 @@ jobs:
           set -euo pipefail
           cp website/index.html build/site/index.html
           cp website/site.css build/site/site.css
+          cp website/ui-preview.png build/site/ui-preview.png
           cp -R website/mobile-preview build/site/mobile-preview
           cp -R website/konflux-gallery build/site/konflux-gallery
           cp CNAME build/site/CNAME
