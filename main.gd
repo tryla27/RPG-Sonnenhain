@@ -389,7 +389,7 @@ func start_multiplayer_smoke_client() -> void:
 	hero_name = multiplayer_smoke_name
 	character_created = true
 	class_id = 0 if multiplayer_smoke_name.ends_with("A") else 2
-	player_pos = Vector2(560.0, 520.0) if class_id == 0 else Vector2(620.0, 520.0)
+	player_pos = Vector2(2200.0, 1000.0) if class_id == 0 else Vector2(2260.0, 1000.0)
 	panel = ""
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_client("ws://127.0.0.1:27845")
@@ -406,7 +406,7 @@ func process_multiplayer_smoke(delta: float) -> void:
 	if not multiplayer_smoke_client_mode:
 		return
 	multiplayer_smoke_chat_timer -= delta
-	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer_smoke_chat_timer <= 0.0:
+	if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and multiplayer_smoke_chat_timer <= 0.0:
 		multiplayer_smoke_chat_timer = 0.7
 		send_chat_message("SMOKE:%s" % multiplayer_smoke_name)
 	var saw_other_chat := false
@@ -682,6 +682,8 @@ func rpc_server_damage(amount: int) -> void:
 
 func push_player_state() -> void:
 	if network_mode == "offline" or multiplayer.multiplayer_peer == null or dedicated_server_mode: return
+	if network_mode == "client" and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return
 	var state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "element":weapon_element(), "region":region_at(player_pos)}
 	if network_mode == "client":
 		rpc_player_state.rpc_id(1, state)
