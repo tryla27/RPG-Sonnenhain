@@ -1,11 +1,14 @@
 <?php
 declare(strict_types=1);
 // All website files pass through this controller; the password hash stays outside htdocs.
+$hashFile = getenv('SONNENHAIN_ACCESS_FILE') ?: '/home/sites/site100047525/web/sonnenhain-access.htpasswd';
+$privateDir = dirname($hashFile) . '/sonnenhain-access-data';
 ini_set('session.use_strict_mode', '1');
 ini_set('session.use_cookies', '1');
 ini_set('session.use_only_cookies', '1');
 // Shared hosting may provide an unwritable default session directory.
-$sessionDir = sys_get_temp_dir() . '/sonnenhain-sessions-' . substr(hash('sha256', __DIR__), 0, 16);
+$sessionDir = $privateDir . '/sessions';
+if (!is_dir($privateDir) && !@mkdir($privateDir, 0700)) { http_response_code(503); exit('Der Zugang ist kurzzeitig nicht verfügbar.'); }
 if (!is_dir($sessionDir) && !@mkdir($sessionDir, 0700)) {
     http_response_code(503); exit('Der Zugang ist kurzzeitig nicht verfügbar.');
 }
@@ -22,7 +25,6 @@ function destination(string $path): string {
     if ($path === '' || $path[0] !== '/' || substr($path, 0, 2) === '//' || preg_match('/[\\\\\x00-\x20\x7f]/', $path)) return '/';
     return $path;
 }
-$hashFile = getenv('SONNENHAIN_ACCESS_FILE') ?: '/home/sites/site100047525/web/sonnenhain-access.htpasswd';
 $entry = @file_get_contents($hashFile);
 $hash = $entry === false ? '' : trim(explode(':', $entry, 2)[1] ?? '');
 if ($hash === '' || password_get_info($hash)['algoName'] === 'unknown') {
@@ -42,7 +44,7 @@ if ($login && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         http_response_code(403); $error = 'Bitte lade die Seite neu und versuche es erneut.';
     } else {
         // Server-side rate limiting survives a new browser session or cookie deletion.
-        $limitDir = sys_get_temp_dir() . '/sonnenhain-login-' . substr(hash('sha256', __DIR__), 0, 16);
+        $limitDir = $privateDir . '/attempts';
         if (!is_dir($limitDir)) @mkdir($limitDir, 0700);
         $limitFile = $limitDir . '/' . hash('sha256', $_SERVER['REMOTE_ADDR'] ?? 'unknown');
         $lock = @fopen($limitFile, 'c+');
