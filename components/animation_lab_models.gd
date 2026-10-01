@@ -46,8 +46,8 @@ static func shadow(c: CanvasItem, p: Vector2, rx: float, ry: float) -> void:
 	c.draw_set_transform(Vector2.ZERO)
 
 static func mage(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: String,state_t: float) -> void:
-	var heading := direction_index(facing)
-	var look := direction_vector(heading)
+	var heading: int = direction_index(facing)
+	var look: Vector2 = direction_vector(heading)
 	var side := Vector2(look.y,-look.x)
 	var profile := heading in [2,6]
 	var diagonal := heading in [1,3,5,7]
@@ -174,8 +174,8 @@ static func mage(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 		c.draw_circle(base+Vector2(0,-50),38,Color(1,0.75,0.65,0.11))
 
 static func slime(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: String,state_t: float) -> void:
-	var heading := direction_index(facing)
-	var look := direction_vector(heading)
+	var heading: int = direction_index(facing)
+	var look: Vector2 = direction_vector(heading)
 	var t := phase
 	var squash := 1.0
 	var stretch := 1.0
@@ -214,27 +214,27 @@ static func slime(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: S
 	poly_px(c,pts,Color("55c85f"))
 	ellipse(c,p+Vector2(-8,-18-lift),11,8,Color("84e77b"))
 	ellipse(c,p+Vector2(4,-13-lift),13,6,Color("68d969"))
-	var eye_center := p+look*6.0+Vector2(0,-12-lift)
-	var right := Vector2(look.y,-look.x)
+	var eye_center: Vector2 = p+look*6.0+Vector2(0,-12-lift)
+	var right: Vector2 = Vector2(look.y,-look.x)
 	if heading in [2,6]:
 		ellipse(c,eye_center+right*3,3.5,5,Color("112b35"))
 		ellipse(c,eye_center+right*4+Vector2(-1,-2),1.2,1.6,Color.WHITE)
 	else:
 		for sgn in [-1.0,1.0]:
-			var ep := eye_center+right*sgn*7
+			var ep: Vector2 = eye_center+right*float(sgn)*7.0
 			ellipse(c,ep,3.5,5,Color("112b35"))
 			ellipse(c,ep+Vector2(-1,-2),1.2,1.6,Color.WHITE)
 	if state == "attack" and state_t > 0.4 and state_t < 0.7:
 		for i in 5:
-			var q := p+look*(30.0+i*9.0)+right*float(i-2)*3.0
+			var q: Vector2 = p+look*(30.0+float(i)*9.0)+right*float(i-2)*3.0
 			ellipse(c,q,3.0,2.0,Color("9af58c"))
 
 static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: String,state_t: float) -> void:
-	var heading := direction_index(facing)
-	var f := direction_vector(heading).normalized()
-	var r := Vector2(f.y,-f.x)
+	var heading: int = direction_index(facing)
+	var f: Vector2 = direction_vector(heading).normalized()
+	var r: Vector2 = Vector2(f.y,-f.x)
 	var gait := sin(phase*2.0)
-	var body_center := p-f*4.0+Vector2(0,-23)
+	var body_center: Vector2 = p-f*4.0+Vector2(0,-23)
 	var lunge := 0.0
 	if state == "attack":
 		lunge = sin(clampf(state_t,0.0,1.0)*PI)*22.0
@@ -248,22 +248,19 @@ static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	shadow(c,p+f*lunge+Vector2(0,10),34,8)
 
 	# Tail behind body.
-	var tail_root := body_center-f*24.0
-	var tail_tip := tail_root-f*25.0+r*(10.0+sin(phase)*5.0)
+	var tail_root: Vector2 = body_center-f*24.0
+	var tail_tip: Vector2 = tail_root-f*25.0+r*(10.0+sin(phase)*5.0)
 	c.draw_line(tail_root,tail_tip,OUTLINE,12.0)
 	c.draw_line(tail_root,tail_tip,Color("596175"),8.0)
 	ellipse(c,tail_tip,7,7,Color("80879a"))
 
 	# Four independently planted legs.
-	var anchors := [
-		Vector2(-17,-10),Vector2(-17,10),Vector2(17,-10),Vector2(17,10)
-	]
 	for i in 4:
 		var front := 1.0 if i>=2 else -1.0
 		var side_sign := -1.0 if i%2==0 else 1.0
 		var swing := gait*(1.0 if (i==0 or i==3) else -1.0) if state=="walk" else 0.0
-		var hip := body_center+f*front*16.0+r*side_sign*10.0
-		var paw := hip+f*swing*7.0+Vector2(0,24.0+absf(swing)*2.0)
+		var hip: Vector2 = body_center+f*front*16.0+r*side_sign*10.0
+		var paw: Vector2 = hip+f*swing*7.0+Vector2(0,24.0+absf(swing)*2.0)
 		c.draw_line(hip,paw,OUTLINE,9.0)
 		c.draw_line(hip,paw,Color("555e72"),5.0)
 		ellipse(c,paw,6,3.5,Color("c4c7cf"))
@@ -274,9 +271,9 @@ static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	ellipse(c,body_center-f*11.0+r*4.0,13,10,Color("83899a"))
 
 	# Head, muzzle, ears, all positioned from actual 8-direction vector.
-	var head := body_center+f*31.0+Vector2(0,-5)
+	var head: Vector2 = body_center+f*31.0+Vector2(0,-5)
 	ellipse(c,head,15,14,Color("697186"))
-	var muzzle := head+f*13.0+Vector2(0,4)
+	var muzzle: Vector2 = head+f*13.0+Vector2(0,4)
 	ellipse(c,muzzle,10,7,Color("b5b8c2"))
 	var ear_base_l: Vector2 = head-f*2.0+r*9.0+Vector2(0,-9)
 	var ear_base_r: Vector2 = head-f*2.0-r*9.0+Vector2(0,-9)
@@ -288,7 +285,7 @@ static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	]),Color("555d72"))
 	# Eyes only on visible/front-ish views.
 	if heading not in [3,4,5]:
-		var eye_f := head+f*6.0+Vector2(0,-3)
+		var eye_f: Vector2 = head+f*6.0+Vector2(0,-3)
 		for sgn in [-1.0,1.0]:
 			ellipse(c,eye_f+r*sgn*5.0,2.5,2.5,Color("b91f32"))
 	ellipse(c,muzzle+f*7.0,3.5,3.0,Color("151a20"))
