@@ -6,6 +6,7 @@ const ENTRANCE := Vector2(14800,9120)
 const SAFE_RADIUS := 1200.0
 const CHUNK := 512
 const MAX_CHUNKS := 48
+const CHUNK_PRELOAD_MARGIN := 1
 const BIOMES := ["Smaragdforst", "Frostweite", "Blütenmeer", "Kupfersteppe"]
 const COLORS := [Color("52703d"),Color("9ebcc5"),Color("829b50"),Color("b59455")]
 const NAMES := ["Runenlichtung","Karawanenlager","Jagdloge","Geisterhain","Kristallbruch","Sturmwarte","Frostschrein","Auftauendes Siegel","Sonnenaltar","Wildgarten","Botanisches Haus","Festlichtung","Relaisstation","Sternenkrater","Werkstatt","Kupferlager"]
@@ -23,6 +24,7 @@ var bridge: Texture2D
 var chunks: Dictionary = {}
 var chunk_order: Array[Vector2i] = []
 var sprite_regions: Dictionary = {}
+var last_preload_center := Vector2i(2147483647,2147483647)
 var active := false
 var room := -1
 var outdoor_position := CENTER
@@ -118,12 +120,16 @@ static func cover_allowed(p: Vector2) -> bool:
 		if p.distance_to(loc)<750: return false
 	return true
 
+static func interior_furniture_rect(interior: int, radius: float=0.0) -> Rect2:
+	var furniture: Array = [Rect2(-85,-180,150,110),Rect2(-70,-195,140,140),Rect2(-85,-150,160,100),Rect2(0,-300,150,150)]
+	if interior<0 or interior>=furniture.size(): return Rect2()
+	var body: Rect2=furniture[interior]
+	return Rect2(CENTER+body.position,body.size).grow(radius)
+
 static func blocked(p: Vector2, from: Vector2, interior: int=-1, radius: float=18.0) -> bool:
 	if interior>=0:
 		if not Rect2(CENTER+Vector2(-230,-360),Vector2(460,590)).grow(-radius).has_point(p): return true
-		var furniture: Array = [Rect2(-85,-180,150,110),Rect2(-70,-195,140,140),Rect2(-85,-150,160,100),Rect2(0,-300,150,150)]
-		var body: Rect2=furniture[interior]
-		return Rect2(CENTER+body.position,body.size).grow(radius).has_point(p)
+		return interior_furniture_rect(interior,radius).has_point(p)
 	if not Rect2(Vector2(32,32),SIZE-Vector2(64,64)).grow(-radius).has_point(p): return true
 	# Sample actor footprint, preventing edge clipping on bridges and water.
 	for offset in [Vector2.ZERO,Vector2(radius,0),Vector2(-radius,0),Vector2(0,radius),Vector2(0,-radius)]:
@@ -136,9 +142,14 @@ static func safe(p: Vector2, interior: int=-1) -> bool:
 	return interior<0 and p.distance_to(CENTER)<=SAFE_RADIUS
 
 static func line_clear(a: Vector2,b: Vector2,interior: int=-1) -> bool:
-	if interior>=0: return true
-	var base_h := height_at(a)
 	var steps := maxi(1,ceili(a.distance_to(b)/12.0))
+	if interior>=0:
+		var furniture := interior_furniture_rect(interior,4.0)
+		for i in range(1,steps):
+			var p := a.lerp(b,float(i)/steps)
+			if furniture.has_point(p): return false
+		return true
+	var base_h := height_at(a)
 	for i in range(steps+1):
 		var p := a.lerp(b,float(i)/steps)
 		if safe(p) or solid(p,4.0) or height_at(p)>base_h+20.0: return false
@@ -174,6 +185,7 @@ func enter(g, pos: Vector2=CENTER, target_room: int=-1) -> void:
 	g.camera_pos = g.camera_smooth.round()
 	g.message("KONFLUX · Schutz im Zentrum. E: Gebäude / Tor · M: Karte")
 	load_art()
+	if room<0: preload_camera_chunks(g,true)
 	announce_room(g)
 
 func leave(g, to_start: bool = false) -> void:
@@ -279,6 +291,7 @@ func update(g,delta: float) -> void:
 	if g.sync_timer<=0:
 		g.sync_timer=0.05
 		g.push_player_state()
+	if room<0: preload_camera_chunks(g)
 	g.save_timer+=delta
 	if g.save_timer>20:
 		g.save_timer=0
@@ -499,6 +512,29 @@ func terrain_index(p: Vector2) -> int:
 	if b==3: return 11 if p.x>68000 and p.y>60000 else 3
 	return 0
 
+func touch_chunk(key: Vector2i) -> void:
+	var index := chunk_order.find(key)
+	if index>=0: chunk_order.remove_at(index)
+	chunk_order.append(key)
+
+func get_chunk(key: Vector2i) -> Texture2D:
+	if chunks.has(key):
+		touch_chunk(key)
+		return chunks[key]
+	return make_chunk(key)
+
+func preload_camera_chunks(g, force: bool=false) -> void:
+	var center := Vector2i(floori((g.camera_pos.x+g.VIEW.x*0.5)/CHUNK),floori((g.camera_pos.y+g.VIEW.y*0.5)/CHUNK))
+	if not force and center==last_preload_center: return
+	last_preload_center=center
+	var half_x := ceili(g.VIEW.x*0.5/CHUNK)+CHUNK_PRELOAD_MARGIN
+	var half_y := ceili(g.VIEW.y*0.5/CHUNK)+CHUNK_PRELOAD_MARGIN
+	for y in range(center.y-half_y,center.y+half_y+1):
+		for x in range(center.x-half_x,center.x+half_x+1):
+			var key:=Vector2i(x,y)
+			if x<0 or y<0 or x*CHUNK>=int(SIZE.x) or y*CHUNK>=int(SIZE.y): continue
+			get_chunk(key)
+
 func make_chunk(key: Vector2i) -> Texture2D:
 	var img:=Image.create(CHUNK,CHUNK,false,Image.FORMAT_RGBA8)
 	for y in 16:
@@ -515,9 +551,10 @@ func make_chunk(key: Vector2i) -> Texture2D:
 				img.fill_rect(Rect2i(x*32,y*32,32,6),Color("b3b18a"))
 	var texture:=ImageTexture.create_from_image(img)
 	chunks[key]=texture
-	chunk_order.append(key)
+	touch_chunk(key)
 	while chunk_order.size()>MAX_CHUNKS:
-		chunks.erase(chunk_order.pop_front())
+		var expired:=chunk_order.pop_front()
+		if expired!=key: chunks.erase(expired)
 	return texture
 
 func sprite(g,tex: Texture2D,index: int,p: Vector2,size: Vector2,columns: int=4,rows: int=2) -> void:
@@ -571,7 +608,7 @@ func draw_outdoors(g) -> void:
 	for y in range(start.y,finish.y+1):
 		for x in range(start.x,finish.x+1):
 			var key:=Vector2i(x,y)
-			var tex: Texture2D=chunks[key] if chunks.has(key) else make_chunk(key)
+			var tex: Texture2D=get_chunk(key)
 			g.draw_texture(tex,Vector2(key)*CHUNK)
 	# Bridge rails match their impassable water edges. The center stays clear.
 	for x in BRIDGE_X:
@@ -592,7 +629,7 @@ func draw_outdoors(g) -> void:
 			for cx in range(floori(surface.position.x/CHUNK),ceili(surface.end.x/CHUNK)):
 				var key:=Vector2i(cx,cy)
 				var clip:=Rect2(Vector2(key)*CHUNK,Vector2.ONE*CHUNK).intersection(surface)
-				var tex: Texture2D=chunks[key] if chunks.has(key) else make_chunk(key)
+				var tex: Texture2D=get_chunk(key)
 				g.draw_texture_rect_region(tex,Rect2(clip.position-Vector2(0,h),clip.size),Rect2(clip.position-Vector2(key)*CHUNK,clip.size))
 		var face:=Rect2(r.position.x,r.end.y-h,r.size.x,h).intersection(bounds)
 		for x in range(floori(face.position.x/256)*256,ceili(face.end.x/256)*256,256):
@@ -666,7 +703,7 @@ func draw_entry(g,e: Dictionary) -> void:
 			var state: Dictionary=g.remote_players[e["peer"]]
 			var d: Array=state.get("facing",[0,1])
 			g.draw_shadow(visual)
-			g.draw_character_sprite(visual,int(state.get("class",0)),bool(state.get("walking",false)),Vector2(d[0],d[1]),1,false,int(state.get("race",0)),int(state.get("gender",0)),int(state.get("armor",-1)),float(state.get("death_progress",-1)),clampf((float(state.get("hurt_until",0))-g.combat_feedback.clock)/.18,0,1),int(state.get("head",-1)))
+			g.draw_character_sprite(visual,int(state.get("class",0)),bool(state.get("walking",false)),Vector2(d[0],d[1]),1,false,int(state.get("race",0)),int(state.get("gender",0)),int(state.get("armor",-1)),float(state.get("death_progress",-1)),clampf((float(state.get("hurt_until",0))-g.combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)))
 			g.draw_weapon_world(visual+Vector2(0,-5),int(state.get("class",0)),int(state.get("weapon",0)),Vector2(d[0],d[1]),1)
 			var stats:Dictionary=fighter_stats.get(e["peer"],{})
 			g.combat_feedback.health(g,"konflux:%d"%int(e["peer"]),visual+Vector2(0,-48),float(stats.get("hp",state.get("hp",1))),100.0 if not stats.is_empty() else float(state.get("max_hp",1)),60,Color("79caa3"))
