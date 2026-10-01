@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Sonnenhain RPG - Lokales Animationslabor V3 High-Res"
+config/name="Sonnenhain RPG - Lokales Animationslabor V4 Silhouette"
 config/description="Ein kleines, buntes Top-down-Action-RPG."
 run/main_scene="res://tools/local_animation_lab_v2.tscn"
 run/max_fps=60
@@ -18,8 +18,8 @@ config/features=PackedStringArray("4.3", "GL Compatibility")
 
 [display]
 
-window/size/viewport_width=1152
-window/size/viewport_height=648
+window/size/viewport_width=1600
+window/size/viewport_height=900
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 
