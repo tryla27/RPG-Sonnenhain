@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Sonnenhain RPG - Lokales Animationslabor V2"
+config/name="Sonnenhain RPG - Lokales Animationslabor V3 High-Res"
 config/description="Ein kleines, buntes Top-down-Action-RPG."
 run/main_scene="res://tools/local_animation_lab_v2.tscn"
 run/max_fps=60
