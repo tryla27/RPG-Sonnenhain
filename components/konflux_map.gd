@@ -563,7 +563,7 @@ func make_chunk(key: Vector2i) -> Texture2D:
 	touch_chunk(key)
 	while chunk_order.size()>MAX_CHUNKS:
 		var expired:=chunk_order.pop_front()
-		if expired!=key: chunks.erase(expired)
+		chunks.erase(expired)
 	return texture
 
 func sprite(g,tex: Texture2D,index: int,p: Vector2,size: Vector2,columns: int=4,rows: int=2) -> void:
