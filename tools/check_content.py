@@ -154,9 +154,12 @@ assert 'func draw_mechanics_panel()' in source, 'missing mechanics overview pane
 assert '"mechanics":KEY_H' in source and 'event_matches_binding(event, "mechanics")' in source, 'missing H mechanics shortcut'
 assert 'func spawn_position_allowed' in source, 'missing spawn exclusion logic'
 assert 'distance_to_trail(p) < 165.0' in source, 'spawn path exclusion missing'
-assert 'enemies.size() < 10' in source, 'reduced world spawn cap missing'
-assert 'if region == 0: return' in source, 'safe-zone spawn suppression missing'
+assert 'func server_region_target_mobs' in source and 'const SERVER_WORLD_MOB_CAP := 72' in source, 'regional server mob cap missing'
+assert 'if region == 0: return' in source or 'if target_region == 0: return false' in source, 'safe-zone spawn suppression missing'
 assert 'func flee_from_safe_zone' in source, 'safe-zone flee behavior missing'
+assert 'const WAYSTONE_SAFE_RADIUS := 220.0' in source and 'WAYSTONE_SPAWN_BLOCK_RADIUS := 285.0' in source, 'waystone protection radii missing'
+assert 'food_system.regional_props(self)' in source and 'food_system.bush(self,food_point)' in source, 'regional harvest plants are not wired into world rendering'
+assert 'func move_enemy_with_collision' in source, 'collision-safe enemy knockback missing'
 assert 'ENTER oder T' in source, 'chat prompt missing'
 
 # v27.5 visuals, weapons, roads, daylight, performance, chat, co-op and web preset checks.
