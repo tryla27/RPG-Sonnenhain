@@ -102,7 +102,7 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 	if int(data.get("equipped_head_uid",-1))>=0:
 		for item in data["inventory"]:
 			if int(item["uid"])==int(data["equipped_head_uid"]) and (item["icon"]!="head" or int(item.get("head_class",-1))!=int(data["class_id"])):return false
-	for field in ["learned","skill_levels","slots","quests","event_states","event_progress","opened_chests","dungeon_chests_opened","bosses_defeated","waystone_unlocked","discovered_regions","processed_server_transactions","recent_players","village_gates","arena_leaderboard"]:
+	for field in ["learned","skill_levels","slots","quests","event_states","event_progress","opened_chests","chest_respawn_until","dungeon_chests_opened","dungeon_chest_respawn_until","bosses_defeated","waystone_unlocked","discovered_regions","processed_server_transactions","recent_players","village_gates","arena_leaderboard"]:
 		if not data.get(field,[]) is Array or data.get(field,[]).size() > (256 if field == "processed_server_transactions" else 100): return false
 	for quest in data.get("quests",[]):
 		if not quest is Dictionary or not (quest.get("state") is int or quest.get("state") is float) or not (quest.get("progress") is int or quest.get("progress") is float): return false
@@ -110,9 +110,10 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 	for field in ["hp","energy","music_volume","effects_volume","shop_timer"]:
 		var value: Variant = data.get(field,0)
 		if not (value is int or value is float) or not is_finite(float(value)): return false
-	for field in ["skill_levels","slots","event_states","event_progress"]:
+	for field in ["skill_levels","slots","event_states","event_progress","chest_respawn_until","dungeon_chest_respawn_until"]:
 		for value in data.get(field,[]):
 			if not (value is float or value is int) or not is_finite(float(value)): return false
+			if field in ["chest_respawn_until","dungeon_chest_respawn_until"] and (float(value) < 0.0 or float(value) > Time.get_unix_time_from_system()+86400.0): return false
 	for field in ["learned","opened_chests","dungeon_chests_opened","bosses_defeated","waystone_unlocked","discovered_regions","village_gates"]:
 		for value in data.get(field,[]):
 			if not value is bool: return false
