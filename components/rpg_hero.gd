@@ -20,7 +20,7 @@ static func direction_index(look:Vector2)->int:
 	if look.length_squared()<0.0001:return 0
 	return posmod(roundi(atan2(look.x,look.y)/(PI/4.0)),8)
 
-static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0,hurt:float=0.0,head:int=-1) -> void:
+static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0,hurt:float=0.0,head:int=-1,rings:int=0) -> void:
 	hurt_flash=clampf(hurt,0,1)
 	var female := gender == 1
 	var heading:=direction_index(look)
@@ -126,6 +126,12 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 		r(c,x,37-stride*side/2,8,16,cloth)
 		r(c,x,50-stride*side/2,8,4,trim)
 		r(c,x+1,54-stride*side/2,6,5,skin)
+	for side in [-1,1]:
+		var bit:int=1 if side==1 else 2
+		if rings&bit:
+			var x:int=28+side*(width+2)-4
+			r(c,x+1,55-stride*side/2,6,2,"f8d982")
+			r(c,x+3,54-stride*side/2,2,2,"8ce4e1" if bit==1 else "d6b5ff")
 	# Race-specific head construction.
 	var head_width := 14 if race != 1 else 17
 	poly(c,Vector2.ZERO,[[28-head_width,11],[28+head_width,11],[28+head_width,25],[36,32],[20,32],[28-head_width,25]],Color(shade))

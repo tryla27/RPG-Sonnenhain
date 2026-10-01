@@ -104,7 +104,7 @@ func harvest(g)->bool:
  var item:Dictionary=g.make_item(info["name"],"food",0,0,int(info["price"]), "",1)
  item["count"]=3
  if not g.can_add_item(item):
-  g.message("Deine Tasche ist voll. Die Fruechte bleiben an der Pflanze.");return true
+  g.message("Dein Inventar ist voll. Die Fruechte bleiben an der Pflanze.");return true
  if not g.add_item(item):return true
  harvested[key(p)]=now+REGROW_SECONDS
  g.message("3x %s gepflueckt. Nachwachsen in 5 Minuten." % info["name"])

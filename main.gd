@@ -736,7 +736,7 @@ func _on_peer_connected(id: int) -> void:
 	if network_mode == "host":
 		push_world_snapshot()
 		if not dedicated_server_mode:
-			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
@@ -1031,7 +1031,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
-		"head":clampi(int(state.get("head",-1)),-1,2),
+		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos)
 	}
@@ -3082,7 +3082,7 @@ func open_dungeon_chest() -> void:
 	var treasure := make_item("Relikt aus %s" % DUNGEON_NAMES[dungeon_id], class_weapon_icon(), 2 + int(dungeon_id > 0), 15 + region_level(int(ENEMY_TYPES[int(DUNGEON_ENEMIES[dungeon_id][0])]["region"])) * 2, 280 + dungeon_id * 190, ["blitz", "eis", "gift"][dungeon_id])
 	if rare_head_reward("dungeon",dungeon_id,.10):treasure=make_class_head(level)
 	if not can_add_item(treasure):
-		message("Deine Tasche ist voll. Die Truhe wartet auf deine Rückkehr.")
+		message("Dein Inventar ist voll. Die Truhe wartet auf deine Rückkehr.")
 		return
 	add_item(treasure)
 	dungeon_chests_opened[dungeon_id] = true
@@ -3733,7 +3733,7 @@ func quest_dialogue(npc_name: String) -> void:
 			var reward_power := (6 + i * 3) if reward_icon in ["sword", "staff", "bow"] else (4 + int(i / 2.0) if reward_icon == "armor" else (12 + i * 2 if reward_icon == "ring" else 0))
 			var reward_item := make_item(reward_name, reward_icon, mini(4, 1 + i / 3), reward_power, 75 + i * 30, "blitz" if i == 12 else ("gift" if i == 14 else ""))
 			if not can_add_item(reward_item):
-				message("Deine Tasche ist voll. Verkaufe erst etwas und hole dann die Questbelohnung ab.")
+				message("Dein Inventar ist voll. Verkaufe erst etwas und hole dann die Questbelohnung ab.")
 				return
 			quests[i]["state"] = 3
 			gold += int(QUESTS[i]["gold"])
@@ -3797,13 +3797,12 @@ func save_game() -> void:
 
 func write_local_save(data: Dictionary) -> void:
 	if dedicated_server_mode or konflux_preview_mode or multiplayer_smoke_client_mode: return
-	var file := FileAccess.open(slot_save_path(active_save_slot,creative_mode),FileAccess.WRITE)
-	if file == null:
-		message("Lokales Speichern fehlgeschlagen. Bitte Serverstatus prüfen.")
+	var result:Error=preload("res://components/local_save_store.gd").write(slot_save_path(active_save_slot,creative_mode),data)
+	if result!=OK:
+		pause_status="Lokales Speichern fehlgeschlagen. Vorherige Sicherung bleibt erhalten."
+		message(pause_status)
 		return
-	file.store_string(JSON.stringify(data))
-	file.flush()
-	file.close()
+	pause_status="Lokal gesichert ✓" if creative_mode else ("Server gespeichert ✓" if not server_save.dirty else "Lokal gesichert ✓ · Serverbestätigung ausstehend")
 	last_save_unix = int(Time.get_unix_time_from_system())
 	save_notice_text = "LOKAL GESICHERT" if creative_mode or server_save.dirty else "SERVER GESPEICHERT ✓"
 	save_notice_timer = 2.8
@@ -3820,12 +3819,8 @@ func load_game() -> void:
 	konflux.active=false
 	konflux.room=-1
 	var path := slot_save_path(active_save_slot, creative_mode)
-	if not FileAccess.file_exists(path): return
-	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
-	if file == null: return
-	var data: Variant = JSON.parse_string(file.get_as_text())
-	file.close()
-	if not data is Dictionary: return
+	var data:Dictionary=preload("res://components/local_save_store.gd").read(path)
+	if data.is_empty():return
 	apply_save_data(data)
 	if server_save.connected(self): server_save.begin(self)
 
@@ -4101,6 +4096,13 @@ func handle_panel_click(mouse: Vector2) -> void:
 			return
 		return
 	if panel == "pause":
+		if Rect2(190,485,300,36).has_point(mouse):
+			panel="patches"
+			return
+		if Rect2(540,512,410,42).has_point(mouse):
+			save_game()
+			play_sound("menu")
+			return
 		var destinations:Array=["","inventory","skills","journal","map","party","settings"]
 		for i in destinations.size():
 			if Rect2(540,155+i*51,410,42).has_point(mouse):
@@ -4130,7 +4132,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(300, 270, 550, 42).has_point(mouse):
 			play_sound("menu")
 			save_game()
-			pause_status = "Teststand gespeichert." if creative_mode else "Spielstand gespeichert."
+
 		elif Rect2(300, 432, 550, 42).has_point(mouse):
 			play_sound("menu")
 			toggle_creative_mode()
@@ -4473,10 +4475,10 @@ func click_inventory(mouse: Vector2) -> void:
 	if Rect2(501,235,98,77).has_point(mouse) and equipped_armor_uid >= 0:
 		unequip_slot("armor")
 		return
-	if class_id == 1 and Rect2(180,395,98,77).has_point(mouse) and equipped_ring2_uid >= 0:
+	if class_id == 1 and Rect2(405,440,98,77).has_point(mouse) and equipped_ring2_uid >= 0:
 		unequip_slot("ring2")
 		return
-	if Rect2(501,347,98,77).has_point(mouse) and equipped_ring_uid >= 0:
+	if Rect2(300,440,98,77).has_point(mouse) and equipped_ring_uid >= 0:
 		unequip_slot("ring")
 		return
 	if Rect2(850, 157, 32, 30).has_point(mouse):
@@ -5152,7 +5154,7 @@ func armor_visual() -> int:
 			return clampi(int(item.get("design",0)),0,5)
 	return -1
 
-func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2) -> void:
+func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2,rings_override:int=-2) -> void:
 	var local := race_override < 0 or (p == player_pos and scale_factor == 1.0)
 	var roll := 1.0-dash_timer/dodge_duration if local and dash_timer > 0 else -1.0
 	var death := 1.0-death_timer/DEATH_DURATION if local and death_timer > 0 else death_override
@@ -5160,7 +5162,9 @@ func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: V
 	if panel in ["creation","creation_review"]: outfit = -1
 	var head:int=head_visual() if head_override==-2 else head_override
 	if panel in ["creation","creation_review"]:head=-1
-	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head)
+	var rings:int=ring_visual() if rings_override==-2 else rings_override
+	if panel in ["creation","creation_review"]:rings=0
+	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings)
 
 func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2, scale_factor: float, race: int, gender: int) -> void:
 	var accent: Color = [Color('e5bd77'),Color('8fcde6'),Color('91c787')][clampi(visual_class,0,2)]
@@ -5344,6 +5348,19 @@ func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scal
 				PixelStyle32.rect(self,Rect2(rune-Vector2(2,2)*scale_factor,Vector2(4,4)*scale_factor),Color('e2c477'))
 
 func draw_skill_sprite(id: int, p: Vector2, size: float = 32.0) -> void:
+	if id in [16,17,18]:
+		var s:float=size/32.0
+		if id==16:
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(5,25)*s,p+Vector2(5,17)*s,p+Vector2(11,10)*s,p+Vector2(13,3)*s,p+Vector2(22,13)*s,p+Vector2(26,8)*s,p+Vector2(28,22)*s,p+Vector2(22,29)*s,p+Vector2(11,29)*s]),Color("ef783d"))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(11,25)*s,p+Vector2(16,14)*s,p+Vector2(23,25)*s,p+Vector2(18,29)*s]),Color("ffe39b"))
+		elif id==17:
+			for angle in [0.0,PI/3,2*PI/3]:
+				var d:Vector2=Vector2.from_angle(angle)*12*s
+				PixelStyle32.line(self,p+Vector2(16,16)*s-d,p+Vector2(16,16)*s+d,Color("a9eff5"),3*s)
+			PixelStyle32.rect(self,Rect2(p+Vector2(12,12)*s,Vector2(8,8)*s),Color("efffff"))
+		else:
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(17,2)*s,p+Vector2(7,18)*s,p+Vector2(15,18)*s,p+Vector2(12,30)*s,p+Vector2(27,12)*s,p+Vector2(19,12)*s,p+Vector2(24,2)*s]),Color("ffe799"))
+		return
 	if skill_sprites == null: return
 	var src := Rect2(Vector2((id % 16) * 16, int(id / 16.0) * 16), Vector2(16,16))
 	draw_texture_rect_region(skill_sprites, Rect2(p, Vector2(size,size)), src)
@@ -6563,8 +6580,7 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	# Facing north: the body masks the rear arm and weapon across the head.
 	if base_look == Vector2.UP:
 		draw_character_sprite(p,visual_class,walking,look,scale_factor,attack_now,use_race,use_gender)
-	if (equipped_ring_uid >= 0 or (class_id == 1 and equipped_ring2_uid >= 0)) and preview_class < 0:
-		draw_rect(Rect2(p + Vector2(-23,-2) * scale_factor, Vector2(5,3) * scale_factor), Color('f8d982'))
+
 
 func weapon_attack_look(look: Vector2, family: int, design: int, progress: float) -> Vector2:
 	if progress < 0.0: return look.normalized()
@@ -6917,14 +6933,14 @@ func draw_hud() -> void:
 			ui_box(Rect2(610, 549, 520, 36), Color("587767"))
 			text_at(Vector2(623, 573), nearest.replace("E  ·", "%s  ·" % binding_short("interact")), 15, Color("fff4ca"))
 	if not touch_enabled:
-		ui_button(INVENTORY_HUD_RECT,"TASCHE")
+		ui_button(INVENTORY_HUD_RECT,"INVENTAR")
 	if touch_enabled:
 		draw_touch_controls()
 	else:
 		draw_ref_panel(Rect2(9, 586, 1134, 53))
 		text_at(Vector2(22, 609), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 11, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 550)
-		text_at(Vector2(22, 626), controller.label(int(controller.bindings["pause"]))+": Einstellungen / Belegung" if controller.used else "%s Skills · %s Tasche · %s Quests · %s Karte · %s Chat · %s Hilfe · %s Gruppe" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map"), binding_short("chat"), binding_short("mechanics"), binding_short("party")], 11, Color("becfc6"), HORIZONTAL_ALIGNMENT_LEFT, 550)
-		ui_button(INVENTORY_HUD_RECT,"TASCHE")
+		text_at(Vector2(22, 626), controller.label(int(controller.bindings["pause"]))+": Einstellungen / Belegung" if controller.used else "%s Skills · %s Inventar · %s Quests · %s Karte · %s Chat · %s Hilfe · %s Gruppe" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map"), binding_short("chat"), binding_short("mechanics"), binding_short("party")], 11, Color("becfc6"), HORIZONTAL_ALIGNMENT_LEFT, 550)
+		ui_button(INVENTORY_HUD_RECT,"INVENTAR")
 		for slot in 4:
 			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
 			var x := 694 + slot * 81
@@ -7216,6 +7232,7 @@ func draw_panel() -> void:
 		"creation_review": draw_creation_review_panel()
 		"multiplayer": draw_multiplayer_panel()
 		"intro": draw_intro_panel()
+		"patches": preload("res://components/patch_notes.gd").draw(self)
 		"pause": draw_game_menu()
 		"settings": draw_pause_panel()
 		"controls": draw_controls_panel()
@@ -7346,19 +7363,20 @@ func review_character_creation() -> void:
 func draw_creation_review_panel() -> void:
 	text_at(Vector2(190,145), "DEIN CHARAKTER", 30, Color("ffe2aa"))
 	ui_box(Rect2(190,175,300,330),Color("31474e"))
-	draw_character_sprite(Vector2(340,330),pending_class,false,Vector2.DOWN,2.5,false,pending_race,pending_gender)
-	draw_weapon_world(Vector2(340,318),pending_class,pending_class*4,Vector2.DOWN,2.5)
+	draw_character_sprite(Vector2(330,310),pending_class,false,Vector2.DOWN,2.2,false,pending_race,pending_gender)
+	draw_weapon_world(Vector2(375,330),pending_class,pending_class*4,Vector2.UP,1.35)
 	text_at(Vector2(215,395),creation_name.strip_edges(),24,Color("fff0ce"))
 	text_at(Vector2(215,422),"%s · %s" % [RACE_NAMES[pending_race],GENDER_NAMES[pending_gender]],16,Color("d8e6dc"))
 	text_at(Vector2(215,450),CLASS_NAMES[pending_class],19,Color("ffe2aa"))
-	text_at(Vector2(215,483),"Rasse: Aussehen, keine Kampfboni",12,Color("b8cbc5"))
+	text_at(Vector2(215,483),"Rasse bestimmt dein Aussehen",12,Color("b8cbc5"))
 	text_at(Vector2(520,198),"DEINE ERSTEN FÄHIGKEITEN",19,Color("ffe2aa"))
 	for i in 3:
-		var id:int=CLASS_SKILLS[pending_class][i]
+		var id:int=int(preload("res://components/class_spell_preview.gd").ids(pending_class)[i])
 		var y:float=224+i*75
 		draw_skill_sprite(id,Vector2(520,y),36)
+		preload("res://components/class_spell_preview.gd").draw(self,id,Rect2(800,y-3,155,65))
 		text_at(Vector2(568,y+17),str(ABILITIES[id]["name"]),16,Color("fff0ce"))
-		text_at(Vector2(568,y+36),str(ABILITIES[id]["desc"]),12,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,390)
+		text_at(Vector2(568,y+36),str(ABILITIES[id]["desc"]),12,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,225)
 		text_at(Vector2(568,y+54),"Mögliche Auswahl beim Skillen",11,Color("b8cbc5"))
 	var occupied:=FileAccess.file_exists(slot_save_path(active_save_slot))
 	text_at(Vector2(520,472),"Speicherplatz %d · %s" % [active_save_slot,"BELEGT" if occupied else "FREI"],16,Color("ffe2aa"))
@@ -7400,6 +7418,9 @@ func draw_game_menu() -> void:
 	text_at(Vector2(215,463),"Online: Welt läuft weiter" if network_mode!="offline" else "Spiel pausiert",12,Color("b8cbc5"))
 	var labels:Array=["WEITERSPIELEN","INVENTAR","FÄHIGKEITEN","QUESTBUCH","WELTKARTE","GRUPPE","EINSTELLUNGEN & TESTMODUS"]
 	for i in labels.size():ui_button(Rect2(540,155+i*51,410,42),labels[i])
+	ui_button(Rect2(190,485,300,36),"NEUE PATCHES")
+	ui_button(Rect2(540,512,410,42),"SPIEL SPEICHERN")
+	text_at(Vector2(540,578),pause_status,12,Color("ffe5ab"),HORIZONTAL_ALIGNMENT_LEFT,410)
 	ui_button(Rect2(190,540,300,44),"SPEICHERN & HAUPTMENÜ")
 
 func draw_pause_panel() -> void:
@@ -7568,15 +7589,16 @@ func draw_inventory_panel() -> void:
 	draw_rect(Rect2(296, 211, 195, 288), Color("16344b"))
 	draw_rect(Rect2(302, 217, 183, 276), Color("16344b"))
 	draw_rect(Rect2(337, 457, 113, 12), Color("1f3d43", 0.5))
-	draw_hero(Vector2(395, 370), 2.0, false, Vector2.DOWN)
+	draw_character_sprite(Vector2(385,365),class_id,false,Vector2.DOWN,1.8)
+	draw_weapon_world(Vector2(438,390),class_id,equipped_weapon_design(),Vector2.UP,1.15)
 	draw_equipment_slot(Vector2(180,205),"KOPF",equipped_head_uid,"head")
 	draw_equipment_slot(Vector2(180, 275), "WAFFE", equipped_uid, class_weapon_icon())
 	draw_equipment_slot(Vector2(501, 235), "RÜSTUNG", equipped_armor_uid, "armor")
-	draw_equipment_slot(Vector2(501, 347), "RING 1" if class_id == 1 else "RING", equipped_ring_uid, "ring")
-	if class_id == 1: draw_equipment_slot(Vector2(180,395),"RING 2",equipped_ring2_uid,"ring")
+	draw_equipment_slot(Vector2(300, 440), "RING 1" if class_id == 1 else "RING", equipped_ring_uid, "ring")
+	if class_id == 1: draw_equipment_slot(Vector2(405,440),"RING 2",equipped_ring2_uid,"ring")
 	text_at(Vector2(186, 534), "HP %d  ·  ANGRIFF %d  ·  SCHUTZ %d" % [int(max_hp()), normal_attack_power(), equipment_power(equipped_armor_uid)], 15, Color("e6efdd"))
 	ui_box(Rect2(625, 153, 352, 426), Color("16344b"))
-	text_at(Vector2(644, 179), "TASCHE · Doppelklick", 12, Color("ffeda9"))
+	text_at(Vector2(644, 179), "INVENTAR · Doppelklick", 12, Color("ffeda9"))
 	text_at(Vector2(807, 179), "%d/2" % (inventory_page + 1), 16)
 	ui_button(Rect2(850, 157, 32, 30), "<", inventory_page > 0)
 	ui_button(Rect2(931, 157, 32, 30), ">", inventory_page < 1)
@@ -7608,7 +7630,7 @@ func draw_inventory_panel() -> void:
 			action_label = "AUSZIEHEN" if is_equipped_uid(int(item.get("uid",-1))) else "AUSRÜSTEN"
 		ui_button(Rect2(643, 538, 320, 42), action_label, item["icon"] in ["potion", "food", class_weapon_icon(), "armor", "ring"])
 	else:
-		text_at(Vector2(643, 508), "Wähle einen Gegenstand aus der Tasche.", 14, Color("dbe8d5"))
+		text_at(Vector2(643, 508), "Wähle einen Gegenstand aus dem Inventar.", 14, Color("dbe8d5"))
 	var mouse := get_viewport().get_mouse_position()
 	for cell in 25:
 		var index := inventory_page * 25 + cell
@@ -8393,7 +8415,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
-		"head":clampi(int(state.get("head",-1)),-1,2),
+		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos)
 	}
@@ -9054,7 +9076,7 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		draw_circle(rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
 		draw_arc(rp + Vector2(0, 10), 30.0, 0.0, TAU, 24, Color("8ee7ff", 0.82), 2.0)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
-		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)))
+		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)))
 		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
 		combat_feedback.health(self,"peer:%d"%int(peer_id),rp+Vector2(0,-43),float(state.get("hp",1)),float(state.get("max_hp",1)),60,Color("79caa3"))
 		text_at(rp + Vector2(-75,-57), "%s · LV %d" % [str(state.get("name","Freund")), int(state.get("level",1))], 13, Color('bfe7ff'), HORIZONTAL_ALIGNMENT_CENTER, 150)
@@ -9532,7 +9554,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos), "konflux":konflux.active, "room":konflux.room}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "konflux":konflux.active, "room":konflux.room}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
@@ -10005,3 +10027,6 @@ func normal_mob_count()->int:
 	for enemy in enemies:
 		if int(enemy["type"]) not in [12,13,14] and not bool(enemy.get("small_guardian",false)):count+=1
 	return count
+
+func ring_visual()->int:
+	return (1 if equipped_ring_uid>=0 else 0)|(2 if class_id==1 and equipped_ring2_uid>=0 else 0)

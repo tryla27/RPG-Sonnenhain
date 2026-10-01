@@ -235,8 +235,8 @@ func panel_points(g) -> Array:
 			points.append(Vector2(229,235))
 			points.append(Vector2(229,314))
 			points.append(Vector2(550,274))
-			points.append(Vector2(550,386))
-			if g.class_id == 1: points.append(Vector2(229,433))
+			points.append(Vector2(349,479))
+			if g.class_id == 1: points.append(Vector2(454,479))
 			points.append(Vector2(866,172))
 			points.append(Vector2(947,172))
 			for cell in 25:
@@ -277,7 +277,11 @@ func panel_points(g) -> Array:
 			points.append(Vector2(986,109))
 		"pause":
 			for i in 7:points.append(Vector2(745,176+i*51))
+			points.append(Vector2(745,533))
+			points.append(Vector2(340,503))
 			points.append(Vector2(340,562))
+		"patches":
+			points=[Vector2(986,109)]
 		"settings":
 			points = [Vector2(575,242),Vector2(925,242),Vector2(925,291),Vector2(925,340),Vector2(575,291),Vector2(575,453)]
 			if not g.creative_mode:
