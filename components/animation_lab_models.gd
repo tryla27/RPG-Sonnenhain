@@ -41,12 +41,15 @@ static func poly_px(c: CanvasItem,pts: PackedVector2Array,col: Color) -> void:
 	c.draw_colored_polygon(inner,col)
 
 static func ellipse_px(c: CanvasItem,p: Vector2,rx: float,ry: float,col: Color) -> void:
-	var sp:=snapv(p)
-	c.draw_set_transform(sp,0.0,Vector2(rx,ry))
-	c.draw_circle(Vector2.ZERO,1.0,OUTLINE)
-	c.draw_set_transform(sp,0.0,Vector2(maxf(1.0,rx-PIXEL),maxf(1.0,ry-PIXEL)))
-	c.draw_circle(Vector2.ZERO,1.0,col)
-	c.draw_set_transform(Vector2.ZERO)
+	# Transform-safe polygon ellipse: never resets the caller's local transform.
+	var outer:=PackedVector2Array()
+	var inner:=PackedVector2Array()
+	for i in 20:
+		var a:=float(i)/20.0*TAU
+		outer.append(snapv(p+Vector2(cos(a)*rx,sin(a)*ry)))
+		inner.append(snapv(p+Vector2(cos(a)*maxf(1.0,rx-PIXEL),sin(a)*maxf(1.0,ry-PIXEL))))
+	c.draw_colored_polygon(outer,OUTLINE)
+	c.draw_colored_polygon(inner,col)
 
 static func line_px(c: CanvasItem,a: Vector2,b: Vector2,col: Color,width: float) -> void:
 	c.draw_line(snapv(a),snapv(b),OUTLINE,width+4.0)
@@ -142,6 +145,13 @@ static func mage(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 		rect_px(c,Rect2(o+Vector2(ax-5,ay+35),Vector2(10,3)),Color("f6d66e"))
 		rect_px(c,Rect2(o+Vector2(ax-2,ay+33),Vector2(4,3)),Color("83e6ef"))
 
+	# Neck and collar bridge the torso into one readable silhouette.
+	rect_px(c,Rect2(o+Vector2(-11,-91),Vector2(22,18)),Color("dca77f"))
+	poly_px(c,PackedVector2Array([
+		o+Vector2(-25,-82),o+Vector2(-10,-93),o+Vector2(0,-86),
+		o+Vector2(10,-93),o+Vector2(25,-82),o+Vector2(18,-70),o+Vector2(-18,-70)
+	]),Color("223b73"))
+
 	# HEAD - deliberately larger and below the hat, so it can never disappear.
 	var head_y: float=-103.0
 	var head_rx: float=18.0 if not profile else 15.0
@@ -227,7 +237,7 @@ static func slime(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: S
 		sy=lerpf(1.0,0.14,state_t)
 
 	shadow(c,p+Vector2(0,17),46*sx,10)
-	var base_y: float=10.0-hop
+	var base_y: float=12.0-hop
 	var dome:=PackedVector2Array()
 	var segments: int=28
 	for i in segments:
@@ -328,14 +338,14 @@ static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 		]),Color("778093"))
 
 	# Head and muzzle exaggerated for threat.
-	var head: Vector2=body+f*47.0+Vector2(0,-12)
+	var head: Vector2=body+f*50.0+Vector2(0,-16)
 	ellipse_px(c,head,24,22,Color("596275"))
 	var brow: Vector2=head+f*7.0+Vector2(0,-6)
 	for sgn in [-1.0,1.0]:
 		poly_px(c,PackedVector2Array([
 			brow+r*sgn*3.0,brow+r*sgn*14.0+Vector2(0,-5),brow+r*sgn*10.0+f*8.0
 		]),Color("303746"))
-	var muzzle: Vector2=head+f*20.0+Vector2(0,5)
+	var muzzle: Vector2=head+f*23.0+Vector2(0,7)
 	ellipse_px(c,muzzle,16,10,Color("aeb1bb"))
 	ellipse_px(c,muzzle+f*11.0,5,4,Color("10141a"))
 
@@ -361,12 +371,12 @@ static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	line_px(c,jaw-r*10.0,jaw+r*10.0,Color("5b1e24"),4.0)
 	for sgn in [-1.0,1.0]:
 		poly_px(c,PackedVector2Array([
-			jaw+r*sgn*7.0,jaw+r*sgn*3.0,jaw+r*sgn*5.0+Vector2(0,12)
+			jaw+r*sgn*7.0,jaw+r*sgn*3.0,jaw+r*sgn*5.0+Vector2(0,17)
 		]),Color("f3ead7"))
 	if state=="attack" and state_t>0.28 and state_t<0.72:
 		for sgn in [-1.0,1.0]:
 			poly_px(c,PackedVector2Array([
-				jaw+r*sgn*11.0,jaw+r*sgn*6.0,jaw+r*sgn*8.0+Vector2(0,16)
+				jaw+r*sgn*11.0,jaw+r*sgn*6.0,jaw+r*sgn*8.0+Vector2(0,22)
 			]),Color("fff4df"))
 		c.draw_arc(head+f*13.0,26,-0.8,0.8,18,Color("d32835"),4.0)
 	if state=="hurt":
