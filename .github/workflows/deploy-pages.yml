@@ -98,6 +98,10 @@ jobs:
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_mob_combat.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_boss_music.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_start32_assets.gd
+          for script in check_spawn_platform check_escape_save check_local_save_recovery check_controller_flows check_combat_feedback_network check_mob_combat_network check_party_xp_network; do
+            timeout 120 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script "res://tools/$script.gd" 2>&1 | tee /tmp/sonnenhain-release-check.log
+            if grep -q "SCRIPT ERROR:" /tmp/sonnenhain-release-check.log; then exit 1; fi
+          done
 
       - name: Harden browser game shell
         run: python3 tools/harden_web.py build/site/game/index.html
@@ -141,23 +145,11 @@ jobs:
           mkdir -p build/site/.well-known
           cp web-legal/security.txt build/site/.well-known/security.txt
           touch build/site/.nojekyll
-          printf '%s\n' \
-            'DirectoryIndex index.html' \
-            'AuthType Basic' \
-            'AuthName "Sonnenhain - Passwort erforderlich"' \
-            'AuthUserFile /home/sites/site100047525/web/sonnenhain-access.htpasswd' \
-            'Require valid-user' \
-            'AddType application/wasm .wasm' \
-            'AddType application/javascript .js' \
-            '<IfModule mod_headers.c>' \
-            '  Header always set X-Content-Type-Options "nosniff"' \
-            '  <FilesMatch "^(index\\.(html|js|pck|wasm))$">' \
-            '    Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"' \
-            '    Header always set Pragma "no-cache"' \
-            '    Header always set Expires "0"' \
-            '  </FilesMatch>' \
-            '</IfModule>' \
-            > build/site/.htaccess
+          cp website/access/access.php build/site/access.php
+          cp website/access/site.htaccess build/site/.htaccess
+          php -l build/site/access.php
+          python3 tools/check_website_access.py
+
 
           test -f build/site/index.html
           test -f build/site/site.css
@@ -178,7 +170,8 @@ jobs:
           grep -q "Mobile-App kommt bald" build/site/index.html
           ! grep -q "human-gate" build/site/game/index.html
           grep -q "Cache-Control.*no-store" build/site/.htaccess
-          grep -q "Require valid-user" build/site/.htaccess
+          grep -q "RewriteRule" build/site/.htaccess
+          ! grep -q "AuthType Basic" build/site/.htaccess
           grep -q "DirectoryIndex index.html" build/site/.htaccess
 
       - name: Deploy to Manitu webspace
@@ -269,8 +262,12 @@ jobs:
           for path in / /game/ /patches/ /game/index.js /game/index.pck /game/index.wasm /version.json; do
             code="$(curl -sS -o /tmp/auth-response -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de$path")"
             echo "$path anonymous: HTTP $code"
-            test "$code" = "401"
+            test "$code" = "302"
           done
+          code="$(curl -sS -o /tmp/sonnenhain-login -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/login)"
+          test "$code" = "200"
+          grep -q 'name="password"' /tmp/sonnenhain-login
+          ! grep -qi 'name="username"' /tmp/sonnenhain-login
           for hidden in /.htpasswd /sonnenhain-access.htpasswd; do
             code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://sonnenhainrpg.de$hidden")"
             test "$code" != "200"

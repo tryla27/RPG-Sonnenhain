@@ -1,0 +1,11 @@
+DirectoryIndex index.html
+Options -Indexes
+RewriteEngine On
+RewriteRule ^access\.php$ - [END]
+RewriteRule ^ access.php [END]
+AddType application/wasm .wasm
+AddType application/javascript .js
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+</IfModule>

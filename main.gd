@@ -32,12 +32,14 @@ const MobCombat=preload("res://components/mob_combat.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
 const ItemStyle32=preload("res://components/item_style_32.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
+const SpawnPlatform32=preload("res://components/spawn_platform_32.gd")
+const SpawnStoneBody=preload("res://components/spawn_stone_body.gd")
 const Wagon32 = preload("res://components/wagon_32.gd")
 const StartTileMap32 = preload("res://components/start_tilemap_32.gd")
 var start_tilemap_32_attached := false
 var live_reconnect_timer := 0.0
 const REFERENCE_TREES := [Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680),Vector2(190,1590),Vector2(1170,1880),Vector2(120,1910),Vector2(650,1930),Vector2(180,2240),Vector2(1600,2510)]
-const REFERENCE_WELL := Vector2(1030, 840)
+const REFERENCE_WELL := Vector2(1184, 832)
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
 const VIEW := Vector2(1152, 648)
@@ -624,6 +626,8 @@ func process_multiplayer_smoke(delta: float) -> void:
 		get_tree().quit(32)
 
 func _ready() -> void:
+	var spawn_body:StaticBody2D=SpawnStoneBody.attach(self,0)
+	spawn_body.position=WAYSTONES[0]
 	controller.setup()
 	setup_multiplayer_signals()
 	var user_args := OS.get_cmdline_user_args()
@@ -1832,6 +1836,9 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	if from_region != to_region and not can_cross_gate(from_region, to_region, from_pos, pos):
 		return true
 	for stone in WAYSTONES:
+		if stone==WAYSTONES[0]:
+			if SpawnStoneBody.blocks(pos-stone,0,hero_collision_radius()):return true
+			continue
 		if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).grow(12).has_point(pos): return true
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
@@ -5520,6 +5527,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 			if not obstacle.is_empty() and visible_world(obstacle['pos'], 110): draw_obstacle(obstacle)
 	
 	draw_village_ground()
+	if bounds.intersects(Rect2(WAYSTONES[0]-Vector2(280,280),Vector2(560,560))):SpawnPlatform32.platform(self,WAYSTONES[0])
 	draw_rect(Rect2(Vector2.ZERO, WORLD), Color('45726d'), false, 7)
 
 func draw_tavern_world() -> void:
@@ -7983,6 +7991,9 @@ func draw_atlas_crystal(point: Vector2) -> void:
 	draw_rect(Rect2(point + Vector2(-1,-4), Vector2(2,4)), Color("f6e9c7"))
 
 func draw_waystone(p: Vector2) -> void:
+	if p==WAYSTONES[0]:
+		SpawnPlatform32.core(self,p-Vector2(0,16))
+		return
 	var active := false
 	for i in WAYSTONES.size():
 		if p == WAYSTONES[i]: active = bool(waystone_unlocked[i])
@@ -8239,7 +8250,7 @@ func village_props() -> Array:
 	props.append({"kind":"well","point":REFERENCE_WELL,"depth":REFERENCE_WELL.y+32})
 	props.append({"kind":"board","point":Vector2(630,1250),"depth":1272.0})
 	for p in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]: props.append({"kind":"fence","point":p,"depth":p.y+12})
-	for p in [Vector2(690,980),Vector2(1010,970),Vector2(1305,1200),Vector2(1430,1200),Vector2(480,1530)]: props.append({"kind":"lamp","point":p,"depth":p.y+8})
+	for p in [Vector2(544,1056),Vector2(1120,1056),Vector2(1305,1200),Vector2(1430,1200),Vector2(480,1530)]: props.append({"kind":"lamp","point":p,"depth":p.y+8})
 	for p in [Vector2(460,940),Vector2(1220,1290),Vector2(520,1660),Vector2(1470,1215)]: props.append({"kind":"barrel","point":p,"depth":p.y+17})
 	for p in [Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]: props.append({"kind":"bush","point":p,"depth":p.y+28})
 	for shop in VillageLayout.SHOPS: props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
@@ -8354,8 +8365,8 @@ func draw_sorted_world_objects() -> void:
 			"npc": draw_npc(entry["data"])
 			"stone": draw_waystone(entry["point"])
 			"enemy": draw_enemy(entry["data"])
-			"remote": draw_remote_players(entry["peer"])
-			"player": draw_player()
+			"remote": draw_spawn_elevated_actor(int(entry["peer"]))
+			"player": draw_spawn_elevated_actor(-1)
 
 func class_weapon_icon_for(value: int) -> String:
 	return ["sword", "staff", "bow"][clampi(value, 0, 2)]
@@ -9923,6 +9934,9 @@ func projectile_world_blocked(point:Vector2)->bool:
 		for home in house_positions():
 			if Rect2(home+Vector2(8,73),Vector2(176,75)).has_point(point):return true
 		for stone in WAYSTONES:
+			if stone==WAYSTONES[0]:
+				if SpawnStoneBody.blocks(point-stone,0):return true
+				continue
 			if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).has_point(point):return true
 	return false
 
@@ -10030,3 +10044,14 @@ func normal_mob_count()->int:
 
 func ring_visual()->int:
 	return (1 if equipped_ring_uid>=0 else 0)|(2 if class_id==1 and equipped_ring2_uid>=0 else 0)
+
+func draw_spawn_elevated_actor(peer:int)->void:
+	var point:Vector2=player_pos if peer<0 else network_player_position(peer)
+	var height:float=SpawnPlatform32.height_at(point,WAYSTONES[0]) if multiplayer_context()=="world" else 0
+	var old_offset:Vector2=character_canvas_offset
+	character_canvas_offset=old_offset-Vector2(0,height)
+	draw_set_transform(character_canvas_offset)
+	if peer<0:draw_player()
+	else:draw_remote_players(peer)
+	character_canvas_offset=old_offset
+	draw_set_transform(old_offset)

@@ -56,6 +56,11 @@ jobs:
       - name: Validate content
         run: python3 tools/check_content.py
 
+      - name: Check password-only website access
+        run: |
+          php -l website/access/access.php
+          python3 tools/check_website_access.py
+
       - name: Import project and validate GDScript
         shell: bash
         run: |

@@ -8,6 +8,7 @@ const NOTES=[
 ["Kampf", "Wandtreffer mit Effekten und Sound; Slime-/Käferbewegung; Turmboss mit zwei Wächtern."],
 ["Ausrüstung", "Kopfslot; zwei Magierringe nebeneinander und an beiden Händen; Arena-Basiswaffen."],
 ["Website", "Passwortschutz für die gesamte Website; durchblätterbare Patch-Übersichten."],
+["Spawn", "512px-Plattform auf 32px-Tiles, drei Stufen, breite Treppe und gemeinsamer Kollisionskern."],
 ["In Arbeit", "Neue Waffenpassive, Rüstungsteile, Umhänge und universelles Ausrüsten."],
 ["Noch ausstehend", "Gemeinsame Boden-Drops mit 6 Minuten Lebensdauer und sicherer Händler-Tausch."]]
 static func draw(g)->void:
