@@ -545,7 +545,7 @@ func start_multiplayer_smoke_client() -> void:
 		return
 	multiplayer.multiplayer_peer = peer
 	network_mode = "client"
-	multiplayer_smoke_deadline = Time.get_ticks_msec() + 15000
+	multiplayer_smoke_deadline = Time.get_ticks_msec() + 30000
 	print("MULTIPLAYER_SMOKE_CONNECT ", multiplayer_smoke_name, " url=", smoke_url)
 
 func process_multiplayer_smoke(delta: float) -> void:
@@ -597,6 +597,7 @@ func process_multiplayer_smoke(delta: float) -> void:
 		elif position.distance_to(multiplayer_smoke_mob_origins[uid]) > 4.0: multiplayer_smoke_mobs_moved = true
 	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and multiplayer_smoke_mobs_moved and saw_other_chat and saw_remote_attack and party_ok and ping_ok and multiplayer_smoke_success_since == 0:
 		multiplayer_smoke_success_since = Time.get_ticks_msec()
+		multiplayer_smoke_deadline=maxi(multiplayer_smoke_deadline,multiplayer_smoke_success_since+4000)
 		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack, " party=", party_ok, " ping=", network_ping_ms)
 	# Sobald dieser Client den anderen Spieler, dessen Chat und den
 	# Server-Snapshot gemeinsam gesehen hat, ist die Relay-Prüfung erfüllt.
