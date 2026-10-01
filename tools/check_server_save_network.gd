@@ -39,6 +39,10 @@ func run():
 		await process_frame
 	assert(g.gold in [34567,34568] and g.equipped_ring2_uid >= 0)
 	var initial_revision: int = g.server_save.revision
+	# Existing public fixture may predate the head slot: equip after download.
+	if g.head_visual()!=1:
+		g.add_item(g.make_class_head(40))
+		g.toggle_equipment_item(g.inventory.size()-1)
 	# Every run must also persist a fresh revision, even if a previous test snapshot exists.
 	g.gold = 34568
 	var has_food:=false
