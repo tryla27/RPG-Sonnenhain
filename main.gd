@@ -1986,11 +1986,45 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 		if p.distance_to(portal[0]) < radius + 150.0 or p.distance_to(portal[1]) < radius + 150.0: return {}
 	return {"pos":p, "radius":radius, "zone":zone, "key":key}
 
+func decorative_tree_in_cell(tx:int,ty:int) -> Dictionary:
+	var key := hash_cell(tx,ty)
+	var tile_origin := Vector2(tx*64,ty*64)
+	var center := tile_origin+Vector2(32,32)
+	var zone := visual_region_at(center)
+	if zone == 0: return {}
+	var wet := zone==6 and center.y>6850+sin(center.x/220.0)*125.0
+	var point := Vector2(tx*64+(key%23),ty*64+((key/23)%25))
+	if not region_rect(zone).grow(-45).encloses(Rect2(point-Vector2(100,160),Vector2(200,210))): return {}
+	if distance_to_trail(point)<120.0:return {}
+	var tree := false
+	match zone:
+		1: tree = key%8==0
+		2: tree = key%6==0
+		3: tree = key%6!=0 and key%5==0
+		4: tree = key%4!=0 and key%7==0
+		5: tree = key%13==0
+		6: tree = not wet and key%11==0
+		7: tree = key%11==0
+		8,9: tree = key%4==0
+		10: tree = key%9==0
+		11: tree = key%7==0
+		12: tree = key%6==0
+	if not tree:return {}
+	var trunk_radius := 18.0 if zone in [1,6,8,10] else (23.0 if zone in [2,3,7,9,11] else 27.0)
+	return {"point":point+Vector2(24,42),"radius":trunk_radius,"zone":zone}
+
 func terrain_blocked(p: Vector2,radius:float=-1.0) -> bool:
 	if radius<0:radius=hero_collision_radius()
 	if region_at(p) == 1:
 		for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			if Rect2(RESCUE_POS + offset - Vector2(73, 54), Vector2(146, 108)).grow(16).has_point(p): return true
+	# Nur Stamm/Wurzel blockieren; die Krone bleibt begehbar.
+	var tree_tx := int(floorf(p.x/64.0))
+	var tree_ty := int(floorf(p.y/64.0))
+	for tx in range(tree_tx-1,tree_tx+2):
+		for ty in range(tree_ty-1,tree_ty+2):
+			var tree := decorative_tree_in_cell(tx,ty)
+			if not tree.is_empty() and p.distance_to(tree["point"]) < float(tree["radius"])+radius: return true
 	var cx := int(floorf(p.x / 250.0))
 	var cy := int(floorf(p.y / 250.0))
 	for x in range(cx - 1, cx + 2):
@@ -5658,21 +5692,27 @@ func draw_static_overworld(bounds: Rect2) -> void:
 				elif key % 3 == 0: draw_bush_cluster(p, zone, key)
 				else: draw_grass(p)
 			elif zone == 5:
-				if key % 6 == 0: draw_lava(p)
+				if key % 13 == 0: draw_tree(p,zone)
+				elif key % 6 == 0: draw_lava(p)
 				elif key % 4 == 0: draw_rock(p)
 				else: draw_pebbles(p)
 			elif zone == 6:
 				if wet: draw_wave(p, key)
+				elif key % 11 == 0: draw_tree(p,zone)
 				elif key % 5 == 0: draw_shell(p)
 				elif key % 3 == 0: draw_pebbles(p)
 			elif zone == 7:
-				if key % 4 == 0: draw_crystal(p, key)
+				if key % 11 == 0: draw_tree(p,zone)
+				elif key % 4 == 0: draw_crystal(p, key)
 				elif key % 5 == 0: draw_rock(p)
 				else: draw_pebbles(p)
 			elif zone >= 8:
-				if zone in [8, 9] and key % 4 == 0: draw_tree(p, 2 if zone == 8 else 1)
-				elif zone in [10, 12] and key % 5 == 0: draw_crystal(p, key)
-				elif zone in [11] and key % 4 == 0: draw_rock(p)
+				if zone in [8,9] and key % 4 == 0: draw_tree(p,zone)
+				elif zone == 10 and key % 9 == 0: draw_tree(p,zone)
+				elif zone == 11 and key % 7 == 0: draw_tree(p,zone)
+				elif zone == 12 and key % 6 == 0: draw_tree(p,zone)
+				elif zone in [10,12] and key % 5 == 0: draw_crystal(p, key)
+				elif zone == 11 and key % 4 == 0: draw_rock(p)
 				elif key % 7 == 0: draw_rock(p)
 				elif key % 3 == 0: draw_flower(p, key)
 				else: draw_grass(p)
@@ -6171,10 +6211,7 @@ func draw_bush_cluster(p: Vector2, zone: int, key: int) -> void:
 		var off := Vector2((i % 3 - 1) * spread, (i / 3) * 10 - 8 + (key + i * 5) % 5)
 		draw_circle(p + off, 12 + (key + i) % 5, leaf.darkened(0.08 if i % 2 == 0 else 0.0))
 		draw_rect(Rect2(p + off + Vector2(-6, -8), Vector2(7, 4)), leaf.lightened(0.18))
-	if zone in [1, 9, 12] and key % 3 == 0:
-		for berry in 4:
-			var b := p + Vector2(-16 + berry * 11, -6 + (berry % 2) * 10)
-			draw_rect(Rect2(b, Vector2(4, 4)), Color("e7aa79") if zone != 12 else Color("d4c4ff"))
+	# Dekobuesche tragen absichtlich keine Fruechte. Sichtbare Frucht = FoodSystem-Interaktion.
 
 func draw_tree(p: Vector2, zone: int) -> void:
 	if zone == 0:
@@ -6184,14 +6221,38 @@ func draw_tree(p: Vector2, zone: int) -> void:
 	var leaf := Color('5da875')
 	var bark := Color('705a4e')
 	if zone == 2:
-		leaf = Color('477d72')
+		leaf = Color('477d72') # Mooskrone
 		bark = Color('65534b')
 	elif zone == 3:
-		leaf = Color('8ba376')
+		leaf = Color('8ba376') # Ruinenfeige / Steineiche
 		bark = Color('736457')
 	elif zone == 4:
-		leaf = Color('58a6a8')
+		leaf = Color('58a6a8') # Kristallweide
 		bark = Color('5a605e')
+	elif zone == 5:
+		leaf = Color('80665e') # Aschekiefer
+		bark = Color('493d3d')
+	elif zone == 6:
+		leaf = Color('6f9f8a') # Quellweide / Sumpferle
+		bark = Color('665744')
+	elif zone == 7:
+		leaf = Color('76806b') # Steineiche / Windgrat-Kiefer
+		bark = Color('625b52')
+	elif zone == 8:
+		leaf = Color('7faaa2') # Nebelbirke
+		bark = Color('b9b7aa')
+	elif zone == 9:
+		leaf = Color('a58d52') # Bernsteinulme
+		bark = Color('72523c')
+	elif zone == 10:
+		leaf = Color('6fa6a0') # Quellweide / Perlenbaum
+		bark = Color('65756e')
+	elif zone == 11:
+		leaf = Color('66677b') # Daemmerzypresse
+		bark = Color('514b58')
+	elif zone == 12:
+		leaf = Color('aaa0c5') # Himmelsbaum / Sternenbaum
+		bark = Color('7c7489')
 	var crown := seed % 3
 	draw_rect(Rect2(p + Vector2(18, 19), Vector2(11, 37)), bark)
 	draw_rect(Rect2(p + Vector2(10, 51), Vector2(28, 7)), Color(0.2, 0.35, 0.3, 0.16))
