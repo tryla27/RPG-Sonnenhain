@@ -16,6 +16,9 @@ func run():
 	g.add_item(g.make_item("Netzring B","ring",1,17,10))
 	g.toggle_equipment_item(g.inventory.size()-2)
 	g.toggle_equipment_item(g.inventory.size()-1)
+	g.add_item(g.make_class_head(40))
+	g.toggle_equipment_item(g.inventory.size()-1)
+	assert(g.head_visual()==1)
 	var peer := WebSocketMultiplayerPeer.new()
 	assert(peer.create_client(g.command_arg_value("--save-test-url=","ws://127.0.0.1:31876")) == OK)
 	g.multiplayer.multiplayer_peer = peer
@@ -67,12 +70,14 @@ func run():
 		await process_frame
 	g.gold = 1
 	g.equipped_ring2_uid = -1
+	g.equipped_head_uid = -1
 	g.server_save.latest = g.capture_save_data()
 	g.server_save.dirty = false
 	g.rpc_zz_save_open.rpc_id(1,g.server_save.token,g.player_uuid)
 	while not g.server_save.ready:
 		if Time.get_ticks_msec() > deadline: quit(5); return
 		await process_frame
+	assert(g.head_visual()==1)
 	assert(g.gold == 34568 and g.equipped_ring2_uid >= 0 and g.server_save.revision == initial_revision)
 	var found_food:=false
 	for owned in g.inventory:

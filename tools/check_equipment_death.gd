@@ -26,12 +26,18 @@ func _initialize() -> void:
 	game._process(0.7)
 	assert(game.revivals==1 and game.panel=="")
 	game.class_id = 1
+	game.reset_class_skills()
+	game.player_uuid="equipment-test"
 	game.level = 3
 	game.skill_points = 2
+	game.skill_points=0
 	assert(not game.learn_arcane_step())
 	game.dodge()
 	assert(game.dash_timer==0.0)
 	game.level = 4
+	game.skill_points=2
+	for id in game.CLASS_SKILLS[1]:
+		game.learned[id]=true;game.skill_levels[id]=1
 	assert(game.learn_arcane_step() and game.skill_points==1)
 	assert(not game.learn_arcane_step())
 	game.dodge()

@@ -421,7 +421,10 @@ func authority_update(g,delta: float) -> void:
 			if remove: break
 			shot["pos"]+=shot["dir"]*length/steps
 			var p: Vector2=shot["pos"]
-			if (shot["room"]<0 and (safe(p) or solid(p,4) or height_at(p)>float(shot["height"])+20.0)) or not Rect2(Vector2.ZERO,SIZE).has_point(p):
+			if g.projectile_collision(p-shot["dir"]*length/steps,p,true,"konflux",int(shot["room"]),float(shot["height"]))["hit"]:
+				if not bool(shot.get("melee",false)):
+					var visual:Vector2=p-Vector2(0,float(shot.get("height",0)))
+					g.projectile_break(visual,shot["dir"],int(shot.get("kind",2)),("feuer" if int(shot["id"])==16 else ("eis" if int(shot["id"])==29 else "")),true,"konflux",str(shot["room"]))
 				remove=true
 				break
 			for peer in fighter_stats.keys():
@@ -540,6 +543,7 @@ func draw(g) -> void:
 			shifted["pos"]=v["pos"]-Vector2(0,height_at(v["pos"]) if room<0 else 0.0)
 			shifted["end"]=v["end"]-Vector2(0,height_at(v["end"]) if room<0 else 0.0)
 			g.draw_spell_visual(shifted)
+	g.combat_feedback.draw(g)
 	for shot in shots:
 		if shot["room"]!=room: continue
 		var p: Vector2=shot["pos"]-Vector2(0,shot["height"])
@@ -662,8 +666,10 @@ func draw_entry(g,e: Dictionary) -> void:
 			var state: Dictionary=g.remote_players[e["peer"]]
 			var d: Array=state.get("facing",[0,1])
 			g.draw_shadow(visual)
-			g.draw_character_sprite(visual,int(state.get("class",0)),bool(state.get("walking",false)),Vector2(d[0],d[1]),1,false,int(state.get("race",0)),int(state.get("gender",0)),int(state.get("armor",-1)))
+			g.draw_character_sprite(visual,int(state.get("class",0)),bool(state.get("walking",false)),Vector2(d[0],d[1]),1,false,int(state.get("race",0)),int(state.get("gender",0)),int(state.get("armor",-1)),float(state.get("death_progress",-1)),clampf((float(state.get("hurt_until",0))-g.combat_feedback.clock)/.18,0,1),int(state.get("head",-1)))
 			g.draw_weapon_world(visual+Vector2(0,-5),int(state.get("class",0)),int(state.get("weapon",0)),Vector2(d[0],d[1]),1)
+			var stats:Dictionary=fighter_stats.get(e["peer"],{})
+			g.combat_feedback.health(g,"konflux:%d"%int(e["peer"]),visual+Vector2(0,-48),float(stats.get("hp",state.get("hp",1))),100.0 if not stats.is_empty() else float(state.get("max_hp",1)),60,Color("79caa3"))
 			g.text_at(visual+Vector2(-80,-65),state.get("name","Held"),13,Color("d9f6ff"),HORIZONTAL_ALIGNMENT_CENTER,160)
 
 func draw_interior(g) -> void:

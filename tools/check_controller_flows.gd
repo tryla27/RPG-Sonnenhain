@@ -53,7 +53,7 @@ func run() -> void:
 	if game.panel != "": failures += 1 # Must not reopen on the same press.
 	button(pad,game,JOY_BUTTON_START,false)
 	game.panel = "pause"
-	pad.pointer = Vector2(500,242)
+	pad.pointer = Vector2(745,176)
 	game.dash_timer = 0
 	button(pad,game,JOY_BUTTON_A,true)
 	if game.panel != "" or game.dash_timer > 0 or pad.pressed("dodge"): failures += 1

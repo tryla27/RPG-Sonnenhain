@@ -22,7 +22,7 @@ static func diamond(c:CanvasItem,p:Vector2,col:Color,size:float)->void:
 	c.draw_colored_polygon(PackedVector2Array([p+Vector2(0,-size),p+Vector2(size*.6,0),p+Vector2(0,size),p+Vector2(-size*.6,0)]),col)
 	c.draw_colored_polygon(PackedVector2Array([p+Vector2(0,-size),p,p+Vector2(-size*.6,0)]),col.lightened(.3))
 	c.draw_colored_polygon(PackedVector2Array([p,p+Vector2(size*.6,0),p+Vector2(0,size)]),col.darkened(.25))
-static func weapon(c:CanvasItem,p:Vector2,t:int,level:int,side:int,back:bool,look:Vector2,attack:float=-1.0)->void:
+static func weapon(c:CanvasItem,p:Vector2,t:int,level:int,side:int,back:bool,look:Vector2,attack:float=-1.0,canvas_origin:Vector2=Vector2.ZERO,canvas_scale:Vector2=Vector2.ONE)->void:
 	var rank=tier(level)
 	var metal=[Color("8d795b"),Color("aa967a"),Color("b9c7cd"),Color("83dbe5"),Color("f6aa65"),Color("dbbaf2")][rank]
 	var hand=p+Vector2(side*35,-9)
@@ -36,7 +36,7 @@ static func weapon(c:CanvasItem,p:Vector2,t:int,level:int,side:int,back:bool,loo
 			elif attack<.72: swing=lerpf(1.25,0.0,smoothstep(.43,.72,attack))*side
 		else: swing=lerpf(-.65,.95,smoothstep(.22,.55,attack))*side
 	var angle=look.angle()+PI*.5
-	c.draw_set_transform(hand,angle*.2+swing)
+	c.draw_set_transform(canvas_origin+hand*canvas_scale,angle*.2+swing,canvas_scale)
 	hand=Vector2.ZERO
 	box(c,hand,-3,5,6,5,Color("ac9876"))
 	box(c,hand,-1,-9,2,28,Color("674b38"))
@@ -52,8 +52,12 @@ static func weapon(c:CanvasItem,p:Vector2,t:int,level:int,side:int,back:bool,loo
 		if rank>=3: box(c,hand,-1,-17,2,13,Color("fff0cd"))
 	if rank>=4:
 		diamond(c,hand+Vector2(0,8),metal.lightened(.3),4)
-	c.draw_set_transform(Vector2.ZERO)
-static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color,phase:float=0.0,attack:float=-1.0)->void:
+	c.draw_set_transform(canvas_origin,0,canvas_scale)
+static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color,phase:float=0.0,attack:float=-1.0,scale_factor:float=1.0,stretch:Vector2=Vector2.ONE)->void:
+	var canvas_origin:=p
+	var canvas_scale:=stretch*scale_factor
+	c.draw_set_transform(canvas_origin,0,canvas_scale)
+	p=Vector2.ZERO
 	var heading=Hero.direction_index(look)
 	look=Vector2(sin(heading*PI/4.0),cos(heading*PI/4.0))
 	var foot=p
@@ -79,7 +83,7 @@ static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color
 	var eye=p+Vector2(side*(10 if diag else 16),-24)
 	# All bodies stay upright. Back and side views change visible anatomy.
 	if ARMED.has(t):
-		if back: weapon(c,p,t,level,side,true,look,attack)
+		if back: weapon(c,p,t,level,side,true,look,attack,canvas_origin,canvas_scale)
 		var breadth=(14 if profile else 19) if HEAVY.has(t) else (12 if profile else 16)
 		box(c,p,-breadth,-19,breadth*2,25,dark)
 		box(c,p,-breadth+2,-18,breadth*2-4,20,base)
@@ -112,7 +116,7 @@ static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color
 			if t==26:
 				for x in [-8,0,8]: box(c,p,x,-40,3,8,Color("d9b964"))
 			if not back: box(c,p,-11,-27,22,4,dark)
-		if not back: weapon(c,p,t,level,side,false,look,attack)
+		if not back: weapon(c,p,t,level,side,false,look,attack,canvas_origin,canvas_scale)
 	elif t in [3,17,21,23]:
 		var width=21 if profile else 15
 		box(c,p,-width,-13,width*2,21,base)
@@ -138,6 +142,10 @@ static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color
 		else:
 			for x in [-1,1]: diamond(c,p+Vector2(x*20,-8),light,7)
 	elif t in [1,6,10,19,25]:
+		if t==1:
+			var flap:=sin(phase)
+			for wing in [-1,1]:
+				box(c,p,wing*(18+absf(flap)*7)-8,-22-flap*6,16,7,Color("b7cfaf"))
 		for x in [-1,1]:
 			for leg in 3: box(c,p,x*19-3,-12+leg*9+stride*x,9,3,dark)
 		box(c,p,-14,-23,28,34,base)
@@ -245,3 +253,5 @@ static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color
 		box(c,p,-12,-37,24,5,Color("d8c58b"))
 		box(c,p,-2,-44,4,10,Color("d8c58b"))
 		if not back:box(c,p,-8,-25,16,3,Color("d8c58b"))
+
+	c.draw_set_transform(Vector2.ZERO)

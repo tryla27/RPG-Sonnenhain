@@ -120,6 +120,9 @@ jobs:
           "$godot" --headless --path . --script tools/check_mob_combat.gd
           "$godot" --headless --path . --script tools/check_boss_music.gd
           "$godot" --headless --path . --script tools/check_mob_combat_network.gd
+          "$godot" --headless --path . --script tools/check_headgear_arena_choices.gd
+          "$godot" --headless --path . --script tools/check_combat_feedback.gd
+          "$godot" --headless --path . --script tools/check_combat_feedback_network.gd
           "$godot" --headless --path . --script tools/check_party_xp_network.gd
           save_dir="$(mktemp -d /tmp/sonnenhain-save-network.XXXXXX)"
           start_save_server() {

@@ -96,6 +96,8 @@ func handle(g, event: InputEvent) -> bool:
 		if event.button_index == JOY_BUTTON_B or event.button_index == JOY_BUTTON_START:
 			if g.panel == "controller": g.panel = "pause"
 			elif g.panel == "quest_details": g.panel = g.quest_guide.return_panel
+			elif g.panel=="creation_review":g.panel="creation"
+			elif g.panel=="settings":g.panel="pause"
 			elif g.panel not in ["start", "creation"]: g.panel = ""
 			g.chat_open = false
 		elif event.button_index == JOY_BUTTON_A:
@@ -219,7 +221,18 @@ func draw_cursor(g) -> void:
 func panel_points(g) -> Array:
 	var points: Array = []
 	match g.panel:
+		"start":
+			points=[Vector2(575,405),Vector2(575,475),Vector2(298,558),Vector2(571,558),Vector2(844,558)]
+		"creation":
+			points=[Vector2(575,250),Vector2(390,320),Vector2(600,320),Vector2(347,387),Vector2(567,387),Vector2(787,387),Vector2(347,465),Vector2(572,465),Vector2(797,465),Vector2(575,546),Vector2(220,546)]
+		"creation_review":
+			points=[Vector2(280,562),Vector2(772,562)]
+		"skills":
+			for i in 3:points.append(Vector2(260+i*204,170))
+			for i in g.skill_choices().size():points.append(Vector2(295+i*275,290))
+			for i in 4:points.append(Vector2(550,421+i*37))
 		"inventory":
+			points.append(Vector2(229,235))
 			points.append(Vector2(229,314))
 			points.append(Vector2(550,274))
 			points.append(Vector2(550,386))
@@ -263,6 +276,9 @@ func panel_points(g) -> Array:
 				points.append(Vector2(294+col*271,215+row*96))
 			points.append(Vector2(986,109))
 		"pause":
+			for i in 7:points.append(Vector2(745,176+i*51))
+			points.append(Vector2(340,562))
+		"settings":
 			points = [Vector2(575,242),Vector2(925,242),Vector2(925,291),Vector2(925,340),Vector2(575,291),Vector2(575,453)]
 			if not g.creative_mode:
 				points.append(Vector2(430,499))

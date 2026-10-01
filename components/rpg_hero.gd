@@ -3,23 +3,25 @@ extends RefCounted
 const H = preload("res://components/reference_house.gd")
 const TILE_SIZE := 32
 const PIXEL_STEP := 2.0
+static var hurt_flash:=0.0
 
 static func r(c: CanvasItem, x: float,y: float,w: float,h: float,color: String) -> void:
 	var position := Vector2(roundf(x/PIXEL_STEP),roundf(y/PIXEL_STEP))*PIXEL_STEP
 	var size := Vector2(maxf(1.0,roundf(w/PIXEL_STEP)),maxf(1.0,roundf(h/PIXEL_STEP)))*PIXEL_STEP
-	c.draw_rect(Rect2(position,size),Color(color))
+	c.draw_rect(Rect2(position,size),Color(color).lerp(Color("fff3de"),hurt_flash*.75))
 
 static func poly(c:CanvasItem,p:Vector2,points:Array,color:Color)->void:
 	var vertices := PackedVector2Array()
 	for point in points:
 		vertices.append(p+Vector2(roundf(float(point[0])/PIXEL_STEP),roundf(float(point[1])/PIXEL_STEP))*PIXEL_STEP)
-	c.draw_colored_polygon(vertices,color)
+	c.draw_colored_polygon(vertices,color.lerp(Color("fff3de"),hurt_flash*.75))
 
 static func direction_index(look:Vector2)->int:
 	if look.length_squared()<0.0001:return 0
 	return posmod(roundi(atan2(look.x,look.y)/(PI/4.0)),8)
 
-static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0) -> void:
+static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0,hurt:float=0.0,head:int=-1) -> void:
+	hurt_flash=clampf(hurt,0,1)
 	var female := gender == 1
 	var heading:=direction_index(look)
 	look=Vector2(sin(heading*PI/4.0),cos(heading*PI/4.0))
@@ -173,21 +175,23 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 				poly(c,Vector2.ZERO,[[16,27],[20,20],[23,29]],Color("efe5bd"))
 				poly(c,Vector2.ZERO,[[34,29],[38,20],[41,27]],Color("efe5bd"))
 				r(c,23,13,10,3,"c7c6a1" if female else "9b563e")
-	# Class helmets above the race face, with gender-specific crest/hood details.
-	if role == 0:
-		r(c,12,7,32,5,"69828d")
-		r(c,16,4,24,4,"bacac7")
-		r(c,26,4,5,10,trim)
-		poly(c,Vector2.ZERO,[[26,5],[26,-5],[31,-9],[35,-3],[31,5]],Color("b76254" if female else "d8bb6f"))
-	elif role == 1:
-		poly(c,Vector2.ZERO,[[8,10],[18,2],[25,-15],[35,-20],[33,-7],[42,10]],Color("302c51"))
-		poly(c,Vector2.ZERO,[[13,9],[23,0],[28,-10],[32,-13],[30,-3],[36,9]],Color("76638e"))
-		r(c,6,10,42,5,"b89965")
-		r(c,9,15,37,3,"493b63")
-		r(c,27,-4,3,3,"eee7b6")
-		if female: r(c,37,8,4,9,"8bdfd5")
-	else:
-		poly(c,Vector2.ZERO,[[10,16],[12,4],[25,-1],[38,4],[46,16],[38,14],[34,9],[20,9],[16,14]],Color("254a3d"))
-		poly(c,Vector2.ZERO,[[14,5],[26,2],[38,6],[35,10],[21,8]],Color("76915b"))
-		poly(c,Vector2.ZERO,[[37,5],[46,-8],[49,-5],[41,8]],Color("c5af74" if female else "91bd80"))
+	if head==role:
+		# Class helmets above the race face, with gender-specific crest/hood details.
+		if role == 0:
+			r(c,12,7,32,5,"69828d")
+			r(c,16,4,24,4,"bacac7")
+			r(c,26,4,5,10,trim)
+			poly(c,Vector2.ZERO,[[26,5],[26,-5],[31,-9],[35,-3],[31,5]],Color("b76254" if female else "d8bb6f"))
+		elif role == 1:
+			poly(c,Vector2.ZERO,[[8,10],[18,2],[25,-15],[35,-20],[33,-7],[42,10]],Color("302c51"))
+			poly(c,Vector2.ZERO,[[13,9],[23,0],[28,-10],[32,-13],[30,-3],[36,9]],Color("76638e"))
+			r(c,6,10,42,5,"b89965")
+			r(c,9,15,37,3,"493b63")
+			r(c,27,-4,3,3,"eee7b6")
+			if female: r(c,37,8,4,9,"8bdfd5")
+		else:
+			poly(c,Vector2.ZERO,[[10,16],[12,4],[25,-1],[38,4],[46,16],[38,14],[34,9],[20,9],[16,14]],Color("254a3d"))
+			poly(c,Vector2.ZERO,[[14,5],[26,2],[38,6],[35,10],[21,8]],Color("76915b"))
+			poly(c,Vector2.ZERO,[[37,5],[46,-8],[49,-5],[41,8]],Color("c5af74" if female else "91bd80"))
+	hurt_flash=0.0
 	c.draw_set_transform(offset)

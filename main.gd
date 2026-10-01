@@ -18,6 +18,16 @@ const USE_VILLAGE_REFERENCE_BACKGROUND := false
 const ReferenceScenery = preload("res://components/reference_scenery.gd")
 const VillageLayout = preload("res://components/village_layout.gd")
 const StartScenery32 = preload("res://components/start_scenery_32.gd")
+const CombatFeedback=preload("res://components/combat_feedback.gd")
+var combat_feedback=CombatFeedback.new()
+var creation_class_selected:=false
+var creation_replace_confirmed:=false
+var last_vitals:Vector2=Vector2(-1,-1)
+var teleport_serial:=0
+var hurt_until:=0.0
+var mob_deaths:Array=[]
+var dead_mob_uids:Dictionary={}
+const INVENTORY_HUD_RECT:=Rect2(584,590,98,42)
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
 const ItemStyle32=preload("res://components/item_style_32.gd")
@@ -249,6 +259,7 @@ var cooldowns: Array = []
 var inventory: Array = []
 var equipped_uid := -1
 var equipped_armor_uid := -1
+var equipped_head_uid := -1
 var death_timer := 0.0
 var arcane_step_learned := false
 const DEATH_DURATION := 1.15
@@ -289,6 +300,7 @@ var arena_return_pos := Vector2(900, 1050)
 var arena_leaderboard: Array = []
 var arena_best := 0
 var arena_reward_wave := 0
+var arena_reward_item:Dictionary={}
 var arena_pending_loaded := false
 var dungeon_id := -1
 var dungeon_return_pos := Vector2(900, 1050)
@@ -666,6 +678,8 @@ func _ready() -> void:
 	add_child(music_incoming)
 	for name in SFX_NAMES:
 		sound_streams[name] = load("res://audio/%s.wav" % name)
+	sound_streams["arrow_break"]=CombatFeedback.break_sound(true)
+	sound_streams["magic_break"]=CombatFeedback.break_sound(false)
 	for i in 8:
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -15.0
@@ -721,7 +735,7 @@ func _on_peer_connected(id: int) -> void:
 	if network_mode == "host":
 		push_world_snapshot()
 		if not dedicated_server_mode:
-			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
@@ -843,7 +857,7 @@ func join_live_multiplayer() -> void:
 		return
 	disconnect_multiplayer(false)
 	var peer := WebSocketMultiplayerPeer.new()
-	var err := peer.create_client(LIVE_MULTIPLAYER_URL)
+	var err := peer.create_client(command_arg_value("--test-server-url=", "ws://127.0.0.1:31879") if "--local-test" in OS.get_cmdline_user_args() else LIVE_MULTIPLAYER_URL)
 	if err != OK:
 		network_status = "Online-Server konnte nicht kontaktiert werden · Fehler %d" % err
 		return
@@ -949,7 +963,7 @@ func push_player_state() -> void:
 	if network_mode == "host" and int(world_time * 5.0) % 2 == 0: push_world_snapshot()
 
 @rpc("any_peer", "call_remote", "unreliable", 0)
-func rpc_player_state(state: Dictionary) -> void:
+func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 	var sender := multiplayer.get_remote_sender_id()
 	if sender <= 0: return
 	var pos_data: Array = state.get("pos", [])
@@ -969,10 +983,15 @@ func rpc_player_state(state: Dictionary) -> void:
 	if in_konflux:
 		context = "konflux"
 		instance_id = str(room_id)
+	var teleported:=false
 	var context_changed := false
 	if network_mode == "host" and remote_players.has(sender):
 		context_changed = str(remote_players[sender].get("context","world")) != context or str(remote_players[sender].get("instance_id","world")) != instance_id
-	if network_mode == "host" and remote_players.has(sender) and not context_changed:
+	if network_mode=="host" and remote_players.has(sender):
+		var previous:Dictionary=remote_players[sender]
+		var old_data:Array=previous.get("pos",[incoming_pos.x,incoming_pos.y])
+		teleported=int(state.get("teleport_serial",0))>int(previous.get("teleport_serial",0)) and valid_network_teleport(Vector2(float(old_data[0]),float(old_data[1])),incoming_pos,previous,context)
+	if network_mode == "host" and remote_players.has(sender) and not context_changed and not teleported:
 		var old_data: Array = remote_players[sender].get("pos", [incoming_pos.x, incoming_pos.y])
 		var old_pos := Vector2(float(old_data[0]), float(old_data[1]))
 		if incoming_pos.distance_to(old_pos) > 95.0:
@@ -1011,9 +1030,13 @@ func rpc_player_state(state: Dictionary) -> void:
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
+		"head":clampi(int(state.get("head",-1)),-1,2),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos)
 	}
+	clean["teleport_serial"]=int(state.get("teleport_serial",0)) if teleported or context_changed or not remote_players.has(sender) else int(remote_players[sender].get("teleport_serial",0))
+	clean["state_tick"]=Time.get_ticks_msec()
+	clean["death_progress"]=clampf(float(state.get("death_progress",0)),0,1) if float(clean["hp"])<=0 else -1.0
 	clean["konflux"] = in_konflux
 	clean["room"] = room_id
 	remote_players[sender] = clean
@@ -1022,15 +1045,22 @@ func rpc_player_state(state: Dictionary) -> void:
 	if network_mode == "host":
 		for peer_id in multiplayer.get_peers():
 			if int(peer_id) != sender:
-				rpc_receive_player_state.rpc_id(int(peer_id), sender, clean)
+				if reliable_vitals:rpc_receive_player_vitals.rpc_id(int(peer_id),sender,clean)
+				else:rpc_receive_player_state.rpc_id(int(peer_id), sender, clean)
 
 @rpc("authority", "call_remote", "unreliable", 0)
 func rpc_receive_player_state(peer_id: int, state: Dictionary) -> void:
 	if peer_id == multiplayer.get_unique_id(): return
+	var previous:Dictionary=remote_players.get(peer_id,{})
+	if int(state.get("state_tick",0))<int(previous.get("state_tick",0)):return
+	if float(state.get("hp",1))<float(previous.get("hp",state.get("hp",1))):state["hurt_until"]=combat_feedback.clock+.18
+	else:state["hurt_until"]=previous.get("hurt_until",0.0)
 	remote_players[peer_id] = state
 	var coords: Array = state.get("pos",[])
-	if coords.size() >= 2 and not remote_player_render_positions.has(peer_id):
+	if coords.size() >= 2 and (not remote_player_render_positions.has(peer_id) or int(state.get("teleport_serial",0))!=int(previous.get("teleport_serial",0)) or str(state.get("context","world"))!=str(previous.get("context","world")) or str(state.get("instance_id","world"))!=str(previous.get("instance_id","world"))):
 		remote_player_render_positions[peer_id] = Vector2(float(coords[0]),float(coords[1]))
+		for index in range(remote_combat_visuals.size()-1,-1,-1):
+			if int(remote_combat_visuals[index].get("peer_id",-1))==peer_id:remote_combat_visuals.remove_at(index)
 	queue_redraw()
 
 func push_world_snapshot() -> void:
@@ -1040,7 +1070,7 @@ func push_world_snapshot() -> void:
 		var state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
 		if state.has("dir"):state["dir"]=[state["dir"].x,state["dir"].y]
 		var face:Vector2=enemy.get("facing",Vector2.DOWN)
-		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0)})
+		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0)})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
 		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0)})
@@ -1066,6 +1096,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 		var coords: Array = raw.get("pos", [0.0,0.0])
 		var target := Vector2(float(coords[0]),float(coords[1]))
 		var uid := int(raw.get("uid",-1))
+		if dead_mob_uids.has(uid) and combat_feedback.clock-float(dead_mob_uids[uid])<6:continue
 		var attack:Dictionary=copy.get("attack_state",{})
 		if attack.has("dir"):
 			var aim:Array=attack["dir"]
@@ -1076,6 +1107,8 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 		if previous_by_uid.has(uid):
 			var old: Dictionary = previous_by_uid[uid]
 			copy["pos"] = old.get("pos",target)
+			copy["flash"]=maxf(float(copy.get("flash",0)),float(old.get("flash",0)))
+			if float(copy.get("hp",1))<float(old.get("hp",1)):copy["flash"]=.18
 		else:
 			copy["pos"] = target
 		rebuilt.append(copy)
@@ -1251,7 +1284,7 @@ func equipment_power(uid: int) -> int:
 	return 0
 
 func equipped_item_uids() -> Array:
-	var ids := [equipped_uid,equipped_armor_uid,equipped_ring_uid]
+	var ids := [equipped_uid,equipped_armor_uid,equipped_head_uid,equipped_ring_uid]
 	if class_id == 1 and equipped_ring2_uid >= 0 and equipped_ring2_uid != equipped_ring_uid: ids.append(equipped_ring2_uid)
 	return ids
 
@@ -1315,6 +1348,8 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 	return ExperienceRules.reward(base_xp, recipient_level, enemy_level(type))
 
 func _process(delta: float) -> void:
+	combat_feedback.step(delta)
+	if character_created and Vector2(hp,max_hp())!=last_vitals:push_vital_state()
 	if not dedicated_server_mode: food_system.tick(self,delta)
 	update_connection_health(delta)
 	server_save.update(self)
@@ -1471,6 +1506,7 @@ func network_player_position(peer_id: int) -> Vector2:
 	return Vector2(float(coords[0]), float(coords[1]))
 
 func spawn_dedicated_enemy() -> void:
+	if normal_mob_count()>=mini(24,remote_players.size()*8):return
 	if remote_players.is_empty(): return
 	var peers: Array = []
 	for raw_peer in remote_players.keys():
@@ -1491,7 +1527,7 @@ func spawn_dedicated_enemy() -> void:
 	var type := int(candidates.pick_random())
 	for attempt in 12:
 		var pos := center + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(470.0, 760.0)
-		if region_at(pos) == target_region and not terrain_blocked(pos) and pos.distance_to(center) >= 390.0:
+		if spawn_position_allowed(pos,target_region) and pos.distance_to(center) >= 390.0:
 			var roll := randf()
 			var mob := make_enemy(type, pos, 2 if roll < 0.01 and target_region >= 3 else (1 if roll < 0.075 else 0))
 			mob["uid"] = server_next_mob_uid
@@ -1504,7 +1540,11 @@ func spawn_dedicated_enemy() -> void:
 func mob_profile(enemy:Dictionary)->Dictionary:
 	var type:int=int(enemy["type"])
 	var damage:int=roundi(enemy_damage(type)*[1.0,1.15,1.3][clampi(int(enemy.get("elite",0)),0,2)]*float(enemy.get("arena_power",1.0)))
-	return MobCombat.profile(type,ENEMY_TYPES[type],enemy_level(type),damage)
+	var profile:Dictionary=MobCombat.profile(type,ENEMY_TYPES[type],enemy_level(type),damage)
+	var reach_scale:float=1.3 if type==12 else (.65 if bool(enemy.get("small_guardian",false)) else 1.0)
+	profile["attack_range"]*=reach_scale
+	for ability in profile["abilities"]:ability["range"]*=reach_scale
+	return profile
 
 func mob_targets(enemy:Dictionary,server:bool)->Array:
 	var result:Array=[]
@@ -1547,11 +1587,12 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		for other in enemies:
 			if other==enemy:continue
 			var away:Vector2=origin-Vector2(other["pos"])
-			if away.length_squared()>.01 and away.length()<54:separation+=away.normalized()*(54-away.length())/54
+			var spacing:float=mob_hit_radius(enemy)+mob_hit_radius(other)+8
+			if away.length_squared()>.01 and away.length()<spacing:separation+=away.normalized()*(spacing-away.length())/spacing
 		if separation.length_squared()>.01:movement=(movement+separation.normalized()*.6).normalized()
 		for angle in [0.0,.52,-.52,.92,-.92,1.35,-1.35,PI]:
 			var next:Vector2=origin+movement.rotated(angle)*speed*delta
-			var valid:bool=not terrain_blocked(next) and region_at(next)==region_at(origin)
+			var valid:bool=not terrain_blocked(next,mob_hit_radius(enemy)) and not blocked_by_region_wall(next) and region_at(next)==region_at(origin)
 			if not server and arena_mode!="":valid=next.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
 			elif not server and dungeon_id>=0:valid=not dungeon_blocked(next)
 			if valid:
@@ -1605,7 +1646,9 @@ func advance_mob_shots(delta:float,server:bool)->void:
 		shot["life"]=float(shot.get("life",0))-delta
 		shot["pos"]=previous+Vector2(shot["dir"])*float(shot.get("speed",265))*delta
 		var unsafe:bool=(server or (arena_mode=="" and dungeon_id<0)) and (region_at(shot["pos"])==0 or region_at(shot["pos"])!=int(shot.get("source_region",region_at(previous))))
-		if float(shot["life"])<=0 or mob_shot_cancelled(shot) or unsafe or mob_shot_blocked(previous,shot["pos"],server):
+		var collision:=projectile_collision(previous,shot["pos"],server)
+		if float(shot["life"])<=0 or mob_shot_cancelled(shot) or unsafe or collision["hit"]:
+			if collision["hit"]:projectile_break(collision["pos"],shot["dir"],2,"",false)
 			enemy_projectiles.remove_at(i);continue
 		var candidates:Array=[]
 		if server:
@@ -1635,17 +1678,31 @@ func update_dedicated_enemy_projectiles(delta:float)->void:
 func update_dedicated_player_projectiles(delta: float) -> void:
 	for i in range(projectiles.size() - 1, -1, -1):
 		var shot: Dictionary = projectiles[i]
+		var previous:Vector2=shot["pos"]
+		if int(shot.get("spell_id",-1))==20:steer_homing_shot(shot,delta)
 		shot["life"] = float(shot.get("life",0.0)) - delta
 		shot["pos"] = Vector2(shot["pos"]) + Vector2(shot["dir"]) * float(shot.get("speed",520.0)) * delta
-		if shot["life"] <= 0.0:
+		var collision:=projectile_collision(previous,shot["pos"],true)
+		if shot["life"] <= 0.0 or collision["hit"]:
+			if collision["hit"]:
+				shot["pos"]=collision["pos"]
+				projectile_break(shot["pos"],shot["dir"],int(shot.get("kind",2)),str(shot.get("element","")))
+				if int(shot.get("spell_id",-1))==16:server_fireball_impact(shot)
 			projectiles.remove_at(i)
 			continue
 		var consumed := false
 		for e in range(enemies.size() - 1, -1, -1):
-			if Vector2(shot["pos"]).distance_to(Vector2(enemies[e]["pos"])) < 30.0:
+			if e>=enemies.size():continue
+			var uid:int=int(enemies[e]["uid"])
+			if uid in shot.get("hits",[]):continue
+			if MobCombat.shot_hits(previous,shot["pos"],enemies[e]["pos"],mob_hit_radius(enemies[e])+4):
+				if not shot.has("hits"):shot["hits"]=[]
+				shot["hits"].append(uid)
 				damage_enemy(e, int(shot.get("damage",1)), Vector2(shot["dir"]), false, str(shot.get("element","")), int(shot.get("owner_peer",0)))
-				consumed = true
-				break
+				consumed = not bool(shot.get("pierce",false))
+				if consumed:
+					if int(shot.get("spell_id",-1))==16:server_fireball_impact(shot)
+					break
 		if consumed:
 			projectiles.remove_at(i)
 
@@ -1855,7 +1912,8 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 		if p.distance_to(portal[0]) < radius + 150.0 or p.distance_to(portal[1]) < radius + 150.0: return {}
 	return {"pos":p, "radius":radius, "zone":zone, "key":key}
 
-func terrain_blocked(p: Vector2) -> bool:
+func terrain_blocked(p: Vector2,radius:float=-1.0) -> bool:
+	if radius<0:radius=hero_collision_radius()
 	if region_at(p) == 1:
 		for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			if Rect2(RESCUE_POS + offset - Vector2(73, 54), Vector2(146, 108)).grow(16).has_point(p): return true
@@ -1864,7 +1922,7 @@ func terrain_blocked(p: Vector2) -> bool:
 	for x in range(cx - 1, cx + 2):
 		for y in range(cy - 1, cy + 2):
 			var obstacle := obstacle_in_cell(x, y)
-			if not obstacle.is_empty() and p.distance_to(obstacle["pos"]) < float(obstacle["radius"]) + hero_collision_radius()+2.0:
+			if not obstacle.is_empty() and p.distance_to(obstacle["pos"]) < float(obstacle["radius"]) + radius+2.0:
 				return true
 	return false
 
@@ -2075,6 +2133,9 @@ func handle_touch_event(event: InputEvent) -> bool:
 			queue_redraw()
 			return true
 
+		if INVENTORY_HUD_RECT.has_point(pos):
+			toggle_panel("inventory")
+			return true
 		if party_widget_rect().has_point(pos) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 			panel = "party"
 			play_sound("menu")
@@ -2216,7 +2277,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_BACKSPACE:
 			if creation_name.length() > 0: creation_name = creation_name.left(creation_name.length() - 1)
 		elif event.keycode == KEY_ENTER:
-			if creation_name.strip_edges().length() >= 2: start_new_game()
+			if creation_name.strip_edges().length() >= 2 and creation_class_selected: review_character_creation()
 		elif event.unicode >= 32 and creation_name.length() < 16:
 			var typed := String.chr(event.unicode)
 			if "abcdefghijklmnopqrstuvwxyzäöüß0123456789 -_".find(typed.to_lower()) >= 0: creation_name += typed
@@ -2270,6 +2331,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey: triggered = event.pressed and not event.echo
 	elif event is InputEventMouseButton: triggered = event.pressed
 	if not triggered: return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and INVENTORY_HUD_RECT.has_point(event.position):
+		toggle_panel("inventory")
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and Rect2(10,118,348,46).has_point(event.position):
 		quest_guide.open(self,quest_guide.current_id(self),"")
 		return
@@ -2324,14 +2388,14 @@ func toggle_panel(which: String) -> void:
 	sell_all_confirm = false
 
 func learn_arcane_step() -> bool:
-	if class_id != 1 or level < 4 or skill_points <= 0 or arcane_step_learned: return false
+	if class_id != 1 or skill_points <= 0 or arcane_step_learned or -2 not in skill_choices(): return false
 	arcane_step_learned = true
 	skill_points -= 1
 	save_game()
 	return true
 
 func dodge() -> void:
-	if class_id == 1 and (level < 4 or not arcane_step_learned):
+	if class_id == 1 and not arcane_step_learned:
 		message("Arkaner Schritt: ab Level 4 im Fähigkeitenmenü erlernen (1 Skillpunkt).")
 		return
 	var dir := movement_vector()
@@ -2427,6 +2491,7 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 
 func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float, damage: int, stun: bool, element: String = "", source_peer: int = 0) -> void:
 	for i in range(enemies.size() - 1, -1, -1):
+		if i>=enemies.size():continue
 		var enemy: Dictionary = enemies[i]
 		var offset: Vector2 = enemy["pos"] - origin
 		if offset.length() <= reach and (offset.length() < 25 or direction.dot(offset.normalized()) > threshold):
@@ -2503,6 +2568,11 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	server_relay_combat_visual(sender,{"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))})
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	power = clampi(power,1,140 + level_cap * 30)
+	if id in [3,7,16,18,20,25,26,28,29,30]:
+		for shot in ability_projectiles(id,origin,dir,remote_class,power):
+			shot["owner_peer"]=sender
+			projectiles.append(shot)
+		return
 	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
 	var radial_ids := [0,5,17,22,23,24,31,33]
 	if id in radial_ids:
@@ -2646,6 +2716,7 @@ func use_ability(slot: int) -> void:
 func update_projectiles(delta: float) -> void:
 	for i in range(projectiles.size() - 1, -1, -1):
 		var p: Dictionary = projectiles[i]
+		var previous:Vector2=p["pos"]
 		var spell_id: int = int(p.get("spell_id", -1))
 		if spell_id == 20:
 			var nearest := 235.0
@@ -2661,20 +2732,25 @@ func update_projectiles(delta: float) -> void:
 			if p["trail"].size() > 5: p["trail"].pop_front()
 		p["life"] = float(p["life"]) - delta
 		p["pos"] = p["pos"] + p["dir"] * float(p["speed"]) * delta
-		if p["life"] <= 0 or is_blocked(p["pos"], p["pos"] - p["dir"] * 12.0):
-			if spell_id == 16: explode_fireball(p)
-			if spell_id == 28: create_poison_cloud(p["pos"], int(p["damage"]))
+		var collision:=projectile_collision(previous,p["pos"],false)
+		if p["life"] <= 0 or collision["hit"]:
+			if collision["hit"]:
+				p["pos"]=collision["pos"]
+				if not uses_server_world():projectile_break(p["pos"],p["dir"],int(p.get("kind",2)),str(p.get("element","")))
+			if spell_id == 16 and not bool(p.get("network_visual",false)): explode_fireball(p)
+			if spell_id == 28 and not bool(p.get("network_visual",false)): create_poison_cloud(p["pos"], int(p["damage"]))
 			projectiles.remove_at(i)
 			continue
 		var consumed := false
 		for e in range(enemies.size() - 1, -1, -1):
+			if e>=enemies.size():continue
 			var uid: int = int(enemies[e]["uid"])
 			if uid in p["hits"]: continue
-			if p["pos"].distance_to(enemies[e]["pos"]) < 28:
+			if MobCombat.shot_hits(previous,p["pos"],enemies[e]["pos"],mob_hit_radius(enemies[e])+4):
 				p["hits"].append(uid)
 				var impact: Vector2 = enemies[e]["pos"]
-				damage_enemy(e, int(p["damage"]), p["dir"], false, str(p.get("element", "")))
-				match spell_id:
+				if not bool(p.get("network_visual",false)):damage_enemy(e, int(p["damage"]), p["dir"], false, str(p.get("element", "")))
+				match (-1 if bool(p.get("network_visual",false)) else spell_id):
 					25:
 						for survivor in enemies:
 							if int(survivor["uid"]) == uid: survivor["marked"] = 5.0
@@ -2796,6 +2872,7 @@ func enter_arena(mode: String) -> void:
 	arena_wave = 0
 	arena_intermission = 2.5
 	arena_reward_claimed = false
+	arena_reward_item.clear()
 	player_pos = ARENA_CENTER
 	enemies.clear()
 	drops.clear()
@@ -2864,11 +2941,33 @@ func finish_survival_run() -> void:
 	play_sound("level")
 	save_game()
 
+func arena_new_weapon_chance(wave:int) -> float:
+	if wave<5:return 0.0
+	if wave<10:return .20
+	if wave<20:return .35
+	if wave<30:return .50
+	return .65
+
+func make_arena_weapon(wave:int) -> Dictionary:
+	var names:Array=[["Wächterklinge","Blutdornenaxt","Runenhammer","Sturmklinge","Glutspalter"],["Glutstab","Frostzweig","Blitzleiter","Quellstab","Sternenwacht"],["Dornenbogen","Falkenbogen","Windsehne","Splitterarmbrust","Jägerzeichen"]]
+	var choice:int=randi_range(0,4)
+	var item:Dictionary=make_item(names[class_id][choice],class_weapon_icon(),mini(4,2+int(wave/20)),6+level*2+wave,0,"",level)
+	item["new_weapon_id"]=class_id*5+choice
+	item["design"]=2 if class_id==0 and choice in [1,2] else (3 if class_id==2 and choice==3 else choice%4)
+	return item
+
 func claim_arena_chest() -> void:
 	if arena_reward_claimed: return
 	var tier := clampi(int(arena_reward_wave / 5.0), 0, 3)
 	if arena_reward_wave >= 25 and level >= 30: tier = 4
-	var reward := make_item("Truhe der Ewigen Wacht · Welle %d" % arena_reward_wave, class_weapon_icon(), tier, 6 + level * 2 + arena_reward_wave, 0, ["eis", "blitz", "gift"][arena_reward_wave % 3], level)
+	if arena_reward_item.is_empty():
+		arena_reward_item = make_item("Truhe der Ewigen Wacht · Welle %d" % arena_reward_wave, class_weapon_icon(), tier, 6 + level * 2 + arena_reward_wave, 0, ["eis", "blitz", "gift"][arena_reward_wave % 3], level)
+		var roll:float=randf()
+		var head_chance:float=0.0 if arena_reward_wave<5 else minf(.08,.02+floorf(arena_reward_wave/10.0)*.02)
+		if roll<head_chance:arena_reward_item=make_class_head(level)
+		elif roll<head_chance+arena_new_weapon_chance(arena_reward_wave):arena_reward_item=make_arena_weapon(arena_reward_wave)
+		save_game()
+	var reward:Dictionary=arena_reward_item
 	if not can_add_item(reward):
 		message("Inventar voll. Für die Arenabelohnung brauchst du einen freien Platz.")
 		return
@@ -2980,6 +3079,7 @@ func open_dungeon_chest() -> void:
 		message("Die Gewölbetruhe bleibt versiegelt, solange Feinde hier lauern.")
 		return
 	var treasure := make_item("Relikt aus %s" % DUNGEON_NAMES[dungeon_id], class_weapon_icon(), 2 + int(dungeon_id > 0), 15 + region_level(int(ENEMY_TYPES[int(DUNGEON_ENEMIES[dungeon_id][0])]["region"])) * 2, 280 + dungeon_id * 190, ["blitz", "eis", "gift"][dungeon_id])
+	if rare_head_reward("dungeon",dungeon_id,.10):treasure=make_class_head(level)
 	if not can_add_item(treasure):
 		message("Deine Tasche ist voll. Die Truhe wartet auf deine Rückkehr.")
 		return
@@ -3023,6 +3123,7 @@ func flee_from_safe_zone(enemy: Dictionary, delta: float) -> bool:
 	return true
 
 func spawn_enemy() -> void:
+	if uses_server_world() or normal_mob_count()>=10:return
 	if dungeon_id >= 0 or arena_mode != "": return
 	var region: int = region_at(player_pos)
 	# Sonnenhain ist eine echte Sicherheitszone: dort entstehen keine normalen Gegner.
@@ -3067,8 +3168,10 @@ func spawn_dedicated_bosses()->void:
 		boss["hp"]=boss_max_hp(type);boss["max_hp"]=boss["hp"]
 		boss["context"]="world";boss["instance_id"]="world"
 		enemies.append(boss)
+		spawn_tower_guardians(boss)
 
 func spawn_nearby_boss() -> void:
+	if uses_server_world():return
 	for i in 3:
 		var site: Vector2 = LANDMARKS[i + 2]["pos"]
 		if player_pos.distance_to(site) > 700 or boss_cooldowns[i] > 0 or region_at(player_pos) != region_at(site): continue
@@ -3082,6 +3185,7 @@ func spawn_nearby_boss() -> void:
 		var info: Dictionary = ENEMY_TYPES[boss_type]
 		var boss_hp: float = boss_max_hp(boss_type)
 		enemies.append({"uid":randi(), "type":boss_type, "pos":site + Vector2(0, 125), "home":site + Vector2(0,125), "facing":Vector2.DOWN, "hp":boss_hp, "max_hp":boss_hp, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":1.5, "seed":randf() * 6.28})
+		spawn_tower_guardians(enemies.back())
 		message("Boss entdeckt: %s!" % info["name"])
 
 func update_rescue() -> void:
@@ -3140,6 +3244,7 @@ func apply_player_damage(raw: int) -> void:
 				enemy["slow"] = 3.5
 				enemy["stun"] = 0.4
 	hp -= dealt
+	hurt_until=combat_feedback.clock+.18
 	invulnerable = 0.5
 	effect(player_pos + Vector2(0, -30), "-%d" % dealt, Color("ff888d"), 0.75)
 	play_sound("hit")
@@ -3178,6 +3283,7 @@ func respawn() -> void:
 	if arena_mode == "final":
 		arena_mode = ""
 		player_pos = Vector2(825, 1020)
+		mark_network_teleport()
 		enemies.clear()
 		message("Die letzte Wache hält noch stand. Sprich mit Arven, um es erneut zu versuchen.")
 		hp = max_hp()
@@ -3190,6 +3296,7 @@ func respawn() -> void:
 		enemy_projectiles.clear()
 		drops.clear()
 	player_pos = Vector2(825, 1020)
+	mark_network_teleport()
 	hp = max_hp()
 	energy = max_energy()
 	gold = maxi(0, gold - 20)
@@ -3199,10 +3306,14 @@ func respawn() -> void:
 
 func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var enemy: Dictionary = enemies[index]
+	announce_mob_death(enemy)
 	var invasion: bool = bool(enemy.get("invasion", false))
 	var type: int = int(enemy["type"])
 	var pos: Vector2 = enemy["pos"]
 	enemies.remove_at(index)
+	if type==12:
+		for j in range(enemies.size()-1,-1,-1):
+			if int(enemies[j].get("guardian_of",-1))==int(enemy["uid"]):enemies.remove_at(j)
 	if dedicated_server_mode:
 		if type in [12,13,14]:boss_cooldowns[type-12]=90.0
 		send_server_enemy_reward(source_peer, enemy)
@@ -3442,6 +3553,7 @@ func interact() -> void:
 			var desired: Vector2 = portal[1]+Vector2(0,110) if near_old else portal[0]+Vector2(0,110)
 			var expected_region := int(portal[2]) if near_old else region_at(portal[0])
 			player_pos = safe_world_teleport_destination(desired,expected_region)
+			mark_network_teleport()
 			enemies.clear()
 			enemy_projectiles.clear()
 			message("Der alte Torbogen führt nach %s." % region_name(region_at(player_pos)))
@@ -3553,6 +3665,7 @@ func open_chest(index: int) -> void:
 	var rarity := 3 if region_level(region) >= 30 else 2
 	var icon := class_weapon_icon()
 	var item := make_item("%s von %s" % [{"sword":"Schatzklinge", "staff":"Schatzstab", "bow":"Schatzbogen"}[icon], LANDMARKS[index]["name"]], icon, rarity, 12 + region_level(region) * 2 + rarity * 3, 0, element, region_level(region))
+	if rare_head_reward("chest",index,.04):item=make_class_head(region_level(region))
 	inventory.append(item)
 	gold += 35 + region * 25
 	message("Schatztruhe geöffnet: %s (%s)!" % [item["name"], RARITY_NAMES[rarity]])
@@ -3572,6 +3685,7 @@ func use_waystone() -> void:
 				waystone_unlocked[i] = true
 				last_waystone = i
 				player_pos = WAYSTONES[0] + Vector2(0, 180)
+				mark_network_teleport()
 				message("Wegstein %s aktiviert. Reise vom Dorf aus jederzeit zurück." % region_name(region_at(WAYSTONES[i])))
 			enemy_projectiles.clear()
 			save_game()
@@ -3587,6 +3701,7 @@ func click_travel(mouse: Vector2) -> void:
 				return
 			if dungeon_id >= 0: dungeon_id = -1
 			player_pos = WAYSTONES[i] + Vector2(0, 180)
+			mark_network_teleport()
 			last_waystone = i
 			panel = ""
 			enemies.clear()
@@ -3644,6 +3759,10 @@ func effect(pos: Vector2, value: String, color: Color, life: float) -> void:
 	effects.append({"pos":pos, "text":value, "color":color, "life":life, "max":life})
 
 func slot_save_path(index: int, testing: bool = false) -> String:
+	if "--local-test" in OS.get_cmdline_user_args():
+		var isolated_dir := command_arg_value("--test-save-dir=", "user://local-test")
+		DirAccess.make_dir_recursive_absolute(isolated_dir)
+		return isolated_dir.path_join("slot%d%s.json" % [index, "_creative" if testing else ""])
 	if index == 1: return CREATIVE_SAVE_PATH if testing else SAVE_PATH
 	return "user://sonnenhain_slot%d%s.json" % [index, "_testmodus" if testing else ""]
 
@@ -3663,7 +3782,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
@@ -3767,6 +3886,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	# Alte Kartenkoordinaten passen nicht zu den neuen Gebietsgrenzen.
 	if int(data.get("world_version", 1)) < 2 and region_at(player_pos) != 0:
 		player_pos = Vector2(825, 1020)
+	mark_network_teleport()
 	level = maxi(1, int(data.get("level", 1)))
 	xp = maxi(0, int(data.get("xp", 0)))
 	gold = maxi(0, int(data.get("gold", 55)))
@@ -3814,6 +3934,8 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 				add_item(make_item(old_name, old_icon, clampi(int(raw_item.get("rarity", 0)), 0, 4), 5 if old_icon == "sword" else 0, 20))
 	equipped_uid = int(data.get("equipped_uid", -1))
 	equipped_armor_uid = int(data.get("equipped_armor_uid", -1))
+	equipped_head_uid = int(data.get("equipped_head_uid", -1))
+	arena_reward_item=data.get("arena_reward_item",{}).duplicate(true) if data.get("arena_reward_item",{}) is Dictionary else {}
 	arcane_step_learned = bool(data.get("arcane_step_learned", false))
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
 	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1)) if class_id == 1 else -1
@@ -3853,6 +3975,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		if target in [12,13,14] and int(quests[q].get("state",0))>=2:bosses_defeated[target-12]=true
 	if is_blocked(player_pos) or (not creative_mode and level < region_level(region_at(player_pos))):
 		player_pos = Vector2(825, 1020)
+	mark_network_teleport()
 	if level < region_level(region_at(WAYSTONES[last_waystone])): last_waystone = 1
 	if level >= 20:
 		learned[class_ultimate()] = true
@@ -3869,17 +3992,9 @@ func handle_panel_click(mouse: Vector2) -> void:
 		panel = "controller"
 		return
 	if panel == "start":
-		if Rect2(855, 158, 130, 33).has_point(mouse):
-			controls_return_panel = "start"
-			panel = "controls"
-			return
 		for candidate in 3:
 			if Rect2(168 + candidate * 273, 530, 260, 57).has_point(mouse):
 				selected_save_slot = candidate + 1
-				play_sound("menu")
-				return
-			if Rect2(174 + candidate * 273, 330, 250, 38).has_point(mouse) or Rect2(168 + candidate * 273, 202, 260, 127).has_point(mouse):
-				pending_class = candidate
 				play_sound("menu")
 				return
 		if Rect2(300, 378, 550, 54).has_point(mouse):
@@ -3906,13 +4021,26 @@ func handle_panel_click(mouse: Vector2) -> void:
 			else: panel = ""
 			ensure_live_multiplayer()
 			message("Spielstand %d geladen. Willkommen zurück!" % active_save_slot)
-		elif Rect2(860, 448, 125, 54).has_point(mouse):
-			panel = "multiplayer"
-			join_code = ""
-			network_status = "Online-Server bereit zum Verbinden." if is_web_platform() else "Online-Server oder klassischer Desktop-Koop"
-			play_sound("menu")
+		return
+	if panel == "creation_review":
+		if Rect2(190,540,180,44).has_point(mouse):
+			creation_replace_confirmed=false
+			panel="creation"
+		elif Rect2(590,540,365,44).has_point(mouse):
+			if FileAccess.file_exists(slot_save_path(active_save_slot)) and not creation_replace_confirmed:
+				creation_replace_confirmed=true
+				play_sound("menu")
+			else:
+				start_new_game()
 		return
 	if panel == "creation":
+		for cls in 3:
+			if Rect2(245+cls*225,414,205,100).has_point(mouse):
+				pending_class=cls
+				creation_class_selected=true
+				play_sound("menu")
+				queue_redraw()
+				return
 		if Rect2(300, 228, 550, 48).has_point(mouse):
 			if touch_enabled: creation_name = mobile_text_prompt("Name deines Helden", creation_name, 16)
 			queue_redraw()
@@ -3925,8 +4053,8 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if Rect2(245 + i * 220, 365, 205, 44).has_point(mouse):
 				pending_race = i
 				play_sound("menu")
-		if Rect2(300, 520, 550, 52).has_point(mouse) and creation_name.strip_edges().length() >= 2:
-			start_new_game()
+		if Rect2(300, 520, 550, 52).has_point(mouse) and creation_name.strip_edges().length() >= 2 and creation_class_selected:
+			review_character_creation()
 		elif Rect2(165, 520, 110, 52).has_point(mouse):
 			panel = "start"
 		return
@@ -3972,6 +4100,19 @@ func handle_panel_click(mouse: Vector2) -> void:
 			return
 		return
 	if panel == "pause":
+		var destinations:Array=["","inventory","skills","journal","map","party","settings"]
+		for i in destinations.size():
+			if Rect2(540,155+i*51,410,42).has_point(mouse):
+				panel=destinations[i]
+				play_sound("menu")
+				return
+		if Rect2(190,540,300,44).has_point(mouse):
+			save_game()
+			refresh_save_slot_labels()
+			disconnect_multiplayer(false)
+			panel="start"
+		return
+	if panel == "settings":
 		if set_volume_from_mouse(mouse):
 			save_game()
 		elif Rect2(860, 221, 130, 42).has_point(mouse):
@@ -4086,6 +4227,8 @@ func set_volume_from_mouse(mouse: Vector2) -> bool:
 	return false
 
 func begin_character_creation() -> void:
+	creation_replace_confirmed=false
+	creation_class_selected=false
 	creation_name = ""
 	pending_gender = 0
 	pending_race = 0
@@ -4094,6 +4237,8 @@ func begin_character_creation() -> void:
 	play_sound("menu")
 
 func start_new_game() -> void:
+	arena_reward_item.clear()
+	equipped_head_uid=-1
 	quest_guide.tracked_id = QuestGuide.AUTO
 	creative_mode = false
 	opened_village_gates.clear()
@@ -4109,7 +4254,7 @@ func start_new_game() -> void:
 	var current_path := slot_save_path(active_save_slot)
 	if FileAccess.file_exists(current_path):
 		var old_save: String = FileAccess.get_file_as_string(current_path)
-		var backup: FileAccess = FileAccess.open("user://sonnenhain_slot%d_backup.json" % active_save_slot, FileAccess.WRITE)
+		var backup: FileAccess = FileAccess.open(current_path.trim_suffix(".json")+"_backup_%d.json" % Time.get_ticks_usec(), FileAccess.WRITE)
 		if backup != null: backup.store_string(old_save)
 	final_completed = false
 	final_countdown = -1.0
@@ -4122,6 +4267,7 @@ func start_new_game() -> void:
 	arena_pending_loaded = false
 	arena_leaderboard.clear()
 	player_pos = Vector2(825, 1020)
+	mark_network_teleport()
 	class_id = pending_class
 	rescue_state = 0
 	rescue_kills = 0
@@ -4252,35 +4398,56 @@ func set_creative_level(target: int) -> void:
 	pause_status = "Testmodus: Level %d · volle HP und %s." % [level, "Mana" if class_id == 1 else "Energie"]
 	save_game()
 
+func skill_choices() -> Array:
+	if skill_levels.size()!=ABILITIES.size() or learned.size()!=ABILITIES.size():return []
+	if skill_points<=0:return []
+	var fresh:Array=[]
+	var upgrades:Array=[]
+	var spent:int=1 if arcane_step_learned else 0
+	for id in CLASS_SKILLS[class_id]:
+		spent+=int(skill_levels[id])
+		if not learned[id]:fresh.append(id)
+		elif int(skill_levels[id])<5:upgrades.append(id)
+	if class_id==1 and not arcane_step_learned:fresh.append(-2)
+	var pool:Array=fresh if fresh.size()>=3 else fresh+upgrades
+	var rng:=RandomNumberGenerator.new()
+	rng.seed=abs((player_uuid+":"+str(class_id)+":"+str(spent)).hash())
+	for i in range(pool.size()-1,0,-1):
+		var j:int=rng.randi_range(0,i)
+		var tmp=pool[i];pool[i]=pool[j];pool[j]=tmp
+	# Remaining new skills always keep priority over improvements.
+	if fresh.size()<3:
+		pool= fresh + pool.filter(func(id):return id not in fresh)
+	return pool.slice(0,mini(3,pool.size()))
+
 func click_skills(mouse: Vector2) -> void:
-	if class_id == 1 and Rect2(165,532,815,32).has_point(mouse):
-		learn_arcane_step()
-		return
 	for slot in 3:
-		if Rect2(165 + slot * 204, 148, 193, 44).has_point(mouse):
-			selected_slot = slot
+		if Rect2(165+slot*204,148,193,44).has_point(mouse):selected_slot=slot;return
+	var offers:Array=skill_choices()
+	for card in offers.size():
+		if Rect2(165+card*275,215,265,155).has_point(mouse):
+			if offers[card]==-2:learn_arcane_step()
+			else:upgrade_skill(int(offers[card]))
 			return
-	for row in 7:
-		var class_list: Array = CLASS_SKILLS[class_id]
-		var list_index := row + menu_scroll
-		if list_index >= class_list.size(): break
-		var index: int = int(class_list[list_index])
-		if Rect2(165, 215 + row * 44, 816, 40).has_point(mouse):
-			if mouse.x >= 832 or not learned[index]:
-				upgrade_skill(index)
-			else:
-				for slot in 3:
-					if slots[slot] == index: slots[slot] = -1
-				slots[selected_slot] = index
-				message("%s auf Taste %d gelegt" % [ABILITIES[index]["name"], selected_slot + 1])
-				save_game()
+	var known:Array=[]
+	for id in CLASS_SKILLS[class_id]:
+		if learned[id]:known.append(id)
+	for row in 4:
+		var i:int=row+menu_scroll
+		if i>=known.size():break
+		if Rect2(165,405+row*37,815,33).has_point(mouse):
+			var id:int=known[i]
+			for slot in 3:
+				if slots[slot]==id:slots[slot]=-1
+			slots[selected_slot]=id
+			save_game()
 			return
 
 func upgrade_skill(index: int) -> void:
-	var next_rank: int = int(skill_levels[index]) + 1
-	if not creative_mode and level < skill_rank_level(index, next_rank):
-		message("Rang %d von %s ist ab Level %d verfügbar." % [next_rank, ABILITIES[index]["name"], skill_rank_level(index, next_rank)])
+	if index not in skill_choices():
+		message("Wähle eine der drei angebotenen Fähigkeiten.")
 		return
+	var next_rank: int = int(skill_levels[index]) + 1
 	if int(skill_levels[index]) >= 5:
 		message("%s ist bereits auf Rang 5." % ABILITIES[index]["name"])
 		return
@@ -4296,6 +4463,9 @@ func upgrade_skill(index: int) -> void:
 	save_game()
 
 func click_inventory(mouse: Vector2) -> void:
+	if Rect2(180,205,98,60).has_point(mouse) and equipped_head_uid>=0:
+		unequip_slot("head")
+		return
 	if Rect2(180,275,98,77).has_point(mouse) and equipped_uid >= 0:
 		unequip_slot("weapon")
 		return
@@ -4407,7 +4577,7 @@ func use_item(index: int) -> void:
 			inventory.remove_at(index)
 			selected_item = -1
 		message("%s verwendet" % name)
-	elif item["icon"] in ["sword", "staff", "bow", "armor", "ring"]:
+	elif item["icon"] in ["sword", "staff", "bow", "armor", "ring", "head"]:
 		toggle_equipment_item(index)
 		return
 	else:
@@ -4470,7 +4640,7 @@ func buy_item(stock_item: Dictionary) -> void:
 		message("Dafür fehlen dir %d Gold." % (price-gold))
 		return
 	var icon := str(stock_item.get("icon","gem"))
-	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food"]:
+	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food","head"]:
 		message("Dieses Angebot ist ungültig.")
 		return
 	var purchased := make_item(String(stock_item.get("name","Fundstück")), icon, clampi(int(stock_item.get("rarity",1)),0,4), maxi(0,int(stock_item.get("power",0))), int(price/2.0), String(stock_item.get("element","")), maxi(1,int(stock_item.get("level",level))))
@@ -4505,6 +4675,15 @@ func sell_item(index: int) -> void:
 	save_game()
 
 func _draw() -> void:
+	if panel in ["start","creation","creation_review"] and not dedicated_server_mode:
+		character_canvas_offset=Vector2.ZERO
+		draw_set_transform(Vector2.ZERO)
+		draw_rect(Rect2(Vector2.ZERO,VIEW),Color("071321"))
+		for i in 18:
+			var x:float=i*72
+			draw_line(Vector2(x,0),Vector2(x-240,648),Color("152b3b"),1)
+		draw_panel()
+		return
 	if dedicated_server_mode or DisplayServer.get_name() == "headless": return
 	if konflux.active:
 		var started:=Time.get_ticks_usec()
@@ -4767,7 +4946,7 @@ func draw_rescue_alert() -> void:
 		text_at(Vector2(351, 190), "+160 XP · +80 Gold · seltene Klassenwaffe", 15, Color("f6e0a0"))
 	elif danger:
 		text_at(Vector2(304, 190), "FORTSCHRITT  %d / %d" % [rescue_kills, RESCUE_GOAL], 15, Color("ffb1a1"), HORIZONTAL_ALIGNMENT_CENTER, 544)
- 
+	
 
 func draw_spell_visual(visual: Dictionary) -> void:
 	var origin: Vector2=visual["pos"]
@@ -4972,13 +5151,15 @@ func armor_visual() -> int:
 			return clampi(int(item.get("design",0)),0,5)
 	return -1
 
-func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0) -> void:
+func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2) -> void:
 	var local := race_override < 0 or (p == player_pos and scale_factor == 1.0)
 	var roll := 1.0-dash_timer/dodge_duration if local and dash_timer > 0 else -1.0
 	var death := 1.0-death_timer/DEATH_DURATION if local and death_timer > 0 else death_override
 	var outfit := armor_visual() if armor_override == -2 else armor_override
-	if panel == "creation": outfit = -1
-	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death)
+	if panel in ["creation","creation_review"]: outfit = -1
+	var head:int=head_visual() if head_override==-2 else head_override
+	if panel in ["creation","creation_review"]:head=-1
+	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head)
 
 func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2, scale_factor: float, race: int, gender: int) -> void:
 	var accent: Color = [Color('e5bd77'),Color('8fcde6'),Color('91c787')][clampi(visual_class,0,2)]
@@ -6010,7 +6191,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 	var elite_kind: int = int(enemy.get("elite", 0))
 	var boss := type in [12,13,14]
 	var bob := sin(world_time * (3.1 if type != 0 else 5.4) + float(enemy.get("seed",0.0))) * (4.0 if type in [0,5,7,11,18,22,25] else 2.0)
-	var scale_factor := 1.38 if boss else (1.42 if elite_kind == 2 else (1.22 if elite_kind == 1 else 1.0))
+	var scale_factor:float=mob_visual_scale(enemy)
 	# Keine schwarzen Balken unter Gegnern: die Silhouette endet mit ihren eigenen Füßen.
 	if elite_kind > 0:
 		var aura := Color('f4d485',0.65) if elite_kind == 2 else Color('d99ce7',0.55)
@@ -6034,21 +6215,22 @@ func draw_enemy(enemy: Dictionary) -> void:
 	var model_pos:Vector2=p
 	var stride:float=world_time*(3.5 if bool(profile["heavy"]) else 7.0) if bool(enemy.get("walking",false)) else 0.0
 	draw_set_transform(Vector2.ZERO)
-	MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color,stride,animation)
+	var motion:=Vector2.ONE
+	if type==0:
+		var creep:=sin(world_time*6+float(enemy.get("seed",0)))
+		motion=Vector2(1+creep*.1,1-creep*.08)
+	if type==1:
+		model_pos.y-=9+sin(world_time*7+float(enemy.get("seed",0)))*3
+		stride=world_time*18
+	MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion)
 	draw_set_transform(character_canvas_offset)
 	if float(enemy.get("flash", 0.0)) > 0.0:
 		draw_arc(model_pos, 37.0 * scale_factor, 0.0, TAU, 18, Color("fff7df", 0.72), 3.0)
 	draw_enemy_level(p, type, boss, elite_kind)
-	var fraction := clampf(float(enemy["hp"]) / float(enemy["max_hp"]), 0.0, 1.0)
-	if boss:
-		draw_rect(Rect2(p + Vector2(-53,-106),Vector2(106,9)),Color('382f35'))
-		draw_rect(Rect2(p + Vector2(-51,-104),Vector2(102*fraction,5)),Color('f3a07e'))
-	elif fraction < 1.0:
-		draw_rect(Rect2(p + Vector2(-27,-55),Vector2(54,6)),Color('453f4b'))
-		draw_rect(Rect2(p + Vector2(-26,-54),Vector2(52*fraction,4)),Color('f47d80'))
+	combat_feedback.health(self,"mob:%d"%int(enemy["uid"]),p+Vector2(0,-135 if type==12 else (-104 if boss else -54)),float(enemy["hp"]),float(enemy["max_hp"]),106 if boss else 54)
 
 func draw_enemy_level(p: Vector2, type: int, boss: bool, elite_kind: int = 0) -> void:
-	var y := -139.0 if boss else (-103.0 if elite_kind > 0 else -82.0)
+	var y := (-170.0 if type==12 else -139.0) if boss else (-103.0 if elite_kind > 0 else -82.0)
 	var level_text := "BOSS · LV %d" % enemy_level(type) if boss else ("CHAMPION · LV %d" % enemy_level(type) if elite_kind == 2 else ("ELITE · LV %d" % enemy_level(type) if elite_kind == 1 else "LV %d" % enemy_level(type)))
 	var width := 134.0 if elite_kind == 2 else (108.0 if boss or elite_kind == 1 else 54.0)
 	var bg := Rect2(p + Vector2(-width * 0.5, y), Vector2(width, 20))
@@ -6484,6 +6666,10 @@ func equipped_weapon_design() -> int:
 func draw_item_icon(origin: Vector2, kind: String, accent: Color, scale_factor: float = 1.0, stage: int = 0, design: int = 0) -> void:
 	var p := origin
 	var s := scale_factor
+	if kind=="head":
+		PixelStyle32.rect(self,Rect2(p+Vector2(3,22)*s,Vector2(28,6)*s),accent)
+		PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(7,22)*s,p+Vector2(16,2)*s,p+Vector2(25,22)*s]),[Color("718d9b"),Color("796292"),Color("658956")][clampi(design,0,2)])
+		return
 	if kind in ["armor","essence"]:
 		ItemStyle32.paint(self,origin,kind,accent,scale_factor,design)
 		return
@@ -6729,12 +6915,15 @@ func draw_hud() -> void:
 		else:
 			ui_box(Rect2(610, 549, 520, 36), Color("587767"))
 			text_at(Vector2(623, 573), nearest.replace("E  ·", "%s  ·" % binding_short("interact")), 15, Color("fff4ca"))
+	if not touch_enabled:
+		ui_button(INVENTORY_HUD_RECT,"TASCHE")
 	if touch_enabled:
 		draw_touch_controls()
 	else:
 		draw_ref_panel(Rect2(9, 586, 1134, 53))
-		text_at(Vector2(22, 609), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 11, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 655)
-		text_at(Vector2(22, 626), controller.label(int(controller.bindings["pause"]))+": Einstellungen / Belegung" if controller.used else "%s Skills · %s Tasche · %s Quests · %s Karte · %s Chat · %s Hilfe · %s Gruppe" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map"), binding_short("chat"), binding_short("mechanics"), binding_short("party")], 11, Color("becfc6"), HORIZONTAL_ALIGNMENT_LEFT, 655)
+		text_at(Vector2(22, 609), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 11, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 550)
+		text_at(Vector2(22, 626), controller.label(int(controller.bindings["pause"]))+": Einstellungen / Belegung" if controller.used else "%s Skills · %s Tasche · %s Quests · %s Karte · %s Chat · %s Hilfe · %s Gruppe" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map"), binding_short("chat"), binding_short("mechanics"), binding_short("party")], 11, Color("becfc6"), HORIZONTAL_ALIGNMENT_LEFT, 550)
+		ui_button(INVENTORY_HUD_RECT,"TASCHE")
 		for slot in 4:
 			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
 			var x := 694 + slot * 81
@@ -7023,9 +7212,11 @@ func draw_panel() -> void:
 	match panel:
 		"start": draw_start_panel()
 		"creation": draw_creation_panel()
+		"creation_review": draw_creation_review_panel()
 		"multiplayer": draw_multiplayer_panel()
 		"intro": draw_intro_panel()
-		"pause": draw_pause_panel()
+		"pause": draw_game_menu()
+		"settings": draw_pause_panel()
 		"controls": draw_controls_panel()
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
@@ -7103,19 +7294,11 @@ func draw_mechanics_panel() -> void:
 	ui_button(Rect2(820,548,160,38), "SCHLIESSEN")
 
 func draw_start_panel() -> void:
-	text_at(Vector2(291, 151), "SONNENHAIN", 39, Color("ffe2aa"))
-	text_at(Vector2(900, 148), "v29 · KONFLUX · %s" % ("MOBILE" if touch_enabled else "PC"), 16, Color("f4d7a3"))
-	ui_button(Rect2(855, 158, 130, 33), "TOUCH" if touch_enabled else "TASTEN")
-	text_at(Vector2(295, 184), "Eine Reise durch die alten Reiche  ·  Wähle deinen Helden", 18, Color("dce7d8"))
-	for i in 3:
-		var card := Rect2(168 + i * 273, 202, 260, 170)
-		ui_box(card, Color("545e5d") if pending_class == i else Color("3a4c4f"))
-		draw_rect(Rect2(card.position + Vector2(10, 10), Vector2(240, 3)), [Color("d2a36e"), Color("9abce4"), Color("a5c88d")][i])
-		draw_hero(Vector2(298 + i * 273, 277), 1.0, false, Vector2.DOWN, false, i)
-		ui_button(Rect2(174 + i * 273, 330, 250, 38), CLASS_NAMES[i].to_upper(), true, pending_class == i)
-	ui_button(Rect2(300, 378, 550, 54), "NEUES SPIEL  ·  Im gewählten Speicherplatz")
-	ui_button(Rect2(300, 448, 550, 54), "GEWÄHLTEN SPIELSTAND LADEN", FileAccess.file_exists(slot_save_path(selected_save_slot)))
-	ui_button(Rect2(860, 448, 125, 54), "KOOP")
+	text_at(Vector2(300, 210), "SONNENHAIN", 42, Color("ffe2aa"))
+	text_at(Vector2(300, 248), "Deine Reise beginnt hier.", 18, Color("dce7d8"))
+	text_at(Vector2(300, 320), "Lade deinen Spielstand oder erschaffe einen neuen Charakter.", 16, Color("dce7d8"), HORIZONTAL_ALIGNMENT_LEFT, 550)
+	ui_button(Rect2(300, 378, 550, 54), "NEUEN CHARAKTER ERSTELLEN")
+	ui_button(Rect2(300, 448, 550, 54), "SPIELSTAND LADEN", FileAccess.file_exists(slot_save_path(selected_save_slot)))
 	text_at(Vector2(168, 521), "SPEICHERPLATZ WÄHLEN", 14, Color("f6dfa9"))
 	for index in 3:
 		var card := Rect2(168 + index * 273, 530, 260, 57)
@@ -7125,7 +7308,7 @@ func draw_start_panel() -> void:
 
 func draw_creation_panel() -> void:
 	text_at(Vector2(270, 142), "CHARAKTER ERSTELLEN", 31, Color('ffe1a0'))
-	text_at(Vector2(270, 172), "Name, Geschlecht und Rasse werden für diesen Spielstand fest gespeichert.", 15, Color('d8e6dc'))
+	text_at(Vector2(270, 172), "Wähle Name, Rasse und Geschlecht. Klicke danach deine Klassenfigur an.", 15, Color('d8e6dc'))
 	text_at(Vector2(270, 215), "NAME", 14, Color('e9cc90'))
 	var name_box := Rect2(300, 228, 550, 48)
 	draw_rect(name_box, Color('22363c'))
@@ -7139,13 +7322,48 @@ func draw_creation_panel() -> void:
 		ui_button(Rect2(245 + i*220, 365, 205, 44), RACE_NAMES[i].to_upper(), true, pending_race == i)
 	# Vorschau der drei Klassen mit gewählter Rasse/Geschlecht.
 	for cls in 3:
-		var center := Vector2(350 + cls*225, 462)
+		var center := Vector2(278 + cls*225, 470)
+		var figure_rect:=Rect2(245+cls*225,414,205,100)
+		ui_box(figure_rect,Color("3a4c4f"))
+		if figure_rect.has_point(get_viewport().get_mouse_position()):draw_rect(figure_rect.grow(-3),Color("90b3c1"),false,2)
+		if creation_class_selected and pending_class==cls:draw_rect(Rect2(245+cls*225,414,205,100),Color("e5c783"),false,3)
 		draw_character_sprite(center, cls, false, Vector2.DOWN, 1.0, false, pending_race, pending_gender)
 		draw_weapon_world(center + Vector2(0,-5), cls, cls*4, Vector2.DOWN, 1.0)
-		text_at(center + Vector2(-65,55), CLASS_NAMES[cls], 14, Color('eaf2df'), HORIZONTAL_ALIGNMENT_CENTER, 130)
+		text_at(Vector2(255+cls*225,434), CLASS_NAMES[cls], 14, Color('ffe2aa'))
+		var descriptions := [["Nahkampf · Energie", "Hiebe und Schutz", "Attribut: Stärke"], ["Fernkampf · Mana", "Feuer, Eis und Blitz", "Intelligenz · 2 Ringe"], ["Fernkampf · Energie", "Pfeile und Ausweichen", "Attribut: Beweglichkeit"]]
+		for line in 3:
+			text_at(Vector2(312+cls*225,456+line*18), descriptions[cls][line], 10, Color('d8e6dc'), HORIZONTAL_ALIGNMENT_LEFT, 135)
 	ui_button(Rect2(165, 520, 110, 52), "ZURÜCK")
-	ui_button(Rect2(300, 520, 550, 52), "ABENTEUER STARTEN", creation_name.strip_edges().length() >= 2)
-	text_at(Vector2(305, 592), "Rasse und Geschlecht verändern das Pixelmodell. Klasse wurde im Hauptmenü gewählt.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_CENTER, 540)
+	ui_button(Rect2(300, 520, 550, 52), "VORSCHAU & FÄHIGKEITEN", creation_name.strip_edges().length() >= 2 and creation_class_selected)
+	text_at(Vector2(305, 592), "Figur anklicken, dann Auswahl bestätigen. Rasse und Geschlecht bestimmen dein Modell.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_CENTER, 540)
+
+func review_character_creation() -> void:
+	if creation_name.strip_edges().length()<2 or not creation_class_selected: return
+	creation_replace_confirmed=false
+	panel="creation_review"
+
+func draw_creation_review_panel() -> void:
+	text_at(Vector2(190,145), "DEIN CHARAKTER", 30, Color("ffe2aa"))
+	ui_box(Rect2(190,175,300,330),Color("31474e"))
+	draw_character_sprite(Vector2(340,330),pending_class,false,Vector2.DOWN,2.5,false,pending_race,pending_gender)
+	draw_weapon_world(Vector2(340,318),pending_class,pending_class*4,Vector2.DOWN,2.5)
+	text_at(Vector2(215,395),creation_name.strip_edges(),24,Color("fff0ce"))
+	text_at(Vector2(215,422),"%s · %s" % [RACE_NAMES[pending_race],GENDER_NAMES[pending_gender]],16,Color("d8e6dc"))
+	text_at(Vector2(215,450),CLASS_NAMES[pending_class],19,Color("ffe2aa"))
+	text_at(Vector2(215,483),"Rasse: Aussehen, keine Kampfboni",12,Color("b8cbc5"))
+	text_at(Vector2(520,198),"DEINE ERSTEN FÄHIGKEITEN",19,Color("ffe2aa"))
+	for i in 3:
+		var id:int=CLASS_SKILLS[pending_class][i]
+		var y:float=224+i*75
+		draw_skill_sprite(id,Vector2(520,y),36)
+		text_at(Vector2(568,y+17),str(ABILITIES[id]["name"]),16,Color("fff0ce"))
+		text_at(Vector2(568,y+36),str(ABILITIES[id]["desc"]),12,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,390)
+		text_at(Vector2(568,y+54),"Mögliche Auswahl beim Skillen",11,Color("b8cbc5"))
+	var occupied:=FileAccess.file_exists(slot_save_path(active_save_slot))
+	text_at(Vector2(520,472),"Speicherplatz %d · %s" % [active_save_slot,"BELEGT" if occupied else "FREI"],16,Color("ffe2aa"))
+	text_at(Vector2(520,498),"Alter Stand wird gesichert und ersetzt." if occupied else "Dein Abenteuer beginnt auf Level 1.",12,Color("edb8a0") if occupied else Color("b8cbc5"))
+	ui_button(Rect2(190,540,180,44),"ZURÜCK")
+	ui_button(Rect2(590,540,365,44),"ERSETZEN BESTÄTIGEN" if creation_replace_confirmed else ("SPIELSTAND ERSETZEN?" if occupied else "CHARAKTER ERSTELLEN"))
 
 func draw_multiplayer_panel() -> void:
 	text_at(Vector2(205, 150), "SONNENHAIN ONLINE", 31, Color('ffe1a0'))
@@ -7170,6 +7388,18 @@ func draw_multiplayer_panel() -> void:
 	var can_start := network_mode == "host" or (network_mode == "client" and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED)
 	ui_button(Rect2(605, 520, 340, 46), "WELT STARTEN" if network_mode == "host" else "WELT BEITRETEN", can_start)
 	text_at(Vector2(205, 586), "Online: wss://multiplayer.sonnenhainrpg.de/ · Desktop-Legacy bleibt zusätzlich verfügbar.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 740)
+
+func draw_game_menu() -> void:
+	text_at(Vector2(190,145),"SPIELMENÜ",30,Color("ffe2aa"))
+	ui_box(Rect2(190,175,300,335),Color("243b48"))
+	draw_character_sprite(Vector2(340,310),class_id,false,Vector2.DOWN,2.0,false,hero_race,hero_gender)
+	text_at(Vector2(215,360),hero_name,23,Color("fff0ce"))
+	text_at(Vector2(215,389),"%s · Level %d" % [CLASS_NAMES[class_id],level],16,Color("d8e6dc"))
+	text_at(Vector2(215,425),region_name(region_at(player_pos)),14,Color("d8e6dc"))
+	text_at(Vector2(215,463),"Online: Welt läuft weiter" if network_mode!="offline" else "Spiel pausiert",12,Color("b8cbc5"))
+	var labels:Array=["WEITERSPIELEN","INVENTAR","FÄHIGKEITEN","QUESTBUCH","WELTKARTE","GRUPPE","EINSTELLUNGEN & TESTMODUS"]
+	for i in labels.size():ui_button(Rect2(540,155+i*51,410,42),labels[i])
+	ui_button(Rect2(190,540,300,44),"SPEICHERN & HAUPTMENÜ")
 
 func draw_pause_panel() -> void:
 	ui_button(Rect2(860,319,130,42), "CONTROLLER")
@@ -7292,43 +7522,34 @@ func draw_intro_panel() -> void:
 	text_at(Vector2(230, 413), binding_short("interact")+" / Leertaste / Klick: Überspringen", 15, Color("c7d4ca"))
 
 func draw_skills_panel() -> void:
-	text_at(Vector2(165, 125), "%s · FÄHIGKEITEN" % CLASS_NAMES[class_id].to_upper(), 26, Color("ffeda9"))
-	text_at(Vector2(670, 124), "%d SKILLPUNKTE" % skill_points, 20, Color("f6dc9a"))
+	text_at(Vector2(165,125),"%s · FÄHIGKEITEN" % CLASS_NAMES[class_id].to_upper(),26,Color("ffeda9"))
+	text_at(Vector2(700,124),"%d SKILLPUNKTE" % skill_points,18,Color("f6dc9a"))
 	for slot in 3:
-		var id: int = int(slots[slot])
-		var name := "Frei" if id < 0 else String(ABILITIES[id]["name"])
-		ui_button(Rect2(165 + slot * 204, 148, 193, 44), "%d: %s" % [slot + 1, name], true, selected_slot == slot)
-	text_at(Vector2(169, 205), "Links: Fähigkeit ausrüsten · Rechts: Rang mit Skillpunkt verbessern (max. 5)", 15, Color("daebce"))
-	if class_id == 1:
-		ui_button(Rect2(165,532,815,32),"ARKANER SCHRITT · "+binding_short("dodge")+" · "+("GELERNT · 1,25s Abklingzeit" if arcane_step_learned else "AB LEVEL 4 · LERNEN: 1 SKILLPUNKT"),not arcane_step_learned and level>=4 and skill_points>0)
-	else:
-		text_at(Vector2(172,551),binding_short("dodge")+" · AUSWEICHROLLE · 1,25s Abklingzeit",14,Color("e6d49e"))
-	for row in 7:
-		var class_list: Array = CLASS_SKILLS[class_id]
-		if row + menu_scroll >= class_list.size(): break
-		var id: int = int(class_list[row + menu_scroll])
-		var a: Dictionary = ABILITIES[id]
-		var y := 215 + row * 44
-		var unlocked: bool = learned[id]
-		var requirement: int = a["req"]
-		var selected := id in slots
-		var can_upgrade: bool = skill_points > 0 and int(skill_levels[id]) < 5 and (creative_mode or level >= skill_rank_level(id, int(skill_levels[id]) + 1))
-		ui_box(Rect2(165, y, 815, 40), Color("608273") if selected else (Color("496a61") if can_upgrade else Color("3c4d51")))
-		draw_skill_icon(Vector2(174, y + 5), id, 29)
-		text_at(Vector2(212, y + 25), String(a["name"]), 16, Color("fff1bc") if unlocked else Color("cbd8c9"), HORIZONTAL_ALIGNMENT_LEFT, 177)
-		for star in 5:
-			var lit := star < int(skill_levels[id])
-			var star_color := (Color("8bdcf5") if class_id == 1 else Color("ffdc87")) if lit else Color("78858b")
-			draw_skill_star(Vector2(396 + star * 16, y + 20), star_color, lit)
-		text_at(Vector2(486, y + 25), String(a["desc"]), 13, Color("e4edd6") if unlocked else Color("bac6c2"), HORIZONTAL_ALIGNMENT_LEFT, 335)
-		var state := "+ RANG" if unlocked else "+ LERNEN"
-		var rank_level := skill_rank_level(id, int(skill_levels[id]) + 1)
-		if not creative_mode and level < rank_level: state = "AB LV %d" % rank_level
-		if int(skill_levels[id]) >= 5: state = "MAX"
-		if skill_points == 0 and state.begins_with("+"): state = "PUNKT FEHLT"
-		text_at(Vector2(838, y + 25), state, 13, Color("9de6c2") if can_upgrade else Color("afbec2"), HORIZONTAL_ALIGNMENT_LEFT, 135)
-	text_at(Vector2(172, 572), "Ab Level 20: feste Klassenfähigkeit auf Taste 4 · %s" % ABILITIES[class_ultimate()]["name"], 15, Color("d9e6d5"))
-	draw_skill_icon(Vector2(907, 110), class_ultimate(), 36)
+		var id:int=slots[slot]
+		ui_button(Rect2(165+slot*204,148,193,44),"%d: %s" % [slot+1,"Frei" if id<0 else ABILITIES[id]["name"]],true,selected_slot==slot)
+	text_at(Vector2(165,207),"Wähle genau eine Fähigkeit · kostet 1 Skillpunkt",14,Color("daebce"))
+	var offers:Array=skill_choices()
+	for i in offers.size():
+		var id:int=offers[i]
+		var x:float=165+i*275
+		ui_box(Rect2(x,215,265,155),Color("314b54"))
+		if id>=0:draw_skill_icon(Vector2(x+15,232),id,32)
+		text_at(Vector2(x+58,254),"Arkaner Schritt" if id==-2 else ABILITIES[id]["name"],16,Color("fff1bc"),HORIZONTAL_ALIGNMENT_LEFT,195)
+		text_at(Vector2(x+15,294),"Arkanes Ausweichen" if id==-2 else ABILITIES[id]["desc"],12,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,235)
+		var rank:int=1 if id==-2 else int(skill_levels[id])+1
+		text_at(Vector2(x+15,321),"NEU LERNEN" if rank==1 else "AUF RANG %d VERBESSERN" % rank,13,Color("ffe2aa"))
+		text_at(Vector2(x+15,350),"AUSWÄHLEN · 1 PUNKT",13,Color("9de6c2"))
+	if offers.is_empty():text_at(Vector2(185,285),"Keine Auswahl verfügbar. Neue Skillpunkte erhältst du beim Leveln.",16,Color("d8e6dc"))
+	text_at(Vector2(165,394),"GELERNT · anklicken, um den gewählten Slot zu belegen",14,Color("ffe2aa"))
+	var known:Array=[]
+	for id in CLASS_SKILLS[class_id]:
+		if learned[id]:known.append(id)
+	for row in 4:
+		var i:int=row+menu_scroll
+		if i>=known.size():break
+		var id:int=known[i]
+		ui_button(Rect2(165,405+row*37,815,33),"%s · Rang %d · %s" % [ABILITIES[id]["name"],skill_levels[id],ABILITIES[id]["desc"]],true,id in slots)
+	text_at(Vector2(165,575),"Taste 4 ab Level 20: "+str(ABILITIES[class_ultimate()]["name"]),14,Color("d9e6d5"))
 
 func draw_skill_star(center: Vector2, tint: Color, lit: bool) -> void:
 	if lit: draw_rect(Rect2(center - Vector2(7, 7), Vector2(14, 14)), Color(tint, 0.2))
@@ -7347,6 +7568,7 @@ func draw_inventory_panel() -> void:
 	draw_rect(Rect2(302, 217, 183, 276), Color("16344b"))
 	draw_rect(Rect2(337, 457, 113, 12), Color("1f3d43", 0.5))
 	draw_hero(Vector2(395, 370), 2.0, false, Vector2.DOWN)
+	draw_equipment_slot(Vector2(180,205),"KOPF",equipped_head_uid,"head")
 	draw_equipment_slot(Vector2(180, 275), "WAFFE", equipped_uid, class_weapon_icon())
 	draw_equipment_slot(Vector2(501, 235), "RÜSTUNG", equipped_armor_uid, "armor")
 	draw_equipment_slot(Vector2(501, 347), "RING 1" if class_id == 1 else "RING", equipped_ring_uid, "ring")
@@ -7378,7 +7600,7 @@ func draw_inventory_panel() -> void:
 		var item: Dictionary = inventory[selected_item]
 		text_at(Vector2(643, 491), String(item["name"]), 17, RARITY_COLORS[int(item["rarity"])], HORIZONTAL_ALIGNMENT_LEFT, 310)
 		var detail := "%s · %s · %d Gold" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), item_sale_value(item)]
-		if item["icon"] in ["sword", "staff", "bow", "armor", "ring"]: detail += " · +%d" % int(item["power"])
+		if item["icon"] in ["sword", "staff", "bow", "armor", "ring", "head"]: detail += " · +%d" % int(item["power"])
 		text_at(Vector2(643, 518), detail, 13, Color("e5eddd"), HORIZONTAL_ALIGNMENT_LEFT, 320)
 		var action_label := "ESSEN" if item["icon"] == "food" else "BENUTZEN"
 		if item["icon"] in ["sword","staff","bow","armor","ring"]:
@@ -7401,7 +7623,7 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 	text_at(pos + Vector2(55, 38), String(item["name"]).substr(0, 19), 15, RARITY_COLORS[int(item["rarity"])])
 	text_at(pos + Vector2(14, 66), "%s · %s · LV %d" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), int(item.get("level", 1))], 13, Color("e2ebde"))
 	var icon: String = item["icon"]
-	var equipped := equipped_uid if icon in ["sword", "bow", "staff"] else (equipped_armor_uid if icon == "armor" else (equipped_ring_uid if icon == "ring" else -1))
+	var equipped := equipped_uid if icon in ["sword", "bow", "staff"] else (equipped_head_uid if icon=="head" else (equipped_armor_uid if icon == "armor" else (equipped_ring_uid if icon == "ring" else -1)))
 	if icon == "ring" and class_id == 1:
 		var uid := int(item.get("uid",-1))
 		if uid == equipped_ring2_uid: equipped = equipped_ring2_uid
@@ -7412,7 +7634,7 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		if int(candidate.get("uid", -1)) == equipped:
 			worn = candidate
 			break
-	if icon in ["sword", "staff", "bow", "armor", "ring"]:
+	if icon in ["sword", "staff", "bow", "armor", "ring", "head"]:
 		var diff := int(item["power"]) - current
 		var color := Color("83e4a0") if diff > 0 else (Color("ee8a86") if diff < 0 else Color("dfdcc3"))
 		var stat_name := "Schaden" if icon in ["sword", "staff", "bow"] else ("Schutz" if icon == "armor" else "Leben")
@@ -8170,6 +8392,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
+		"head":clampi(int(state.get("head",-1)),-1,2),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos)
 	}
@@ -8279,6 +8502,7 @@ func rpc_konflux_dodge() -> void:
 @rpc("authority","call_remote","reliable")
 func rpc_konflux_health(value: float) -> void:
 	if not konflux.active: return
+	if max_hp()*clampf(value,0,100)/100<hp:hurt_until=combat_feedback.clock+.18
 	hp=max_hp()*clampf(value,0,100)/100
 	konflux.capture_id=-1
 	if hp<=0:
@@ -8304,6 +8528,15 @@ func rpc_konflux_respawn() -> void:
 func rpc_konflux_snapshot(rows: Array,stats: Dictionary,arena_time: float,areas: Array,casts: Array) -> void:
 	if not konflux.active: return
 	konflux.time=arena_time
+	konflux.fighter_stats=stats
+	for target_peer in stats:
+		if not remote_players.has(target_peer):continue
+		var state:Dictionary=remote_players[target_peer]
+		var target:Dictionary=stats[target_peer]
+		var value:float=float(state.get("max_hp",1))*float(target.get("hp",100))/100
+		if value<float(state.get("hp",value)):state["hurt_until"]=combat_feedback.clock+.18
+		state["hp"]=value
+		state["death_progress"]=clampf(1-float(target.get("respawn",DEATH_DURATION))/DEATH_DURATION,0,1) if bool(target.get("dead",false)) else -1.0
 	konflux.shots.clear()
 	for raw in rows:
 		var row: Dictionary=raw.duplicate()
@@ -8612,6 +8845,15 @@ func rpc_remote_combat_visual(peer_id: int, payload: Dictionary) -> void:
 	var dir := Vector2(float(dir_data[0]),float(dir_data[1]))
 	if not pos.is_finite() or not dir.is_finite() or dir.length_squared() < 0.01: return
 	dir = dir.normalized()
+	var remote_class:int=clampi(int(payload.get("class",0)),0,2)
+	if str(payload.get("kind","normal"))=="ability" and int(payload.get("ability",-1)) in [3,7,16,18,20,25,26,28,29,30]:
+		for shot in ability_projectiles(int(payload["ability"]),pos,dir,remote_class,0):
+			shot["damage"]=0;shot["network_visual"]=true;shot["remote_owner"]=peer_id
+			projectiles.append(shot)
+		return
+	if str(payload.get("kind","normal"))=="normal" and remote_class!=0:
+		projectiles.append({"pos":pos,"dir":dir,"speed":650.0 if remote_class==2 else 520.0,"life":1.2,"damage":0,"kind":3 if remote_class==2 else 2,"element":str(payload.get("element","")),"hits":[],"network_visual":true,"remote_owner":peer_id})
+		return
 	remote_combat_visuals.append({
 		"peer_id":peer_id,
 		"kind":str(payload.get("kind","normal")),
@@ -8667,6 +8909,8 @@ func rpc_server_world_manifest(manifest: Dictionary) -> void:
 	queue_redraw()
 
 func draw_remote_combat_visuals() -> void:
+	combat_feedback.draw(self)
+	draw_mob_deaths()
 	for visual in remote_combat_visuals:
 		var pos: Vector2 = visual["pos"]
 		var dir: Vector2 = visual["dir"]
@@ -8798,7 +9042,7 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		if not state_matches_local_context(state): continue
 		var coords: Array = state.get("pos", [0.0,0.0])
 		if coords.size() < 2: continue
-		var rp := Vector2(float(coords[0]), float(coords[1]))
+		var rp := network_player_position(int(peer_id))
 		if not visible_world(rp, 120): continue
 		var dir_data: Array = state.get("facing", [0.0,1.0])
 		var rdir := Vector2(float(dir_data[0]),float(dir_data[1])) if dir_data.size() >= 2 else Vector2.DOWN
@@ -8808,8 +9052,9 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		draw_circle(rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
 		draw_arc(rp + Vector2(0, 10), 30.0, 0.0, TAU, 24, Color("8ee7ff", 0.82), 2.0)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
-		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)))
-		draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
+		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)))
+		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
+		combat_feedback.health(self,"peer:%d"%int(peer_id),rp+Vector2(0,-43),float(state.get("hp",1)),float(state.get("max_hp",1)),60,Color("79caa3"))
 		text_at(rp + Vector2(-75,-57), "%s · LV %d" % [str(state.get("name","Freund")), int(state.get("level",1))], 13, Color('bfe7ff'), HORIZONTAL_ALIGNMENT_CENTER, 150)
 
 func ensure_player_uuid() -> void:
@@ -8848,6 +9093,7 @@ func update_network_interpolation(delta: float) -> void:
 	if uses_server_world():
 		var mob_blend := 1.0-exp(-15.0*delta)
 		for enemy in enemies:
+			enemy["flash"]=maxf(0,float(enemy.get("flash",0))-delta)
 			var attack:Dictionary=enemy.get("attack_state",{})
 			if not attack.is_empty():attack["age"]=float(attack.get("age",0))+delta
 			if not enemy.has("net_target_pos"): continue
@@ -9031,7 +9277,7 @@ func rpc_server_pong(client_stamp: int) -> void:
 	network_ping_ms = clampi(Time.get_ticks_msec()-client_stamp,0,9999)
 	queue_redraw()
 
-@rpc("authority","call_remote","unreliable")
+@rpc("authority","call_remote","reliable")
 func rpc_server_hit_confirm(payload: Dictionary) -> void:
 	var pos_data: Array = payload.get("pos",[])
 	if pos_data.size() < 2: return
@@ -9040,11 +9286,12 @@ func rpc_server_hit_confirm(payload: Dictionary) -> void:
 	for enemy in enemies:
 		if int(enemy.get("uid",-2)) == uid:
 			enemy["flash"] = 0.18
+			enemy["hp"]=clampf(float(payload.get("hp",enemy["hp"])),0,float(enemy["max_hp"]))
 			break
 	effect(pos+Vector2(0,-30),"-%d" % int(payload.get("damage",0)),Color("fff1a1"),0.55)
 
 func server_broadcast_hit_confirm(source_peer: int, enemy: Dictionary, damage: int) -> void:
-	if network_mode != "host" or source_peer <= 0: return
+	if network_mode != "host": return
 	var payload := {"uid":int(enemy.get("uid",-1)),"pos":[enemy["pos"].x,enemy["pos"].y],"damage":damage,"hp":maxf(0.0,float(enemy.get("hp",0.0)))}
 	for raw_peer in multiplayer.get_peers():
 		var peer_id := int(raw_peer)
@@ -9072,6 +9319,7 @@ func item_icon_for_uid(uid: int) -> String:
 	return ""
 
 func validate_equipment_slots() -> void:
+	if head_visual()!=class_id:equipped_head_uid=-1
 	var weapon_icon := item_icon_for_uid(equipped_uid)
 	if equipped_uid >= 0 and (weapon_icon == "" or weapon_icon != class_weapon_icon()):
 		equipped_uid = -1
@@ -9085,11 +9333,39 @@ func validate_equipment_slots() -> void:
 func is_equipped_uid(uid: int) -> bool:
 	return uid >= 0 and uid in equipped_item_uids()
 
+func head_visual() -> int:
+	for item in inventory:
+		if int(item.get("uid",-1))==equipped_head_uid and str(item.get("icon",""))=="head":
+			return int(item.get("head_class",-1))
+	return -1
+
+func rare_head_reward(source:String,index:int,chance:float) -> bool:
+	var rng:=RandomNumberGenerator.new()
+	rng.seed=abs((player_uuid+":"+source+":"+str(index)).hash())
+	return rng.randf()<chance
+
+func make_class_head(item_level:int) -> Dictionary:
+	var names:Array=["Helm der Morgenwacht","Hut des Erzmagiers","Haube des Falken"]
+	var item:Dictionary=make_item(names[class_id],"head",4,0,0,"",maxi(1,item_level))
+	item["head_class"]=class_id
+	item[["str","int","agi"][class_id]]=12+int(item_level/4)
+	item["design"]=class_id
+	return item
+
 func toggle_equipment_item(index: int) -> bool:
 	if index < 0 or index >= inventory.size(): return false
 	var item: Dictionary = inventory[index]
 	var uid := int(item.get("uid",-1))
 	var icon := str(item.get("icon",""))
+	if icon=="head":
+		if int(item.get("head_class",-1))!=class_id:
+			message("Diese Kopfbedeckung gehört einer anderen Klasse.")
+			return true
+		equipped_head_uid=-1 if equipped_head_uid==uid else uid
+		validate_equipment_slots()
+		save_game()
+		announce_multiplayer_context()
+		return true
 	if icon in ["sword","staff","bow"]:
 		if icon != class_weapon_icon():
 			message("%s kann nur %s ausrüsten." % [CLASS_NAMES[class_id], {"sword":"Schwerter","staff":"Stäbe","bow":"Bögen"}[class_weapon_icon()]])
@@ -9132,6 +9408,7 @@ func toggle_equipment_item(index: int) -> bool:
 func unequip_slot(slot: String) -> void:
 	match slot:
 		"weapon": equipped_uid = -1
+		"head": equipped_head_uid = -1
 		"armor": equipped_armor_uid = -1
 		"ring2": equipped_ring2_uid = -1
 		"ring":
@@ -9253,7 +9530,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos), "konflux":konflux.active, "room":konflux.room}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "element":weapon_element(), "region":region_at(player_pos), "konflux":konflux.active, "room":konflux.room}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
@@ -9560,3 +9837,169 @@ func rpc_zz_save_reply(response: Dictionary) -> void:
 	if network_mode != "client": return
 	server_last_reply_ms = Time.get_ticks_msec()
 	server_save.reply(self,response)
+
+func mob_visual_scale(enemy:Dictionary)->float:
+	var type:int=int(enemy["type"])
+	if bool(enemy.get("small_guardian",false)):return .48
+	var factor:float=1.3 if type==12 else (.48 if type in [0,1,18,25] else (.6 if type in [2,6,10] else .8))
+	if type in [13,14]:factor=1.0
+	return factor*(1.42 if int(enemy.get("elite",0))==2 else (1.22 if int(enemy.get("elite",0))==1 else 1.0))
+
+func spawn_tower_guardians(boss:Dictionary)->void:
+	if int(boss["type"])!=12:return
+	for side in [-1,1]:
+		var pos:Vector2=boss["home"]+Vector2(side*100,40)
+		var guard:=make_enemy(4,pos)
+		guard["guardian_of"]=int(boss["uid"]);guard["small_guardian"]=true
+		guard["hp"]*=.6;guard["max_hp"]=guard["hp"]
+		if dedicated_server_mode:
+			guard["uid"]=server_next_mob_uid;server_next_mob_uid+=1
+		guard["context"]="world";guard["instance_id"]="world"
+		enemies.append(guard)
+
+func projectile_collision(a:Vector2,b:Vector2,server:bool,context:String="",room:int=-1,height:float=0)->Dictionary:
+	var count:int=maxi(1,ceili(a.distance_to(b)/8.0))
+	var previous:=a
+	for n in range(1,count+1):
+		var point:Vector2=a.lerp(b,float(n)/count)
+		var blocked:bool=projectile_world_blocked(point) if server else is_blocked(point,previous)
+		if context=="konflux":blocked=(KonfluxMap.safe(point,room) or KonfluxMap.solid(point,4) or KonfluxMap.height_at(point)>height+20 or not Rect2(Vector2.ZERO,KonfluxMap.SIZE).has_point(point)) if room<0 else KonfluxMap.blocked(point,previous,room,4)
+		if blocked:return {"hit":true,"pos":previous}
+		previous=point
+	return {"hit":false,"pos":b}
+
+func projectile_break(pos:Vector2,dir:Vector2,kind:int,element:String,player_shot:bool=true,context:String="",instance:String="")->void:
+	var where:String=("world" if dedicated_server_mode else multiplayer_context()) if context=="" else context
+	var room:String=("world" if dedicated_server_mode else multiplayer_instance_id()) if instance=="" else instance
+	if not dedicated_server_mode:
+		combat_feedback.burst(pos,dir,kind,element)
+		if pos.distance_to(player_pos)<850:play_sound("arrow_break" if kind==3 else "magic_break")
+	if network_mode=="host":
+		var payload:Dictionary={"pos":[pos.x,pos.y],"dir":[dir.x,dir.y],"kind":kind,"element":element,"context":where,"instance_id":room}
+		for peer in multiplayer.get_peers():
+			var state:Dictionary=remote_players.get(int(peer),{})
+			if str(state.get("context","world"))==where and str(state.get("instance_id","world"))==room:
+				rpc_projectile_break.rpc_id(int(peer),payload)
+
+@rpc("authority","call_remote","reliable")
+func rpc_projectile_break(payload:Dictionary)->void:
+	if str(payload.get("context","world"))!=multiplayer_context() or str(payload.get("instance_id","world"))!=multiplayer_instance_id():return
+	var raw:Array=payload.get("pos",[])
+	var facing_data:Array=payload.get("dir",[])
+	if raw.size()!=2 or facing_data.size()!=2:return
+	var pos:=Vector2(float(raw[0]),float(raw[1]))
+	if not pos.is_finite() or pos.distance_to(player_pos)>900:return
+	combat_feedback.burst(pos,Vector2(float(facing_data[0]),float(facing_data[1])),int(payload.get("kind",2)),str(payload.get("element","")))
+	play_sound("arrow_break" if int(payload.get("kind",2))==3 else "magic_break")
+
+func projectile_world_blocked(point:Vector2)->bool:
+	if point.x<26 or point.y<26 or point.x>WORLD.x-26 or point.y>WORLD.y-26:return true
+	if blocked_by_region_wall(point) or terrain_blocked(point):return true
+	if region_at(point)==0:
+		for home in house_positions():
+			if Rect2(home+Vector2(8,73),Vector2(176,75)).has_point(point):return true
+		for stone in WAYSTONES:
+			if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).has_point(point):return true
+	return false
+
+func mark_network_teleport()->void:
+	teleport_serial+=1
+	camera_smooth=player_pos-VIEW*.5
+	camera_pos=camera_smooth
+	if network_mode=="client" and multiplayer.multiplayer_peer!=null:push_vital_state()
+
+func valid_network_teleport(origin:Vector2,target:Vector2,previous:Dictionary,context:String)->bool:
+	if context!="world":return false
+	if float(previous.get("hp",1))<=0 and target.distance_to(Vector2(825,1020))<80:return true
+	for stone in WAYSTONES:
+		if origin.distance_to(stone)>210:continue
+		for destination in WAYSTONES:
+			if target.distance_to(destination+Vector2(0,180))<80:return true
+	for portal in PORTALS:
+		if origin.distance_to(portal[0])<160 and target.distance_to(portal[1])<280:return true
+		if origin.distance_to(portal[1])<160 and target.distance_to(portal[0])<280:return true
+	return false
+
+func mob_hit_radius(enemy:Dictionary)->float:
+	return maxf(8,28*mob_visual_scale(enemy))
+
+func ability_projectiles(id:int,origin:Vector2,dir:Vector2,cls:int,power:int)->Array:
+	var result:Array=[]
+	var count:int=3 if id in [7,20,26] else 1
+	for n in count:
+		var speed:float=650 if id==3 else (700 if id==7 else (920 if id in [18,25] else (390 if id==20 else (570 if id in [16,29] else 720))))
+		var damage:int=power+15 if id==3 else (power+10 if id==7 else int(power*(.72 if id in [20,26] else (.68 if id==16 else 1.0)))+(22 if id in [18,25] else 7))
+		result.append({"pos":origin,"dir":dir.rotated((n-(count-1)*.5)*.24),"speed":speed,"life":.9 if id==3 else (.8 if id==7 else (1.65 if id==20 else 1.25)),"damage":damage,"kind":0 if id==3 else (1 if id==7 else (3 if cls==2 else 2)),"element":"gift" if id==28 else ("eis" if id==29 else ("blitz" if id in [18,30] else ("feuer" if id==16 else ""))),"spell_id":id,"pierce":id in [3,18,25],"hits":[],"trail":[]})
+	return result
+
+func steer_homing_shot(shot:Dictionary,delta:float)->void:
+	var nearest:=235.0
+	for enemy in enemies:
+		if int(enemy["uid"]) in shot.get("hits",[]):continue
+		var distance:float=shot["pos"].distance_to(enemy["pos"])
+		if distance<nearest:
+			nearest=distance
+			shot["dir"]=Vector2(shot["dir"]).lerp((Vector2(enemy["pos"])-Vector2(shot["pos"])).normalized(),minf(1,delta*5.5)).normalized()
+
+func server_fireball_impact(shot:Dictionary)->void:
+	for i in range(enemies.size()-1,-1,-1):
+		if i>=enemies.size():continue
+		if Vector2(shot["pos"]).distance_to(enemies[i]["pos"])<85 and int(enemies[i]["uid"]) not in shot.get("hits",[]) and not projectile_collision(shot["pos"],enemies[i]["pos"],true)["hit"]:
+			damage_enemy(i,int(shot["damage"]*.5),Vector2.ZERO,false,"feuer",int(shot.get("owner_peer",0)))
+
+func push_vital_state()->void:
+	if network_mode!="client" or multiplayer.multiplayer_peer==null:return
+	if multiplayer.multiplayer_peer.get_connection_status()!=MultiplayerPeer.CONNECTION_CONNECTED:return
+	last_vitals=Vector2(hp,max_hp())
+	rpc_player_vital_state.rpc_id(1,local_player_state())
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_player_vital_state(state:Dictionary)->void:
+	rpc_player_state(state,true)
+
+@rpc("authority","call_remote","reliable")
+func rpc_receive_player_vitals(peer_id:int,state:Dictionary)->void:
+	rpc_receive_player_state(peer_id,state)
+
+func announce_mob_death(enemy:Dictionary)->void:
+	var payload:Dictionary={"uid":enemy["uid"],"type":enemy["type"],"pos":[enemy["pos"].x,enemy["pos"].y],"scale":mob_visual_scale(enemy),"context":"world","instance_id":"world"}
+	if not dedicated_server_mode:receive_mob_death(payload)
+	if network_mode=="host":
+		for peer in multiplayer.get_peers():
+			var state:Dictionary=remote_players.get(int(peer),{})
+			if str(state.get("context","world"))=="world":rpc_mob_death.rpc_id(int(peer),payload)
+
+@rpc("authority","call_remote","reliable")
+func rpc_mob_death(payload:Dictionary)->void:
+	if multiplayer_context()!="world":return
+	receive_mob_death(payload)
+	for i in range(enemies.size()-1,-1,-1):
+		if int(enemies[i]["uid"])==int(payload.get("uid",-1)):enemies.remove_at(i)
+
+func receive_mob_death(payload:Dictionary)->void:
+	var uid:int=int(payload.get("uid",-1))
+	if dead_mob_uids.has(uid):return
+	dead_mob_uids[uid]=combat_feedback.clock
+	var row:Dictionary=payload.duplicate()
+	row["at"]=combat_feedback.clock
+	mob_deaths.append(row)
+	while mob_deaths.size()>24:mob_deaths.pop_front()
+	for key in dead_mob_uids.keys():
+		if combat_feedback.clock-float(dead_mob_uids[key])>15:dead_mob_uids.erase(key)
+
+func draw_mob_deaths()->void:
+	for i in range(mob_deaths.size()-1,-1,-1):
+		var row:Dictionary=mob_deaths[i]
+		var age:float=combat_feedback.clock-float(row["at"])
+		if age>.45:mob_deaths.remove_at(i);continue
+		var raw:Array=row["pos"];var p:=Vector2(float(raw[0]),float(raw[1]))
+		if not visible_world(p,150):continue
+		var type:int=int(row["type"])
+		MobDesign32.paint(self,p+character_canvas_offset,type,enemy_level(type),Vector2.DOWN,ENEMY_TYPES[type]["color"].darkened(age*.9),0,-1,float(row["scale"])*(1-age*.75),Vector2(1,1-age*1.6))
+		draw_set_transform(character_canvas_offset)
+
+func normal_mob_count()->int:
+	var count:=0
+	for enemy in enemies:
+		if int(enemy["type"]) not in [12,13,14] and not bool(enemy.get("small_guardian",false)):count+=1
+	return count
