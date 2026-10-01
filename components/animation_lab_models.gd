@@ -76,13 +76,18 @@ static func mage(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	var attack_push: float=0.0
 	var staff_swing: float=0.0
 	if state=="attack":
-		if state_t<0.30:
-			staff_swing=lerpf(0.0,-0.75,state_t/0.30)
+		if state_t<0.26:
+			# anticipation: staff pulls back, body holds position
+			staff_swing=lerpf(0.0,-1.02,smoothstep(0.0,0.26,state_t))
+			attack_push=-sin(state_t/0.26*PI)*3.0
 		elif state_t<0.50:
-			staff_swing=lerpf(-0.75,0.95,(state_t-0.30)/0.20)
-			attack_push=sin((state_t-0.30)/0.20*PI)*10.0
+			# cast: fast release with visible forward commitment
+			var cast_t: float=(state_t-0.26)/0.24
+			staff_swing=lerpf(-1.02,1.08,smoothstep(0.0,1.0,cast_t))
+			attack_push=sin(cast_t*PI)*14.0
 		else:
-			staff_swing=lerpf(0.95,0.0,clampf((state_t-0.50)/0.50,0.0,1.0))
+			# recovery
+			staff_swing=lerpf(1.08,0.0,smoothstep(0.0,1.0,(state_t-0.50)/0.50))
 	var recoil: float=sin(clampf(state_t,0.0,1.0)*PI)*11.0 if state=="hurt" else 0.0
 	var death: float=clampf(state_t,0.0,1.0) if state=="death" else 0.0
 	var base: Vector2=p+look*attack_push-look*recoil
@@ -197,11 +202,16 @@ static func mage(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	ellipse_px(c,Vector2(0,-84),15,15,Color("45cbe0"))
 	ellipse_px(c,Vector2(0,-84),9,9,Color("a9f5ff"))
 	ellipse_px(c,Vector2(-4,-88),3,3,Color.WHITE)
-	if state=="attack" and state_t>=0.34 and state_t<=0.65:
-		var pulse: float=15.0+sin((state_t-0.34)/0.31*PI)*12.0
+	if state=="attack" and state_t>=0.18 and state_t<=0.72:
+		var charge: float=clampf((state_t-0.18)/0.22,0.0,1.0)
+		var release: float=1.0-clampf((state_t-0.50)/0.22,0.0,1.0)
+		var pulse: float=14.0+charge*13.0+sin(state_t*TAU*5.0)*2.0
 		c.draw_arc(Vector2(0,-84),pulse,0,TAU,32,Color("81efff"),4.0)
+		c.draw_arc(Vector2(0,-84),maxf(7.0,pulse-7.0),0,TAU,24,Color("d6fbff"),2.0)
 		for sgn in [-1.0,1.0]:
-			c.draw_line(Vector2(0,-84),Vector2(sgn*18,-84-12),Color("c4f9ff"),3.0)
+			c.draw_line(Vector2(0,-84),Vector2(sgn*20,-98),Color("c4f9ff"),3.0)
+		if state_t>=0.42 and state_t<=0.62:
+			c.draw_line(Vector2(0,-84),Vector2(look.x*82,-84+look.y*34),Color("9defff"),7.0*release+2.0)
 	c.draw_set_transform(Vector2.ZERO)
 	if state=="hurt":
 		c.draw_circle(base+Vector2(0,-76),52,Color(1.0,0.65,0.55,0.10))
@@ -223,10 +233,21 @@ static func slime(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: S
 		sx=1.0+pulse*0.025
 		sy=1.0-pulse*0.02
 	elif state=="attack":
-		var a: float=sin(clampf(state_t,0.0,1.0)*PI)
-		sx=1.0+a*0.36
-		sy=1.0-a*0.18
-		p+=look*a*26.0
+		if state_t<0.28:
+			var wind: float=smoothstep(0.0,0.28,state_t)
+			sx=1.0+wind*0.22
+			sy=1.0-wind*0.26
+			p-=look*wind*5.0
+		elif state_t<0.56:
+			var slam: float=(state_t-0.28)/0.28
+			sx=1.22-slam*0.10
+			sy=0.74+slam*0.38
+			p+=look*smoothstep(0.0,1.0,slam)*34.0
+		else:
+			var recover: float=smoothstep(0.0,1.0,(state_t-0.56)/0.44)
+			sx=lerpf(1.12,1.0,recover)
+			sy=lerpf(1.12,1.0,recover)
+			p+=look*lerpf(34.0,0.0,recover)
 	elif state=="hurt":
 		var h: float=sin(clampf(state_t,0.0,1.0)*PI)
 		sx=1.0+h*0.16
@@ -276,10 +297,13 @@ static func slime(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: S
 		ellipse_px(c,p+Vector2(q.x*sx,q.y-hop),9,4,Color("72dc78"))
 	ellipse_px(c,p+Vector2(-47,-13-hop),4,4,Color("83ec83"))
 	ellipse_px(c,p+Vector2(43,-25-hop),3,3,Color("9af198"))
-	if state=="attack" and state_t>0.40 and state_t<0.72:
-		for i in 4:
-			var q: Vector2=p+look*(50.0+float(i)*11.0)+right*float(i-1)*4.0
-			ellipse_px(c,q,4,3,Color("a3f49a"))
+	if state=="attack" and state_t>0.34 and state_t<0.68:
+		for i in 6:
+			var spray_t: float=float(i)/5.0
+			var q: Vector2=p+look*(47.0+spray_t*43.0)+right*(float(i)-2.5)*6.0
+			ellipse_px(c,q,5.0-spray_t*2.0,4.0-spray_t,Color("a3f49a"))
+		if state_t>0.46 and state_t<0.60:
+			c.draw_arc(p+look*42.0+Vector2(0,7),38.0,0.1,PI-0.1,20,Color("c5ffb8"),4.0)
 
 static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: String,state_t: float) -> void:
 	# Dangerous low stance: oversized shoulders/head, jagged mane, fangs, claws and red eyes.
@@ -290,7 +314,17 @@ static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	var body: Vector2=p-f*8.0+Vector2(0,-34)
 	var lunge: float=0.0
 	if state=="attack":
-		lunge=sin(clampf(state_t,0.0,1.0)*PI)*30.0
+		if state_t<0.24:
+			var crouch: float=smoothstep(0.0,0.24,state_t)
+			lunge=-crouch*7.0
+			body.y+=crouch*7.0
+		elif state_t<0.56:
+			var pounce: float=(state_t-0.24)/0.32
+			lunge=lerpf(-7.0,42.0,smoothstep(0.0,1.0,pounce))
+			body.y-=sin(pounce*PI)*13.0
+		else:
+			var recover: float=smoothstep(0.0,1.0,(state_t-0.56)/0.44)
+			lunge=lerpf(42.0,0.0,recover)
 	elif state=="hurt":
 		lunge=-sin(clampf(state_t,0.0,1.0)*PI)*12.0
 	elif state=="death":
@@ -373,11 +407,15 @@ static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 		poly_px(c,PackedVector2Array([
 			jaw+r*sgn*7.0,jaw+r*sgn*3.0,jaw+r*sgn*5.0+Vector2(0,17)
 		]),Color("f3ead7"))
-	if state=="attack" and state_t>0.28 and state_t<0.72:
+	if state=="attack" and state_t>0.30 and state_t<0.70:
 		for sgn in [-1.0,1.0]:
 			poly_px(c,PackedVector2Array([
-				jaw+r*sgn*11.0,jaw+r*sgn*6.0,jaw+r*sgn*8.0+Vector2(0,22)
+				jaw+r*sgn*12.0,jaw+r*sgn*5.0,jaw+r*sgn*8.0+Vector2(0,24)
 			]),Color("fff4df"))
-		c.draw_arc(head+f*13.0,26,-0.8,0.8,18,Color("d32835"),4.0)
+		var bite_open: float=sin(clampf((state_t-0.30)/0.40,0.0,1.0)*PI)
+		c.draw_arc(head+f*15.0,28.0+bite_open*5.0,-0.88,0.88,20,Color("d32835"),4.0)
+		if state_t>0.46 and state_t<0.60:
+			for sgn in [-1.0,1.0]:
+				c.draw_line(muzzle+f*13.0+r*sgn*4.0,muzzle+f*31.0+r*sgn*10.0,Color("f5e6d0"),3.0)
 	if state=="hurt":
 		c.draw_circle(head,32,Color(1.0,0.25,0.25,0.12))
