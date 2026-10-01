@@ -303,6 +303,7 @@ var arena_leaderboard: Array = []
 var arena_best := 0
 var arena_reward_wave := 0
 var arena_reward_item:Dictionary={}
+var arena_reward_record := false
 var arena_pending_loaded := false
 var dungeon_id := -1
 var dungeon_return_pos := Vector2(900, 1050)
@@ -321,6 +322,10 @@ var structure_tiles: Texture2D
 var house_tiles: Texture2D
 var village_bg: Texture2D
 var dungeon_chests_opened: Array = [false, false, false]
+const CHEST_RESPAWN_SECONDS := 360.0
+var chest_ready_at: Array = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+var dungeon_chest_ready_at: Array = [0.0, 0.0, 0.0]
+var server_chest_ready_at: Dictionary = {}
 var battle_zones: Array = []
 var active_save_slot := 1
 var selected_save_slot := 1
@@ -743,6 +748,8 @@ func _on_connected_to_server() -> void:
 		player_pos=konflux.return_position
 		message("Neu verbunden. Betritt Konflux erneut durch das Tor.")
 	local_peer_id = multiplayer.get_unique_id()
+	for chest_index in LANDMARKS.size():
+		rpc_request_chest_state.rpc_id(1,"world",chest_index)
 	live_reconnect_timer = 0.0
 	network_status = "Online · Peer %d" % local_peer_id
 	add_chat_line("SYSTEM", "Mit dem Sonnenhain-Live-Server verbunden.")
@@ -1344,6 +1351,7 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 	return ExperienceRules.reward(base_xp, recipient_level, enemy_level(type))
 
 func _process(delta: float) -> void:
+	update_chest_respawns()
 	combat_feedback.step(delta)
 	if character_created and Vector2(hp,max_hp())!=last_vitals:push_vital_state()
 	if not dedicated_server_mode: food_system.tick(self,delta)
@@ -1501,37 +1509,75 @@ func network_player_position(peer_id: int) -> Vector2:
 		return remote_player_render_positions[peer_id]
 	return Vector2(float(coords[0]), float(coords[1]))
 
-func spawn_dedicated_enemy() -> void:
-	if normal_mob_count()>=mini(24,remote_players.size()*8):return
-	if remote_players.is_empty(): return
-	var peers: Array = []
-	for raw_peer in remote_players.keys():
-		if str(remote_players[raw_peer].get("context","world")) == "world":
-			peers.append(raw_peer)
-	if peers.is_empty(): return
-	var peer_id := int(peers[randi() % peers.size()])
-	if konflux.fighter_stats.has(peer_id): return
-	var center := network_player_position(peer_id)
-	if center.x < -9000.0: return
-	var target_region := region_at(center)
-	if target_region == 0: return
-	var candidates: Array = []
+func server_normal_mob_cap() -> int:
+	return mini(32,maxi(8,remote_players.size()*8))
+
+func server_region_mob_count(target_region:int) -> int:
+	var count:=0
+	for enemy in enemies:
+		if bool(enemy.get("invasion",false)): continue
+		if int(enemy.get("type",-1)) in [12,13,14]: continue
+		if str(enemy.get("context","world"))!="world": continue
+		if region_at(Vector2(enemy.get("pos",Vector2.ZERO)))==target_region: count+=1
+	return count
+
+func spawn_dedicated_enemy_for_peer(peer_id:int) -> bool:
+	if not remote_players.has(peer_id): return false
+	if str(remote_players[peer_id].get("context","world"))!="world": return false
+	if konflux.fighter_stats.has(peer_id): return false
+	var center:=network_player_position(peer_id)
+	if center.x < -9000.0: return false
+	var target_region:=region_at(center)
+	if target_region==0: return false
+	var candidates:Array=[]
 	for i in ENEMY_TYPES.size():
-		if i not in [12, 13, 14] and int(ENEMY_TYPES[i]["region"]) == target_region:
-			candidates.append(i)
-	if candidates.is_empty(): return
-	var type := int(candidates.pick_random())
-	for attempt in 12:
-		var pos := center + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(470.0, 760.0)
-		if spawn_position_allowed(pos,target_region) and pos.distance_to(center) >= 390.0:
-			var roll := randf()
-			var mob := make_enemy(type, pos, 2 if roll < 0.01 and target_region >= 3 else (1 if roll < 0.075 else 0))
-			mob["uid"] = server_next_mob_uid
-			mob["context"] = "world"
-			mob["instance_id"] = "world"
-			server_next_mob_uid += 1
+		if i not in [12,13,14] and int(ENEMY_TYPES[i]["region"])==target_region: candidates.append(i)
+	if candidates.is_empty(): return false
+	var type:=int(candidates.pick_random())
+	for attempt in 18:
+		var pos:=center+Vector2.RIGHT.rotated(randf()*TAU)*randf_range(470.0,780.0)
+		if spawn_position_allowed(pos,target_region) and pos.distance_to(center)>=390.0:
+			var roll:=randf()
+			var mob:=make_enemy(type,pos,2 if roll<0.01 and target_region>=3 else (1 if roll<0.075 else 0))
+			mob["uid"]=server_next_mob_uid
+			mob["context"]="world"
+			mob["instance_id"]="world"
+			server_next_mob_uid+=1
 			enemies.append(mob)
-			return
+			return true
+	return false
+
+func spawn_dedicated_enemy() -> void:
+	if remote_players.is_empty() or normal_mob_count()>=server_normal_mob_cap():return
+	var peers:Array=[]
+	for raw_peer in remote_players.keys():
+		if str(remote_players[raw_peer].get("context","world"))=="world" and region_at(network_player_position(int(raw_peer)))!=0:
+			peers.append(int(raw_peer))
+	if peers.is_empty():return
+	spawn_dedicated_enemy_for_peer(int(peers.pick_random()))
+
+func ensure_dedicated_region_population() -> void:
+	if network_mode!="host":return
+	var region_peers:Dictionary={}
+	for raw_peer in remote_players.keys():
+		var peer_id:=int(raw_peer)
+		var state:Dictionary=remote_players[raw_peer]
+		if str(state.get("context","world"))!="world" or konflux.fighter_stats.has(peer_id):continue
+		var pos:=network_player_position(peer_id)
+		if pos.x < -9000.0:continue
+		var region:=region_at(pos)
+		if region==0:continue
+		if not region_peers.has(region):region_peers[region]=[]
+		region_peers[region].append(peer_id)
+	for raw_region in region_peers.keys():
+		if normal_mob_count()>=server_normal_mob_cap():break
+		var region:=int(raw_region)
+		var peers:Array=region_peers[raw_region]
+		var desired:=mini(10,maxi(4,peers.size()*5))
+		var deficit:=maxi(0,desired-server_region_mob_count(region))
+		for n in mini(3,deficit):
+			if normal_mob_count()>=32:break
+			if not spawn_dedicated_enemy_for_peer(int(peers[n%peers.size()])):break
 
 func mob_profile(enemy:Dictionary)->Dictionary:
 	var type:int=int(enemy["type"])
@@ -1725,10 +1771,9 @@ func process_dedicated_server(delta: float) -> void:
 		server_rescue_spawn_timer = 0.0
 		update_dedicated_rescue_spawns()
 		spawn_dedicated_bosses()
-	if server_spawn_timer >= 2.4:
+	if server_spawn_timer >= 1.2:
 		server_spawn_timer = 0.0
-		if enemies.size() < mini(24, remote_players.size() * 8):
-			spawn_dedicated_enemy()
+		ensure_dedicated_region_population()
 	update_dedicated_enemies(delta)
 	update_dedicated_player_projectiles(delta)
 	update_dedicated_enemy_projectiles(delta)
@@ -2495,6 +2540,34 @@ func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float
 		if offset.length() <= reach and (offset.length() < 25 or direction.dot(offset.normalized()) > threshold):
 			damage_enemy(i, damage, direction, stun, element, source_peer)
 
+func enemy_position_blocked(candidate:Vector2,enemy:Dictionary) -> bool:
+	if arena_mode!="":return candidate.distance_to(ARENA_CENTER)>ARENA_RADIUS-28.0
+	if dungeon_id>=0:return dungeon_blocked(candidate)
+	if interior_id>=0:return tavern_blocked(candidate)
+	if terrain_blocked(candidate) or blocked_by_region_wall(candidate):return true
+	for other in enemies:
+		if int(other.get("uid",-1))==int(enemy.get("uid",-2)):continue
+		if Vector2(other.get("pos",Vector2.ZERO)).distance_to(candidate)<24.0:return true
+	return false
+
+func safe_enemy_knockback(enemy:Dictionary,push:Vector2) -> Vector2:
+	if push.length_squared()<0.0001:return Vector2(enemy["pos"])
+	var scale:=1.0
+	var type:=int(enemy.get("type",-1))
+	if type in [12,13,14]:scale=.15
+	elif int(enemy.get("elite",0))>=2:scale=.35
+	elif int(enemy.get("elite",0))==1:scale=.60
+	var origin:Vector2=enemy["pos"]
+	var distance:=18.0*scale
+	var steps:=maxi(1,ceili(distance/4.0))
+	var step:=push.normalized()*distance/steps
+	var current:=origin
+	for i in steps:
+		var candidate:=current+step
+		if enemy_position_blocked(candidate,enemy):break
+		current=candidate
+	return current
+
 func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0) -> void:
 	if index < 0 or index >= enemies.size(): return
 	play_sound("hit")
@@ -2534,7 +2607,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	enemy["flash"] = 0.16
 	if source_peer > 0 and network_mode == "host":
 		server_broadcast_hit_confirm(source_peer,enemy,amount)
-	enemy["pos"] = enemy["pos"] + push * 18.0
+	enemy["pos"] = safe_enemy_knockback(enemy,push)
 	if stun: enemy["stun"] = 1.2
 	effect(enemy["pos"] + Vector2(0, -25), str(amount), Color("fff1a1"), 0.75)
 	if drain_timer > 0: hp = minf(max_hp(), hp + minf(8.0, amount * 0.2))
@@ -2870,6 +2943,7 @@ func enter_arena(mode: String) -> void:
 	arena_wave = 0
 	arena_intermission = 2.5
 	arena_reward_claimed = false
+	arena_reward_record = false
 	arena_reward_item.clear()
 	player_pos = ARENA_CENTER
 	enemies.clear()
@@ -2928,7 +3002,11 @@ func finish_final_arena() -> void:
 
 func finish_survival_run() -> void:
 	arena_reward_wave = maxi(1, arena_wave)
+	var previous_best := arena_best
+	arena_reward_record = arena_reward_wave > previous_best
 	arena_best = maxi(arena_best, arena_reward_wave)
+	arena_reward_claimed = false
+	arena_reward_item.clear()
 	arena_leaderboard.append({"wave":arena_reward_wave, "level":level, "class":CLASS_NAMES[class_id]})
 	arena_leaderboard.sort_custom(func(a, b): return int(a["wave"]) > int(b["wave"]))
 	if arena_leaderboard.size() > 10: arena_leaderboard.resize(10)
@@ -2939,39 +3017,81 @@ func finish_survival_run() -> void:
 	play_sound("level")
 	save_game()
 
-func arena_new_weapon_chance(wave:int) -> float:
-	if wave<5:return 0.0
-	if wave<10:return .20
-	if wave<20:return .35
-	if wave<30:return .50
-	return .65
+func arena_reward_rarity(wave:int, record_bonus:bool) -> int:
+	var roll := randf()
+	# Neuer persönlicher Rekord: 99 % High-End-Luck = episch oder legendär.
+	if record_bonus:
+		if roll < 0.35: return 4
+		if roll < 0.99: return 3
+		return 2
+	if wave < 5:
+		return 0 if roll < .55 else (1 if roll < .90 else 2)
+	if wave < 10:
+		return 0 if roll < .30 else (1 if roll < .72 else (2 if roll < .96 else 3))
+	if wave < 20:
+		return 0 if roll < .12 else (1 if roll < .47 else (2 if roll < .85 else (3 if roll < .99 else 4)))
+	if wave < 30:
+		return 0 if roll < .03 else (1 if roll < .21 else (2 if roll < .63 else (3 if roll < .95 else 4)))
+	if wave < 40:
+		return 1 if roll < .06 else (2 if roll < .38 else (3 if roll < .86 else 4))
+	return 2 if roll < .18 else (3 if roll < .73 else 4)
 
-func make_arena_weapon(wave:int) -> Dictionary:
+func arena_new_weapon_chance(wave:int) -> float:
+	if wave<5:return .12
+	if wave<10:return .24
+	if wave<20:return .38
+	if wave<30:return .52
+	return .68
+
+func make_arena_weapon(wave:int, rarity_override:int=-1) -> Dictionary:
 	var names:Array=[["Wächterklinge","Blutdornenaxt","Runenhammer","Sturmklinge","Glutspalter"],["Glutstab","Frostzweig","Blitzleiter","Quellstab","Sternenwacht"],["Dornenbogen","Falkenbogen","Windsehne","Splitterarmbrust","Jägerzeichen"]]
 	var choice:int=randi_range(0,4)
-	var item:Dictionary=make_item(names[class_id][choice],class_weapon_icon(),mini(4,2+int(wave/20)),6+level*2+wave,0,"",level)
+	var rarity:int=rarity_override if rarity_override>=0 else mini(4,2+int(wave/20))
+	var strength:int=10+level*2+wave*2+rarity*6
+	var item:Dictionary=make_item(names[class_id][choice],class_weapon_icon(),rarity,strength,0,["","eis","blitz","gift"][randi_range(0,3)],maxi(level,1+wave))
 	item["new_weapon_id"]=class_id*5+choice
 	item["design"]=2 if class_id==0 and choice in [1,2] else (3 if class_id==2 and choice==3 else choice%4)
 	return item
 
+func make_arena_reward(wave:int, record_bonus:bool) -> Dictionary:
+	var rarity := arena_reward_rarity(wave,record_bonus)
+	var item_level := maxi(level, level + int(wave/4.0))
+	var power := 7 + level * 2 + wave * 2 + rarity * 7
+	var roll := randf()
+	var head_chance := minf(.16,.04+float(wave)*.0025)
+	if record_bonus: head_chance = .18
+	if roll < head_chance:
+		var head := make_class_head(item_level)
+		head["rarity"] = maxi(rarity,3 if record_bonus else rarity)
+		head[["str","int","agi"][class_id]] = 10 + int(wave/3.0) + int(item_level/4.0) + int(head["rarity"])*3
+		head["value"] = 220 + wave*18 + int(head["rarity"])*120
+		return head
+	if roll < head_chance + arena_new_weapon_chance(wave):
+		return make_arena_weapon(wave,rarity)
+	var category := randf()
+	if category < .43:
+		return make_arena_weapon(wave,rarity)
+	if category < .73:
+		var armor_names := ["Wachtpanzer","Runenmantel","Kristallrüstung","Sternenrüstung","Ewige Wacht"]
+		return make_item(armor_names[mini(rarity,armor_names.size()-1)],"armor",rarity,maxi(1,int(power*.38)),0,"",item_level)
+	var ring_names := ["Ring des Antritts","Ring der Ausdauer","Ring des Sieges","Ring der Ewigen Wacht","Arvens Siegel"]
+	return make_item(ring_names[mini(rarity,ring_names.size()-1)],"ring",rarity,maxi(8,int(power*.65)),0,"",item_level)
+
 func claim_arena_chest() -> void:
 	if arena_reward_claimed: return
-	var tier := clampi(int(arena_reward_wave / 5.0), 0, 3)
-	if arena_reward_wave >= 25 and level >= 30: tier = 4
 	if arena_reward_item.is_empty():
-		arena_reward_item = make_item("Truhe der Ewigen Wacht · Welle %d" % arena_reward_wave, class_weapon_icon(), tier, 6 + level * 2 + arena_reward_wave, 0, ["eis", "blitz", "gift"][arena_reward_wave % 3], level)
-		var roll:float=randf()
-		var head_chance:float=0.0 if arena_reward_wave<5 else minf(.08,.02+floorf(arena_reward_wave/10.0)*.02)
-		if roll<head_chance:arena_reward_item=make_class_head(level)
-		elif roll<head_chance+arena_new_weapon_chance(arena_reward_wave):arena_reward_item=make_arena_weapon(arena_reward_wave)
+		arena_reward_item = make_arena_reward(arena_reward_wave,arena_reward_record)
 		save_game()
 	var reward:Dictionary=arena_reward_item
 	if not can_add_item(reward):
-		message("Inventar voll. Für die Arenabelohnung brauchst du einen freien Platz.")
+		message("Inventar voll. Arvens Belohnung bleibt gespeichert, bis ein Platz frei ist.")
 		return
-	add_item(reward)
+	if not add_item(reward):
+		message("Arenabelohnung konnte nicht eingelagert werden. Bitte erneut versuchen.")
+		return
 	arena_reward_claimed = true
-	message("Arenatruhe geöffnet: %s!" % reward["name"])
+	message("Arenatruhe: %s · %s!" % [reward["name"],RARITY_NAMES[int(reward["rarity"])]])
+	play_sound("level")
 	save_game()
 
 func leave_arena() -> void:
@@ -3056,6 +3176,8 @@ func enter_dungeon(index: int) -> void:
 	message("%s · Die Fackeln weisen dir den Weg. E an der Tür führt hinaus." % DUNGEON_NAMES[index])
 	play_sound("menu")
 	announce_multiplayer_context()
+	if network_mode == "client" and multiplayer.multiplayer_peer != null:
+		rpc_request_chest_state.rpc_id(1,"dungeon",index)
 
 func leave_dungeon() -> void:
 	dungeon_id = -1
@@ -3071,10 +3193,140 @@ func leave_dungeon() -> void:
 	save_game()
 	announce_multiplayer_context()
 
+func chest_clock() -> float:
+	return Time.get_unix_time_from_system()
+
+func chest_server_key(context: String, index: int) -> String:
+	return "%s:%d" % [context, index]
+
+func update_chest_respawns() -> void:
+	var now := chest_clock()
+	for i in range(mini(opened_chests.size(), chest_ready_at.size())):
+		if opened_chests[i] and float(chest_ready_at[i]) > 0.0 and now >= float(chest_ready_at[i]):
+			opened_chests[i] = false
+			chest_ready_at[i] = 0.0
+	for i in range(mini(dungeon_chests_opened.size(), dungeon_chest_ready_at.size())):
+		if dungeon_chests_opened[i] and float(dungeon_chest_ready_at[i]) > 0.0 and now >= float(dungeon_chest_ready_at[i]):
+			dungeon_chests_opened[i] = false
+			dungeon_chest_ready_at[i] = 0.0
+
+func server_chest_ready_time(context: String, index: int) -> float:
+	var key := chest_server_key(context,index)
+	var ready_at := float(server_chest_ready_at.get(key,0.0))
+	if ready_at > 0.0 and chest_clock() >= ready_at:
+		server_chest_ready_at.erase(key)
+		return 0.0
+	return ready_at
+
+func apply_chest_state(context: String, index: int, ready_at: float) -> void:
+	var opened := ready_at > chest_clock()
+	if context == "world" and index >= 0 and index < opened_chests.size():
+		opened_chests[index] = opened
+		chest_ready_at[index] = ready_at if opened else 0.0
+	elif context == "dungeon" and index >= 0 and index < dungeon_chests_opened.size():
+		dungeon_chests_opened[index] = opened
+		dungeon_chest_ready_at[index] = ready_at if opened else 0.0
+	queue_redraw()
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_request_chest_state(context: String, index: int) -> void:
+	if network_mode != "host": return
+	var sender := multiplayer.get_remote_sender_id()
+	if sender <= 0: return
+	if context == "world":
+		if index < 0 or index >= LANDMARKS.size(): return
+	elif context == "dungeon":
+		if index < 0 or index >= DUNGEON_NAMES.size(): return
+	else:
+		return
+	rpc_chest_state.rpc_id(sender,context,index,server_chest_ready_time(context,index))
+
+@rpc("authority","call_remote","reliable")
+func rpc_chest_state(context: String, index: int, ready_at: float) -> void:
+	if network_mode != "client": return
+	apply_chest_state(context,index,ready_at)
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_request_chest_open(context: String, index: int) -> void:
+	if network_mode != "host": return
+	var sender := multiplayer.get_remote_sender_id()
+	if sender <= 0 or not remote_players.has(sender): return
+	var state: Dictionary = remote_players[sender]
+	if str(state.get("context","world")) != context: return
+	var coords: Array = state.get("pos",[])
+	if coords.size() < 2: return
+	var actor_pos := Vector2(float(coords[0]),float(coords[1]))
+	var target_pos := Vector2.ZERO
+	if context == "world":
+		if index < 0 or index >= LANDMARKS.size(): return
+		if str(state.get("instance_id","world")) != "world": return
+		target_pos = chest_position(index)
+		if actor_pos.distance_to(target_pos) > 110.0: return
+	elif context == "dungeon":
+		if index < 0 or index >= DUNGEON_NAMES.size(): return
+		if str(state.get("instance_id","")) != str(index): return
+		target_pos = DUNGEON_CENTER + Vector2(555,0)
+		if actor_pos.distance_to(target_pos) > 125.0: return
+	else:
+		return
+	var existing_ready := server_chest_ready_time(context,index)
+	if existing_ready > chest_clock():
+		rpc_chest_state.rpc_id(sender,context,index,existing_ready)
+		return
+	var ready_at := chest_clock() + CHEST_RESPAWN_SECONDS
+	server_chest_ready_at[chest_server_key(context,index)] = ready_at
+	var reward_class := clampi(int(state.get("class",0)),0,2)
+	var reward_level := clampi(int(state.get("level",1)),1,99)
+	var item: Dictionary
+	var gold_reward := 0
+	if context == "world":
+		var element: String = ["eis","gift","blitz"][index % 3]
+		var region := region_at(chest_position(index))
+		var rarity := 3 if region_level(region) >= 30 else 2
+		var icon := class_weapon_icon_for(reward_class)
+		item = make_item("%s von %s" % [{"sword":"Schatzklinge","staff":"Schatzstab","bow":"Schatzbogen"}[icon], LANDMARKS[index]["name"]], icon, rarity, 12 + region_level(region) * 2 + rarity * 3, 0, element, region_level(region))
+		gold_reward = 35 + region * 25
+	else:
+		var dtype := int(DUNGEON_ENEMIES[index][0])
+		var area_level := region_level(int(ENEMY_TYPES[dtype]["region"]))
+		item = make_item("Relikt aus %s" % DUNGEON_NAMES[index],class_weapon_icon_for(reward_class),2 + int(index > 0),15 + area_level * 2,280 + index * 190,["blitz","eis","gift"][index],reward_level)
+	var payload := network_reward_payload(item)
+	var tx_id := "chest:%s:%d:%d" % [context,index,int(ready_at)]
+	server_register_transaction(sender,tx_id)
+	rpc_chest_reward.rpc_id(sender,tx_id,context,index,ready_at,gold_reward,payload)
+
+@rpc("authority","call_remote","reliable")
+func rpc_chest_reward(tx_id: String, context: String, index: int, ready_at: float, gold_reward: int, raw_item: Dictionary) -> void:
+	if network_mode != "client": return
+	tx_id = tx_id.substr(0,96)
+	if not remember_server_transaction(tx_id):
+		ack_server_transaction(tx_id)
+		apply_chest_state(context,index,ready_at)
+		return
+	var item := sanitize_network_reward_item(raw_item)
+	if not add_item(item):
+		var compensation := maxi(1,item_sale_value(item))
+		gold += compensation
+		message("Inventar voll · Truhenbeute automatisch für %d Gold verkauft." % compensation)
+	gold += maxi(0,gold_reward)
+	apply_chest_state(context,index,ready_at)
+	play_sound("pickup")
+	message("Truhe geöffnet · nächste Beute in 6 Minuten%s" % (" · +%d Gold" % gold_reward if gold_reward > 0 else ""))
+	save_game()
+	ack_server_transaction(tx_id)
+
 func open_dungeon_chest() -> void:
-	if dungeon_id < 0 or dungeon_chests_opened[dungeon_id]: return
+	if dungeon_id < 0: return
+	update_chest_respawns()
+	if dungeon_chests_opened[dungeon_id]:
+		var remaining := maxi(1,ceili((float(dungeon_chest_ready_at[dungeon_id])-chest_clock())/60.0))
+		message("Die Gewölbetruhe erscheint in etwa %d Min. erneut." % remaining)
+		return
 	if not enemies.is_empty():
 		message("Die Gewölbetruhe bleibt versiegelt, solange Feinde hier lauern.")
+		return
+	if network_mode == "client" and multiplayer.multiplayer_peer != null:
+		rpc_request_chest_open.rpc_id(1,"dungeon",dungeon_id)
 		return
 	var treasure := make_item("Relikt aus %s" % DUNGEON_NAMES[dungeon_id], class_weapon_icon(), 2 + int(dungeon_id > 0), 15 + region_level(int(ENEMY_TYPES[int(DUNGEON_ENEMIES[dungeon_id][0])]["region"])) * 2, 280 + dungeon_id * 190, ["blitz", "eis", "gift"][dungeon_id])
 	if rare_head_reward("dungeon",dungeon_id,.10):treasure=make_class_head(level)
@@ -3083,8 +3335,9 @@ func open_dungeon_chest() -> void:
 		return
 	add_item(treasure)
 	dungeon_chests_opened[dungeon_id] = true
+	dungeon_chest_ready_at[dungeon_id] = chest_clock() + CHEST_RESPAWN_SECONDS
 	play_sound("level")
-	message("Gewölbe geräumt! %s erhalten." % treasure["name"])
+	message("Gewölbe geräumt! %s erhalten. Respawn in 6 Minuten." % treasure["name"])
 	save_game()
 
 func make_enemy(type: int, pos: Vector2, elite_kind: int = 0) -> Dictionary:
@@ -3302,6 +3555,21 @@ func respawn() -> void:
 	message("Du wurdest im Dorf wiederbelebt. -20 Gold")
 	save_game()
 
+func drop_position_blocked(candidate:Vector2,origin:Vector2) -> bool:
+	if dungeon_id>=0:return dungeon_blocked(candidate)
+	if interior_id>=0:return tavern_blocked(candidate)
+	if arena_mode!="":return candidate.distance_to(ARENA_CENTER)>ARENA_RADIUS-30.0
+	if region_at(candidate)!=region_at(origin):return true
+	return terrain_blocked(candidate) or blocked_by_region_wall(candidate)
+
+func safe_drop_position(origin:Vector2,preferred:Vector2=Vector2.ZERO) -> Vector2:
+	var base:Vector2=origin+preferred
+	var offsets:Array=[Vector2.ZERO,Vector2(24,0),Vector2(-24,0),Vector2(0,24),Vector2(0,-24),Vector2(34,34),Vector2(-34,34),Vector2(34,-34),Vector2(-34,-34),Vector2(52,0),Vector2(-52,0),Vector2(0,52),Vector2(0,-52)]
+	for offset in offsets:
+		var candidate:Vector2=base+Vector2(offset)
+		if not drop_position_blocked(candidate,origin):return candidate
+	return origin
+
 func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var enemy: Dictionary = enemies[index]
 	announce_mob_death(enemy)
@@ -3332,7 +3600,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 		bosses_defeated[type - 12] = true
 		var boss_element: String = ["blitz", "eis", "gift"][type - 12]
 		var boss_item := make_item("%s · %s" % [ENEMY_TYPES[type]["name"], String(boss_element).capitalize()], class_weapon_icon(), 3 + int(type == 14), 28 + (type - 12) * 8, 700 + type * 35, boss_element)
-		drops.append({"pos":pos + Vector2(25, 0), "item":boss_item, "life":120.0})
+		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)), "item":boss_item, "life":120.0})
 		message("%s besiegt! Ein neuer Weg ist offen." % ENEMY_TYPES[type]["name"])
 		if bosses_defeated.count(true) == bosses_defeated.size() and not final_completed and final_countdown < 0.0:
 			final_countdown = 8.0
@@ -3341,7 +3609,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var elite_kind: int = int(enemy.get("elite", 0))
 	gain_xp(enemy_xp_reward(type, elite_kind, level))
 	var coins: int = randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
-	drops.append({"pos":pos + Vector2(8, 12), "gold":coins, "life":80.0})
+	drops.append({"pos":safe_drop_position(pos,Vector2(8,12)), "gold":coins, "life":80.0})
 	for qindex in quests.size():
 		var quest: Dictionary = quests[qindex]
 		if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == type:
@@ -3652,11 +3920,20 @@ func chest_position(index: int) -> Vector2:
 	return LANDMARKS[index]["pos"] + Vector2(95, 65)
 
 func open_chest(index: int) -> void:
-	if opened_chests[index]: return
+	if index < 0 or index >= opened_chests.size(): return
+	update_chest_respawns()
+	if opened_chests[index]:
+		var remaining := maxi(1,ceili((float(chest_ready_at[index])-chest_clock())/60.0))
+		message("Diese Truhe erscheint in etwa %d Min. erneut." % remaining)
+		return
+	if network_mode == "client" and multiplayer.multiplayer_peer != null:
+		rpc_request_chest_open.rpc_id(1,"world",index)
+		return
 	if inventory.size() >= 42:
 		message("Inventar voll — verkaufe erst etwas im Dorf.")
 		return
 	opened_chests[index] = true
+	chest_ready_at[index] = chest_clock() + CHEST_RESPAWN_SECONDS
 	play_sound("pickup")
 	var element: String = ["eis", "gift", "blitz"][index % 3]
 	var region := region_at(chest_position(index))
@@ -3666,7 +3943,7 @@ func open_chest(index: int) -> void:
 	if rare_head_reward("chest",index,.04):item=make_class_head(region_level(region))
 	inventory.append(item)
 	gold += 35 + region * 25
-	message("Schatztruhe geöffnet: %s (%s)!" % [item["name"], RARITY_NAMES[rarity]])
+	message("Schatztruhe geöffnet: %s (%s)! Respawn in 6 Minuten." % [item["name"], RARITY_NAMES[rarity]])
 	save_game()
 
 func use_waystone() -> void:
@@ -3780,7 +4057,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item,"arena_reward_record":arena_reward_record, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
@@ -3929,6 +4206,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	equipped_armor_uid = int(data.get("equipped_armor_uid", -1))
 	equipped_head_uid = int(data.get("equipped_head_uid", -1))
 	arena_reward_item=data.get("arena_reward_item",{}).duplicate(true) if data.get("arena_reward_item",{}) is Dictionary else {}
+	arena_reward_record=bool(data.get("arena_reward_record",false))
 	arcane_step_learned = bool(data.get("arcane_step_learned", false))
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
 	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1)) if class_id == 1 else -1
@@ -5675,36 +5953,60 @@ func draw_overworld_atmosphere() -> void:
 		if visible_world(torch_pos, 55): draw_torch(torch_pos, region_at(torch_pos) == 4, true)
 
 func draw_arena_world() -> void:
-	draw_rect(Rect2(camera_pos, VIEW), Color("1b2632"))
+	draw_rect(Rect2(camera_pos, VIEW), Color("111a24"))
 	var center := ARENA_CENTER
-	draw_circle(center, ARENA_RADIUS + 23.0, Color("493d4a"))
-	draw_circle(center, ARENA_RADIUS + 10.0, Color("ba9564"))
-	draw_circle(center, ARENA_RADIUS - 4.0, Color("45525a"))
-	draw_circle(center, ARENA_RADIUS - 24.0, Color("66635b"))
-	draw_circle(center, ARENA_RADIUS - 43.0, Color("74766f"))
-	for ring in [92.0, 216.0, 345.0, 434.0]:
-		draw_arc(center, ring, 0.0, TAU, 96, Color("c7ab76", 0.52), 3)
-	for i in 40:
-		var angle := float(i) * TAU / 40.0
-		var direction := Vector2.RIGHT.rotated(angle)
-		var edge := center + direction * (ARENA_RADIUS - 5.0)
-		draw_line(edge - direction * 27.0, edge - direction * 7.0, Color("e0c282"), 7)
-		if i % 5 == 0:
-			draw_circle(edge + direction * 20.0, 13.0, Color("342f3a"))
-			draw_rect(Rect2(edge + direction * 20.0 - Vector2(5, 16), Vector2(10, 11)), Color("e3a960"))
-			draw_rect(Rect2(edge + direction * 20.0 - Vector2(3, 22), Vector2(6, 8)), Color("fff0ae"))
-	for row in range(-8, 9):
-		for column in range(-8, 9):
-			var tile := center + Vector2(column * 58.0, row * 58.0)
-			if tile.distance_to(center) > ARENA_RADIUS - 58.0: continue
-			var code := hash_cell(column + 47, row + 91)
-			draw_rect(Rect2(tile - Vector2(16, 10), Vector2(32, 20)), Color("858478", 0.43))
-			if code % 4 == 0: draw_rect(Rect2(tile - Vector2(9, 4), Vector2(12, 4)), Color("dbc89a", 0.53))
-			if code % 11 == 0: draw_rect(Rect2(tile + Vector2(11, 9), Vector2(6, 4)), Color("c3a074", 0.45))
-	draw_arc(center, 38.0, 0.0, TAU, 32, Color("e1c98f"), 4)
+	# Tile-basierte Arena: 32px Raster, drei sichtbare Höhenebenen und zentrale Treppen.
+	for gy in range(-14,15):
+		for gx in range(-15,16):
+			var tile_center := center + Vector2(gx*32,gy*32)
+			if tile_center.distance_to(center) > ARENA_RADIUS-18: continue
+			var local_y := tile_center.y-center.y
+			var height := 2 if local_y < -176 else (0 if local_y > 190 else 1)
+			var base:Color = [Color("3e4650"),Color("59636a"),Color("737970")][height]
+			var code := hash_cell(gx+173,gy+211)
+			var tint:Color = base.lightened(.035) if code%5==0 else (base.darkened(.045) if code%7==0 else base)
+			draw_rect(Rect2(tile_center-Vector2(16,16),Vector2(32,32)),tint)
+			draw_line(tile_center+Vector2(-16,15),tile_center+Vector2(16,15),Color("1f2931",.34),1)
+			draw_line(tile_center+Vector2(15,-16),tile_center+Vector2(15,16),Color("a9a78e",.14),1)
+	# Stufenkanten; in der Mitte liegen breite begehbare Treppen.
+	for yoff in [-176.0,190.0]:
+		for gx in range(-13,14):
+			if abs(gx) <= 2: continue
+			var lip := center+Vector2(gx*32,yoff)
+			draw_rect(Rect2(lip-Vector2(16,4),Vector2(32,12)),Color("303b44"))
+			draw_line(lip-Vector2(16,4),lip+Vector2(16,-4),Color("d0b77d",.55),2)
+	for yoff in [-176.0,190.0]:
+		for step in range(-3,4):
+			var sy:float = float(yoff) + step*8.0
+			draw_rect(Rect2(center+Vector2(-80,sy-4),Vector2(160,8)),Color("887b65"))
+			draw_line(center+Vector2(-80,sy-4),center+Vector2(80,sy-4),Color("d4bd83",.65),2)
+	# Massiver Außenring aus Tile-Segmenten.
+	for i in 72:
+		var a := float(i)*TAU/72.0
+		var p := center+Vector2.RIGHT.rotated(a)*(ARENA_RADIUS-5)
+		draw_rect(Rect2(p-Vector2(8,8),Vector2(16,16)),Color("9b815d"))
+		if i%6==0:
+			draw_circle(p,11,Color("2b3038"))
+			draw_rect(Rect2(p-Vector2(3,18),Vector2(6,12)),Color("f2c66f"))
+	# Runenmitte.
+	draw_circle(center,48,Color("283846"))
+	draw_arc(center,48,0,TAU,32,Color("d7b873"),4)
 	for i in 8:
-		var rune := center + Vector2.RIGHT.rotated(float(i) * TAU / 8.0) * 28.0
-		draw_rect(Rect2(rune - Vector2(3, 3), Vector2(6, 6)), Color("a6d7dc") if arena_mode == "final" else Color("f0c783"))
+		var rune := center+Vector2.RIGHT.rotated(float(i)*TAU/8.0)*32
+		draw_rect(Rect2(rune-Vector2(4,4),Vector2(8,8)),Color("9edbe0") if arena_mode=="final" else Color("f0c783"))
+	# Permanente Bestenlisten-Tafel auf der erhöhten Nordplattform.
+	var board := center+Vector2(0,-330)
+	draw_rect(Rect2(board-Vector2(174,86),Vector2(348,172)),Color("35291f"))
+	draw_rect(Rect2(board-Vector2(167,79),Vector2(334,158)),Color("10283c"))
+	draw_rect(Rect2(board-Vector2(162,74),Vector2(324,148)),Color("17354b"))
+	draw_line(board+Vector2(-160,-70),board+Vector2(160,-70),Color("e2bd72"),3)
+	text_at(board+Vector2(-150,-48),"ARVENS TOP 5",17,Color("ffe0a0"),HORIZONTAL_ALIGNMENT_CENTER,300)
+	if arena_leaderboard.is_empty():
+		text_at(board+Vector2(-145,-8),"Noch keine Wertung",13,Color("cad9d1"),HORIZONTAL_ALIGNMENT_CENTER,290)
+	else:
+		for index in mini(5,arena_leaderboard.size()):
+			var record:Dictionary=arena_leaderboard[index]
+			text_at(board+Vector2(-145,-13+index*24),"%d. Welle %d · LV %d %s" % [index+1,int(record.get("wave",0)),int(record.get("level",1)),str(record.get("class",""))],12,Color("e5e4cf"),HORIZONTAL_ALIGNMENT_LEFT,290)
 
 func _trail_theme(region: int) -> int:
 	return 1 if region in [3,4,7,10,11,12] else (2 if region in [2,5,9] else (3 if region == 8 else 0))
@@ -7496,14 +7798,22 @@ func draw_arena_entry_panel() -> void:
 	text_at(Vector2(265, 474), "Das Finale beginnt automatisch nach dem letzten Boss. Arven hilft bei einem neuen Versuch.", 14, Color("bcd2c9"), HORIZONTAL_ALIGNMENT_LEFT, 690)
 
 func draw_arena_reward_panel() -> void:
-	text_at(Vector2(255, 154), "DIE PRÜFUNG IST VORBEI", 28, Color("ffe0a2"))
-	text_at(Vector2(260, 190), "Erreicht: Welle %d  ·  Bestleistung: %d" % [arena_reward_wave, arena_best], 19, Color("d9e8dd"))
-	text_at(Vector2(260, 225), "Arvens Truhe wartet auf dich. Ihre Stärke folgt deinem Level und deiner Welle.", 16, Color("edddba"))
-	draw_chest(Vector2(760, 321), arena_reward_claimed)
-	text_at(Vector2(260, 266), "BESTENLISTE", 17, Color("f3d393"))
-	for index in mini(10, arena_leaderboard.size()):
+	text_at(Vector2(255, 142), "DIE PRÜFUNG IST VORBEI", 28, Color("ffe0a2"))
+	text_at(Vector2(260, 178), "Erreicht: Welle %d  ·  Bestleistung: %d" % [arena_reward_wave, arena_best], 19, Color("d9e8dd"))
+	text_at(Vector2(260, 211), "NEUER REKORD · 99 % HIGH-END-LUCK" if arena_reward_record else "Arvens Truhe skaliert mit Level und erreichter Welle.", 15, Color("ffd980") if arena_reward_record else Color("edddba"))
+	draw_chest(Vector2(790, 270), arena_reward_claimed)
+	text_at(Vector2(260, 248), "TOP 5", 16, Color("f3d393"))
+	for index in mini(5, arena_leaderboard.size()):
 		var record: Dictionary = arena_leaderboard[index]
-		text_at(Vector2(265, 290 + index * 19), "%d. Welle %d · LV %d %s" % [index + 1, int(record["wave"]), int(record["level"]), str(record["class"])], 13, Color("dce7d9"))
+		text_at(Vector2(265, 272 + index * 20), "%d. Welle %d · LV %d %s" % [index + 1, int(record["wave"]), int(record["level"]), str(record["class"])], 12, Color("dce7d9"))
+	if arena_reward_claimed and not arena_reward_item.is_empty():
+		var reward:=arena_reward_item
+		ui_box(Rect2(560,330,365,130),Color("17354b"))
+		draw_item_icon(Vector2(580,350),str(reward.get("icon","gem")),RARITY_COLORS[int(reward.get("rarity",0))],1.2,weapon_visual_stage(reward),item_design(reward))
+		text_at(Vector2(640,360),str(reward.get("name","Belohnung")),16,RARITY_COLORS[int(reward.get("rarity",0))],HORIZONTAL_ALIGNMENT_LEFT,265)
+		text_at(Vector2(640,386),RARITY_NAMES[int(reward.get("rarity",0))]+" · "+item_type(str(reward.get("icon","gem"))),13,Color("e4eadc"))
+		text_at(Vector2(640,412),"Stärke +%d · Itemlevel %d" % [int(reward.get("power",0)),int(reward.get("level",level))],13,Color("c8ddd4"))
+		text_at(Vector2(640,438),"Im Inventar gespeichert",12,Color("8ee0a7"))
 	ui_button(Rect2(307, 510, 260, 48), "TRUHE GEÖFFNET" if arena_reward_claimed else "TRUHE ÖFFNEN", not arena_reward_claimed)
 	ui_button(Rect2(585, 510, 260, 48), "ZURÜCK INS DORF", arena_reward_claimed)
 
@@ -9739,8 +10049,29 @@ func server_party_member_xp(type: int, elite_kind: int, member: int) -> int:
 	if not remote_players.has(member): return 0
 	return enemy_xp_reward(type,elite_kind,int(remote_players[member].get("level",1)))
 
+func server_reward_fallback_peer(enemy:Dictionary) -> int:
+	var enemy_pos:Vector2=enemy.get("pos",Vector2.ZERO)
+	var enemy_region:=region_at(enemy_pos)
+	var best_peer:=-1
+	var best_distance:=INF
+	for raw_peer in remote_players.keys():
+		var peer_id:=int(raw_peer)
+		var state:Dictionary=remote_players[raw_peer]
+		if str(state.get("context","world"))!="world":continue
+		var pos:=network_player_position(peer_id)
+		if pos.x < -9000.0 or region_at(pos)!=enemy_region:continue
+		var distance:=pos.distance_to(enemy_pos)
+		if distance<best_distance and distance<=950.0:
+			best_distance=distance
+			best_peer=peer_id
+	return best_peer
+
 func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
-	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
+	if not dedicated_server_mode:return
+	if peer_id<=0 or not remote_players.has(peer_id):peer_id=server_reward_fallback_peer(enemy)
+	if peer_id<=0 or not remote_players.has(peer_id):
+		push_warning("SERVER_REWARD_NO_RECIPIENT uid=%s type=%s" % [str(enemy.get("uid",-1)),str(enemy.get("type",-1))])
+		return
 	server_send_all_quest_progress(peer_id,enemy)
 	var player_state: Dictionary = remote_players[peer_id]
 	var reward_class := clampi(int(player_state.get("class", 0)), 0, 2)
