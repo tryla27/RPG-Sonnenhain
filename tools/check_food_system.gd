@@ -32,6 +32,31 @@ func run():
   assert(g.item_design(item)==Food.index_for(info["name"]))
   assert(g.stack_limit(item)==30)
   assert(item["value"]==info["price"])
+ # Every regional plant must be reachable by the normal E/interact path.
+ var expected_regions:Dictionary={}
+ for region in range(1,13):
+  expected_regions[region]=0
+ g.inventory.clear()
+ g.food_system.harvested={}
+ for plant in g.food_system.plants:
+  var plant_pos:Vector2=plant["point"]
+  var plant_region:int=g.region_at(plant_pos)
+  assert(plant_region>=1 and plant_region<=12)
+  expected_regions[plant_region]=int(expected_regions[plant_region])+1
+  g.player_pos=plant_pos+Vector2(0,20)
+  var before_count:int=0
+  for owned in g.inventory:
+   before_count+=int(owned.get("count",1))
+  g.interact()
+  var after_count:int=0
+  for owned in g.inventory:
+   after_count+=int(owned.get("count",1))
+  assert(after_count==before_count+3)
+ for region in range(1,13):
+  assert(int(expected_regions[region])==3)
+ # Reset after the all-map interaction pass for cooldown/save tests.
+ g.inventory.clear()
+ g.food_system.harvested={}
  # Pick, reject second harvest, survive reconnect, and regrow.
  var test_plant:Vector2=g.food_system.plants[0]["point"]
  assert(g.region_at(test_plant)==1)
@@ -88,5 +113,5 @@ func run():
  data["food_state"]["regen_rate"]=999
  assert(not store.valid_data(data,g.player_uuid))
  assert(not store.valid_food_state({"plants":[]}))
- print("FOOD_SYSTEM_OK 31 foods, 12 regional palettes, 36 plants, no fruit in Map 0, harvest cooldown, inventory limits, healing, regen caps, non-stacking and durable server saves")
+ print("FOOD_SYSTEM_OK 31 foods, 12 regions / 36 plants harvested through normal interact(), cooldown, inventory limits, healing, regen caps, non-stacking and durable server saves")
  quit()
