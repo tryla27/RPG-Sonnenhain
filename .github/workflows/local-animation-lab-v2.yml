@@ -1,9 +1,9 @@
-name: Local Animation Lab V2
+name: Local Animation Lab V3 High-Res
 
 on:
   push:
     branches:
-      - feature/local-animation-lab-mage-slime-wolf-v2
+      - feature/local-animation-lab-mage-slime-wolf-v3
   workflow_dispatch:
 
 permissions:
@@ -25,7 +25,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/godot
-          key: animation-lab-godot-${{ env.GODOT_VERSION }}-${{ runner.os }}
+          key: animation-lab-v3-godot-${{ env.GODOT_VERSION }}-${{ runner.os }}
 
       - name: Install Godot
         if: steps.godot-cache.outputs.cache-hit != 'true'
@@ -42,12 +42,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p package/Sonnenhain-Animationslabor-V2
-          cp project.godot main.gd main.gd.uid main.tscn export_presets.cfg package/Sonnenhain-Animationslabor-V2/
-          cp -R components art audio music tools design package/Sonnenhain-Animationslabor-V2/
-          cp README.md package/Sonnenhain-Animationslabor-V2/ 2>/dev/null || true
+          mkdir -p package/Sonnenhain-Animationslabor-V3-HighRes
+          cp project.godot main.gd main.gd.uid main.tscn export_presets.cfg package/Sonnenhain-Animationslabor-V3-HighRes/
+          cp -R components art audio music tools design package/Sonnenhain-Animationslabor-V3-HighRes/
+          cp README.md package/Sonnenhain-Animationslabor-V3-HighRes/ 2>/dev/null || true
           printf '%s\n' \
-            'SONNENHAIN - LOKALES ANIMATIONSLABOR V2' \
+            'SONNENHAIN - LOKALES ANIMATIONSLABOR V3 HIGH-RES' \
             '' \
             'Start: project.godot mit Godot 4.7.2 öffnen und F6/F5 drücken.' \
             'Die Test-Branch startet direkt das Labor für Magier, Schleim und Wolf.' \
@@ -59,13 +59,13 @@ jobs:
             'H = Hurt' \
             'R = Tod/Reset' \
             '1/2/3 = Fokus' \
-            > package/Sonnenhain-Animationslabor-V2/START_HIER.txt
+            > package/Sonnenhain-Animationslabor-V3-HighRes/START_HIER.txt
 
       - name: Import and compile packaged Godot project
         shell: bash
         run: |
           set -euo pipefail
-          "$GODOT_BIN" --headless --path package/Sonnenhain-Animationslabor-V2 --editor --import --quit 2>&1 | tee /tmp/import.log
+          "$GODOT_BIN" --headless --path package/Sonnenhain-Animationslabor-V3-HighRes --editor --import --quit 2>&1 | tee /tmp/import.log
           ! grep -q "SCRIPT ERROR:" /tmp/import.log
           ! grep -q "Parse Error:" /tmp/import.log
 
@@ -73,7 +73,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          timeout 60 "$GODOT_BIN" --headless --path package/Sonnenhain-Animationslabor-V2 --script tools/check_animation_lab_v2.gd 2>&1 | tee /tmp/lab.log
+          timeout 60 "$GODOT_BIN" --headless --path package/Sonnenhain-Animationslabor-V3-HighRes --script tools/check_animation_lab_v2.gd 2>&1 | tee /tmp/lab.log
           ! grep -q "SCRIPT ERROR:" /tmp/lab.log
           grep -q "ANIMATION_LAB_V2_OK" /tmp/lab.log
 
@@ -81,14 +81,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf package/Sonnenhain-Animationslabor-V2/.godot
+          rm -rf package/Sonnenhain-Animationslabor-V3-HighRes/.godot
           cd package
-          zip -qr ../Sonnenhain-Animationslabor-V2-Godot.zip Sonnenhain-Animationslabor-V2
+          zip -qr ../Sonnenhain-Animationslabor-V3-HighRes-Godot.zip Sonnenhain-Animationslabor-V3-HighRes
 
       - name: Upload complete Godot ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: Sonnenhain-Animationslabor-V2-Godot
-          path: Sonnenhain-Animationslabor-V2-Godot.zip
+          name: Sonnenhain-Animationslabor-V3-HighRes-Godot
+          path: Sonnenhain-Animationslabor-V3-HighRes-Godot.zip
           if-no-files-found: error
           retention-days: 14
