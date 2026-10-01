@@ -94,8 +94,8 @@ static func mage(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	# Layer 2: legs / boots with visible foot planting.
 	var leg_phase := stride if state == "walk" else 0.0
 	for sgn in [-1.0,1.0]:
-		var step := leg_phase*sgn
-		var lx := sgn*(8.0 if not profile else 5.0)
+		var step: float = leg_phase*float(sgn)
+		var lx: float = float(sgn)*(8.0 if not profile else 5.0)
 		rect_px(c,Rect2(o+Vector2(lx-5,-20+step*4),Vector2(10,20)),Color("27364b"))
 		rect_px(c,Rect2(o+Vector2(lx-6,-3+step*5),Vector2(13,7)),Color("6a4b35"))
 		rect_px(c,Rect2(o+Vector2(lx-7,2+step*5),Vector2(15,3)),Color("b29057"))
@@ -120,8 +120,8 @@ static func mage(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	# Layer 4: arms / hands / rings.
 	var arm_swing := leg_phase*5.0 if state == "walk" else 0.0
 	for sgn in [-1.0,1.0]:
-		var ax := sgn*(torso_w+2.0)
-		var ay := -51.0-arm_swing*sgn
+		var ax: float = float(sgn)*(torso_w+2.0)
+		var ay: float = -51.0-arm_swing*float(sgn)
 		rect_px(c,Rect2(o+Vector2(ax-5,ay),Vector2(10,23)),Color("304c8f"))
 		rect_px(c,Rect2(o+Vector2(ax-5,ay+18),Vector2(10,5)),Color("d1b46e"))
 		rect_px(c,Rect2(o+Vector2(ax-4,ay+23),Vector2(8,7)),Color("d8a37a"))
@@ -280,7 +280,7 @@ static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	ellipse(c,muzzle,10,7,Color("b5b8c2"))
 	var ear_base_l := head-f*2.0+r*9.0+Vector2(0,-9)
 	var ear_base_r := head-f*2.0-r*9.0+Vector2(0,-9)
-	for ep in [ear_base_l,ear_base_r]:
+	for ep: Vector2 in [ear_base_l,ear_base_r]:
 		poly_px(c,PackedVector2Array([
 			ep+r*3.0,ep-r*3.0,ep-f*9.0+Vector2(0,-11)
 		]),Color("555d72"))
