@@ -38,23 +38,7 @@ jobs:
           unzip -q /tmp/godot.zip -d /tmp/godot
           chmod +x "$GODOT_BIN"
 
-      - name: Import and compile Godot project
-        shell: bash
-        run: |
-          set -euo pipefail
-          "$GODOT_BIN" --headless --path . --editor --import --quit 2>&1 | tee /tmp/import.log
-          ! grep -q "SCRIPT ERROR:" /tmp/import.log
-          ! grep -q "Parse Error:" /tmp/import.log
-
-      - name: Run animation lab smoke test
-        shell: bash
-        run: |
-          set -euo pipefail
-          timeout 60 "$GODOT_BIN" --headless --path . --script tools/check_animation_lab_v2.gd 2>&1 | tee /tmp/lab.log
-          ! grep -q "SCRIPT ERROR:" /tmp/lab.log
-          grep -q "ANIMATION_LAB_V2_OK" /tmp/lab.log
-
-      - name: Build local Godot project ZIP
+      - name: Prepare local Godot project
         shell: bash
         run: |
           set -euo pipefail
@@ -76,6 +60,28 @@ jobs:
             'R = Tod/Reset' \
             '1/2/3 = Fokus' \
             > package/Sonnenhain-Animationslabor-V2/START_HIER.txt
+
+      - name: Import and compile packaged Godot project
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BIN" --headless --path package/Sonnenhain-Animationslabor-V2 --editor --import --quit 2>&1 | tee /tmp/import.log
+          ! grep -q "SCRIPT ERROR:" /tmp/import.log
+          ! grep -q "Parse Error:" /tmp/import.log
+
+      - name: Run animation lab smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 60 "$GODOT_BIN" --headless --path package/Sonnenhain-Animationslabor-V2 --script tools/check_animation_lab_v2.gd 2>&1 | tee /tmp/lab.log
+          ! grep -q "SCRIPT ERROR:" /tmp/lab.log
+          grep -q "ANIMATION_LAB_V2_OK" /tmp/lab.log
+
+      - name: Build local Godot project ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf package/Sonnenhain-Animationslabor-V2/.godot
           cd package
           zip -qr ../Sonnenhain-Animationslabor-V2-Godot.zip Sonnenhain-Animationslabor-V2
 
