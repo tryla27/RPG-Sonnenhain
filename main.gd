@@ -8145,7 +8145,6 @@ func draw_hamlet(p: Vector2) -> void:
 		draw_rect(Rect2(p + Vector2(x - 6, -60), Vector2(20, 13)), Color("cfa86b"))
 	if safe:
 		draw_rect(Rect2(p + Vector2(-153, -45), Vector2(298, 9)), Color("f1c77b"))
-		text_at(p + Vector2(-91, -91), "BLÜTENWEILER", 18, Color("fff2bb"), HORIZONTAL_ALIGNMENT_CENTER, 182)
 
 func draw_chest(p: Vector2, opened: bool) -> void:
 	var lid_y := -30 if opened else -22
