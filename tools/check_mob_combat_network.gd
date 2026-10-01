@@ -54,21 +54,22 @@ func run() -> void:
 	server.server_parties = {1:[low_id,high_id]}
 	server.server_party_of_peer = {low_id:1,high_id:1}
 	var reward: int = server.enemy_xp_reward(1,0,7)
+	var shared_reward: int = roundi(float(reward)*1.02)
 	# Higher-level killer must not reduce the lower-level recipient's XP.
 	server.send_server_enemy_reward(high_id,{"uid":901,"type":1,"elite":0,"pos":Vector2(2200,1000)})
-	while low.xp < reward:
+	while low.xp < shared_reward:
 		if Time.get_ticks_msec() > deadline: quit(3); return
 		await process_frame
-	assert(low.xp == reward and high.xp == 0)
+	assert(low.xp == shared_reward and high.xp == 0)
 	# Reverse killer: XP goes directly with the low-level member's loot packet.
 	server.send_server_enemy_reward(low_id,{"uid":902,"type":1,"elite":0,"pos":Vector2(2200,1000)})
-	while low.xp < reward*2:
+	while low.xp < shared_reward*2:
 		if Time.get_ticks_msec() > deadline: quit(4); return
 		await process_frame
-	assert(low.xp == reward*2 and high.xp == 0)
+	assert(low.xp == shared_reward*2 and high.xp == 0)
 	for i in 10: await process_frame
 	assert(server.server_pending_transactions.is_empty())
-	print("PARTY_XP_NETWORK_OK real WebSocket RPC: level7 +",reward," for level40 kill and own kill; acknowledgments received")
+	print("PARTY_XP_NETWORK_OK local-range group XP +2% bonus=",shared_reward," acknowledgments received")
 	low.hp=1000.0;high.hp=1000.0
 	low.invulnerable=0.0;high.invulnerable=0.0
 	low.player_pos=Vector2(6000,1035);high.player_pos=Vector2(6000,1045)
@@ -102,7 +103,8 @@ func run() -> void:
 		await process_frame
 	assert(low.hp==1000-damage and high.hp==1000-damage)
 	for index in 3:
-		server.server_send_all_quest_progress(low_id,{"type":12+index,"uid":990+index,"pos":Vector2(6000,1000)})
+		var now_ms := Time.get_ticks_msec()
+		server.server_send_all_quest_progress(low_id,{"type":12+index,"uid":990+index,"pos":Vector2(6000,1000),"damage_by_peer":{low_id:100,high_id:80},"damage_at_by_peer":{low_id:now_ms,high_id:now_ms}})
 	while not low.bosses_defeated[2] or not high.bosses_defeated[2]:
 		if Time.get_ticks_msec()>deadline:quit(7);return
 		await process_frame
