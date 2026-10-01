@@ -7,6 +7,7 @@ const SAFE_RADIUS := 1200.0
 const CHUNK := 512
 const MAX_CHUNKS := 48
 const CHUNK_PRELOAD_MARGIN := 1
+const CHUNKS_PER_PRELOAD_TICK := 2
 const BIOMES := ["Smaragdforst", "Frostweite", "Blütenmeer", "Kupfersteppe"]
 const COLORS := [Color("52703d"),Color("9ebcc5"),Color("829b50"),Color("b59455")]
 const NAMES := ["Runenlichtung","Karawanenlager","Jagdloge","Geisterhain","Kristallbruch","Sturmwarte","Frostschrein","Auftauendes Siegel","Sonnenaltar","Wildgarten","Botanisches Haus","Festlichtung","Relaisstation","Sternenkrater","Werkstatt","Kupferlager"]
@@ -25,6 +26,7 @@ var chunks: Dictionary = {}
 var chunk_order: Array[Vector2i] = []
 var sprite_regions: Dictionary = {}
 var last_preload_center := Vector2i(2147483647,2147483647)
+var chunk_preload_queue: Array[Vector2i] = []
 var active := false
 var room := -1
 var outdoor_position := CENTER
@@ -525,15 +527,22 @@ func get_chunk(key: Vector2i) -> Texture2D:
 
 func preload_camera_chunks(g, force: bool=false) -> void:
 	var center := Vector2i(floori((g.camera_pos.x+g.VIEW.x*0.5)/CHUNK),floori((g.camera_pos.y+g.VIEW.y*0.5)/CHUNK))
-	if not force and center==last_preload_center: return
-	last_preload_center=center
-	var half_x := ceili(g.VIEW.x*0.5/CHUNK)+CHUNK_PRELOAD_MARGIN
-	var half_y := ceili(g.VIEW.y*0.5/CHUNK)+CHUNK_PRELOAD_MARGIN
-	for y in range(center.y-half_y,center.y+half_y+1):
-		for x in range(center.x-half_x,center.x+half_x+1):
-			var key:=Vector2i(x,y)
-			if x<0 or y<0 or x*CHUNK>=int(SIZE.x) or y*CHUNK>=int(SIZE.y): continue
-			get_chunk(key)
+	if force or center!=last_preload_center:
+		last_preload_center=center
+		chunk_preload_queue.clear()
+		var half_x := ceili(g.VIEW.x*0.5/CHUNK)+CHUNK_PRELOAD_MARGIN
+		var half_y := ceili(g.VIEW.y*0.5/CHUNK)+CHUNK_PRELOAD_MARGIN
+		for y in range(center.y-half_y,center.y+half_y+1):
+			for x in range(center.x-half_x,center.x+half_x+1):
+				var key:=Vector2i(x,y)
+				if x<0 or y<0 or x*CHUNK>=int(SIZE.x) or y*CHUNK>=int(SIZE.y) or chunks.has(key): continue
+				chunk_preload_queue.append(key)
+		chunk_preload_queue.sort_custom(func(a,b): return a.distance_squared_to(center)<b.distance_squared_to(center))
+	var budget:=CHUNKS_PER_PRELOAD_TICK*2 if force else CHUNKS_PER_PRELOAD_TICK
+	while budget>0 and not chunk_preload_queue.is_empty():
+		var key:=chunk_preload_queue.pop_front()
+		if not chunks.has(key): get_chunk(key)
+		budget-=1
 
 func make_chunk(key: Vector2i) -> Texture2D:
 	var img:=Image.create(CHUNK,CHUNK,false,Image.FORMAT_RGBA8)
