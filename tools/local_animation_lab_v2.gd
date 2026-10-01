@@ -2,8 +2,7 @@ extends Node2D
 
 const Models = preload("res://components/animation_lab_models.gd")
 
-var mage_pos := Vector2(576,360)
-var facing := Vector2.DOWN
+var mage_pos := Vector2(800,390)
 var phase := 0.0
 var action := "idle"
 var action_t := 0.0
@@ -20,8 +19,7 @@ func _process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP): move.y -= 1.0
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): move.y += 1.0
 	if move.length_squared() > 0.01 and action != "death":
-		facing = move.normalized()
-		mage_pos += facing*150.0*delta
+		mage_pos += move.normalized()*150.0*delta
 		phase += delta*6.0
 		if action == "idle": action = "walk"
 	elif action == "walk":
@@ -29,7 +27,7 @@ func _process(delta: float) -> void:
 		phase += delta*2.0
 	else:
 		phase += delta*(1.2 if action=="idle" else 3.0)
-	mage_pos = mage_pos.clamp(Vector2(90,205),Vector2(1060,570))
+	mage_pos = mage_pos.clamp(Vector2(120,220),Vector2(1480,540))
 	if action in ["attack","hurt","death"]:
 		action_t = minf(1.0,action_t+delta*(2.3 if action=="attack" else (3.2 if action=="hurt" else 1.1)))
 		if action_t >= 1.0 and action != "death":
@@ -50,8 +48,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_1: selected=0
 			KEY_2: selected=1
 			KEY_3: selected=2
-			KEY_Q: facing=facing.rotated(-PI/4.0)
-			KEY_E: facing=facing.rotated(PI/4.0)
 	if event is InputEventMouseButton and event.pressed and event.button_index==MOUSE_BUTTON_LEFT:
 		if action!="death": action="attack"; action_t=0.0
 
@@ -64,50 +60,56 @@ func panel(r: Rect2,title: String,active: bool=false) -> void:
 	label(r.position+Vector2(12,25),title,16,Color("ffe2aa") if active else Color("c8d8d3"))
 
 func grid_floor() -> void:
-	draw_rect(Rect2(0,0,1152,648),Color("081722"))
-	for y in range(170,648,32):
-		for x in range(0,1152,32):
+	draw_rect(Rect2(0,0,1600,900),Color("081722"))
+	for y in range(170,900,32):
+		for x in range(0,1600,32):
 			var cell := int(x/32)+int(y/32)
 			var col := Color("123342") if posmod(cell,2)==0 else Color("102f3d")
 			draw_rect(Rect2(x,y,32,32),col)
-	for x in range(0,1152,32): draw_line(Vector2(x,170),Vector2(x,648),Color(0.18,0.32,0.37,0.35),1)
-	for y in range(170,648,32): draw_line(Vector2(0,y),Vector2(1152,y),Color(0.18,0.32,0.37,0.35),1)
+	for x in range(0,1600,32): draw_line(Vector2(x,170),Vector2(x,900),Color(0.18,0.32,0.37,0.35),1)
+	for y in range(170,900,32): draw_line(Vector2(0,y),Vector2(1600,y),Color(0.18,0.32,0.37,0.35),1)
 
 func _draw() -> void:
 	grid_floor()
-	label(Vector2(24,35),"SONNENHAIN · LOKALES QUALITÄTSLABOR V3 · HIGH-RES PIXELART",26,Color("ffe2aa"))
-	label(Vector2(24,64),"Magier ~96×144 · Schleim ~96×72 · Wolf ~144×104 · mehr Pixel für echte Details",16,Color("b8d4ce"))
-	label(Vector2(24,91),"WASD/Pfeile bewegen · Q/E Richtung · Leertaste/M1 Angriff · H Treffer · R Tod/Reset · 1–3 Fokus",15)
+	label(Vector2(24,35),"SONNENHAIN · LOKALES QUALITÄTSLABOR V4 · SILHOUETTE FIRST",26,Color("ffe2aa"))
+	label(Vector2(24,64),"High-Res Pixelart · Cursor steuert Blickrichtung · unten: echte 8-Richtungs-Galerie",16,Color("b8d4ce"))
+	label(Vector2(24,91),"WASD/Pfeile Magier bewegen · Maus = Blickrichtung für jede Einheit · Leertaste/M1 Angriff · H Treffer · R Tod/Reset · 1–3 Galerie",15)
 	label(Vector2(24,116),"Keine Serververbindung · keine Savegame-Änderung · reine Darstellungs-/Animationsprüfung",14,Color("91b6ac"))
-	panel(Rect2(20,130,350,34),"1 · MAGIER / HIGH-RES LAYER",selected==0)
-	panel(Rect2(401,130,350,34),"2 · SCHLEIM / KLASSISCHER BLOB",selected==1)
-	panel(Rect2(782,130,350,34),"3 · WOLF / AGGRESSIVE SILHOUETTE",selected==2)
+	panel(Rect2(20,130,500,34),"1 · MAGIER / SILHOUETTE + KOPF",selected==0)
+	panel(Rect2(550,130,500,34),"2 · SCHLEIM / KLASSISCHER BLOB",selected==1)
+	panel(Rect2(1080,130,500,34),"3 · WOLF / AGGRESSIVE SILHOUETTE",selected==2)
 
-	Models.mage(self,mage_pos,facing,phase,action,action_t)
-	label(mage_pos+Vector2(-78,74),"MAGIER · "+dir_name(facing),14,Color("ffe2aa"))
+	var mouse:=get_local_mouse_position()
+	var slime_pos := Vector2(320,420)
+	var wolf_pos := Vector2(1280,420)
+	var mage_face := (mouse-mage_pos).normalized()
+	var slime_face := (mouse-slime_pos).normalized()
+	var wolf_face := (mouse-wolf_pos).normalized()
+	if mage_face.length_squared()<0.01: mage_face=Vector2.DOWN
+	if slime_face.length_squared()<0.01: slime_face=Vector2.DOWN
+	if wolf_face.length_squared()<0.01: wolf_face=Vector2.DOWN
 
-	var slime_pos := Vector2(255,385)
-	var wolf_pos := Vector2(900,390)
-	Models.slime(self,slime_pos,facing,phase,action,action_t)
-	label(slime_pos+Vector2(-74,70),"SCHLEIM · "+action.to_upper(),14,Color("baf2a9"))
-	Models.wolf(self,wolf_pos,facing,phase,action,action_t)
-	label(wolf_pos+Vector2(-65,78),"WOLF · "+action.to_upper(),14,Color("d8dde8"))
+	Models.mage(self,mage_pos,mage_face,phase,action,action_t)
+	label(mage_pos+Vector2(-100,92),"MAGIER · "+dir_name(mage_face),14,Color("ffe2aa"))
+	Models.slime(self,slime_pos,slime_face,phase,action,action_t)
+	label(slime_pos+Vector2(-95,82),"SCHLEIM · "+dir_name(slime_face),14,Color("baf2a9"))
+	Models.wolf(self,wolf_pos,wolf_face,phase,action,action_t)
+	label(wolf_pos+Vector2(-90,100),"WOLF · "+dir_name(wolf_face),14,Color("d8dde8"))
 
-	draw_rect(Rect2(26,515,330,91),Color(0.04,0.10,0.14,0.78))
-	label(Vector2(38,540),"MAGIER",15,Color("ffe2aa"))
-	label(Vector2(38,560),"• größerer Kopf / sichtbares Gesicht / Staff-Handbindung",13)
-	label(Vector2(38,579),"• mehr Materialdetails, Goldkanten und Stofffalten",13)
-	label(Vector2(38,598),"• Walk / Attack / Hurt / Death",13)
-	draw_rect(Rect2(411,515,330,91),Color(0.04,0.10,0.14,0.78))
-	label(Vector2(423,540),"SCHLEIM",15,Color("baf2a9"))
-	label(Vector2(423,560),"• klassischer Sonnenhain-Blob mit Gelkern",13)
-	label(Vector2(423,579),"• breite Kuppel, Glanz, Spritzrand, Blasen",13)
-	label(Vector2(423,598),"• gerichteter Angriff mit Masse",13)
-	draw_rect(Rect2(796,515,330,91),Color(0.04,0.10,0.14,0.78))
-	label(Vector2(808,540),"WOLF",15,Color("d8dde8"))
-	label(Vector2(808,560),"• tiefe Kampfhaltung + breite Schulterpartie",13)
-	label(Vector2(808,579),"• Zähne, Krallen, rote Augen, zackige Mähne",13)
-	label(Vector2(808,598),"• Kopf/Schweif folgen Richtung",13)
+	# Fixed eight-direction gallery for silhouette review.
+	draw_rect(Rect2(20,585,1560,285),Color(0.035,0.08,0.11,0.92))
+	label(Vector2(34,612),"8-RICHTUNGS-GALERIE · "+["MAGIER","SCHLEIM","WOLF"][selected],18,Color("ffe2aa"))
+	label(Vector2(34,636),"S · SO · O · NO · N · NW · W · SW — gleiche Figur, echte Seiten-/Rückenlesbarkeit",14,Color("a9c9be"))
+	for i in 8:
+		var gp:=Vector2(110+i*195,795)
+		var gv:=Models.direction_vector(i)
+		draw_rect(Rect2(gp+Vector2(-88,-142),Vector2(176,190)),Color(0.05,0.12,0.16,0.7))
+		draw_rect(Rect2(gp+Vector2(-88,-142),Vector2(176,190)),Color("34505d"),false,1)
+		match selected:
+			0: Models.mage(self,gp,gv,phase,"idle",0.0)
+			1: Models.slime(self,gp,gv,phase,"idle",0.0)
+			2: Models.wolf(self,gp,gv,phase,"idle",0.0)
+		label(gp+Vector2(-18,56),["S","SO","O","NO","N","NW","W","SW"][i],13,Color("e8e0ca"))
 
 func dir_name(v: Vector2) -> String:
 	return ["S","SO","O","NO","N","NW","W","SW"][Models.direction_index(v)]
