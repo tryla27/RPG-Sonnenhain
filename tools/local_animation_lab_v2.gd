@@ -71,10 +71,10 @@ func grid_floor() -> void:
 
 func _draw() -> void:
 	grid_floor()
-	label(Vector2(24,35),"SONNENHAIN · LOKALES QUALITÄTSLABOR V4 · SILHOUETTE FIRST",26,Color("ffe2aa"))
-	label(Vector2(24,64),"High-Res Pixelart · Cursor steuert Blickrichtung · unten: echte 8-Richtungs-Galerie",16,Color("b8d4ce"))
+	label(Vector2(24,35),"SONNENHAIN · LOKALES QUALITÄTSLABOR V5 · SILHOUETTE + ATTACK",26,Color("ffe2aa"))
+	label(Vector2(24,64),"High-Res Pixelart · Cursor steuert Blickrichtung · 8 Richtungen · Attack-Choreografie mit Wind-up / Impact / Recovery",16,Color("b8d4ce"))
 	label(Vector2(24,91),"WASD/Pfeile Magier bewegen · Maus = Blickrichtung für jede Einheit · Leertaste/M1 Angriff · H Treffer · R Tod/Reset · 1–3 Galerie",15)
-	label(Vector2(24,116),"Keine Serververbindung · keine Savegame-Änderung · reine Darstellungs-/Animationsprüfung",14,Color("91b6ac"))
+	label(Vector2(24,116),"Nur Qualitätslabor · keine Server-/Savegame-Änderung · Leertaste/M1 testet die neuen Angriffe",14,Color("91b6ac"))
 	panel(Rect2(20,130,500,34),"1 · MAGIER / SILHOUETTE + KOPF",selected==0)
 	panel(Rect2(550,130,500,34),"2 · SCHLEIM / KLASSISCHER BLOB",selected==1)
 	panel(Rect2(1080,130,500,34),"3 · WOLF / AGGRESSIVE SILHOUETTE",selected==2)
@@ -90,11 +90,18 @@ func _draw() -> void:
 	if wolf_face.length_squared()<0.01: wolf_face=Vector2.DOWN
 
 	Models.mage(self,mage_pos,mage_face,phase,action,action_t)
-	label(mage_pos+Vector2(-100,92),"MAGIER · "+dir_name(mage_face),14,Color("ffe2aa"))
+	label(mage_pos+Vector2(-120,92),"MAGIER · "+dir_name(mage_face)+" · "+action.to_upper(),14,Color("ffe2aa"))
 	Models.slime(self,slime_pos,slime_face,phase,action,action_t)
-	label(slime_pos+Vector2(-95,82),"SCHLEIM · "+dir_name(slime_face),14,Color("baf2a9"))
+	label(slime_pos+Vector2(-115,82),"SCHLEIM · "+dir_name(slime_face)+" · "+action.to_upper(),14,Color("baf2a9"))
 	Models.wolf(self,wolf_pos,wolf_face,phase,action,action_t)
-	label(wolf_pos+Vector2(-90,100),"WOLF · "+dir_name(wolf_face),14,Color("d8dde8"))
+	label(wolf_pos+Vector2(-110,100),"WOLF · "+dir_name(wolf_face)+" · "+action.to_upper(),14,Color("d8dde8"))
+
+	# Attack phase strip for timing review.
+	draw_rect(Rect2(20,535,1560,40),Color(0.04,0.09,0.13,0.9))
+	var attack_phase: String="IDLE"
+	if action=="attack":
+		attack_phase="WIND-UP" if action_t<0.30 else ("IMPACT" if action_t<0.58 else "RECOVERY")
+	label(Vector2(34,561),"ATTACK TEST · "+attack_phase+" · Leertaste/M1 startet alle drei Referenzangriffe synchron",14,Color("f2d69a"))
 
 	# Fixed eight-direction gallery for silhouette review.
 	draw_rect(Rect2(20,585,1560,285),Color(0.035,0.08,0.11,0.92))
