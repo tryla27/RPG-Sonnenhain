@@ -3560,10 +3560,10 @@ func drop_position_blocked(candidate:Vector2,origin:Vector2) -> bool:
 	return terrain_blocked(candidate) or blocked_by_region_wall(candidate)
 
 func safe_drop_position(origin:Vector2,preferred:Vector2=Vector2.ZERO) -> Vector2:
-	var base:=origin+preferred
+	var base:Vector2=origin+preferred
 	var offsets:Array=[Vector2.ZERO,Vector2(24,0),Vector2(-24,0),Vector2(0,24),Vector2(0,-24),Vector2(34,34),Vector2(-34,34),Vector2(34,-34),Vector2(-34,-34),Vector2(52,0),Vector2(-52,0),Vector2(0,52),Vector2(0,-52)]
 	for offset in offsets:
-		var candidate:=base+offset
+		var candidate:Vector2=base+Vector2(offset)
 		if not drop_position_blocked(candidate,origin):return candidate
 	return origin
 
@@ -5959,9 +5959,9 @@ func draw_arena_world() -> void:
 			if tile_center.distance_to(center) > ARENA_RADIUS-18: continue
 			var local_y := tile_center.y-center.y
 			var height := 2 if local_y < -176 else (0 if local_y > 190 else 1)
-			var base := [Color("3e4650"),Color("59636a"),Color("737970")][height]
+			var base:Color = [Color("3e4650"),Color("59636a"),Color("737970")][height]
 			var code := hash_cell(gx+173,gy+211)
-			var tint := base.lightened(.035) if code%5==0 else (base.darkened(.045) if code%7==0 else base)
+			var tint:Color = base.lightened(.035) if code%5==0 else (base.darkened(.045) if code%7==0 else base)
 			draw_rect(Rect2(tile_center-Vector2(16,16),Vector2(32,32)),tint)
 			draw_line(tile_center+Vector2(-16,15),tile_center+Vector2(16,15),Color("1f2931",.34),1)
 			draw_line(tile_center+Vector2(15,-16),tile_center+Vector2(15,16),Color("a9a78e",.14),1)
@@ -5974,7 +5974,7 @@ func draw_arena_world() -> void:
 			draw_line(lip-Vector2(16,4),lip+Vector2(16,-4),Color("d0b77d",.55),2)
 	for yoff in [-176.0,190.0]:
 		for step in range(-3,4):
-			var sy := yoff + step*8.0
+			var sy:float = float(yoff) + step*8.0
 			draw_rect(Rect2(center+Vector2(-80,sy-4),Vector2(160,8)),Color("887b65"))
 			draw_line(center+Vector2(-80,sy-4),center+Vector2(80,sy-4),Color("d4bd83",.65),2)
 	# Massiver Außenring aus Tile-Segmenten.
