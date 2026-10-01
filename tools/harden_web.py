@@ -11,6 +11,26 @@ security_meta = """		<meta name="referrer" content="no-referrer">
 """
 
 
+browser_bridge = """<script id="sonnenhain-browser-bridge">
+window.SonnenhainBrowser = Object.freeze({
+  touchCapability() {
+    if (window.SONNENHAIN_CONTROL_MODE === 'mobile') return true;
+    if (window.SONNENHAIN_CONTROL_MODE === 'desktop') return false;
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ((navigator.maxTouchPoints || 0) > 0 && (!window.matchMedia || window.matchMedia('(pointer: coarse)').matches));
+  },
+  downloadBackup(payload, filename) {
+    const url = URL.createObjectURL(new Blob([payload], {type:'application/json'}));
+    const link = document.createElement('a');
+    link.href = url; link.download = filename;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  }
+});
+</script>"""
+if 'id="sonnenhain-browser-bridge"' not in html:
+    html=html.replace('</head>',browser_bridge+'\n</head>',1)
+
 if 'name="referrer"' not in html:
     html=html.replace('</head>',security_meta+'\n</head>',1)
 html=html.replace('<html lang="en">','<html lang="de">',1)

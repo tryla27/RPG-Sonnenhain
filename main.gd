@@ -464,21 +464,9 @@ const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
 func detect_touch_capability() -> bool:
-	if not is_web_platform():
-		return DisplayServer.is_touchscreen_available()
-
-	# PC und Mobile bekommen getrennte öffentliche Start-URLs. Der jeweilige
-	# HTML-Shell setzt den Modus ausdrücklich, damit Browser-Erkennung,
-	# Touch-Laptops und Cache-Effekte die Steuerung nicht vermischen können.
-	var forced_mode = JavaScriptBridge.eval("String(window.SONNENHAIN_CONTROL_MODE || '')")
-	if str(forced_mode) == "mobile":
-		return true
-	if str(forced_mode) == "desktop":
-		return false
-
-	# Fallback nur für alte oder direkt aufgerufene Game-Links.
-	var auto_mobile = JavaScriptBridge.eval("Boolean(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || ((navigator.maxTouchPoints||0)>0 && (!window.matchMedia || window.matchMedia('(pointer: coarse)').matches)))")
-	return bool(auto_mobile)
+	if not is_web_platform():return DisplayServer.is_touchscreen_available()
+	var bridge=JavaScriptBridge.get_interface("SonnenhainBrowser")
+	return bool(bridge.touchCapability()) if bridge!=null else DisplayServer.is_touchscreen_available()
 
 func clear_touch_inputs() -> void:
 	touch_attack_ids.clear()
@@ -2230,8 +2218,7 @@ func mobile_text_prompt(title: String, current: String, max_length: int) -> Stri
 	if not is_web_platform():
 		DisplayServer.virtual_keyboard_show(current)
 		return current
-	var script := "window.prompt(%s,%s)" % [JSON.stringify(title), JSON.stringify(current)]
-	var result = JavaScriptBridge.eval(script)
+	var result = JavaScriptBridge.get_interface("window").prompt(title,current)
 	if result == null:
 		return current
 	return str(result).strip_edges().substr(0, max_length)
@@ -4153,7 +4140,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(300, 563, 550, 35).has_point(mouse):
 			if is_web_platform():
 				save_game()
-				JavaScriptBridge.eval("window.location.href='/'")
+				JavaScriptBridge.get_interface("window").location.assign("/")
 				return
 			if arena_mode != "":
 				arena_mode = ""
@@ -9147,8 +9134,10 @@ func export_save_backup() -> void:
 	var payload := FileAccess.get_file_as_string(path)
 	if is_web_platform():
 		var filename := "sonnenhain_slot%d%s.json" % [active_save_slot,"_test" if creative_mode else ""]
-		var script := "(function(){const d=%s;const b=new Blob([d],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=%s;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);})()" % [JSON.stringify(payload),JSON.stringify(filename)]
-		JavaScriptBridge.eval(script)
+		var bridge=JavaScriptBridge.get_interface("SonnenhainBrowser")
+		if bridge==null or not bool(bridge.downloadBackup(payload,filename)):
+			pause_status="Backup-Download konnte nicht gestartet werden."
+			return
 		pause_status = "Backup heruntergeladen."
 	else:
 		DisplayServer.clipboard_set(payload)
@@ -9160,7 +9149,7 @@ func import_save_backup() -> void:
 		return
 	var raw := ""
 	if is_web_platform():
-		var result = JavaScriptBridge.eval("window.prompt('Sonnenhain-Backup JSON hier einfügen:','')")
+		var result = JavaScriptBridge.get_interface("window").prompt("Sonnenhain-Backup JSON hier einfügen:","")
 		if result == null: return
 		raw = str(result).strip_edges()
 	else:

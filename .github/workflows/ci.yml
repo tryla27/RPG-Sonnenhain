@@ -60,6 +60,7 @@ jobs:
         run: |
           php -l website/access/access.php
           python3 tools/check_website_access.py
+          node tools/check_browser_bridge.cjs
 
       - name: Import project and validate GDScript
         shell: bash
