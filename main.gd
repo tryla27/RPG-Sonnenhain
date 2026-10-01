@@ -2508,6 +2508,10 @@ func normal_attack() -> void:
 	if konflux.active:
 		konflux.attack(self)
 		return
+	if waystone_safe_at(player_pos):
+		message("Wegstein-Schutz: Hier sind Angriffe deaktiviert.")
+		attack_timer = 0.25
+		return
 	var variant := equipped_weapon_variant()
 	attack_timer = 0.62 if variant == "axe" else (0.78 if variant == "crossbow" else (0.45 if class_id == 0 else (0.62 if class_id == 1 else 0.52)))
 	swing_duration = 0.29 if variant == "axe" else (0.20 if variant == "crossbow" else (0.24 if class_id == 0 else 0.32))
@@ -2542,7 +2546,7 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 	if state_pos.size() < 2: return
 	var requested_origin := Vector2(float(origin_data[0]),float(origin_data[1]))
 	var origin := Vector2(float(state_pos[0]),float(state_pos[1]))
-	if requested_origin.distance_to(origin) > 125.0: return
+	if requested_origin.distance_to(origin) > 125.0 or waystone_safe_at(origin): return
 	var dir := Vector2(float(dir_data[0]),float(dir_data[1]))
 	if not dir.is_finite() or dir.length_squared() < 0.01: return
 	dir = dir.normalized()
@@ -2647,7 +2651,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	if state_pos.size() < 2: return
 	var requested_origin := Vector2(float(pos_data[0]),float(pos_data[1]))
 	var origin := Vector2(float(state_pos[0]),float(state_pos[1]))
-	if requested_origin.distance_to(origin) > 145.0: return
+	if requested_origin.distance_to(origin) > 145.0 or waystone_safe_at(origin): return
 	var dir := Vector2(float(dir_data[0]),float(dir_data[1]))
 	if not dir.is_finite() or dir.length_squared() < 0.01: return
 	dir = dir.normalized()
@@ -2687,6 +2691,9 @@ func use_ability(slot: int) -> void:
 		energy -= float(ability["cost"])
 		cooldowns[id] = float(ability["cd"])
 		konflux.attack(self,id)
+		return
+	if waystone_safe_at(player_pos):
+		message("Wegstein-Schutz: Hier sind Fähigkeiten deaktiviert.")
 		return
 	energy -= float(ability["cost"])
 	var rank: int = int(skill_levels[id])
@@ -3411,6 +3418,21 @@ func respawn() -> void:
 	message("Du wurdest im Dorf wiederbelebt. -20 Gold")
 	save_game()
 
+func safe_drop_position(origin: Vector2, offset: Vector2 = Vector2.ZERO) -> Vector2:
+	var wanted := origin+offset
+	var origin_region := region_at(origin)
+	var candidates: Array = [wanted,origin]
+	for radius in [24.0,40.0,56.0,76.0,96.0]:
+		for n in 8:
+			candidates.append(origin+Vector2.RIGHT.rotated(float(n)*TAU/8.0)*radius)
+	for candidate in candidates:
+		var p: Vector2 = candidate
+		if region_at(p)!=origin_region: continue
+		if blocked_by_region_wall(p) or terrain_blocked(p,12.0): continue
+		if waystone_safe_at(p): continue
+		return p
+	return origin
+
 func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var enemy: Dictionary = enemies[index]
 	announce_mob_death(enemy)
@@ -3442,7 +3464,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 		bosses_defeated[type - 12] = true
 		var boss_element: String = ["blitz", "eis", "gift"][type - 12]
 		var boss_item := make_item("%s · %s" % [ENEMY_TYPES[type]["name"], String(boss_element).capitalize()], class_weapon_icon(), 3 + int(type == 14), 28 + (type - 12) * 8, 700 + type * 35, boss_element)
-		drops.append({"pos":pos + Vector2(25, 0), "item":boss_item, "life":120.0})
+		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)), "item":boss_item, "life":120.0})
 		message("%s besiegt! Ein neuer Weg ist offen." % ENEMY_TYPES[type]["name"])
 		if bosses_defeated.count(true) == bosses_defeated.size() and not final_completed and final_countdown < 0.0:
 			final_countdown = 8.0
@@ -3451,7 +3473,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var elite_kind: int = int(enemy.get("elite", 0))
 	gain_xp(enemy_xp_reward(type, elite_kind, level))
 	var coins: int = randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
-	drops.append({"pos":pos + Vector2(8, 12), "gold":coins, "life":80.0})
+	drops.append({"pos":safe_drop_position(pos,Vector2(8,12)), "gold":coins, "life":80.0})
 	for qindex in quests.size():
 		var quest: Dictionary = quests[qindex]
 		if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == type:
@@ -3461,9 +3483,9 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 				message("Questziel erreicht: %s. Kehre zurück!" % QUESTS[qindex]["title"])
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
 		var item: Dictionary = random_loot(type)
-		drops.append({"pos":pos, "item":item, "life":90.0})
+		drops.append({"pos":safe_drop_position(pos), "item":item, "life":90.0})
 	if randf() < 0.03:
-		drops.append({"pos":pos + Vector2(20, 0), "item":make_item("Heiltrank", "potion", 1, 0, 18), "life":90.0})
+		drops.append({"pos":safe_drop_position(pos,Vector2(20,0)), "item":make_item("Heiltrank", "potion", 1, 0, 18), "life":90.0})
 	if type in [12, 13, 14]: save_game()
 
 func register_boss_defeat(boss_index:int,shared:bool=false)->bool:
