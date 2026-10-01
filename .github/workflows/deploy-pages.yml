@@ -16,6 +16,7 @@ on:
       - "website/**"
       - "CNAME"
       - ".github/workflows/deploy-pages.yml"
+      - ".github/workflows/deploy-server.yml"
   workflow_dispatch:
 
 permissions:

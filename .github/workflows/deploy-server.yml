@@ -173,11 +173,25 @@ jobs:
 
       - name: Wait for matching website version
         if: env.VSERVER_HOST != '' && env.VSERVER_USER != '' && env.VSERVER_SSH_KEY != ''
+        env:
+          MANITU_SSH_KEY: ${{ secrets.MANITU_SSH_KEY }}
         shell: bash
         run: |
           set -euo pipefail
+          umask 077
+          install -d -m 700 "$HOME/.ssh"
+          trap 'rm -f "$HOME/.ssh/website_version_key"' EXIT
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          raw=os.environ["MANITU_SSH_KEY"].replace("\r", "").strip()
+          key=raw.replace("\\n","\n") if "BEGIN OPENSSH PRIVATE KEY" in raw else base64.b64decode("".join(raw.split()),validate=True).decode().strip()
+          if "BEGIN OPENSSH PRIVATE KEY" not in key: raise SystemExit("Website deploy key unavailable")
+          Path.home().joinpath(".ssh/website_version_key").write_text(key+"\n")
+          PY
+          chmod 600 "$HOME/.ssh/website_version_key"
           for attempt in {1..60}; do
-            published=$(curl -fsS --max-time 10 "https://sonnenhainrpg.de/version.json?release=$GITHUB_SHA" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("commit",""))' || true)
+            published=$(ssh -4 -i "$HOME/.ssh/website_version_key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ssh300011111@ngcobalt378.manitu.net 'cat /home/sites/site100047525/web/htdocs/sonnenhainrpg.de/version.json' | python3 -c 'import json,sys; print(json.load(sys.stdin).get("commit",""))' || true)
             if [ "$published" = "$GITHUB_SHA" ]; then
               echo "Website and server release match: $GITHUB_SHA"
               exit 0
