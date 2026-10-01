@@ -431,6 +431,7 @@ var server_next_party_id := 1
 var server_action_times: Dictionary = {}
 var server_pending_transactions: Dictionary = {}
 var multiplayer_smoke_client_mode := false
+var multiplayer_smoke_saw_attack:=false
 var multiplayer_smoke_name := ""
 var multiplayer_smoke_deadline := 0
 var multiplayer_smoke_chat_timer := 0.0
@@ -599,7 +600,7 @@ func process_multiplayer_smoke(delta: float) -> void:
 		var facing_data: Array = remote_state.get("facing", [])
 		if pos_data.size() >= 2 and facing_data.size() >= 2 and remote_state.has("class") and remote_state.has("race") and str(remote_state.get("name", "")).strip_edges() != "":
 			complete_remote_count += 1
-	var saw_remote_attack := remote_combat_visuals.size() >= 1
+	var saw_remote_attack := remote_combat_visuals.size() >= 1 or multiplayer_smoke_saw_attack
 	var party_ok := (party_state.get("members",[]) as Array).size() >= 2
 	var ping_ok := network_ping_ms >= 0
 	for enemy in enemies:
@@ -8835,6 +8836,7 @@ func rpc_server_party_progress(payload: Dictionary) -> void:
 
 @rpc("authority","call_remote","reliable")
 func rpc_remote_combat_visual(peer_id: int, payload: Dictionary) -> void:
+	if multiplayer_smoke_client_mode:multiplayer_smoke_saw_attack=true
 	if int(payload.get("protocol",-1)) != NETWORK_PROTOCOL_VERSION: return
 	if peer_id == multiplayer.get_unique_id(): return
 	if remote_players.has(peer_id) and not state_matches_local_context(remote_players[peer_id]): return
