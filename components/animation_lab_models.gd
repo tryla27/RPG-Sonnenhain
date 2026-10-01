@@ -278,12 +278,14 @@ static func wolf(c: CanvasItem,p: Vector2,facing: Vector2,phase: float,state: St
 	ellipse(c,head,15,14,Color("697186"))
 	var muzzle := head+f*13.0+Vector2(0,4)
 	ellipse(c,muzzle,10,7,Color("b5b8c2"))
-	var ear_base_l := head-f*2.0+r*9.0+Vector2(0,-9)
-	var ear_base_r := head-f*2.0-r*9.0+Vector2(0,-9)
-	for ep: Vector2 in [ear_base_l,ear_base_r]:
-		poly_px(c,PackedVector2Array([
-			ep+r*3.0,ep-r*3.0,ep-f*9.0+Vector2(0,-11)
-		]),Color("555d72"))
+	var ear_base_l: Vector2 = head-f*2.0+r*9.0+Vector2(0,-9)
+	var ear_base_r: Vector2 = head-f*2.0-r*9.0+Vector2(0,-9)
+	poly_px(c,PackedVector2Array([
+		ear_base_l+r*3.0,ear_base_l-r*3.0,ear_base_l-f*9.0+Vector2(0,-11)
+	]),Color("555d72"))
+	poly_px(c,PackedVector2Array([
+		ear_base_r+r*3.0,ear_base_r-r*3.0,ear_base_r-f*9.0+Vector2(0,-11)
+	]),Color("555d72"))
 	# Eyes only on visible/front-ish views.
 	if heading not in [3,4,5]:
 		var eye_f := head+f*6.0+Vector2(0,-3)
