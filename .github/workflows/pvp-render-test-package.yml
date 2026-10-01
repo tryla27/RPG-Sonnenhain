@@ -1,0 +1,88 @@
+name: PvP Render Test Package
+
+on:
+  push:
+    branches:
+      - test/pvp-render-audit-fixes-2026-10-01
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_BIN: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+
+      - name: Restore Godot cache
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/godot
+          key: godot-${{ env.GODOT_VERSION }}-${{ runner.os }}
+
+      - name: Install Godot
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 8 --retry-all-errors \
+            -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x "$GODOT_BIN"
+
+      - name: Validate static content
+        run: python3 tools/check_content.py
+
+      - name: Import project and validate GDScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BIN" --headless --path . --editor --import --quit
+
+      - name: Run Konflux PvP render regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 120 "$GODOT_BIN" --headless --path . --script tools/check_konflux_pvp_render_fixes.gd 2>&1 | tee /tmp/konflux-test.log
+          ! grep -q "SCRIPT ERROR:" /tmp/konflux-test.log
+          grep -q "KONFLUX_PVP_RENDER_FIXES_OK" /tmp/konflux-test.log
+
+      - name: Package Godot test source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package/Sonnenhain-PvP-Render-Test
+          cp project.godot main.gd main.gd.uid main.tscn export_presets.cfg package/Sonnenhain-PvP-Render-Test/
+          cp -R components art audio music tools package/Sonnenhain-PvP-Render-Test/
+          cp README.md PATCH_V29_KONFLUX.md package/Sonnenhain-PvP-Render-Test/ 2>/dev/null || true
+          printf '%s\n' \
+            'Sonnenhain PvP Render Test' \
+            'Branch: test/pvp-render-audit-fixes-2026-10-01' \
+            'Basis: main' \
+            'Änderungen:' \
+            '- Remote-Spieler übernehmen Ring-Visuals' \
+            '- Innenraum-AoE/Sichtlinie wird durch Möbel blockiert' \
+            '- Chunk-Cache verwendet LRU statt FIFO' \
+            '- Chunk-Vorladen läuft budgetiert über mehrere Frames' \
+            '' \
+            'Start:' \
+            '1. Ordner in Godot 4.7.2 importieren' \
+            '2. project.godot öffnen' \
+            '3. Projekt starten (F6/F5)' \
+            > package/Sonnenhain-PvP-Render-Test/TESTVERSION.txt
+
+      - name: Upload Godot test source
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonnenhain-pvp-render-test
+          path: package/Sonnenhain-PvP-Render-Test
+          if-no-files-found: error
+          retention-days: 14
