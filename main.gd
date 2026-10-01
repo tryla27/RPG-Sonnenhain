@@ -419,6 +419,8 @@ const PARTY_XP_RANGE := 850.0
 const PARTY_BOSS_RANGE := 1100.0
 const PARTY_BOSS_ACTIVITY_MS := 15000
 const SERVER_WORLD_MOB_CAP := 72
+const WAYSTONE_SAFE_RADIUS := 220.0
+const WAYSTONE_SPAWN_BLOCK_RADIUS := 285.0
 var dedicated_server_mode := false
 var invite_code := ""
 var join_code := ""
@@ -1608,10 +1610,10 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 			var state:Dictionary=remote_players[peer]
 			if str(state.get("context","world"))!="world" or bool(state.get("konflux",false)) or konflux.fighter_stats.has(peer) or float(state.get("hp",1.0))<=0:continue
 			var pos:=network_player_position(int(peer))
-			if region_at(pos)==0 or region_at(pos)!=region_at(enemy["pos"]):continue
+			if region_at(pos)==0 or region_at(pos)!=region_at(enemy["pos"]) or waystone_safe_at(pos):continue
 			result.append({"id":int(peer),"pos":pos})
 	elif hp>0 and death_timer<=0 and (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)!=0):
-		if arena_mode!="" or dungeon_id>=0 or region_at(player_pos)==region_at(enemy["pos"]):
+		if (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)==region_at(enemy["pos"])) and not waystone_safe_at(player_pos):
 			result.append({"id":0,"pos":player_pos})
 	return result
 
@@ -1657,6 +1659,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		for angle in [0.0,.52,-.52,.92,-.92,1.35,-1.35,PI]:
 			var next:Vector2=origin+movement.rotated(angle)*speed*delta
 			var valid:bool=not terrain_blocked(next,mob_hit_radius(enemy)) and not blocked_by_region_wall(next) and region_at(next)==region_at(origin)
+			if server or (arena_mode=="" and dungeon_id<0): valid = valid and not waystone_safe_at(next)
 			if not server and arena_mode!="":valid=next.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
 			elif not server and dungeon_id>=0:valid=not dungeon_blocked(next)
 			if valid:
@@ -1700,6 +1703,7 @@ func mob_shot_blocked(a:Vector2,b:Vector2,server:bool)->bool:
 		elif not server and arena_mode!="":
 			if p.distance_to(ARENA_CENTER)>ARENA_RADIUS:return true
 		elif terrain_blocked(p):return true
+		if (server or (arena_mode=="" and dungeon_id<0)) and waystone_safe_at(p):return true
 	return false
 
 func advance_mob_shots(delta:float,server:bool)->void:
@@ -1719,9 +1723,9 @@ func advance_mob_shots(delta:float,server:bool)->void:
 			for peer in remote_players:
 				var state:Dictionary=remote_players[peer]
 				var pos:=network_player_position(int(peer))
-				if str(state.get("context","world"))=="world" and not bool(state.get("konflux",false)) and not konflux.fighter_stats.has(peer) and float(state.get("hp",1))>0 and region_at(pos)==int(shot.get("source_region",region_at(previous))) and region_at(pos)!=0:
+				if str(state.get("context","world"))=="world" and not bool(state.get("konflux",false)) and not konflux.fighter_stats.has(peer) and float(state.get("hp",1))>0 and region_at(pos)==int(shot.get("source_region",region_at(previous))) and region_at(pos)!=0 and not waystone_safe_at(pos):
 					candidates.append({"id":int(peer),"pos":pos})
-		elif hp>0 and death_timer<=0:candidates.append({"id":0,"pos":player_pos})
+		elif hp>0 and death_timer<=0 and not waystone_safe_at(player_pos):candidates.append({"id":0,"pos":player_pos})
 		var nearest:Dictionary={}
 		var distance:float=INF
 		for candidate in candidates:
@@ -1898,7 +1902,7 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 		if stone==WAYSTONES[0]:
 			if SpawnStoneBody.blocks(pos-stone,0,hero_collision_radius()):return true
 			continue
-		if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).grow(12).has_point(pos): return true
+		if Rect2(stone+Vector2(-58,-82),Vector2(116,142)).grow(12).has_point(pos): return true
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
 	for shop in VillageLayout.SHOPS:
@@ -2563,6 +2567,20 @@ func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float
 		if offset.length() <= reach and (offset.length() < 25 or direction.dot(offset.normalized()) > threshold):
 			damage_enemy(i, damage, direction, stun, element, source_peer)
 
+func move_enemy_with_collision(enemy: Dictionary, displacement: Vector2) -> void:
+	if displacement.length_squared() <= 0.001: return
+	var steps := maxi(1,ceili(displacement.length()/6.0))
+	var step := displacement/steps
+	for n in steps:
+		var origin: Vector2 = enemy["pos"]
+		var next := origin+step
+		var valid := not terrain_blocked(next,mob_hit_radius(enemy)) and not blocked_by_region_wall(next) and region_at(next)==region_at(origin)
+		if arena_mode != "": valid = next.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
+		elif dungeon_id >= 0: valid = not dungeon_blocked(next)
+		elif waystone_safe_at(next): valid = false
+		if not valid: break
+		enemy["pos"]=next
+
 func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0) -> void:
 	if index < 0 or index >= enemies.size(): return
 	play_sound("hit")
@@ -2609,7 +2627,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	enemy["flash"] = 0.16
 	if source_peer > 0 and network_mode == "host":
 		server_broadcast_hit_confirm(source_peer,enemy,amount)
-	enemy["pos"] = enemy["pos"] + push * 18.0
+	move_enemy_with_collision(enemy,push*18.0)
 	if stun: enemy["stun"] = 1.2
 	effect(enemy["pos"] + Vector2(0, -25), str(amount), Color("fff1a1"), 0.75)
 	if drain_timer > 0: hp = minf(max_hp(), hp + minf(8.0, amount * 0.2))
@@ -3176,13 +3194,29 @@ func spawn_position_allowed(p: Vector2, target_region: int) -> bool:
 	for landmark in LANDMARKS:
 		if p.distance_to(landmark["pos"]) < 235.0: return false
 	for stone in WAYSTONES:
-		if p.distance_to(stone) < 185.0: return false
+		if p.distance_to(stone) < WAYSTONE_SPAWN_BLOCK_RADIUS: return false
 	for portal in PORTALS:
 		if p.distance_to(portal[0]) < 210.0 or p.distance_to(portal[1]) < 210.0: return false
 	for npc in NPCS:
 		if p.distance_to(npc["pos"]) < 170.0: return false
 	if target_region == 1 and p.distance_to(RESCUE_POS) < 330.0: return false
 	return true
+
+func waystone_safe_at(p: Vector2) -> bool:
+	if arena_mode != "" or dungeon_id >= 0 or interior_id >= 0: return false
+	for stone in WAYSTONES:
+		if p.distance_to(stone) <= WAYSTONE_SAFE_RADIUS: return true
+	return false
+
+func nearest_waystone(p: Vector2) -> Vector2:
+	var best := WAYSTONES[0]
+	var best_distance := INF
+	for stone in WAYSTONES:
+		var distance := p.distance_to(stone)
+		if distance < best_distance:
+			best_distance = distance
+			best = stone
+	return best
 
 func flee_from_safe_zone(enemy: Dictionary, delta: float) -> bool:
 	if arena_mode != "" or dungeon_id >= 0: return false
@@ -8062,13 +8096,13 @@ func draw_waystone(p: Vector2) -> void:
 	var active := false
 	for i in WAYSTONES.size():
 		if p == WAYSTONES[i]: active = bool(waystone_unlocked[i])
-	draw_set_transform(p-camera_pos,0,Vector2.ONE*1.65)
-	if p == WAYSTONES[0]:
-		StartScenery32.waystone(self,Vector2.ZERO,active)
-	else:
-		draw_waystone_model(Vector2.ZERO,p)
+	# Regionale Wegsteine sind bewusst fast so praesent wie der Spawn-Schrein.
+	draw_set_transform(p-camera_pos,0,Vector2.ONE*2.05)
+	draw_waystone_model(Vector2.ZERO,p)
 	draw_set_transform(-camera_pos)
-	text_at(p+Vector2(-140,-166),"SPAWNSTEIN · SONNENHAIN" if p == WAYSTONES[0] else "WEGSTEIN",16,Color("fff1c9"),HORIZONTAL_ALIGNMENT_CENTER,280)
+	# Sichtbarer Schutzring: dieselbe Flaeche wird serverseitig fuer Mob-Schutz genutzt.
+	draw_arc(p-camera_pos+Vector2(0,10),WAYSTONE_SAFE_RADIUS,0,TAU,64,Color("8fe6df",0.18),3.0)
+	text_at(p+Vector2(-160,-205),"WEGSTEIN · SCHUTZZONE",16,Color("fff1c9"),HORIZONTAL_ALIGNMENT_CENTER,320)
 
 func draw_waystone_model(p: Vector2, stone_position: Vector2) -> void:
 	var active := false
@@ -8407,6 +8441,10 @@ func draw_sorted_world_objects() -> void:
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0:
 		for prop in village_props():
 			if prop_bounds(prop).intersects(current_static_bounds()): entries.append({"kind":"prop","depth":prop["depth"],"data":prop})
+		# Die gezeichneten Fruchtpflanzen SIND die interaktiven FoodSystem-Punkte.
+		for food_prop in food_system.regional_props(self):
+			var food_point: Vector2 = food_prop["point"]
+			if visible_world(food_point,140): entries.append({"kind":"food_plant","depth":food_prop["depth"],"data":food_prop})
 		for npc in NPCS:
 			if visible_world(npc["pos"],130): entries.append({"kind":"npc","depth":npc["pos"].y+24,"data":npc})
 		for stone in WAYSTONES:
@@ -8426,6 +8464,14 @@ func draw_sorted_world_objects() -> void:
 	for entry in entries:
 		match entry["kind"]:
 			"prop": draw_cached_prop(entry["data"])
+			"food_plant":
+				var food_point: Vector2 = entry["data"]["point"]
+				food_system.bush(self,food_point)
+				if player_pos.distance_to(food_point+Vector2(0,20)) < 120.0:
+					var food_id := int(food_system.plant_foods.get(FoodSystem.key(food_point),-1))
+					if food_id >= 0:
+						var food_name := str(FoodSystem.FOODS[food_id]["name"])
+						text_at(food_point+Vector2(-95,42),"E · %s pfluecken" % food_name,13,Color("fff0b8"),HORIZONTAL_ALIGNMENT_CENTER,190)
 			"npc": draw_npc(entry["data"])
 			"stone": draw_waystone(entry["point"])
 			"enemy": draw_enemy(entry["data"])
