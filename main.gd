@@ -1716,7 +1716,7 @@ func advance_mob_shots(delta:float,server:bool)->void:
 		var previous:Vector2=shot["pos"]
 		shot["life"]=float(shot.get("life",0))-delta
 		shot["pos"]=previous+Vector2(shot["dir"])*float(shot.get("speed",265))*delta
-		var unsafe:bool=(server or (arena_mode=="" and dungeon_id<0)) and (region_at(shot["pos"])==0 or region_at(shot["pos"])!=int(shot.get("source_region",region_at(previous))))
+		var unsafe:bool=(server or (arena_mode=="" and dungeon_id<0)) and (region_at(shot["pos"])==0 or region_at(shot["pos"])!=int(shot.get("source_region",region_at(previous))) or waystone_safe_at(shot["pos"]))
 		var collision:=projectile_collision(previous,shot["pos"],server)
 		if float(shot["life"])<=0 or mob_shot_cancelled(shot) or unsafe or collision["hit"]:
 			if collision["hit"]:projectile_break(collision["pos"],shot["dir"],2,"",false)
