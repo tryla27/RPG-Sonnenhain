@@ -2,9 +2,18 @@
 declare(strict_types=1);
 // All website files pass through this controller; the password hash stays outside htdocs.
 ini_set('session.use_strict_mode', '1');
+ini_set('session.use_cookies', '1');
+ini_set('session.use_only_cookies', '1');
+// Shared hosting may provide an unwritable default session directory.
+$sessionDir = sys_get_temp_dir() . '/sonnenhain-sessions-' . substr(hash('sha256', __DIR__), 0, 16);
+if (!is_dir($sessionDir) && !@mkdir($sessionDir, 0700)) {
+    http_response_code(503); exit('Der Zugang ist kurzzeitig nicht verfügbar.');
+}
+ini_set('session.save_handler', 'files');
+session_save_path($sessionDir);
 session_name('sonnenhain_access');
 session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
-session_start();
+if (!session_start()) { http_response_code(503); exit('Die Anmeldung ist kurzzeitig nicht verfügbar.'); }
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');

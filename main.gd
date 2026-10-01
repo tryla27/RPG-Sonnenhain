@@ -1009,6 +1009,9 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 				if KonfluxMap.blocked(target,accepted,room_id): break
 				accepted=target
 			incoming_pos=accepted
+		elif context=="world" and (region_at(old_pos)==0 or region_at(incoming_pos)==0):
+			var radius:float=[15.0,18.0,16.0][clampi(int(state.get("race",0)),0,2)]-(1.0 if int(state.get("gender",0))==1 else 0.0)
+			incoming_pos=WAYSTONES[0]+SpawnStoneBody.accepted_move(old_pos-WAYSTONES[0],incoming_pos-WAYSTONES[0],radius)
 	if in_konflux and incoming_pos.distance_to(Vector2(float(pos_data[0]),float(pos_data[1])))>20:
 		rpc_konflux_correct.rpc_id(sender,[incoming_pos.x,incoming_pos.y])
 	var clean_facing := Vector2(float(facing_data[0]), float(facing_data[1]))

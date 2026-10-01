@@ -18,3 +18,14 @@ static func blocks(local_position:Vector2,variant:int,margin:float=0)->bool:
 	for side in [-1,1]:
 		if Rect2(Vector2(side*96-18,0),Vector2(36,24)).grow(margin).has_point(local_position):return true
 	return false
+
+static func accepted_move(origin:Vector2,target:Vector2,margin:float)->Vector2:
+	# Legacy saves inside the core may leave it; nobody may enter or jump through it.
+	if blocks(origin,0,margin) and not blocks(target,0,margin):return target
+	var steps:int=maxi(1,ceili(origin.distance_to(target)/8.0))
+	var accepted:Vector2=origin
+	for step in range(1,steps+1):
+		var point:Vector2=origin.lerp(target,float(step)/steps)
+		if blocks(point,0,margin):break
+		accepted=point
+	return accepted
