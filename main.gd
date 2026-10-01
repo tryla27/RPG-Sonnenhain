@@ -414,6 +414,11 @@ var network_port := 27844
 var websocket_port := 27845
 const LIVE_MULTIPLAYER_URL := "wss://multiplayer.sonnenhainrpg.de/"
 const NETWORK_PROTOCOL_VERSION := 8
+const PARTY_MAX_MEMBERS := 10
+const PARTY_XP_RANGE := 850.0
+const PARTY_BOSS_RANGE := 1100.0
+const PARTY_BOSS_ACTIVITY_MS := 15000
+const SERVER_WORLD_MOB_CAP := 72
 var dedicated_server_mode := false
 var invite_code := ""
 var join_code := ""
@@ -1501,37 +1506,91 @@ func network_player_position(peer_id: int) -> Vector2:
 		return remote_player_render_positions[peer_id]
 	return Vector2(float(coords[0]), float(coords[1]))
 
-func spawn_dedicated_enemy() -> void:
-	if normal_mob_count()>=mini(24,remote_players.size()*8):return
-	if remote_players.is_empty(): return
-	var peers: Array = []
+func server_active_region_peers() -> Dictionary:
+	var regions: Dictionary = {}
 	for raw_peer in remote_players.keys():
-		if str(remote_players[raw_peer].get("context","world")) == "world":
-			peers.append(raw_peer)
-	if peers.is_empty(): return
-	var peer_id := int(peers[randi() % peers.size()])
-	if konflux.fighter_stats.has(peer_id): return
-	var center := network_player_position(peer_id)
-	if center.x < -9000.0: return
-	var target_region := region_at(center)
-	if target_region == 0: return
+		var peer_id := int(raw_peer)
+		var state: Dictionary = remote_players[raw_peer]
+		if str(state.get("context","world")) != "world" or bool(state.get("konflux",false)) or konflux.fighter_stats.has(peer_id):
+			continue
+		var pos := network_player_position(peer_id)
+		if pos.x < -9000.0: continue
+		var region := region_at(pos)
+		if region == 0: continue
+		if not regions.has(region): regions[region] = []
+		regions[region].append(peer_id)
+	return regions
+
+func server_region_target_mobs(player_count: int) -> int:
+	if player_count <= 0: return 0
+	if player_count == 1: return 8
+	if player_count == 2: return 12
+	if player_count <= 4: return 16
+	return 22
+
+func server_region_normal_mob_count(region: int) -> int:
+	var count := 0
+	for enemy in enemies:
+		if int(enemy.get("type",-1)) in [12,13,14] or bool(enemy.get("small_guardian",false)): continue
+		if str(enemy.get("context","world")) != "world": continue
+		if region_at(Vector2(enemy["pos"])) == region: count += 1
+	return count
+
+func server_spawn_enemy_for_region(target_region: int, peers: Array) -> bool:
+	if target_region == 0 or peers.is_empty() or normal_mob_count() >= SERVER_WORLD_MOB_CAP: return false
 	var candidates: Array = []
 	for i in ENEMY_TYPES.size():
-		if i not in [12, 13, 14] and int(ENEMY_TYPES[i]["region"]) == target_region:
+		if i not in [12,13,14] and int(ENEMY_TYPES[i]["region"]) == target_region:
 			candidates.append(i)
-	if candidates.is_empty(): return
+	if candidates.is_empty(): return false
+	var peer_id := int(peers[randi() % peers.size()])
+	var center := network_player_position(peer_id)
+	if center.x < -9000.0: return false
 	var type := int(candidates.pick_random())
-	for attempt in 12:
-		var pos := center + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(470.0, 760.0)
-		if spawn_position_allowed(pos,target_region) and pos.distance_to(center) >= 390.0:
-			var roll := randf()
-			var mob := make_enemy(type, pos, 2 if roll < 0.01 and target_region >= 3 else (1 if roll < 0.075 else 0))
-			mob["uid"] = server_next_mob_uid
-			mob["context"] = "world"
-			mob["instance_id"] = "world"
-			server_next_mob_uid += 1
-			enemies.append(mob)
-			return
+	var chosen := Vector2(-10000,-10000)
+	for attempt in 18:
+		var pos := center + Vector2.RIGHT.rotated(randf()*TAU) * randf_range(520.0,820.0)
+		if spawn_position_allowed(pos,target_region) and pos.distance_to(center) >= 420.0:
+			chosen = pos
+			break
+	if chosen.x < -9000.0:
+		for step in 12:
+			var distance := 580.0 + float(step % 3) * 90.0
+			var pos := center + Vector2.RIGHT.rotated((TAU/12.0)*float(step)) * distance
+			if spawn_position_allowed(pos,target_region) and pos.distance_to(center) >= 420.0:
+				chosen = pos
+				break
+	if chosen.x < -9000.0: return false
+	var roll := randf()
+	var mob := make_enemy(type,chosen,2 if roll < 0.01 and target_region >= 3 else (1 if roll < 0.075 else 0))
+	mob["uid"] = server_next_mob_uid
+	mob["context"] = "world"
+	mob["instance_id"] = "world"
+	mob["spawned_at_ms"] = Time.get_ticks_msec()
+	server_next_mob_uid += 1
+	enemies.append(mob)
+	return true
+
+func spawn_dedicated_enemy() -> void:
+	var regions := server_active_region_peers()
+	for raw_region in regions.keys():
+		var region := int(raw_region)
+		var peers: Array = regions[raw_region]
+		var target := server_region_target_mobs(peers.size())
+		var missing := maxi(0,target-server_region_normal_mob_count(region))
+		for n in mini(2,missing):
+			if not server_spawn_enemy_for_region(region,peers): break
+
+func server_cleanup_orphan_mobs() -> void:
+	var active := server_active_region_peers()
+	var now := Time.get_ticks_msec()
+	for i in range(enemies.size()-1,-1,-1):
+		var enemy: Dictionary = enemies[i]
+		if int(enemy.get("type",-1)) in [12,13,14] or bool(enemy.get("small_guardian",false)) or bool(enemy.get("invasion",false)): continue
+		var region := region_at(Vector2(enemy["pos"]))
+		if active.has(region): continue
+		if now-int(enemy.get("spawned_at_ms",now)) < 30000: continue
+		enemies.remove_at(i)
 
 func mob_profile(enemy:Dictionary)->Dictionary:
 	var type:int=int(enemy["type"])
@@ -1569,6 +1628,15 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		if float(enemy["poison_tick"])<=0:
 			enemy["poison_tick"]=1.0
 			enemy["hp"]=float(enemy["hp"])-6
+			var poison_owner := int(enemy.get("poison_owner_peer",0))
+			if poison_owner > 0:
+				enemy["last_hit_peer"] = poison_owner
+				var damage_by_peer: Dictionary = enemy.get("damage_by_peer",{})
+				damage_by_peer[poison_owner] = int(damage_by_peer.get(poison_owner,0))+6
+				enemy["damage_by_peer"] = damage_by_peer
+				var damage_at: Dictionary = enemy.get("damage_at_by_peer",{})
+				damage_at[poison_owner] = Time.get_ticks_msec()
+				enemy["damage_at_by_peer"] = damage_at
 	if float(enemy["hp"])<=0:
 		MobCombat.cancel(enemy);return false
 	var profile:=mob_profile(enemy)
@@ -1725,10 +1793,10 @@ func process_dedicated_server(delta: float) -> void:
 		server_rescue_spawn_timer = 0.0
 		update_dedicated_rescue_spawns()
 		spawn_dedicated_bosses()
-	if server_spawn_timer >= 2.4:
+	if server_spawn_timer >= 0.8:
 		server_spawn_timer = 0.0
-		if enemies.size() < mini(24, remote_players.size() * 8):
-			spawn_dedicated_enemy()
+		spawn_dedicated_enemy()
+		server_cleanup_orphan_mobs()
 	update_dedicated_enemies(delta)
 	update_dedicated_player_projectiles(delta)
 	update_dedicated_enemy_projectiles(delta)
@@ -2501,6 +2569,12 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	var enemy: Dictionary = enemies[index]
 	if source_peer > 0:
 		enemy["last_hit_peer"] = source_peer
+		var damage_by_peer: Dictionary = enemy.get("damage_by_peer",{})
+		damage_by_peer[source_peer] = int(damage_by_peer.get(source_peer,0)) + maxi(0,amount)
+		enemy["damage_by_peer"] = damage_by_peer
+		var damage_at: Dictionary = enemy.get("damage_at_by_peer",{})
+		damage_at[source_peer] = Time.get_ticks_msec()
+		enemy["damage_at_by_peer"] = damage_at
 	if uses_server_world():
 		enemy["flash"] = 0.16
 		effect(enemy["pos"] + Vector2(0, -25), str(maxi(0, amount)), Color("fff1a1"), 0.55)
@@ -2529,6 +2603,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 		"gift":
 			enemy["poison"] = 5.0
 			enemy["poison_tick"] = 1.0
+			if source_peer > 0: enemy["poison_owner_peer"] = source_peer
 			effect(enemy["pos"] + Vector2(0, -44), "GIFT", Color("b7e885"), 0.8)
 	enemy["hp"] = float(enemy["hp"]) - amount
 	enemy["flash"] = 0.16
@@ -3314,6 +3389,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 			if int(enemies[j].get("guardian_of",-1))==int(enemy["uid"]):enemies.remove_at(j)
 	if dedicated_server_mode:
 		if type in [12,13,14]:boss_cooldowns[type-12]=90.0
+		source_peer = resolve_enemy_reward_peer(enemy,source_peer)
 		send_server_enemy_reward(source_peer, enemy)
 		return
 	if arena_mode != "": return # Arenagegner geben weder Beute noch Erfahrung.
@@ -7297,7 +7373,7 @@ func draw_mechanics_panel() -> void:
 			text_at(Vector2(x+38,y+17), "%s" % str(a["desc"]), 11, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 345)
 		text_at(Vector2(190,575), "Skillbuch: K · freie Skillpunkte: %d" % skill_points, 13, Color('ffe0a1'))
 	else:
-		text_at(Vector2(190,211), "Online: 2–4 Spieler · Browser und Desktop verbinden sich mit dem gemeinsamen Live-Server.", 16, Color('e9cc90'))
+		text_at(Vector2(190,211), "Online: Gruppen mit bis zu 10 Spielern · Browser und Desktop verbinden sich mit dem gemeinsamen Live-Server.", 16, Color('e9cc90'))
 		text_at(Vector2(190,250), "Status: %s" % network_status, 14, Color('bfe7d4'), HORIZONTAL_ALIGNMENT_LEFT, 750)
 		text_at(Vector2(190,286), "CHAT", 17, Color('ffe0a1'))
 		text_at(Vector2(190,315), ("CHAT antippen öffnet die Smartphone-Tastatur." if touch_enabled else "ENTER oder T öffnet den Gruppenchat. ENTER sendet, ESC bricht ab."), 14, Color('e5ecd9'))
@@ -8784,7 +8860,7 @@ func rpc_party_command(command: Dictionary) -> void:
 			return
 		if server_party_of_peer.has(sender):
 			var existing_party := int(server_party_of_peer[sender])
-			if server_parties.has(existing_party) and server_parties[existing_party].size() >= 4:
+			if server_parties.has(existing_party) and server_parties[existing_party].size() >= PARTY_MAX_MEMBERS:
 				server_party_notice(sender,"Deine Gruppe ist bereits voll.")
 				return
 		server_party_invites[target] = {"from":sender,"expires":Time.get_ticks_msec()+30000}
@@ -8814,7 +8890,7 @@ func rpc_party_command(command: Dictionary) -> void:
 			server_next_party_id += 1
 			server_parties[party_id] = [inviter]
 			server_party_of_peer[inviter] = party_id
-		if not server_parties.has(party_id) or server_parties[party_id].size() >= 4:
+		if not server_parties.has(party_id) or server_parties[party_id].size() >= PARTY_MAX_MEMBERS:
 			server_party_notice(sender,"Die Gruppe ist inzwischen voll.")
 			server_send_party_state(sender)
 			return
@@ -8977,7 +9053,7 @@ func draw_party_widget() -> void:
 		var member_names: Array[String] = []
 		for row in members:
 			if row is Dictionary: member_names.append(str(row.get("name","Held")))
-		text_at(box.position+Vector2(10,17),"GRUPPE · %d/4" % members.size(),12,Color("ffe0a1"))
+		text_at(box.position+Vector2(10,17),"GRUPPE · %d/%d" % [members.size(),PARTY_MAX_MEMBERS],12,Color("ffe0a1"))
 		text_at(box.position+Vector2(10,34),", ".join(member_names).substr(0,42),11,Color("e7f2e8"))
 
 func draw_multiplayer_debug_overlay() -> void:
@@ -8999,7 +9075,7 @@ func draw_party_panel() -> void:
 		ui_button(Rect2(205,285,335,48),"ANNEHMEN")
 		ui_button(Rect2(575,285,335,48),"ABLEHNEN")
 	else:
-		text_at(Vector2(205,225),"MITGLIEDER · %d/4" % members.size(),17,Color("e9cc90"))
+		text_at(Vector2(205,225),"MITGLIEDER · %d/%d" % [members.size(),PARTY_MAX_MEMBERS],17,Color("e9cc90"))
 		for i in members.size():
 			var row: Dictionary = members[i]
 			var y := 265.0+i*54.0
@@ -9078,7 +9154,9 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)))
 		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
 		combat_feedback.health(self,"peer:%d"%int(peer_id),rp+Vector2(0,-43),float(state.get("hp",1)),float(state.get("max_hp",1)),60,Color("79caa3"))
-		text_at(rp + Vector2(-75,-57), "%s · LV %d" % [str(state.get("name","Freund")), int(state.get("level",1))], 13, Color('bfe7ff'), HORIZONTAL_ALIGNMENT_CENTER, 150)
+		var party_peer_ids := local_party_peer_ids()
+		var name_color := Color("ffe0a1") if int(peer_id) in party_peer_ids else Color("bfe7ff")
+		text_at(rp + Vector2(-75,-57), "%s · LV %d" % [str(state.get("name","Freund")), int(state.get("level",1))], 13, name_color, HORIZONTAL_ALIGNMENT_CENTER, 150)
 
 func ensure_player_uuid() -> void:
 	if player_uuid != "": return
@@ -9259,7 +9337,7 @@ func server_restore_party_reconnect(peer_id: int) -> void:
 		server_party_reconnect.erase(uuid)
 		return
 	var party_id := int(reservation.get("party_id",0))
-	if party_id <= 0 or not server_parties.has(party_id) or server_parties[party_id].size() >= 4:
+	if party_id <= 0 or not server_parties.has(party_id) or server_parties[party_id].size() >= PARTY_MAX_MEMBERS:
 		server_party_reconnect.erase(uuid)
 		return
 	server_parties[party_id].append(peer_id)
@@ -9547,7 +9625,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 	var recipients := server_party_members(killer_peer)
 	for raw_peer in recipients:
 		var peer_id := int(raw_peer)
-		if not remote_players.has(peer_id): continue
+		if not remote_players.has(peer_id) or not server_party_member_eligible(peer_id,killer_peer,enemy): continue
 		var state: Dictionary = remote_players[peer_id]
 		if int(state.get("rescue_state",0)) != 1: continue
 		if str(state.get("context","world")) != "world": continue
@@ -9739,6 +9817,42 @@ func server_party_member_xp(type: int, elite_kind: int, member: int) -> int:
 	if not remote_players.has(member): return 0
 	return enemy_xp_reward(type,elite_kind,int(remote_players[member].get("level",1)))
 
+func server_party_member_eligible(member: int, killer: int, enemy: Dictionary) -> bool:
+	if member <= 0 or not remote_players.has(member) or not remote_players.has(killer): return false
+	var state: Dictionary = remote_players[member]
+	var killer_state: Dictionary = remote_players[killer]
+	if str(state.get("context","world")) != str(killer_state.get("context","world")): return false
+	if str(state.get("instance_id","world")) != str(killer_state.get("instance_id","world")): return false
+	var enemy_pos: Vector2 = enemy.get("pos",Vector2.ZERO)
+	var member_pos := network_player_position(member)
+	if member_pos.x < -9000.0: return false
+	var is_boss := int(enemy.get("type",-1)) in [12,13,14]
+	var max_range := PARTY_BOSS_RANGE if is_boss else PARTY_XP_RANGE
+	if member_pos.distance_to(enemy_pos) > max_range: return false
+	if is_boss and member != killer:
+		var contributed := int((enemy.get("damage_by_peer",{}) as Dictionary).get(member,0)) > 0
+		var recent_at := int((enemy.get("damage_at_by_peer",{}) as Dictionary).get(member,0))
+		if not contributed or Time.get_ticks_msec()-recent_at > PARTY_BOSS_ACTIVITY_MS: return false
+	return true
+
+func resolve_enemy_reward_peer(enemy: Dictionary, requested: int) -> int:
+	if requested > 0 and remote_players.has(requested): return requested
+	var last := int(enemy.get("last_hit_peer",0))
+	if last > 0 and remote_players.has(last): return last
+	var best_peer := 0
+	var best_damage := -1
+	for raw_peer in (enemy.get("damage_by_peer",{}) as Dictionary).keys():
+		var peer := int(raw_peer)
+		var damage := int((enemy.get("damage_by_peer",{}) as Dictionary)[raw_peer])
+		if remote_players.has(peer) and damage > best_damage:
+			best_peer = peer
+			best_damage = damage
+	if best_peer > 0: return best_peer
+	var enemy_pos: Vector2 = enemy.get("pos",Vector2.ZERO)
+	var region := region_at(enemy_pos)
+	var nearest := nearest_network_player(enemy_pos,1400.0,region)
+	return int(nearest.get("peer",0))
+
 func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	if not dedicated_server_mode or peer_id <= 0 or not remote_players.has(peer_id): return
 	server_send_all_quest_progress(peer_id,enemy)
@@ -9747,7 +9861,14 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	var type := clampi(int(enemy.get("type", 0)), 0, ENEMY_TYPES.size() - 1)
 	var elite_kind := clampi(int(enemy.get("elite", 0)), 0, 2)
 	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
-	var xp_reward := enemy_xp_reward(type, elite_kind, int(player_state.get("level",1)))
+	var party_members := server_party_members(peer_id)
+	var eligible_party: Array = []
+	for raw_member in party_members:
+		var member := int(raw_member)
+		if server_party_member_eligible(member,peer_id,enemy): eligible_party.append(member)
+	if peer_id not in eligible_party: eligible_party.append(peer_id)
+	var group_bonus := minf(0.15,maxf(0.0,float(eligible_party.size()-1)*0.02))
+	var xp_reward := roundi(float(enemy_xp_reward(type, elite_kind, int(player_state.get("level",1))))*(1.0+group_bonus))
 	var gold_reward := randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
 	var rewards: Array = []
 	if type in [12, 13, 14]:
@@ -9761,25 +9882,19 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	for reward in rewards:
 		if reward is Dictionary:
 			network_rewards.append(network_reward_payload(reward))
-	var party_members := server_party_members(peer_id)
 	var mob_uid := int(enemy.get("uid",-1))
 	var killer_uuid := str(player_state.get("uuid","peer%d" % peer_id))
 	var reward_tx := "reward:%d:%s" % [mob_uid,killer_uuid]
 	server_register_transaction(peer_id,reward_tx)
-	if party_members.size() > 1:
-		# Each recipient uses their own level. Killer XP travels with loot, never a fake zero.
-		# Other members receive a separate, visible XP transaction.
-		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
-		for raw_member in party_members:
-			var member := int(raw_member)
-			if member == peer_id or member <= 0 or not remote_players.has(member): continue
-			var member_uuid := str(remote_players[member].get("uuid","peer%d" % member))
-			var party_tx := "partyxp:%d:%s" % [mob_uid,member_uuid]
-			server_register_transaction(member,party_tx)
-			var member_xp := server_party_member_xp(type,elite_kind,member)
-			rpc_server_party_progress.rpc_id(member,{"tx":party_tx,"xp":member_xp})
-	else:
-		rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
+	rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
+	for raw_member in eligible_party:
+		var member := int(raw_member)
+		if member == peer_id or member <= 0 or not remote_players.has(member): continue
+		var member_uuid := str(remote_players[member].get("uuid","peer%d" % member))
+		var party_tx := "partyxp:%d:%s" % [mob_uid,member_uuid]
+		server_register_transaction(member,party_tx)
+		var member_xp := roundi(float(server_party_member_xp(type,elite_kind,member))*(1.0+group_bonus))
+		rpc_server_party_progress.rpc_id(member,{"tx":party_tx,"xp":member_xp})
 
 func can_enter_konflux() -> bool:
 	return creative_mode or level >= KONFLUX_MIN_LEVEL
@@ -10035,13 +10150,26 @@ func normal_mob_count()->int:
 func ring_visual()->int:
 	return (1 if equipped_ring_uid>=0 else 0)|(2 if class_id==1 and equipped_ring2_uid>=0 else 0)
 
+func local_party_peer_ids() -> Array:
+	var ids: Array = []
+	for row in (party_state.get("members",[]) as Array):
+		if row is Dictionary: ids.append(int(row.get("peer_id",0)))
+	return ids
+
+func draw_local_player_label() -> void:
+	if not character_created: return
+	var label := hero_name.strip_edges() if hero_name.strip_edges() != "" else "Held"
+	text_at(player_pos+Vector2(-80,-58),"%s · LV %d" % [label,level],13,Color("fff0b8"),HORIZONTAL_ALIGNMENT_CENTER,160)
+
 func draw_spawn_elevated_actor(peer:int)->void:
 	var point:Vector2=player_pos if peer<0 else network_player_position(peer)
 	var height:float=SpawnPlatform32.height_at(point,WAYSTONES[0]) if multiplayer_context()=="world" else 0
 	var old_offset:Vector2=character_canvas_offset
 	character_canvas_offset=old_offset-Vector2(0,height)
 	draw_set_transform(character_canvas_offset)
-	if peer<0:draw_player()
+	if peer<0:
+		draw_player()
+		draw_local_player_label()
 	else:draw_remote_players(peer)
 	character_canvas_offset=old_offset
 	draw_set_transform(old_offset)
