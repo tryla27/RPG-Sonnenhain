@@ -50,7 +50,7 @@ func run() -> void:
 		await process_frame
 	var low_id := low_peer.get_unique_id()
 	var high_id := high_peer.get_unique_id()
-	server.remote_players = {low_id:{"level":7,"uuid":"low","class":0,"context":"world"},high_id:{"level":40,"uuid":"high","class":0,"context":"world"}}
+	server.remote_players = {low_id:{"level":7,"uuid":"low","class":0,"context":"world","instance_id":"world","pos":[2200.0,1000.0]},high_id:{"level":40,"uuid":"high","class":0,"context":"world","instance_id":"world","pos":[2220.0,1000.0]}}
 	server.server_parties = {1:[low_id,high_id]}
 	server.server_party_of_peer = {low_id:1,high_id:1}
 	var reward: int = server.enemy_xp_reward(1,0,7)
