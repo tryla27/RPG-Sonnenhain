@@ -75,7 +75,7 @@ def main():
                 assert request(path, cookies=False)[0] == 302, path
             status, headers, body = request("/login?next=%2Fgame%2F")
             assert status == 200 and b'name="password"' in body and b'name="username"' not in body
-            assert "Secure" in secure_cookie and "HttpOnly" in secure_cookie and "SameSite=Lax" in secure_cookie
+            assert "secure" in secure_cookie.lower() and "httponly" in secure_cookie.lower() and "samesite=lax" in secure_cookie.lower()
             csrf = re.search(rb'name="csrf" value="([^"]+)"', body).group(1).decode()
             assert request("/login", "POST", {"password": password, "csrf": "wrong"})[0] == 403
             assert request("/login", "POST", {"password": "wrong", "csrf": csrf})[0] == 401
