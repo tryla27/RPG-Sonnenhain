@@ -1509,6 +1509,9 @@ func network_player_position(peer_id: int) -> Vector2:
 		return remote_player_render_positions[peer_id]
 	return Vector2(float(coords[0]), float(coords[1]))
 
+func server_normal_mob_cap() -> int:
+	return mini(32,maxi(8,remote_players.size()*8))
+
 func server_region_mob_count(target_region:int) -> int:
 	var count:=0
 	for enemy in enemies:
@@ -1545,7 +1548,7 @@ func spawn_dedicated_enemy_for_peer(peer_id:int) -> bool:
 	return false
 
 func spawn_dedicated_enemy() -> void:
-	if remote_players.is_empty() or normal_mob_count()>=32:return
+	if remote_players.is_empty() or normal_mob_count()>=server_normal_mob_cap():return
 	var peers:Array=[]
 	for raw_peer in remote_players.keys():
 		if str(remote_players[raw_peer].get("context","world"))=="world" and region_at(network_player_position(int(raw_peer)))!=0:
@@ -1567,7 +1570,7 @@ func ensure_dedicated_region_population() -> void:
 		if not region_peers.has(region):region_peers[region]=[]
 		region_peers[region].append(peer_id)
 	for raw_region in region_peers.keys():
-		if normal_mob_count()>=32:break
+		if normal_mob_count()>=server_normal_mob_cap():break
 		var region:=int(raw_region)
 		var peers:Array=region_peers[raw_region]
 		var desired:=mini(10,maxi(4,peers.size()*5))
