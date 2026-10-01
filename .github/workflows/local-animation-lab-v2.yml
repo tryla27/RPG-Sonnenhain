@@ -1,0 +1,88 @@
+name: Local Animation Lab V2
+
+on:
+  push:
+    branches:
+      - feature/local-animation-lab-mage-slime-wolf-v2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_BIN: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+
+jobs:
+  validate-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Godot cache
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/godot
+          key: animation-lab-godot-${{ env.GODOT_VERSION }}-${{ runner.os }}
+
+      - name: Install Godot
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 8 --retry-all-errors \
+            -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x "$GODOT_BIN"
+
+      - name: Import and compile Godot project
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BIN" --headless --path . --editor --import --quit 2>&1 | tee /tmp/import.log
+          ! grep -q "SCRIPT ERROR:" /tmp/import.log
+          ! grep -q "Parse Error:" /tmp/import.log
+
+      - name: Run animation lab smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 60 "$GODOT_BIN" --headless --path . --script tools/check_animation_lab_v2.gd 2>&1 | tee /tmp/lab.log
+          ! grep -q "SCRIPT ERROR:" /tmp/lab.log
+          grep -q "ANIMATION_LAB_V2_OK" /tmp/lab.log
+
+      - name: Build local Godot project ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package/Sonnenhain-Animationslabor-V2
+          cp project.godot main.gd main.gd.uid main.tscn export_presets.cfg package/Sonnenhain-Animationslabor-V2/
+          cp -R components art audio music tools design package/Sonnenhain-Animationslabor-V2/
+          cp README.md package/Sonnenhain-Animationslabor-V2/ 2>/dev/null || true
+          printf '%s\n' \
+            'SONNENHAIN - LOKALES ANIMATIONSLABOR V2' \
+            '' \
+            'Start: project.godot mit Godot 4.7.2 öffnen und F6/F5 drücken.' \
+            'Die Test-Branch startet direkt das Labor für Magier, Schleim und Wolf.' \
+            '' \
+            'Steuerung:' \
+            'WASD/Pfeile = bewegen' \
+            'Q/E = Blickrichtung um 45 Grad' \
+            'Leertaste/M1 = Angriff' \
+            'H = Hurt' \
+            'R = Tod/Reset' \
+            '1/2/3 = Fokus' \
+            > package/Sonnenhain-Animationslabor-V2/START_HIER.txt
+          cd package
+          zip -qr ../Sonnenhain-Animationslabor-V2-Godot.zip Sonnenhain-Animationslabor-V2
+
+      - name: Upload complete Godot ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonnenhain-Animationslabor-V2-Godot
+          path: Sonnenhain-Animationslabor-V2-Godot.zip
+          if-no-files-found: error
+          retention-days: 14
