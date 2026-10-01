@@ -160,6 +160,10 @@ assert 'func flee_from_safe_zone' in source, 'safe-zone flee behavior missing'
 assert 'const WAYSTONE_SAFE_RADIUS := 220.0' in source and 'WAYSTONE_SPAWN_BLOCK_RADIUS := 285.0' in source, 'waystone protection radii missing'
 assert 'food_system.regional_props(self)' in source and 'food_system.bush(self,food_point)' in source, 'regional harvest plants are not wired into world rendering'
 assert 'func move_enemy_with_collision' in source, 'collision-safe enemy knockback missing'
+assert 'func safe_drop_position' in source, 'collision-safe loot placement missing'
+assert 'const CHEST_RESPAWN_SECONDS := 360.0' in source and 'chest_respawn_until' in source and 'dungeon_chest_respawn_until' in source, 'six-minute chest respawn missing'
+assert 'func decorative_tree_in_cell' in source and 'Nur Stamm/Wurzel blockieren' in source, 'regional tree trunk collisions missing'
+assert 'Dekobuesche tragen absichtlich keine Fruechte' in source, 'decorative bushes still imply fake harvest fruit'
 assert 'ENTER oder T' in source, 'chat prompt missing'
 
 # v27.5 visuals, weapons, roads, daylight, performance, chat, co-op and web preset checks.
