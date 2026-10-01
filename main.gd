@@ -7362,12 +7362,11 @@ func draw_creation_review_panel() -> void:
 	text_at(Vector2(190,145), "DEIN CHARAKTER", 30, Color("ffe2aa"))
 	ui_box(Rect2(190,175,300,330),Color("31474e"))
 	draw_character_sprite(Vector2(330,310),pending_class,false,Vector2.DOWN,2.2,false,pending_race,pending_gender)
-	draw_weapon_world(Vector2(375,330),pending_class,pending_class*4,Vector2.UP,1.35)
 	text_at(Vector2(215,395),creation_name.strip_edges(),24,Color("fff0ce"))
 	text_at(Vector2(215,422),"%s · %s" % [RACE_NAMES[pending_race],GENDER_NAMES[pending_gender]],16,Color("d8e6dc"))
 	text_at(Vector2(215,450),CLASS_NAMES[pending_class],19,Color("ffe2aa"))
 	text_at(Vector2(215,483),"Rasse bestimmt dein Aussehen",12,Color("b8cbc5"))
-	text_at(Vector2(520,198),"DEINE ERSTEN FÄHIGKEITEN",19,Color("ffe2aa"))
+	text_at(Vector2(520,198),"DREI KLASSENFÄHIGKEITEN",19,Color("ffe2aa"))
 	for i in 3:
 		var id:int=int(preload("res://components/class_spell_preview.gd").ids(pending_class)[i])
 		var y:float=224+i*75
@@ -7375,7 +7374,7 @@ func draw_creation_review_panel() -> void:
 		preload("res://components/class_spell_preview.gd").draw(self,id,Rect2(800,y-3,155,65))
 		text_at(Vector2(568,y+17),str(ABILITIES[id]["name"]),16,Color("fff0ce"))
 		text_at(Vector2(568,y+36),str(ABILITIES[id]["desc"]),12,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,225)
-		text_at(Vector2(568,y+54),"Mögliche Auswahl beim Skillen",11,Color("b8cbc5"))
+		text_at(Vector2(568,y+54),"Vorschau · beim Skillen freischalten",11,Color("b8cbc5"))
 	var occupied:=FileAccess.file_exists(slot_save_path(active_save_slot))
 	text_at(Vector2(520,472),"Speicherplatz %d · %s" % [active_save_slot,"BELEGT" if occupied else "FREI"],16,Color("ffe2aa"))
 	text_at(Vector2(520,498),"Alter Stand wird gesichert und ersetzt." if occupied else "Dein Abenteuer beginnt auf Level 1.",12,Color("edb8a0") if occupied else Color("b8cbc5"))
