@@ -289,6 +289,8 @@ var shop_stock: Dictionary = {}
 var previous_region := 0
 var discovered_regions: Array = [true, false, false, false, false, false, false, false, false, false, false, false, false]
 var opened_chests: Array = [false, false, false, false, false, false, false, false, false, false, false]
+var chest_respawn_until: Array = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+const CHEST_RESPAWN_SECONDS := 360.0
 var obstacle_cache: Dictionary = {}
 var boss_cooldowns: Array = [0.0, 0.0, 0.0]
 var bosses_defeated: Array = [false, false, false]
@@ -321,6 +323,7 @@ var structure_tiles: Texture2D
 var house_tiles: Texture2D
 var village_bg: Texture2D
 var dungeon_chests_opened: Array = [false, false, false]
+var dungeon_chest_respawn_until: Array = [0.0,0.0,0.0]
 var battle_zones: Array = []
 var active_save_slot := 1
 var selected_save_slot := 1
@@ -3172,7 +3175,10 @@ func leave_dungeon() -> void:
 	announce_multiplayer_context()
 
 func open_dungeon_chest() -> void:
-	if dungeon_id < 0 or dungeon_chests_opened[dungeon_id]: return
+	if dungeon_id < 0: return
+	if not dungeon_chest_ready(dungeon_id):
+		message("Die Gewoelbetruhe erscheint nach 6 Minuten erneut.")
+		return
 	if not enemies.is_empty():
 		message("Die Gewölbetruhe bleibt versiegelt, solange Feinde hier lauern.")
 		return
@@ -3183,6 +3189,7 @@ func open_dungeon_chest() -> void:
 		return
 	add_item(treasure)
 	dungeon_chests_opened[dungeon_id] = true
+	dungeon_chest_respawn_until[dungeon_id] = Time.get_unix_time_from_system()+CHEST_RESPAWN_SECONDS
 	play_sound("level")
 	message("Gewölbe geräumt! %s erhalten." % treasure["name"])
 	save_game()
@@ -3709,7 +3716,7 @@ func interact() -> void:
 			message("Nela: Hinter dem Turm in den Ruinen liegt die Quelle der Plage. Sei vorsichtig!")
 		return
 	for i in LANDMARKS.size():
-		if not opened_chests[i] and player_pos.distance_to(chest_position(i)) < 85:
+		if chest_ready(i) and player_pos.distance_to(chest_position(i)) < 85:
 			open_chest(i)
 			return
 	for i in WORLD_EVENTS.size():
@@ -3783,12 +3790,35 @@ func visit_healer() -> void:
 func chest_position(index: int) -> Vector2:
 	return LANDMARKS[index]["pos"] + Vector2(95, 65)
 
+func chest_ready(index: int) -> bool:
+	if index < 0 or index >= opened_chests.size(): return false
+	var now := Time.get_unix_time_from_system()
+	if bool(opened_chests[index]) and now >= float(chest_respawn_until[index]):
+		opened_chests[index] = false
+		chest_respawn_until[index] = 0.0
+	return not bool(opened_chests[index])
+
+func chest_cooldown_seconds(index: int) -> int:
+	if chest_ready(index): return 0
+	return maxi(0,ceili(float(chest_respawn_until[index])-Time.get_unix_time_from_system()))
+
+func dungeon_chest_ready(index: int) -> bool:
+	if index < 0 or index >= dungeon_chests_opened.size(): return false
+	var now := Time.get_unix_time_from_system()
+	if bool(dungeon_chests_opened[index]) and now >= float(dungeon_chest_respawn_until[index]):
+		dungeon_chests_opened[index] = false
+		dungeon_chest_respawn_until[index] = 0.0
+	return not bool(dungeon_chests_opened[index])
+
 func open_chest(index: int) -> void:
-	if opened_chests[index]: return
+	if not chest_ready(index):
+		message("Die Truhe erscheint in %ds erneut." % chest_cooldown_seconds(index))
+		return
 	if inventory.size() >= 42:
 		message("Inventar voll — verkaufe erst etwas im Dorf.")
 		return
 	opened_chests[index] = true
+	chest_respawn_until[index] = Time.get_unix_time_from_system()+CHEST_RESPAWN_SECONDS
 	play_sound("pickup")
 	var element: String = ["eis", "gift", "blitz"][index % 3]
 	var region := region_at(chest_position(index))
@@ -3912,7 +3942,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "dungeon_chests_opened":dungeon_chests_opened, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
@@ -4073,9 +4103,17 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if stored_shop is Dictionary and stored_shop.has("smith"): shop_stock = stored_shop
 	append_new_equipment()
 	var stored_chests: Array = data.get("opened_chests", [])
-	for i in mini(stored_chests.size(), LANDMARKS.size()): opened_chests[i] = bool(stored_chests[i])
+	var stored_chest_until: Array = data.get("chest_respawn_until", [])
+	for i in opened_chests.size():
+		opened_chests[i] = bool(stored_chests[i]) if i < stored_chests.size() and i < stored_chest_until.size() else false
+		chest_respawn_until[i] = clampf(float(stored_chest_until[i]),0.0,Time.get_unix_time_from_system()+CHEST_RESPAWN_SECONDS) if i < stored_chest_until.size() else 0.0
+		chest_ready(i)
 	var stored_dungeon_chests: Array = data.get("dungeon_chests_opened", [])
-	for i in mini(stored_dungeon_chests.size(), dungeon_chests_opened.size()): dungeon_chests_opened[i] = bool(stored_dungeon_chests[i])
+	var stored_dungeon_until: Array = data.get("dungeon_chest_respawn_until", [])
+	for i in dungeon_chests_opened.size():
+		dungeon_chests_opened[i] = bool(stored_dungeon_chests[i]) if i < stored_dungeon_chests.size() and i < stored_dungeon_until.size() else false
+		dungeon_chest_respawn_until[i] = clampf(float(stored_dungeon_until[i]),0.0,Time.get_unix_time_from_system()+CHEST_RESPAWN_SECONDS) if i < stored_dungeon_until.size() else 0.0
+		dungeon_chest_ready(i)
 	var stored_bosses: Array = data.get("bosses_defeated", [])
 	if stored_bosses.size() == bosses_defeated.size():
 		for i in bosses_defeated.size(): bosses_defeated[i] = bool(stored_bosses[i])
@@ -4868,7 +4906,7 @@ func _draw() -> void:
 		for event_index in WORLD_EVENTS.size():
 			if visible_world(WORLD_EVENTS[event_index]["pos"], 180): draw_event_scene(event_index)
 		for i in LANDMARKS.size():
-			if visible_world(chest_position(i), 80): draw_chest(chest_position(i), opened_chests[i])
+			if visible_world(chest_position(i), 80): draw_chest(chest_position(i), not chest_ready(i))
 		for portal in PORTALS:
 			if visible_world(portal[0], 100): draw_portal(portal[0], int(portal[2]))
 			if visible_world(portal[1], 100): draw_portal(portal[1], int(portal[2]))
@@ -5715,8 +5753,8 @@ func draw_dungeon_world() -> void:
 	var chest_pos := DUNGEON_CENTER + Vector2(555, 0)
 	draw_rect(Rect2(chest_pos + Vector2(-43, -42), Vector2(86, 70)), Color("524f51"))
 	draw_pixel_tile(28, chest_pos + Vector2(-32, -31), 64.0)
-	draw_chest(chest_pos, dungeon_chests_opened[dungeon_id])
-	if not enemies.is_empty() and not dungeon_chests_opened[dungeon_id]:
+	draw_chest(chest_pos, not dungeon_chest_ready(dungeon_id))
+	if not enemies.is_empty() and dungeon_chest_ready(dungeon_id):
 		draw_arc(chest_pos, 47, 0, TAU, 28, Color("adccd4", 0.75), 3)
 
 func draw_dungeon_entrance(p: Vector2, index: int) -> void:
@@ -7035,7 +7073,7 @@ func draw_hud() -> void:
 			nearest = "E  ·  Torbogen nach %s (LV %d)" % [region_name(int(portal[2])), region_level(int(portal[2]))]
 			break
 	for i in LANDMARKS.size():
-		if not opened_chests[i] and player_pos.distance_to(chest_position(i)) < 85:
+		if chest_ready(i) and player_pos.distance_to(chest_position(i)) < 85:
 			nearest = "E  ·  Schatztruhe öffnen"
 			break
 	for npc in NPCS:
@@ -7045,7 +7083,7 @@ func draw_hud() -> void:
 	if rescue_state >= 2 and player_pos.distance_to(RESCUE_POS + Vector2(0, 120)) < 120:
 		nearest = "E  ·  Nela (Bewohnerin)"
 	if dungeon_id >= 0:
-		nearest = "E  ·  Gewölbe verlassen" if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110 else ("E  ·  Versiegelte Truhe" if player_pos.distance_to(DUNGEON_CENTER + Vector2(555, 0)) < 105 and not dungeon_chests_opened[dungeon_id] else "")
+		nearest = "E  ·  Gewölbe verlassen" if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110 else ("E  ·  Versiegelte Truhe" if player_pos.distance_to(DUNGEON_CENTER + Vector2(555, 0)) < 105 and dungeon_chest_ready(dungeon_id) else "")
 	elif interior_id >= 0:
 		nearest = "E  ·  Taverne verlassen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95 else ("E  ·  Alma ansprechen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -105)) < 130 else "")
 	else:
@@ -7189,7 +7227,7 @@ func draw_minimap(rect: Rect2, compact: bool) -> void:
 			var point: Vector2 = inset.position + landmark["pos"] * Vector2(sx, sy)
 			draw_rect(Rect2(point - Vector2(3, 3), Vector2(6, 6)), Color("fff2c2"))
 	for i in LANDMARKS.size():
-		if not opened_chests[i]:
+		if chest_ready(i):
 			var treasure_point: Vector2 = inset.position + chest_position(i) * Vector2(sx, sy)
 			draw_rect(Rect2(treasure_point - Vector2(2, 2), Vector2(5, 5)), Color("ffe27b"))
 	for npc in NPCS:
