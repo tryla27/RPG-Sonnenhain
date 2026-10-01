@@ -1,0 +1,1000 @@
+SONNENHAIN – VOLLSTÄNDIGE CHARACTER-&-MOB-PIXELART-BIBEL
+Repo-Basis: tryla27/RPG-Sonnenhain
+Grundlage: aktueller main-Stand, insbesondere main.gd, components/rpg_hero.gd,
+components/monster_design_32.gd, components/mob_combat.gd sowie ergänzend
+MONSTER-UPDATE-ENTWURF.md.
+
+WICHTIG:
+- Der Live-Code bestimmt, welche Charaktere, Mobs und generischen Angriffsprofile aktuell wirklich existieren.
+- MONSTER-UPDATE-ENTWURF.md wird nur als Design-/Benennungshilfe verwendet, wenn dort vorhandene Live-Angriffe
+  monsterartspezifisch beschrieben werden. Nicht jede dort beschriebene spätere Fähigkeit ist bereits live.
+- Ziel dieser Bibel ist eine vollständige Produktionsgrundlage für hochwertige, saubere, konsistente
+  High-Res-Pixelart-Einzeltexturen und flüssige Animationen im gesamten Spiel.
+
+
+======================================================================
+1. TATSÄCHLICHER FIGURENBESTAND
+======================================================================
+
+SPIELBARE CHARAKTERE
+
+Im aktuellen Spiel gibt es 18 spielbare Charakterkombinationen:
+
+3 Klassen:
+- Krieger
+- Magier
+- Bogenschütze
+
+3 Rassen:
+- Mensch
+- Ork
+- Roboter
+
+2 Geschlechter:
+- männlich
+- weiblich
+
+Gesamt:
+3 × 3 × 2 = 18 Spielerfiguren
+
+
+AKTIVE BENANNTE NPCs
+
+- Mira – Älteste · Quests
+- Borin – Wächter · Quests
+- Liora – Forscherin · Quests
+- Torvald – Schmied
+- Fenna – Händlerin
+- Pip – Alchemist
+- Elara – Heilerin · Vollheilung
+- Arven – Arenameister · Endlose Prüfung
+
+
+ZUSÄTZLICHE VISUELLE NPC-ARCHETYPEN IM ASSETSYSTEM
+
+- innkeeper
+- rescued
+- event
+- generic
+
+
+GEGNER
+
+Der aktuelle ENEMY_TYPES-Block enthält 27 Gegnertypen:
+
+00 Waldschleim
+01 Blütenkäfer
+02 Pilzling
+03 Mooswolf
+04 Steingolem
+05 Ruinenbeholder
+06 Kristallkrabbe
+07 Kristallgolem
+08 Ascheläufer
+09 Lavagolem
+10 Strandkrabbe
+11 Wassergeist
+12 Turmwächter
+13 Kristallhüter
+14 Aschefürst
+15 Sternenschatten
+16 Bruchwächter
+17 Nebelhirsch
+18 Irrlicht
+19 Harzbestie
+20 Wurzelhexe
+21 Quellkriecher
+22 Perlengeist
+23 Gratgreif
+24 Schattenritter
+25 Himmelsfalter
+26 Sternenwächterin
+
+
+======================================================================
+2. OBERSTES PRODUKTIONSPRINZIP
+======================================================================
+
+Die neuen Figuren dürfen NICHT mehr aussehen wie:
+- Rechteck + Kreis + Ellipse + angeklebte Arme
+- gleiche Grundform mit anderer Farbe
+- Frontbild, das nur schmaler gemacht wird
+- automatisch zugeschnittenes Sammel-Spritesheet
+- Atlas, bei dem Grenzen falsch getroffen werden
+- pro Frame variierende Canvas-Größen
+- pro Frame springende Pivotpunkte
+
+Stattdessen gilt:
+
+Design-Bibel
+→ Key-Pose-Bibel
+→ 8-Richtungs-Bibel
+→ Einzel-PNG-Frames
+→ Godot-Animation-Controller
+→ separate Waffen/VFX nur dort, wo sinnvoll
+
+Jeder Frame muss als Teil einer Bewegungssequenz geplant werden.
+
+
+======================================================================
+3. ALLGEMEINER PIXELART-STIL
+======================================================================
+
+AUSSENKONTUR
+
+Die Außenkontur ist wichtiger als Innendetails.
+Jede Figur muss als schwarze Silhouette bereits eindeutig erkennbar sein.
+
+PIXELCLUSTER
+
+Bevorzugt:
+- 2×2
+- 3×2
+- 3×3
+- größere bewusst gesetzte Cluster
+
+Vermeiden:
+- zufällige Einzelpixel
+- Rauschtexturen
+- unsauberes Anti-Aliasing
+- halbtransparente weiche Kanten ohne Absicht
+
+LICHTQUELLE
+
+Einheitlich:
+oben links
+
+Daraus folgen:
+- linke obere Flächen heller
+- rechte untere Flächen dunkler
+- Hut wirft Schatten aufs Gesicht
+- Fell-/Rüstungsvolumen bleiben konsistent
+- Schleim-/Kristallhighlights sind systematisch
+
+MATERIALSPRACHE
+
+Stoff:
+- große ruhige Flächen
+- wenige klare Falten
+- weiche Schattenstufen
+
+Metall:
+- kleine harte Highlights
+- klare Kanten
+- hoher lokaler Kontrast
+
+Leder:
+- warme Mitteltöne
+- mittlerer Kontrast
+- Kantenverschleiß sparsam
+
+Fell:
+- gezackte Silhouette nur an sinnvollen Stellen
+- nicht überall Rauschen
+
+Kristall:
+- harte Facetten
+- helle Kerne
+- definierte Flächen
+
+Gel/Wasser/Geist:
+- große zusammenhängende Massen
+- klare innere Tiefe
+- keine angeklebten Einzelteile
+
+
+======================================================================
+4. SPIELER – TECHNISCHE BASIS
+======================================================================
+
+Empfohlener Canvas:
+192 × 224 px
+
+Pivot:
+96, 210
+
+Alle 18 Kombinationen verwenden dieselbe logische Canvasgröße und denselben Pivot.
+
+Grundzustände pro Kombination:
+
+Idle:
+4 Frames × 8 Richtungen
+
+Walk:
+6 Frames × 8 Richtungen
+
+Hurt:
+4 Frames × 8 Richtungen
+
+Death:
+8 Frames × 8 Richtungen
+
+Dodge:
+6 Frames × 8 Richtungen
+
+Klassenangriffe:
+eigene Sequenzen
+
+
+======================================================================
+5. SPIELER – 8 RICHTUNGEN
+======================================================================
+
+Reihenfolge:
+
+S
+SO
+O
+NO
+N
+NW
+W
+SW
+
+S:
+- vollständige Front
+- Gesicht komplett sichtbar
+- beide Körperseiten ähnlich
+
+SO:
+- Front + rechte Seite
+- rechte Schulter dominiert
+- linke Gesichtshälfte kleiner
+
+O:
+- echtes Profil
+- ein Auge
+- Nase sichtbar
+- vorderer Arm überdeckt Torso
+- Füße überlappen perspektivisch
+
+NO:
+- Rücken + rechte Seite
+- Gesicht fast weg
+- hintere Ausrüstung sichtbar
+
+N:
+- reine Rückansicht
+- keine Frontgesichtsdetails
+- Rücken-/Mantel-/Rüstungslinien wichtig
+
+NW:
+- Rücken + linke Seite
+
+W:
+- echtes linkes Profil
+- separat gezeichnet, nicht nur technisch gespiegelt
+
+SW:
+- Front + linke Seite
+
+
+======================================================================
+6. RASSENBIBEL
+======================================================================
+
+MENSCH
+
+Silhouette:
+- mittlere Schulterbreite
+- ausgewogene Gliedmaßen
+- normal proportionierter Kopf
+
+Animation:
+- neutraler Standard
+- mittlere Federung
+- moderate Schulterbewegung
+
+
+ORK
+
+Silhouette:
+- breitere Schultern
+- kräftiger Hals
+- größerer Unterkiefer
+- massigere Hände
+- etwas kompaktere Proportion
+
+Animation:
+- stärkere Gewichtsverlagerung
+- Down-Phase 1 px tiefer
+- kräftiger Follow-through
+- schwerere Attacken
+
+
+ROBOTER
+
+Silhouette:
+- segmentierter Kopf
+- sichtbare Gelenke
+- Schulterplatten
+- mechanische Knie/Ellenbogen
+- weniger organische Übergänge
+
+Animation:
+- weniger Kopf-Bob
+- präzisere Gelenke
+- härteres Einrasten
+- stabilere mechanische Achsen
+
+Roboter darf NICHT wie ein grau eingefärbter Mensch aussehen.
+
+
+======================================================================
+7. GESCHLECHTSVARIANTEN
+======================================================================
+
+Unterschiede:
+- Schulterbreite
+- Haar-/Frisurdesign
+- Helm-/Kapuzenakzente
+- Roben-/Rüstungstaillierung
+- leichte Silhouettenvariation
+
+Gleich bleiben:
+- Pivot
+- Fußpunkt
+- Waffenanker
+- Armlängen
+- Gameplay-Hitbox
+
+
+======================================================================
+8. GEMEINSAME SPIELER-ANIMATIONSPRINZIPIEN
+======================================================================
+
+KEINE PIXEL-TELEPORTATION
+
+Normal:
+1–4 px Bewegung markanter Anker pro Frame
+
+Impact:
+5–12 px nur dort, wo echte Beschleunigung stattfindet
+
+ANKERPUNKTE
+
+Spieler:
+- head_anchor
+- pelvis_anchor
+- left_foot
+- right_foot
+- left_hand
+- right_hand
+- weapon_grip
+- weapon_tip
+
+SECONDARY MOTION
+
+Körper bewegt sich zuerst.
+Mantel, Haare, Bart und lose Ausrüstung folgen leicht verzögert.
+
+ARC-PRINZIP
+
+Hände, Waffen, Köpfe und Füße bewegen sich entlang nachvollziehbarer Bögen.
+
+EASE-IN / EASE-OUT
+
+Attacken:
+langsam vorbereiten
+→ beschleunigen
+→ Impact
+→ abbremsen
+→ Recovery
+
+
+======================================================================
+9. KRIEGER – DESIGN
+======================================================================
+
+Silhouette:
+- breiteste Schulter der drei Klassen
+- robuste Rüstung
+- breite Beinstellung
+- dominante Waffe
+- optional klarer Helm
+- kompakter Schwerpunkt
+
+Normaler Angriff:
+
+000 Ready
+001 Gewicht zurück
+002 Waffe zurück
+003 Aushol-Maximum
+004 Beschleunigung
+005 IMPACT
+006 Follow-through
+007 Recovery
+
+Schwert:
+- sauberer Bogen
+- Hand bleibt am Griff
+
+Axt:
+- stärkere Anticipation
+- größere Down-Phase
+- schwererer Impact
+
+
+======================================================================
+10. KRIEGER – AKTUELLE SKILLS UND CLIPS
+======================================================================
+
+Aktive Skills im aktuellen Spiel:
+
+- Wirbelhieb
+- Schildwall
+- Sturmsprung
+- Klingenwelle
+- Kampfschrei
+- Erdspalter
+- Lebensraub
+- Klingenregen
+- Eiserne Haut
+- Frostschlag
+- Blitzkette
+- Giftklinge
+- Avatar der Morgenwache
+
+Passive:
+- Klingenmeister
+- Lebenskraft
+- Ausdauer
+
+Clip-Familien:
+
+Slash:
+- normaler Angriff
+- Frostschlag
+- Giftklinge
+
+Heavy Smash:
+- Erdspalter
+
+Spin:
+- Wirbelhieb
+
+Leap:
+- Sturmsprung
+
+Guard:
+- Schildwall
+- Eiserne Haut
+
+Shout:
+- Kampfschrei
+
+Wave Slash:
+- Klingenwelle
+
+Multi Slash:
+- Klingenregen
+
+Empowered Slash:
+- Lebensraub
+
+Cast/Channel:
+- Blitzkette
+
+Ultimate:
+- Avatar der Morgenwache
+
+Elemente/VFX liegen separat über der Körperanimation.
+
+
+======================================================================
+11. MAGIER – DESIGN
+======================================================================
+
+Silhouette:
+- hohe vertikale Form
+- klarer Hut/Kapuze
+- klar sichtbarer Kopf
+- lange Robe
+- Stab als zweite starke Silhouettenachse
+
+Kopf:
+- groß genug für normales Gameplay-Zoom
+- Gesicht sichtbar
+- Bart/Haar klar getrennt
+- Hut verdeckt Kopf nicht
+
+Normaler Cast:
+
+000 Ready
+001 Weight Back
+002 Staff Back
+003 Charge
+004 Acceleration
+005 Cast Impact
+006 Follow-through
+007 Recovery
+
+
+======================================================================
+12. MAGIER – AKTUELLE SKILLS UND CLIPS
+======================================================================
+
+- Feuerball
+- Frostnova
+- Blitzlanze
+- Arkaner Sprung
+- Sternenfunken
+- Eisschild
+- Meteorschauer
+- Elementarwirbel
+- Arkaner Sturm
+
+Projectile Cast:
+- Feuerball
+
+Ground Cast:
+- Frostnova
+
+Directed Channel:
+- Blitzlanze
+
+Teleport/Dash:
+- Arkaner Sprung
+
+Multi Projectile:
+- Sternenfunken
+
+Ward:
+- Eisschild
+
+Overhead Cast:
+- Meteorschauer
+
+Spin Channel:
+- Elementarwirbel
+
+Ultimate Channel:
+- Arkaner Sturm
+
+
+======================================================================
+13. BOGENSCHÜTZE – DESIGN
+======================================================================
+
+Silhouette:
+- klarer Bogen
+- Köcher hinten
+- agile Haltung
+- schmalere Körperlinie
+- asymmetrische Armstellung
+
+Normaler Schuss:
+
+000 Ready
+001 Bogen hebt sich
+002 Pfeil greifen
+003 Sehne ziehen
+004 Full Draw / Aim Lock
+005 RELEASE
+006 Bow Recoil
+007 Recovery
+
+Pfeil löst sich in Frame 005 wirklich von der Sehne.
+
+
+======================================================================
+14. BOGENSCHÜTZE – AKTUELLE SKILLS
+======================================================================
+
+- Präzisionsschuss
+- Mehrfachschuss
+- Rückwärtssprung
+- Giftpfeil
+- Frostpfeil
+- Blitzpfeil
+- Pfeilhagel
+- Falkenruf
+- Himmelshagel
+
+Precise Draw:
+- Präzisionsschuss
+
+Fan Draw:
+- Mehrfachschuss
+
+Back Leap:
+- Rückwärtssprung
+
+Elemental Arrow:
+- Giftpfeil
+- Frostpfeil
+- Blitzpfeil
+
+Sky Aim:
+- Pfeilhagel
+
+Call:
+- Falkenruf
+
+Ultimate Sky Aim:
+- Himmelshagel
+
+
+======================================================================
+15. SPIELER-AUSRÜSTUNG
+======================================================================
+
+Aktuelle Systeme:
+- Rüstung
+- Kopfteil
+- Waffen
+- zwei Magierringe
+
+Empfohlene Renderlayer:
+
+Body Base
+Armor Overlay
+Headgear Overlay
+Back Equipment
+Weapon
+Hands/Rings
+VFX
+
+Wichtig:
+Alle Layer verwenden exakt dieselben:
+- Pivotpunkte
+- Richtungsframes
+- Animationsphasen
+- Körperanker
+
+Layer dürfen nicht sichtbar wie Baukastenstücke wirken.
+
+
+======================================================================
+16. NPC – TECHNISCHER STANDARD
+======================================================================
+
+Für aktive Haupt-NPCs zunächst:
+
+Idle:
+4 × 8
+
+Talk/Gesture:
+4–6 × 8
+
+Walk:
+6 × 8
+
+Nur bei Gameplaybedarf:
+Hurt / Death
+
+
+======================================================================
+17. MIRA
+======================================================================
+
+Rolle:
+Älteste · Quests
+
+Silhouette:
+- lange Gewandung
+- zeremonielle Kopf-/Haarform
+- ruhige aufrechte Haltung
+
+Idle:
+- minimale Atembewegung
+
+Talk:
+- eine Hand langsam öffnen
+- Kopf leicht zum Spieler
+
+
+======================================================================
+18. BORIN
+======================================================================
+
+Rolle:
+Wächter · Quests
+
+Silhouette:
+- starke Schulter
+- Wächterrüstung
+- Waffe
+- stabile Beine
+
+Idle:
+- kleine Gewichtsverlagerung
+
+Talk:
+- freie Hand gestikuliert
+- Waffenhand bleibt stabil
+
+
+======================================================================
+19. LIORA
+======================================================================
+
+Rolle:
+Forscherin · Quests
+
+Silhouette:
+- Forscher-/Kapuzenelemente
+- Tasche/Gerät
+- schlankere Haltung
+
+Talk:
+- zeigen
+- notieren
+- kleines Forschungsgerät
+
+
+======================================================================
+20. TORVALD
+======================================================================
+
+Rolle:
+Schmied
+
+Silhouette:
+- breite Arme
+- Schürze
+- Hammer
+
+Zusatzanimation:
+work/hammer
+
+
+======================================================================
+21. FENNA
+======================================================================
+
+Rolle:
+Händlerin
+
+Silhouette:
+- Tasche/Beutel
+- offene Haltung
+- klare Händlerform
+
+Talk:
+- Ware präsentieren
+
+
+======================================================================
+22. PIP
+======================================================================
+
+Rolle:
+Alchemist
+
+Silhouette:
+- markante Kopfbedeckung
+- Fläschchen
+- asymmetrische kleine Details
+
+Zusatzanimation:
+mix/potion
+
+
+======================================================================
+23. ELARA
+======================================================================
+
+Rolle:
+Heilerin
+
+Silhouette:
+- helle Gewandung
+- Heilungssymbol
+- ruhige vertikale Form
+
+Zusatzanimation:
+heal/channel
+
+
+======================================================================
+24. ARVEN
+======================================================================
+
+Rolle:
+Arenameister
+
+Silhouette:
+- kampferfahren
+- Waffe/Stab
+- breite selbstbewusste Haltung
+
+Talk:
+- zur Arena zeigen
+
+
+======================================================================
+25. ZUSÄTZLICHE NPC-ARCHETYPEN
+======================================================================
+
+innkeeper
+rescued
+event
+generic
+
+Minimal:
+Idle 4×8
+Walk 6×8
+Gesture 4×8
+
+
+======================================================================
+26. MONSTER – ANATOMIEFAMILIEN
+======================================================================
+
+GEL-/GEISTKÖRPER:
+- Waldschleim
+- Ruinenbeholder
+- Wassergeist
+- Irrlicht
+- Perlengeist
+
+INSEKTEN/PANZER:
+- Blütenkäfer
+- Kristallkrabbe
+- Strandkrabbe
+- Harzbestie
+- Himmelsfalter
+
+VIERBEINER/TIERE:
+- Mooswolf
+- Nebelhirsch
+- Quellkriecher
+- Gratgreif
+
+HUMANOID/BEWAFFNET:
+- Pilzling
+- Ascheläufer
+- Sternenschatten
+- Wurzelhexe
+- Schattenritter
+- Sternenwächterin
+
+GOLEM/SCHWER:
+- Steingolem
+- Kristallgolem
+- Lavagolem
+- Bruchwächter
+
+BOSSE:
+- Turmwächter
+- Kristallhüter
+- Aschefürst
+
+
+======================================================================
+27. MONSTER – CANVASGRÖSSEN
+======================================================================
+
+Klein:
+128×128
+
+Normal:
+160×160
+
+Groß:
+192×192
+
+Boss:
+256×224
+
+Die 32px-Welt bleibt Basis.
+Figuren dürfen mehrere Tiles groß sein.
+
+
+======================================================================
+28. MONSTER – STANDARDCLIPS
+======================================================================
+
+Normaler Mob:
+
+Idle:
+4×8
+
+Move:
+6 oder 8×8
+
+Basic Attack:
+6–8×8
+
+Hurt:
+4×8
+
+Death:
+6–8×8
+
+Zusatzskills:
+eigene Clips oder VFX
+
+
+======================================================================
+29. LIVE-KAMPFPROFILE
+======================================================================
+
+HEAVY im aktuellen mob_combat.gd:
+
+- Steingolem
+- Kristallgolem
+- Lavagolem
+- Turmwächter
+- Kristallhüter
+- Aschefürst
+- Bruchwächter
+- Schattenritter
+- Sternenwächterin
+
+RANGED:
+
+- Pilzling
+- Ruinenbeholder
+- Wassergeist
+- Sternenschatten
+- Irrlicht
+- Wurzelhexe
+- Perlengeist
+- Himmelsfalter
+
+LIVE-ZYKLUSZEITEN:
+
+Normal:
+2,2 s
+
+Heavy:
+2,6 s
+
+Ranged:
+2,7 s
+
+LIVE-WINDUP:
+
+Heavy:
+0,9 s
+
+Ranged:
+0,7 s
+
+Frühe Nahkämpfer:
+0,65 s
+
+Übrige Nahkämpfer:
+0,55 s
+
+WICHTIG:
+Gameplay bestimmt den Trefferzeitpunkt.
+Animation visualisiert denselben Zustand.
+Schaden wird nicht direkt an Renderframes gekoppelt.
+
+
+======================================================================
+30. WALDSCHLEIM
+======================================================================
+
+Region:
+1
+
+Anatomie:
+reine Gelmasse
+
+Silhouette:
+- niedrige breite Kuppel
+- unregelmäßige Unterkante
+- eingebettetes Gesicht
+- keine Beine
+
+Move, 6 Frames:
+
+000 Neutral
+001 Rear Gather
+002 Forward Stretch
+003 Front Land
+004 Rear Catch-up
+005 Settle
+
+Basic Attack:
+langsamer Körperstoß
+
+Attack:
+
+000 Neutral
+001 Squash
+002 Rear Gather
