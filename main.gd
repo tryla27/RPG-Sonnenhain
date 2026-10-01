@@ -18,6 +18,11 @@ const USE_VILLAGE_REFERENCE_BACKGROUND := false
 const ReferenceScenery = preload("res://components/reference_scenery.gd")
 const VillageLayout = preload("res://components/village_layout.gd")
 const StartScenery32 = preload("res://components/start_scenery_32.gd")
+const MobCombat=preload("res://components/mob_combat.gd")
+const MobDesign32=preload("res://components/monster_design_32.gd")
+const ItemStyle32=preload("res://components/item_style_32.gd")
+const PixelStyle32=preload("res://components/pixel_style_32.gd")
+const Wagon32 = preload("res://components/wagon_32.gd")
 const StartTileMap32 = preload("res://components/start_tilemap_32.gd")
 var start_tilemap_32_attached := false
 var live_reconnect_timer := 0.0
@@ -908,6 +913,7 @@ func rpc_server_combat_reward(tx_id: String, enemy_type: int, xp_reward: int, go
 		ack_server_transaction(tx_id)
 		return
 	enemy_type = clampi(enemy_type, 0, ENEMY_TYPES.size() - 1)
+	if enemy_type in [12,13,14]: register_boss_defeat(enemy_type-12,false)
 	xp_reward = clampi(xp_reward, 0, 100000)
 	gold_reward = clampi(gold_reward, 0, 100000)
 	if xp_reward > 0:
@@ -1030,10 +1036,13 @@ func push_world_snapshot() -> void:
 	if network_mode != "host": return
 	var enemy_rows: Array = []
 	for enemy in enemies:
-		enemy_rows.append({"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0)})
+		var state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
+		if state.has("dir"):state["dir"]=[state["dir"].x,state["dir"].y]
+		var face:Vector2=enemy.get("facing",Vector2.DOWN)
+		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0)})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
-		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0)})
+		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0)})
 	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows}
 	for peer_id in multiplayer.get_peers():
 		var state: Dictionary = remote_players.get(int(peer_id),{})
@@ -1056,6 +1065,12 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 		var coords: Array = raw.get("pos", [0.0,0.0])
 		var target := Vector2(float(coords[0]),float(coords[1]))
 		var uid := int(raw.get("uid",-1))
+		var attack:Dictionary=copy.get("attack_state",{})
+		if attack.has("dir"):
+			var aim:Array=attack["dir"]
+			attack["dir"]=Vector2(float(aim[0]),float(aim[1]))
+		var face:Array=raw.get("facing",[0.0,1.0])
+		copy["facing"]=Vector2(float(face[0]),float(face[1]))
 		copy["net_target_pos"] = target
 		if previous_by_uid.has(uid):
 			var old: Dictionary = previous_by_uid[uid]
@@ -1170,6 +1185,11 @@ func play_sound(name: String) -> void:
 	player.pitch_scale = 0.92 if name == "step" and next_sound_player % 2 == 0 else 1.0
 	player.play()
 
+func desired_music_theme() -> String:
+	if konflux.active: return "dorf" if KonfluxMap.safe(player_pos,konflux.room) else "konflux-pvp"
+	var region:int=region_at(player_pos)
+	return "dorf" if panel=="start" or interior_id>=0 else ("boss" if arena_mode!="" else (["ruinen","kristall","quelle"][dungeon_id] if dungeon_id>=0 else MUSIC_THEMES[region]))
+
 func update_music(delta: float = 0.0) -> void:
 	if music_player == null or music_incoming == null: return
 	if not music_enabled:
@@ -1178,9 +1198,7 @@ func update_music(delta: float = 0.0) -> void:
 		music_fading = false
 		music_theme = ""
 		return
-	var region: int = region_at(player_pos)
-	var desired: String = "dorf" if panel == "start" or interior_id >= 0 else ("boss" if arena_mode != "" else (["ruinen", "kristall", "quelle"][dungeon_id] if dungeon_id >= 0 else MUSIC_THEMES[region]))
-	if konflux.active: desired=["pilzwald","kristall","blumen","asche"][KonfluxMap.biome(player_pos) if konflux.room<0 else konflux.room]
+	var desired:String=desired_music_theme()
 	if desired != music_theme:
 		# Bei schnellem Hin- und Herreisen bleibt der gerade lautere Track erhalten.
 		if music_fading:
@@ -1192,7 +1210,7 @@ func update_music(delta: float = 0.0) -> void:
 			else:
 				music_incoming.stop()
 			music_fading = false
-		var path: String = "res://music/%s.ogg" % desired if desired in CUSTOM_MUSIC_THEMES else "res://audio/%s.wav" % desired
+		var path: String = "res://music/%s.ogg" % desired if (desired in CUSTOM_MUSIC_THEMES or desired=="konflux-pvp") else "res://audio/%s.wav" % desired
 		var stream: AudioStream = load(path)
 		if stream == null: return
 		if stream is AudioStreamOggVorbis: stream.loop = true
@@ -1268,11 +1286,11 @@ func region_level(region: int) -> int:
 
 func enemy_damage(type: int) -> int:
 	var region: int = int(ENEMY_TYPES[type]["region"])
-	return ceili(float(ENEMY_TYPES[type]["damage"]) * (1.12 + 0.055 * region_level(region)))
+	return ceili(float(ENEMY_TYPES[type]["damage"]) * (1.12 + 0.055 * (region_level(region)+(5 if type in [12,13,14] else 0))))
 
 func enemy_level(type: int) -> int:
 	var region: int = int(ENEMY_TYPES[type]["region"])
-	return region_level(region) + (2 if type in [12, 13, 14] else type % 3)
+	return region_level(region) + (7 if type in [12, 13, 14] else type % 3)
 
 func update_connection_health(delta: float) -> void:
 	if network_mode != "client" or multiplayer.multiplayer_peer == null: return
@@ -1482,90 +1500,136 @@ func spawn_dedicated_enemy() -> void:
 			enemies.append(mob)
 			return
 
-func update_dedicated_enemies(delta: float) -> void:
-	var moved_count := 0
-	for i in range(enemies.size() - 1, -1, -1):
-		var enemy: Dictionary = enemies[i]
-		if float(enemy.get("hp", 0.0)) <= 0.0:
-			defeat_enemy(i, int(enemy.get("last_hit_peer", 0)))
-			continue
-		enemy["flash"] = maxf(0.0, float(enemy.get("flash",0.0)) - delta)
-		enemy["hit"] = maxf(0.0, float(enemy.get("hit",0.0)) - delta)
-		enemy["stun"] = maxf(0.0, float(enemy.get("stun",0.0)) - delta)
-		enemy["slow"] = maxf(0.0, float(enemy.get("slow",0.0)) - delta)
-		enemy["marked"] = maxf(0.0, float(enemy.get("marked",0.0)) - delta)
-		enemy["shot"] = maxf(0.0, float(enemy.get("shot",0.0)) - delta)
-		var target := nearest_network_player(enemy["pos"], 1300.0, region_at(enemy["pos"]))
-		var peer_id := int(target["peer"])
-		if peer_id <= 0:
-			continue
-		var target_pos: Vector2 = target["pos"]
-		if region_at(target_pos) == 0:
-			continue
-		var offset := target_pos - Vector2(enemy["pos"])
-		var distance := offset.length()
-		var info: Dictionary = ENEMY_TYPES[int(enemy["type"])]
-		if enemy["stun"] <= 0.0 and distance > 34.0 and distance < 980.0:
-			var speed := float(info["speed"]) * (0.45 if enemy["slow"] > 0.0 else 1.0) * (1.08 if int(enemy.get("elite",0)) > 0 else 1.0) * delta
-			var origin: Vector2 = enemy["pos"]
-			var desired := offset.normalized()
-			var separation := Vector2.ZERO
-			for other_index in enemies.size():
-				if other_index == i: continue
-				var other_pos: Vector2 = enemies[other_index]["pos"]
-				var away := origin - other_pos
-				if away.length_squared() > 0.01 and away.length() < 54.0:
-					separation += away.normalized() * (54.0-away.length())/54.0
-			if separation.length_squared() > 0.01:
-				desired = (desired + separation.normalized()*0.72).normalized()
-			var moved := false
-			# Dedicated-Server-Steering: nicht an einem Baum/Haus auf der direkten
-			# Linie hängen bleiben, sondern wie der lokale Gegnercode ausweichen.
-			for angle in [0.0, 0.52, -0.52, 0.92, -0.92, 1.35, -1.35, PI]:
-				var next_pos := origin + desired.rotated(angle) * speed
-				if region_at(next_pos) == region_at(origin) and not terrain_blocked(next_pos):
-					enemy["pos"] = next_pos
-					moved = true
-					break
-			if moved:
-				moved_count += 1
-		if distance < 42.0 and float(enemy["hit"]) <= 0.0:
-			enemy["hit"] = 0.75
-			rpc_server_damage.rpc_id(peer_id, enemy_damage(int(enemy["type"])))
-		var enemy_type := int(enemy["type"])
-		if enemy_type in [5,7,11,12,13,14,18,20,22,24,26] and distance > 95.0 and distance < 420.0 and enemy["stun"] <= 0.0 and enemy["shot"] <= 0.0:
-			enemy["shot"] = randf_range(2.4, 3.1)
-			enemy_projectiles.append({
-				"pos":enemy["pos"],
-				"dir":offset.normalized(),
-				"speed":310.0 if enemy_type in [12,13,14] else 265.0,
-				"life":2.0,
-				"damage":enemy_damage(enemy_type),
-				"type":enemy_type,
-				"target_peer":peer_id
-			})
-	server_moving_mobs = moved_count
+func mob_profile(enemy:Dictionary)->Dictionary:
+	var type:int=int(enemy["type"])
+	var damage:int=roundi(enemy_damage(type)*[1.0,1.15,1.3][clampi(int(enemy.get("elite",0)),0,2)]*float(enemy.get("arena_power",1.0)))
+	return MobCombat.profile(type,ENEMY_TYPES[type],enemy_level(type),damage)
 
-func update_dedicated_enemy_projectiles(delta: float) -> void:
-	for i in range(enemy_projectiles.size() - 1, -1, -1):
-		var shot: Dictionary = enemy_projectiles[i]
-		shot["life"] = float(shot.get("life",0.0)) - delta
-		shot["pos"] = Vector2(shot["pos"]) + Vector2(shot["dir"]) * float(shot.get("speed",265.0)) * delta
-		if shot["life"] <= 0.0:
+func mob_targets(enemy:Dictionary,server:bool)->Array:
+	var result:Array=[]
+	if server:
+		for peer in remote_players:
+			var state:Dictionary=remote_players[peer]
+			if str(state.get("context","world"))!="world" or bool(state.get("konflux",false)) or konflux.fighter_stats.has(peer) or float(state.get("hp",1.0))<=0:continue
+			var pos:=network_player_position(int(peer))
+			if region_at(pos)==0 or region_at(pos)!=region_at(enemy["pos"]):continue
+			result.append({"id":int(peer),"pos":pos})
+	elif hp>0 and death_timer<=0 and (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)!=0):
+		if arena_mode!="" or dungeon_id>=0 or region_at(player_pos)==region_at(enemy["pos"]):
+			result.append({"id":0,"pos":player_pos})
+	return result
+
+func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
+	if float(enemy.get("stun",0.0))>0.0:
+		MobCombat.cancel(enemy)
+		for index in range(enemy_projectiles.size()-1,-1,-1):
+			if int(enemy_projectiles[index].get("owner_uid",-2))==int(enemy.get("uid",-1)):enemy_projectiles.remove_at(index)
+	for key in ["flash","hit","stun","slow","marked","shot"]:
+		enemy[key]=maxf(0.0,float(enemy.get(key,0.0))-delta)
+	if float(enemy.get("poison",0))>0:
+		enemy["poison"]=maxf(0,float(enemy["poison"])-delta)
+		enemy["poison_tick"]=float(enemy.get("poison_tick",1.0))-delta
+		if float(enemy["poison_tick"])<=0:
+			enemy["poison_tick"]=1.0
+			enemy["hp"]=float(enemy["hp"])-6
+	if float(enemy["hp"])<=0:
+		MobCombat.cancel(enemy);return false
+	var profile:=mob_profile(enemy)
+	var targets:=mob_targets(enemy,server)
+	var action:=MobCombat.step(enemy,profile,targets,delta)
+	var moved:=false
+	var movement:Vector2=action["move"]
+	if movement.length_squared()>.001:
+		var speed:float=float(profile["movement_speed"])*(.45 if float(enemy.get("slow",0))>0 else 1.0)
+		var origin:Vector2=enemy["pos"]
+		var separation:=Vector2.ZERO
+		for other in enemies:
+			if other==enemy:continue
+			var away:Vector2=origin-Vector2(other["pos"])
+			if away.length_squared()>.01 and away.length()<54:separation+=away.normalized()*(54-away.length())/54
+		if separation.length_squared()>.01:movement=(movement+separation.normalized()*.6).normalized()
+		for angle in [0.0,.52,-.52,.92,-.92,1.35,-1.35,PI]:
+			var next:Vector2=origin+movement.rotated(angle)*speed*delta
+			var valid:bool=not terrain_blocked(next) and region_at(next)==region_at(origin)
+			if not server and arena_mode!="":valid=next.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
+			elif not server and dungeon_id>=0:valid=not dungeon_blocked(next)
+			if valid:
+				enemy["pos"]=next
+				enemy["walking"]=true
+				moved=true;break
+	else:enemy["walking"]=false
+	for event in action["events"]:
+		if event["kind"]=="projectile":
+			enemy_projectiles.append({"pos":enemy["pos"],"dir":event["dir"],"speed":profile["projectile_speed"],"life":2.0,"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"hit_radius":profile["hit_radius"],"source_region":region_at(enemy["pos"])})
+		elif server:
+			rpc_server_damage.rpc_id(int(event["target"]),int(event["damage"]))
+		elif invulnerable<=0:
+			apply_player_damage(int(event["damage"]))
+	return moved
+
+func update_dedicated_enemies(delta:float)->void:
+	server_moving_mobs=0
+	for i in range(enemies.size()-1,-1,-1):
+		var enemy:Dictionary=enemies[i]
+		if float(enemy.get("hp",0))<=0:
+			MobCombat.cancel(enemy)
+			defeat_enemy(i,int(enemy.get("last_hit_peer",0)));continue
+		if advance_mob(enemy,delta,true):server_moving_mobs+=1
+		if float(enemy.get("hp",0))<=0:defeat_enemy(i,int(enemy.get("last_hit_peer",0)))
+
+
+func mob_shot_cancelled(shot:Dictionary)->bool:
+	if not shot.has("owner_uid"):return false
+	for enemy in enemies:
+		if int(enemy.get("uid",-2))==int(shot["owner_uid"]):
+			return float(enemy.get("hp",0))<=0 or float(enemy.get("stun",0))>0
+	return true
+
+func mob_shot_blocked(a:Vector2,b:Vector2,server:bool)->bool:
+	var count:int=maxi(1,ceili(a.distance_to(b)/16.0))
+	for n in range(1,count+1):
+		var p:Vector2=a.lerp(b,float(n)/count)
+		if not server and dungeon_id>=0:
+			if dungeon_blocked(p):return true
+		elif not server and arena_mode!="":
+			if p.distance_to(ARENA_CENTER)>ARENA_RADIUS:return true
+		elif terrain_blocked(p):return true
+	return false
+
+func advance_mob_shots(delta:float,server:bool)->void:
+	for i in range(enemy_projectiles.size()-1,-1,-1):
+		if i>=enemy_projectiles.size():continue
+		var shot:Dictionary=enemy_projectiles[i]
+		var previous:Vector2=shot["pos"]
+		shot["life"]=float(shot.get("life",0))-delta
+		shot["pos"]=previous+Vector2(shot["dir"])*float(shot.get("speed",265))*delta
+		var unsafe:bool=(server or (arena_mode=="" and dungeon_id<0)) and (region_at(shot["pos"])==0 or region_at(shot["pos"])!=int(shot.get("source_region",region_at(previous))))
+		if float(shot["life"])<=0 or mob_shot_cancelled(shot) or unsafe or mob_shot_blocked(previous,shot["pos"],server):
+			enemy_projectiles.remove_at(i);continue
+		var candidates:Array=[]
+		if server:
+			for peer in remote_players:
+				var state:Dictionary=remote_players[peer]
+				var pos:=network_player_position(int(peer))
+				if str(state.get("context","world"))=="world" and not bool(state.get("konflux",false)) and not konflux.fighter_stats.has(peer) and float(state.get("hp",1))>0 and region_at(pos)==int(shot.get("source_region",region_at(previous))) and region_at(pos)!=0:
+					candidates.append({"id":int(peer),"pos":pos})
+		elif hp>0 and death_timer<=0:candidates.append({"id":0,"pos":player_pos})
+		var nearest:Dictionary={}
+		var distance:float=INF
+		for candidate in candidates:
+			if MobCombat.shot_hits(previous,shot["pos"],candidate["pos"],float(shot.get("hit_radius",14))+10):
+				var along:float=previous.distance_squared_to(candidate["pos"])
+				if along<distance:nearest=candidate;distance=along
+		if not nearest.is_empty():
+			var damage:int=int(shot["damage"])
 			enemy_projectiles.remove_at(i)
-			continue
-		var peer_id := int(shot.get("target_peer",0))
-		if peer_id > 0 and remote_players.has(peer_id) and str(remote_players[peer_id].get("context","world")) != "world":
-			peer_id = 0
-		if peer_id <= 0 or not remote_players.has(peer_id):
-			var target := nearest_network_player(shot["pos"], 460.0)
-			peer_id = int(target["peer"])
-			shot["target_peer"] = peer_id
-		if peer_id <= 0: continue
-		var target_pos := network_player_position(peer_id)
-		if Vector2(shot["pos"]).distance_to(target_pos) < 27.0:
-			rpc_server_damage.rpc_id(peer_id, int(shot.get("damage",1)))
-			enemy_projectiles.remove_at(i)
+			if server:rpc_server_damage.rpc_id(int(nearest["id"]),damage)
+			elif invulnerable<=0:apply_player_damage(damage)
+			if not server and panel=="arena_reward":return
+
+func update_dedicated_enemy_projectiles(delta:float)->void:
+	advance_mob_shots(delta,true)
+
 
 func update_dedicated_player_projectiles(delta: float) -> void:
 	for i in range(projectiles.size() - 1, -1, -1):
@@ -1585,6 +1649,7 @@ func update_dedicated_player_projectiles(delta: float) -> void:
 			projectiles.remove_at(i)
 
 func process_dedicated_server(delta: float) -> void:
+	for i in boss_cooldowns.size():boss_cooldowns[i]=maxf(0,boss_cooldowns[i]-delta)
 	konflux.time += delta
 	konflux.authority_update(self,delta)
 	world_time += delta
@@ -1605,6 +1670,7 @@ func process_dedicated_server(delta: float) -> void:
 	if server_rescue_spawn_timer >= 0.8:
 		server_rescue_spawn_timer = 0.0
 		update_dedicated_rescue_spawns()
+		spawn_dedicated_bosses()
 	if server_spawn_timer >= 2.4:
 		server_spawn_timer = 0.0
 		if enemies.size() < mini(24, remote_players.size() * 8):
@@ -2925,7 +2991,7 @@ func open_dungeon_chest() -> void:
 func make_enemy(type: int, pos: Vector2, elite_kind: int = 0) -> Dictionary:
 	var info: Dictionary = ENEMY_TYPES[type]
 	var health: float = float(info["hp"]) * (1.2 + 0.11 * region_level(int(info["region"]))) * [1.0, 2.1, 4.2][elite_kind]
-	return {"uid":randi(), "type":type, "pos":pos, "hp":health, "max_hp":health, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":randf_range(0.7, 1.7), "seed":randf() * TAU, "elite":elite_kind}
+	return {"uid":randi(), "type":type, "pos":pos, "home":pos, "facing":Vector2.DOWN, "hp":health, "max_hp":health, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":randf_range(0.7, 1.7), "seed":randf() * TAU, "elite":elite_kind}
 
 func spawn_position_allowed(p: Vector2, target_region: int) -> bool:
 	if region_at(p) != target_region: return false
@@ -2978,6 +3044,29 @@ func spawn_enemy() -> void:
 	var roll: float = randf()
 	enemies.append(make_enemy(type, p, 2 if roll < 0.01 and target_region >= 3 else (1 if roll < 0.075 else 0)))
 
+func boss_max_hp(type:int)->float:
+	return float(ENEMY_TYPES[type]["hp"])*(1.2+0.08*(region_level(int(ENEMY_TYPES[type]["region"]))+5))
+
+func spawn_dedicated_bosses()->void:
+	for i in 3:
+		if boss_cooldowns[i]>0:continue
+		var site:Vector2=LANDMARKS[i+2]["pos"]
+		var type:int=12+i
+		var nearby:=false
+		for peer in remote_players:
+			var state:Dictionary=remote_players[peer]
+			if str(state.get("context","world"))=="world" and network_player_position(int(peer)).distance_to(site)<=700:nearby=true
+		if not nearby:continue
+		var exists:=false
+		for mob in enemies:
+			if int(mob["type"])==type:exists=true
+		if exists:continue
+		var boss:=make_enemy(type,site+Vector2(0,125))
+		boss["uid"]=server_next_mob_uid;server_next_mob_uid+=1
+		boss["hp"]=boss_max_hp(type);boss["max_hp"]=boss["hp"]
+		boss["context"]="world";boss["instance_id"]="world"
+		enemies.append(boss)
+
 func spawn_nearby_boss() -> void:
 	for i in 3:
 		var site: Vector2 = LANDMARKS[i + 2]["pos"]
@@ -2990,8 +3079,8 @@ func spawn_nearby_boss() -> void:
 				break
 		if exists: continue
 		var info: Dictionary = ENEMY_TYPES[boss_type]
-		var boss_hp: float = float(info["hp"]) * (1.2 + 0.08 * region_level(int(info["region"])))
-		enemies.append({"uid":randi(), "type":boss_type, "pos":site + Vector2(0, 125), "hp":boss_hp, "max_hp":boss_hp, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":1.5, "seed":randf() * 6.28})
+		var boss_hp: float = boss_max_hp(boss_type)
+		enemies.append({"uid":randi(), "type":boss_type, "pos":site + Vector2(0, 125), "home":site + Vector2(0,125), "facing":Vector2.DOWN, "hp":boss_hp, "max_hp":boss_hp, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":1.5, "seed":randf() * 6.28})
 		message("Boss entdeckt: %s!" % info["name"])
 
 func update_rescue() -> void:
@@ -3026,53 +3115,18 @@ func update_rescue() -> void:
 		invader["invasion"] = true
 		enemies.append(invader)
 
-func update_enemies(delta: float) -> void:
-	for i in range(enemies.size() - 1, -1, -1):
-		var enemy: Dictionary = enemies[i]
-		if float(enemy["hp"]) <= 0:
-			defeat_enemy(i)
-			continue
-		if enemy["pos"].distance_to(player_pos) > 1250 and arena_mode == "":
-			enemies.remove_at(i)
-			continue
-		enemy["flash"] = maxf(0.0, float(enemy["flash"]) - delta)
-		enemy["hit"] = maxf(0.0, float(enemy["hit"]) - delta)
-		enemy["stun"] = maxf(0.0, float(enemy["stun"]) - delta)
-		enemy["slow"] = maxf(0.0, float(enemy["slow"]) - delta)
-		enemy["marked"] = maxf(0.0, float(enemy.get("marked", 0.0)) - delta)
-		if enemy["poison"] > 0:
-			enemy["poison"] = maxf(0.0, float(enemy["poison"]) - delta)
-			enemy["poison_tick"] = float(enemy["poison_tick"]) - delta
-			if enemy["poison_tick"] <= 0:
-				enemy["poison_tick"] = 1.0
-				enemy["hp"] = float(enemy["hp"]) - 6
-				effect(enemy["pos"] + Vector2(0, -28), "-6", Color("b7e885"), 0.6)
-				if enemy["hp"] <= 0:
-					defeat_enemy(i)
-					continue
-		enemy["shot"] = maxf(0.0, float(enemy["shot"]) - delta)
-		var info: Dictionary = ENEMY_TYPES[int(enemy["type"])]
-		if flee_from_safe_zone(enemy, delta):
-			if enemy["pos"].distance_to(player_pos) > 880.0:
-				enemies.remove_at(i)
-			continue
-		var offset: Vector2 = player_pos - enemy["pos"]
-		var distance := offset.length()
-		if enemy["stun"] <= 0 and distance < (ARENA_RADIUS * 2.0 if arena_mode != "" else 390.0) and distance > 33 and (arena_mode != "" or region_at(player_pos) != 0):
-			var speed: float = float(info["speed"]) * (0.45 if enemy["slow"] > 0 else 1.0) * (1.08 if int(enemy.get("elite", 0)) > 0 else 1.0) * delta
-			for angle in [0.0, 0.75, -0.75, 1.4, -1.4]:
-				var next_pos: Vector2 = enemy["pos"] + offset.normalized().rotated(angle) * speed
-				if (arena_mode != "" and next_pos.distance_to(ARENA_CENTER) < ARENA_RADIUS - 16.0) or (dungeon_id >= 0 and not dungeon_blocked(next_pos)) or (arena_mode == "" and dungeon_id < 0 and region_at(next_pos) == region_at(enemy["pos"]) and not terrain_blocked(next_pos)):
-					enemy["pos"] = next_pos
-					break
-		if int(enemy["type"]) in [5, 7, 11, 12, 13, 14, 18, 20, 22, 24, 26] and distance > 95 and distance < 420 and enemy["stun"] <= 0 and enemy["shot"] <= 0 and (arena_mode != "" or region_at(player_pos) != 0):
-			enemy["shot"] = randf_range(2.4, 3.1)
-			enemy_projectiles.append({"pos":enemy["pos"], "dir":offset.normalized(), "speed":310.0 if int(enemy["type"]) in [12, 13, 14] else 265.0, "life":2.0, "damage":int(enemy_damage(int(enemy["type"])) * [1.0, 1.25, 1.6][int(enemy.get("elite", 0))] * float(enemy.get("arena_power", 1.0))), "type":int(enemy["type"])})
-		if distance < (61 if int(enemy["type"]) in [12, 13, 14] else 43) and enemy["hit"] <= 0 and (arena_mode != "" or region_at(player_pos) != 0):
-			enemy["hit"] = 1.0
-			if invulnerable <= 0:
-				apply_player_damage(int(enemy_damage(int(enemy["type"])) * [1.0, 1.25, 1.6][int(enemy.get("elite", 0))] * float(enemy.get("arena_power", 1.0))))
-				if panel == "arena_reward" or (arena_mode == "" and enemies.is_empty()): return
+func update_enemies(delta:float)->void:
+	for i in range(enemies.size()-1,-1,-1):
+		if i>=enemies.size():continue
+		var enemy:Dictionary=enemies[i]
+		if float(enemy.get("hp",0))<=0:
+			MobCombat.cancel(enemy);defeat_enemy(i);continue
+		if enemy["pos"].distance_to(player_pos)>1250 and arena_mode=="":
+			enemies.remove_at(i);continue
+		advance_mob(enemy,delta,false)
+		if panel=="arena_reward":return
+		if float(enemy.get("hp",0))<=0 and i<enemies.size():defeat_enemy(i)
+
 
 func apply_player_damage(raw: int) -> void:
 	if creative_mode or death_timer > 0.0: return
@@ -3097,18 +3151,9 @@ func apply_player_damage(raw: int) -> void:
 		swing_timer = 0.0
 		is_walking = false
 
-func update_enemy_projectiles(delta: float) -> void:
-	for i in range(enemy_projectiles.size() - 1, -1, -1):
-		var shot: Dictionary = enemy_projectiles[i]
-		shot["life"] = float(shot["life"]) - delta
-		shot["pos"] = shot["pos"] + shot["dir"] * float(shot["speed"]) * delta
-		if shot["life"] <= 0 or (arena_mode == "" and region_at(shot["pos"]) == 0):
-			enemy_projectiles.remove_at(i)
-			continue
-		if shot["pos"].distance_to(player_pos) < hero_collision_radius()+10.0:
-			if invulnerable <= 0: apply_player_damage(int(shot["damage"]))
-			if panel == "arena_reward" or enemy_projectiles.is_empty(): return
-			enemy_projectiles.remove_at(i)
+func update_enemy_projectiles(delta:float)->void:
+	if not uses_server_world():advance_mob_shots(delta,false)
+
 
 func respawn() -> void:
 	if konflux.active:
@@ -3158,6 +3203,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var pos: Vector2 = enemy["pos"]
 	enemies.remove_at(index)
 	if dedicated_server_mode:
+		if type in [12,13,14]:boss_cooldowns[type-12]=90.0
 		send_server_enemy_reward(source_peer, enemy)
 		return
 	if arena_mode != "": return # Arenagegner geben weder Beute noch Erfahrung.
@@ -3199,6 +3245,16 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	if randf() < 0.03:
 		drops.append({"pos":pos + Vector2(20, 0), "item":make_item("Heiltrank", "potion", 1, 0, 18), "life":90.0})
 	if type in [12, 13, 14]: save_game()
+
+func register_boss_defeat(boss_index:int,shared:bool=false)->bool:
+	if boss_index<0 or boss_index>=bosses_defeated.size() or bosses_defeated[boss_index]:return false
+	bosses_defeated[boss_index]=true
+	boss_cooldowns[boss_index]=90.0
+	message(("Gruppe · " if shared else "")+ENEMY_TYPES[12+boss_index]["name"]+" besiegt! Ein neuer Weg ist offen.")
+	if bosses_defeated.count(true)==bosses_defeated.size() and not final_completed and final_countdown<0:
+		final_countdown=8.0
+	save_game()
+	return true
 
 func gain_xp(amount: int) -> void:
 	xp += amount
@@ -3790,6 +3846,10 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	elif data.has("quest_state"):
 		quests[0]["state"] = clampi(int(data["quest_state"]), 0, 3)
 		quests[0]["progress"] = clampi(int(data.get("quest_kills", 0)), 0, 5)
+	# Older multiplayer saves may contain completed boss quests but missing boss flags.
+	for q in mini(quests.size(),QUESTS.size()):
+		var target:int=int(QUESTS[q]["target"])
+		if target in [12,13,14] and int(quests[q].get("state",0))>=2:bosses_defeated[target-12]=true
 	if is_blocked(player_pos) or (not creative_mode and level < region_level(region_at(player_pos))):
 		player_pos = Vector2(825, 1020)
 	if level < region_level(region_at(WAYSTONES[last_waystone])): last_waystone = 1
@@ -4924,22 +4984,22 @@ func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2,
 	var face_y: float = -25.0 if look.y >= -0.4 else -28.0
 	if race == 1:
 		# Orks: markante Hauer und breitere Schulterakzente.
-		draw_rect(Rect2(p+Vector2(-10,face_y+8)*scale_factor,Vector2(4,3)*scale_factor),Color('efe0bd'))
-		draw_rect(Rect2(p+Vector2(6,face_y+8)*scale_factor,Vector2(4,3)*scale_factor),Color('efe0bd'))
+		PixelStyle32.rect(self,Rect2(p+Vector2(-10,face_y+8)*scale_factor,Vector2(4,3)*scale_factor),Color('efe0bd'))
+		PixelStyle32.rect(self,Rect2(p+Vector2(6,face_y+8)*scale_factor,Vector2(4,3)*scale_factor),Color('efe0bd'))
 	elif race == 2:
 		# Roboter: leuchtender Sensor und Metallfugen.
-		draw_rect(Rect2(p+Vector2(-6,face_y+2)*scale_factor,Vector2(12,3)*scale_factor),Color('8fe8ef'))
-		draw_rect(Rect2(p+Vector2(-12,-8)*scale_factor,Vector2(24,2)*scale_factor),Color('b8c7ca',0.8))
+		PixelStyle32.rect(self,Rect2(p+Vector2(-6,face_y+2)*scale_factor,Vector2(12,3)*scale_factor),Color('8fe8ef'))
+		PixelStyle32.rect(self,Rect2(p+Vector2(-12,-8)*scale_factor,Vector2(24,2)*scale_factor),Color('b8c7ca',0.8))
 	if visual_class == 0:
-		draw_rect(Rect2(p+Vector2(-17,-15)*scale_factor,Vector2(34,4)*scale_factor),accent.darkened(0.18))
-		draw_rect(Rect2(p+Vector2(-4,-13)*scale_factor,Vector2(8,7)*scale_factor),Color('dbe7e5'))
+		PixelStyle32.rect(self,Rect2(p+Vector2(-17,-15)*scale_factor,Vector2(34,4)*scale_factor),accent.darkened(0.18))
+		PixelStyle32.rect(self,Rect2(p+Vector2(-4,-13)*scale_factor,Vector2(8,7)*scale_factor),Color('dbe7e5'))
 	elif visual_class == 1:
 		# Kleiner Facettenstein am Kapuzenrand statt des unnatürlichen blauen Gesichtsstrichs.
-		draw_colored_polygon(PackedVector2Array([p+Vector2(0,-35)*scale_factor,p+Vector2(4,-32)*scale_factor,p+Vector2(0,-28)*scale_factor,p+Vector2(-4,-32)*scale_factor]),Color('b992df'))
-		draw_line(p+Vector2(-2,-32)*scale_factor,p+Vector2(0,-34)*scale_factor,Color('f0e5ff'),1.4*scale_factor)
+		PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(0,-35)*scale_factor,p+Vector2(4,-32)*scale_factor,p+Vector2(0,-28)*scale_factor,p+Vector2(-4,-32)*scale_factor]),Color('b992df'))
+		PixelStyle32.line(self,p+Vector2(-2,-32)*scale_factor,p+Vector2(0,-34)*scale_factor,Color('f0e5ff'),1.4*scale_factor)
 	else:
-		draw_line(p+Vector2(-14,-10)*scale_factor,p+Vector2(13,12)*scale_factor,Color('d6b879'),3*scale_factor)
-		draw_rect(Rect2(p+Vector2(11,-3)*scale_factor,Vector2(5,17)*scale_factor),Color('7a5b45'))
+		PixelStyle32.line(self,p+Vector2(-14,-10)*scale_factor,p+Vector2(13,12)*scale_factor,Color('d6b879'),3*scale_factor)
+		PixelStyle32.rect(self,Rect2(p+Vector2(11,-3)*scale_factor,Vector2(5,17)*scale_factor),Color('7a5b45'))
 
 func draw_enemy_sprite(type: int, p: Vector2, scale_factor: float = 1.0, flash: bool = false) -> void:
 	if enemy_sprites == null: return
@@ -4956,24 +5016,24 @@ func draw_enemy_detail_overlay(type: int, p: Vector2, scale_factor: float, flash
 	# Kleine, typabhängige Details erhöhen Material- und Rollenlesbarkeit ohne schwarze Sprite-Schatten.
 	match type:
 		0, 2, 17, 19, 21:
-			draw_rect(Rect2(p+Vector2(-13,-17)*scale_factor,Vector2(6,3)*scale_factor),base.lightened(0.35))
-			draw_rect(Rect2(p+Vector2(7,-13)*scale_factor,Vector2(5,3)*scale_factor),base.lightened(0.22))
+			PixelStyle32.rect(self,Rect2(p+Vector2(-13,-17)*scale_factor,Vector2(6,3)*scale_factor),base.lightened(0.35))
+			PixelStyle32.rect(self,Rect2(p+Vector2(7,-13)*scale_factor,Vector2(5,3)*scale_factor),base.lightened(0.22))
 		4, 7, 9, 16, 26:
-			for side in [-1.0,1.0]: draw_rect(Rect2(p+Vector2(side*18-3,-18)*scale_factor,Vector2(6,15)*scale_factor),base.lightened(0.28))
-			draw_rect(Rect2(p+Vector2(-5,-9)*scale_factor,Vector2(10,7)*scale_factor),Color('f4d27c') if type in [4,9,16] else Color('b7f2f6'))
+			for side in [-1.0,1.0]: PixelStyle32.rect(self,Rect2(p+Vector2(side*18-3,-18)*scale_factor,Vector2(6,15)*scale_factor),base.lightened(0.28))
+			PixelStyle32.rect(self,Rect2(p+Vector2(-5,-9)*scale_factor,Vector2(10,7)*scale_factor),Color('f4d27c') if type in [4,9,16] else Color('b7f2f6'))
 		5, 18, 22:
-			draw_circle(p+Vector2(0,-12)*scale_factor,5*scale_factor,Color('f2f4e8'))
-			draw_circle(p+Vector2(0,-12)*scale_factor,2.2*scale_factor,Color('405b69'))
+			PixelStyle32.circle(self,p+Vector2(0,-12)*scale_factor,5*scale_factor,Color('f2f4e8'))
+			PixelStyle32.circle(self,p+Vector2(0,-12)*scale_factor,2.2*scale_factor,Color('405b69'))
 		8, 15, 23, 24, 25:
-			for side in [-1.0,1.0]: draw_colored_polygon(PackedVector2Array([p+Vector2(side*9,-27)*scale_factor,p+Vector2(side*20,-39)*scale_factor,p+Vector2(side*18,-20)*scale_factor]),base.lightened(0.18))
+			for side in [-1.0,1.0]: PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(side*9,-27)*scale_factor,p+Vector2(side*20,-39)*scale_factor,p+Vector2(side*18,-20)*scale_factor]),base.lightened(0.18))
 		10, 6:
-			for side in [-1.0,1.0]: draw_circle(p+Vector2(side*19,-2)*scale_factor,5*scale_factor,base.lightened(0.3))
+			for side in [-1.0,1.0]: PixelStyle32.circle(self,p+Vector2(side*19,-2)*scale_factor,5*scale_factor,base.lightened(0.3))
 		11, 20:
-			draw_arc(p+Vector2(0,-7)*scale_factor,17*scale_factor,0,TAU,16,Color(base.lightened(0.42),0.45*pulse),2*scale_factor)
+			PixelStyle32.arc(self,p+Vector2(0,-7)*scale_factor,17*scale_factor,0,TAU,16,Color(base.lightened(0.42),0.45*pulse),2*scale_factor)
 		12, 13, 14:
-			draw_arc(p+Vector2(0,-5)*scale_factor,27*scale_factor,0,TAU,20,Color(base.lightened(0.35),0.38*pulse),3*scale_factor)
+			PixelStyle32.arc(self,p+Vector2(0,-5)*scale_factor,27*scale_factor,0,TAU,20,Color(base.lightened(0.35),0.38*pulse),3*scale_factor)
 	if flash:
-		draw_arc(p,25*scale_factor,0,TAU,18,Color('fff7df',0.72),2*scale_factor)
+		PixelStyle32.arc(self,p,25*scale_factor,0,TAU,18,Color('fff7df',0.72),2*scale_factor)
 
 func npc_sprite_row(kind: String, name: String) -> int:
 	if kind == "quest":
@@ -5012,53 +5072,53 @@ func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scal
 		# Schwerter und Äxte: klare Silhouette, Metallkante, Griffwicklung und Schmuck.
 		if design % 3 == 2:
 			var haft_end: Vector2 = hand + dir * (39.0 + tier * 3.0) * scale_factor
-			draw_line(hand - dir * 10.0 * scale_factor, haft_end, Color('4b342f'), 7.0 * scale_factor)
-			draw_line(hand - dir * 8.0 * scale_factor, haft_end, Color('a8754d'), 3.0 * scale_factor)
+			PixelStyle32.line(self,hand - dir * 10.0 * scale_factor, haft_end, Color('4b342f'), 7.0 * scale_factor)
+			PixelStyle32.line(self,hand - dir * 8.0 * scale_factor, haft_end, Color('a8754d'), 3.0 * scale_factor)
 			var head: Vector2 = haft_end + dir * 5.0 * scale_factor
-			draw_colored_polygon(PackedVector2Array([head-side*4*scale_factor, head+side*18*scale_factor-dir*5*scale_factor, head+side*15*scale_factor+dir*13*scale_factor, head-side*3*scale_factor+dir*10*scale_factor]), Color('aebbc1'))
-			draw_line(head+side*13*scale_factor-dir*3*scale_factor, head+side*11*scale_factor+dir*9*scale_factor, Color('f2eee2'), 2.0*scale_factor)
+			PixelStyle32.polygon(self,PackedVector2Array([head-side*4*scale_factor, head+side*18*scale_factor-dir*5*scale_factor, head+side*15*scale_factor+dir*13*scale_factor, head-side*3*scale_factor+dir*10*scale_factor]), Color('aebbc1'))
+			PixelStyle32.line(self,head+side*13*scale_factor-dir*3*scale_factor, head+side*11*scale_factor+dir*9*scale_factor, Color('f2eee2'), 2.0*scale_factor)
 		else:
 			var base: Vector2 = hand + dir * 9.0 * scale_factor
 			var tip: Vector2 = base + dir * (49.0 + tier * 5.0 + variant * 2.0) * scale_factor
-			draw_line(hand-dir*9*scale_factor, base, Color('533743'), 7.0*scale_factor)
-			draw_line(base-side*(11+tier)*scale_factor, base+side*(11+tier)*scale_factor, Color('d6a95f'), 6.0*scale_factor)
+			PixelStyle32.line(self,hand-dir*9*scale_factor, base, Color('533743'), 7.0*scale_factor)
+			PixelStyle32.line(self,base-side*(11+tier)*scale_factor, base+side*(11+tier)*scale_factor, Color('d6a95f'), 6.0*scale_factor)
 			var metal: Color = [Color('c9d6da'),Color('c2d0dc'),Color('d7c5df'),Color('d0c1aa')][variant]
-			draw_colored_polygon(PackedVector2Array([base-side*5*scale_factor, tip-dir*6*scale_factor-side*3*scale_factor, tip, tip-dir*6*scale_factor+side*3*scale_factor, base+side*5*scale_factor]), Color('33434a'))
-			draw_colored_polygon(PackedVector2Array([base-side*3*scale_factor, tip-dir*7*scale_factor-side*1.5*scale_factor, tip-dir*2*scale_factor, tip-dir*7*scale_factor+side*1.5*scale_factor, base+side*3*scale_factor]), metal)
-			draw_line(base+dir*7*scale_factor-side*1.4*scale_factor, tip-dir*10*scale_factor-side*1.4*scale_factor, Color('f8fbef',0.78), 1.5*scale_factor)
-			draw_circle(base, (2.8+tier)*scale_factor, [Color('e9bb68'),Color('7fd4e3'),Color('d59be7')][tier])
+			PixelStyle32.polygon(self,PackedVector2Array([base-side*5*scale_factor, tip-dir*6*scale_factor-side*3*scale_factor, tip, tip-dir*6*scale_factor+side*3*scale_factor, base+side*5*scale_factor]), Color('33434a'))
+			PixelStyle32.polygon(self,PackedVector2Array([base-side*3*scale_factor, tip-dir*7*scale_factor-side*1.5*scale_factor, tip-dir*2*scale_factor, tip-dir*7*scale_factor+side*1.5*scale_factor, base+side*3*scale_factor]), metal)
+			PixelStyle32.line(self,base+dir*7*scale_factor-side*1.4*scale_factor, tip-dir*10*scale_factor-side*1.4*scale_factor, Color('f8fbef',0.78), 1.5*scale_factor)
+			PixelStyle32.circle(self,base, (2.8+tier)*scale_factor, [Color('e9bb68'),Color('7fd4e3'),Color('d59be7')][tier])
 	elif family == 1:
 		# Magierstabb: gebundener Hartholzschaft, Metallringe und je Design eine andere Fantasy-Krone.
 		var crown: Vector2 = hand + dir * (52.0 + tier * 6.0) * scale_factor
 		var wood: Color = [Color('563b35'),Color('403c59'),Color('514b39'),Color('39464c')][variant]
 		var wood_hi: Color = [Color('c18a50'),Color('9e86c9'),Color('a5a06b'),Color('83b6b2')][variant]
-		draw_line(hand-dir*15*scale_factor,crown,Color('302b37'),9.0*scale_factor)
-		draw_line(hand-dir*13*scale_factor,crown,wood,6.0*scale_factor)
-		draw_line(hand-dir*9*scale_factor,crown-dir*12*scale_factor,wood_hi,2.0*scale_factor)
+		PixelStyle32.line(self,hand-dir*15*scale_factor,crown,Color('302b37'),9.0*scale_factor)
+		PixelStyle32.line(self,hand-dir*13*scale_factor,crown,wood,6.0*scale_factor)
+		PixelStyle32.line(self,hand-dir*9*scale_factor,crown-dir*12*scale_factor,wood_hi,2.0*scale_factor)
 		for band in range(3):
 			var band_pos := hand + dir * (float(band * 13) - 7.0) * scale_factor
-			draw_line(band_pos-side*4*scale_factor,band_pos+side*4*scale_factor,Color('d2b978'),3.0*scale_factor)
+			PixelStyle32.line(self,band_pos-side*4*scale_factor,band_pos+side*4*scale_factor,Color('d2b978'),3.0*scale_factor)
 		var gem: Color = [Color('62d9e5'),Color('c78af1'),Color('9bdb7d'),Color('ff9a54')][variant]
 		var core := crown + dir * 9.0 * scale_factor
 		match variant:
 			0: # Drachenkrone
 				for branch in [-1.0,1.0]:
-					draw_line(core-dir*5*scale_factor,core+dir*12*scale_factor+side*branch*14*scale_factor,Color('607d68'),6*scale_factor)
-					draw_line(core+dir*8*scale_factor+side*branch*8*scale_factor,core+dir*20*scale_factor+side*branch*15*scale_factor,Color('d1ab6f'),3*scale_factor)
+					PixelStyle32.line(self,core-dir*5*scale_factor,core+dir*12*scale_factor+side*branch*14*scale_factor,Color('607d68'),6*scale_factor)
+					PixelStyle32.line(self,core+dir*8*scale_factor+side*branch*8*scale_factor,core+dir*20*scale_factor+side*branch*15*scale_factor,Color('d1ab6f'),3*scale_factor)
 			1: # Mondsichel mit eingeschlossenem Stern
-				draw_arc(core,15*scale_factor,0.18,TAU-0.18,18,Color('dfd3b3'),5*scale_factor)
-				draw_colored_polygon(PackedVector2Array([core+dir*2*scale_factor,core+side*5*scale_factor,core-dir*5*scale_factor,core-side*5*scale_factor]),gem)
+				PixelStyle32.arc(self,core,15*scale_factor,0.18,TAU-0.18,18,Color('dfd3b3'),5*scale_factor)
+				PixelStyle32.polygon(self,PackedVector2Array([core+dir*2*scale_factor,core+side*5*scale_factor,core-dir*5*scale_factor,core-side*5*scale_factor]),gem)
 			2: # Wurzelstab mit knorrigen Gabeln
 				for branch in [-1.0,1.0]:
-					draw_line(core-dir*5*scale_factor,core+dir*10*scale_factor+side*branch*12*scale_factor,wood_hi,6*scale_factor)
-					draw_line(core+dir*8*scale_factor+side*branch*10*scale_factor,core+dir*19*scale_factor+side*branch*15*scale_factor,wood,4*scale_factor)
+					PixelStyle32.line(self,core-dir*5*scale_factor,core+dir*10*scale_factor+side*branch*12*scale_factor,wood_hi,6*scale_factor)
+					PixelStyle32.line(self,core+dir*8*scale_factor+side*branch*10*scale_factor,core+dir*19*scale_factor+side*branch*15*scale_factor,wood,4*scale_factor)
 			3: # Runenlaterne
 				var rim := core+dir*6*scale_factor
-				draw_line(rim-side*12*scale_factor,rim+side*12*scale_factor,Color('c3d1d0'),4*scale_factor)
-				draw_line(rim-dir*7*scale_factor,rim+dir*7*scale_factor,Color('dce8e4'),3*scale_factor)
-				draw_rect(Rect2(core+dir*5*scale_factor-side*4*scale_factor,Vector2(8,8)*scale_factor),gem)
-		draw_colored_polygon(PackedVector2Array([core+dir*3*scale_factor,core+side*5*scale_factor,core-dir*4*scale_factor,core-side*5*scale_factor]),gem.lightened(0.35))
-		draw_rect(Rect2(core+dir*5*scale_factor-Vector2(2,2)*scale_factor,Vector2(4,4)*scale_factor),Color('fff4cf'))
+				PixelStyle32.line(self,rim-side*12*scale_factor,rim+side*12*scale_factor,Color('c3d1d0'),4*scale_factor)
+				PixelStyle32.line(self,rim-dir*7*scale_factor,rim+dir*7*scale_factor,Color('dce8e4'),3*scale_factor)
+				PixelStyle32.rect(self,Rect2(core+dir*5*scale_factor-side*4*scale_factor,Vector2(8,8)*scale_factor),gem)
+		PixelStyle32.polygon(self,PackedVector2Array([core+dir*3*scale_factor,core+side*5*scale_factor,core-dir*4*scale_factor,core-side*5*scale_factor]),gem.lightened(0.35))
+		PixelStyle32.rect(self,Rect2(core+dir*5*scale_factor-Vector2(2,2)*scale_factor,Vector2(4,4)*scale_factor),Color('fff4cf'))
 	else:
 		# Ein Recurvebogen bildet einen klaren Bogenkörper mit Sehne, Griff und angelegtem Pfeil.
 		var wood: Color = [Color('a8764e'),Color('c08b5b'),Color('788f73'),Color('8a654d')][variant]
@@ -5067,11 +5127,11 @@ func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scal
 			var recoil := 0.0
 			if attack_progress >= 0.0: recoil = 5.0 * (1.0 - clampf(attack_progress, 0.0, 1.0))
 			center -= dir * recoil * scale_factor
-			draw_line(center-side*20*scale_factor, center+side*20*scale_factor, Color('3d3435'), 7*scale_factor)
-			draw_line(center-side*19*scale_factor, center+side*19*scale_factor, wood, 4*scale_factor)
-			draw_line(hand-dir*10*scale_factor, hand+dir*33*scale_factor, Color('7a5a43'), 6*scale_factor)
-			draw_line(center-side*20*scale_factor, center+side*20*scale_factor, Color('e7e2cf'), 1.5*scale_factor)
-			draw_colored_polygon(PackedVector2Array([hand+dir*38*scale_factor,hand+dir*30*scale_factor+side*4*scale_factor,hand+dir*30*scale_factor-side*4*scale_factor]),Color('edf1e6'))
+			PixelStyle32.line(self,center-side*20*scale_factor, center+side*20*scale_factor, Color('3d3435'), 7*scale_factor)
+			PixelStyle32.line(self,center-side*19*scale_factor, center+side*19*scale_factor, wood, 4*scale_factor)
+			PixelStyle32.line(self,hand-dir*10*scale_factor, hand+dir*33*scale_factor, Color('7a5a43'), 6*scale_factor)
+			PixelStyle32.line(self,center-side*20*scale_factor, center+side*20*scale_factor, Color('e7e2cf'), 1.5*scale_factor)
+			PixelStyle32.polygon(self,PackedVector2Array([hand+dir*38*scale_factor,hand+dir*30*scale_factor+side*4*scale_factor,hand+dir*30*scale_factor-side*4*scale_factor]),Color('edf1e6'))
 		else:
 			# The midpoint of the wooden limbs is the same grip as the arm.
 			var center: Vector2 = hand - dir*18*scale_factor
@@ -5083,22 +5143,22 @@ func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scal
 			var bow_points := PackedVector2Array([upper,outer_upper,center+dir*18.0*scale_factor,outer_lower,lower])
 			draw_polyline(bow_points,Color('332d34'),9.0*scale_factor,false)
 			draw_polyline(bow_points,wood,5.0*scale_factor,false)
-			draw_line(hand-side*5*scale_factor,hand+side*5*scale_factor,Color('654331'),6*scale_factor)
-			draw_line(upper,lower,Color('f2e8d1'),1.8*scale_factor)
+			PixelStyle32.line(self,hand-side*5*scale_factor,hand+side*5*scale_factor,Color('654331'),6*scale_factor)
+			PixelStyle32.line(self,upper,lower,Color('f2e8d1'),1.8*scale_factor)
 			var pull := 0.0
 			if attack_progress >= 0.0: pull = 14.0 * sin(clampf(attack_progress, 0.0, 1.0) * PI)
 			var draw_hand := center - dir*pull*scale_factor
-			draw_line(upper,draw_hand,Color('f2e8d1'),1.7*scale_factor)
-			draw_line(draw_hand,lower,Color('f2e8d1'),1.7*scale_factor)
+			PixelStyle32.line(self,upper,draw_hand,Color('f2e8d1'),1.7*scale_factor)
+			PixelStyle32.line(self,draw_hand,lower,Color('f2e8d1'),1.7*scale_factor)
 			# Pfeilschaft liegt in der Sehne und wird beim Spannen sichtbar zurückgezogen.
 			var arrow_start := center-dir*(7.0+pull)*scale_factor
 			var arrow_tip := center+dir*30.0*scale_factor
-			draw_line(arrow_start,arrow_tip,Color('4b3c35'),4.0*scale_factor)
-			draw_line(arrow_start,arrow_tip,Color('d9b66f'),2.0*scale_factor)
-			draw_colored_polygon(PackedVector2Array([arrow_tip+dir*7*scale_factor,arrow_tip-side*4*scale_factor,arrow_tip+side*4*scale_factor]),Color('f0f3e8'))
+			PixelStyle32.line(self,arrow_start,arrow_tip,Color('4b3c35'),4.0*scale_factor)
+			PixelStyle32.line(self,arrow_start,arrow_tip,Color('d9b66f'),2.0*scale_factor)
+			PixelStyle32.polygon(self,PackedVector2Array([arrow_tip+dir*7*scale_factor,arrow_tip-side*4*scale_factor,arrow_tip+side*4*scale_factor]),Color('f0f3e8'))
 			for branch in [-1.0,1.0]:
 				var rune: Vector2 = center+side*branch*8.0*scale_factor+dir*8.0*scale_factor
-				draw_rect(Rect2(rune-Vector2(2,2)*scale_factor,Vector2(4,4)*scale_factor),Color('e2c477'))
+				PixelStyle32.rect(self,Rect2(rune-Vector2(2,2)*scale_factor,Vector2(4,4)*scale_factor),Color('e2c477'))
 
 func draw_skill_sprite(id: int, p: Vector2, size: float = 32.0) -> void:
 	if skill_sprites == null: return
@@ -5954,21 +6014,27 @@ func draw_enemy(enemy: Dictionary) -> void:
 	if elite_kind > 0:
 		var aura := Color('f4d485',0.65) if elite_kind == 2 else Color('d99ce7',0.55)
 		draw_arc(p + Vector2(0,4), 32*scale_factor, 0, TAU, 24, aura, 3)
-	# Fernangriffe und schwere Nahkampfangriffe werden vor dem Treffer sichtbar angekündigt.
-	var shot_left := float(enemy.get("shot", 9.0))
-	if type in [5,7,11,12,13,14,18,20,22,24,26] and shot_left < 0.55:
-		var aim_color := Color('c9a5f1',0.7) if type not in [11,13,22] else Color('a6e9f4',0.75)
-		draw_arc(p, 38*scale_factor, 0, TAU, 28, aim_color, 4)
-		draw_line(p, player_pos, Color(aim_color,0.22), 2)
-	elif type in [4,9,13,14,16] and float(enemy.get("hit",0.0)) < 0.22:
-		draw_arc(p + Vector2(0,8), 42*scale_factor, 0, TAU, 24, Color('f2b07b',0.45), 4)
-	var enemy_color: Color = ENEMY_TYPES[type]["color"]
-	var model_pos := p + Vector2(0.0, bob)
-	var stride := sin(world_time * 7.0 + float(enemy.get("seed", 0.0))) * 3.0
-	if boss:
-		draw_boss_model(type, model_pos, enemy_color, stride)
-	else:
-		draw_enemy_model(type, model_pos, enemy_color, stride)
+	var profile:=mob_profile(enemy)
+	var state:Dictionary=enemy.get("attack_state",{})
+	var aim:Vector2=enemy.get("facing",Vector2.DOWN)
+	var animation:float=-1.0
+	if not state.is_empty():
+		aim=state.get("dir",aim)
+		animation=MobCombat.visual_progress(state,profile)
+		if float(state.get("age",0))<float(profile["windup"]):
+			var ability:Dictionary=state["ability"]
+			var warn:=Color("efd49a",.6)
+			if ability["shape"]=="line":
+				PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.25),20)
+			elif ability["shape"]=="arc":
+				PixelStyle32.arc(self,p,float(ability["range"]),aim.angle()-float(ability["half_angle"]),aim.angle()+float(ability["half_angle"]),18,warn,2)
+			else:PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.3),2)
+	var enemy_color:Color=ENEMY_TYPES[type]["color"]
+	var model_pos:Vector2=p
+	var stride:float=world_time*(3.5 if bool(profile["heavy"]) else 7.0) if bool(enemy.get("walking",false)) else 0.0
+	draw_set_transform(Vector2.ZERO)
+	MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color,stride,animation)
+	draw_set_transform(character_canvas_offset)
 	if float(enemy.get("flash", 0.0)) > 0.0:
 		draw_arc(model_pos, 37.0 * scale_factor, 0.0, TAU, 18, Color("fff7df", 0.72), 3.0)
 	draw_enemy_level(p, type, boss, elite_kind)
@@ -5992,260 +6058,260 @@ func draw_enemy_level(p: Vector2, type: int, boss: bool, elite_kind: int = 0) ->
 func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 	match type:
 		0: # Schleim: gallertiger Körper mit Kern und Spritzrand.
-			draw_circle(p + Vector2(0, 5), 27, c.darkened(0.32))
-			draw_circle(p + Vector2(0, -6 + stride * 0.12), 23, c)
-			draw_circle(p + Vector2(-7, -15), 7, c.lightened(0.42))
-			draw_circle(p + Vector2(8, -10), 4, c.lightened(0.28))
-			draw_rect(Rect2(p + Vector2(-10, -5), Vector2(5, 8)), INK)
-			draw_rect(Rect2(p + Vector2(6, -5), Vector2(5, 8)), INK)
-			draw_rect(Rect2(p + Vector2(-3, 7), Vector2(8, 5)), Color('ffe5aa'))
-			draw_rect(Rect2(p + Vector2(-18, 14), Vector2(9, 4)), c.lightened(0.18))
-			draw_rect(Rect2(p + Vector2(10, 13), Vector2(8, 4)), c.lightened(0.18))
+			PixelStyle32.circle(self,p + Vector2(0, 5), 27, c.darkened(0.32))
+			PixelStyle32.circle(self,p + Vector2(0, -6 + stride * 0.12), 23, c)
+			PixelStyle32.circle(self,p + Vector2(-7, -15), 7, c.lightened(0.42))
+			PixelStyle32.circle(self,p + Vector2(8, -10), 4, c.lightened(0.28))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-10, -5), Vector2(5, 8)), INK)
+			PixelStyle32.rect(self,Rect2(p + Vector2(6, -5), Vector2(5, 8)), INK)
+			PixelStyle32.rect(self,Rect2(p + Vector2(-3, 7), Vector2(8, 5)), Color('ffe5aa'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-18, 14), Vector2(9, 4)), c.lightened(0.18))
+			PixelStyle32.rect(self,Rect2(p + Vector2(10, 13), Vector2(8, 4)), c.lightened(0.18))
 		1: # Käfer mit Fühlern, sechs Beinen und zwei Flügeldecken.
 			for side in [-1.0, 1.0]:
 				for leg in 3:
-					draw_line(p + Vector2(side * 12, -12 + leg * 12), p + Vector2(side * 32, -18 + leg * 16 + stride * side), c.darkened(0.38), 4)
-				draw_line(p + Vector2(side * 6, -25), p + Vector2(side * 20, -46), Color('574951'), 3)
-				draw_circle(p + Vector2(side * 11, -6), 17, c.lightened(0.16))
-				draw_circle(p + Vector2(side * 11, -11), 4, Color('fff2d4'))
-			draw_circle(p + Vector2(0, -14), 12, Color('593f55'))
-			draw_circle(p + Vector2(-5, -17), 3, Color('fff1a7'))
-			draw_circle(p + Vector2(5, -17), 3, Color('fff1a7'))
+					PixelStyle32.line(self,p + Vector2(side * 12, -12 + leg * 12), p + Vector2(side * 32, -18 + leg * 16 + stride * side), c.darkened(0.38), 4)
+				PixelStyle32.line(self,p + Vector2(side * 6, -25), p + Vector2(side * 20, -46), Color('574951'), 3)
+				PixelStyle32.circle(self,p + Vector2(side * 11, -6), 17, c.lightened(0.16))
+				PixelStyle32.circle(self,p + Vector2(side * 11, -11), 4, Color('fff2d4'))
+			PixelStyle32.circle(self,p + Vector2(0, -14), 12, Color('593f55'))
+			PixelStyle32.circle(self,p + Vector2(-5, -17), 3, Color('fff1a7'))
+			PixelStyle32.circle(self,p + Vector2(5, -17), 3, Color('fff1a7'))
 		2: # Pilzling mit Stiel, Hut und Sporenpunkten.
-			draw_rect(Rect2(p + Vector2(-15, -7), Vector2(30, 32)), Color('e5d8b3'))
-			draw_rect(Rect2(p + Vector2(-12, 20), Vector2(10, 10)), Color('9b755e'))
-			draw_rect(Rect2(p + Vector2(3, 20), Vector2(10, 10)), Color('9b755e'))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-33, -9), p + Vector2(-22, -31), p + Vector2(0, -42), p + Vector2(22, -31), p + Vector2(33, -9)]), Color('bd7882'))
-			for dot in [Vector2(-15, -21), Vector2(5, -32), Vector2(19, -18)]: draw_circle(p + dot, 4, Color('fff2d2'))
-			draw_rect(Rect2(p + Vector2(-8, 3), Vector2(4, 5)), INK)
-			draw_rect(Rect2(p + Vector2(5, 3), Vector2(4, 5)), INK)
+			PixelStyle32.rect(self,Rect2(p + Vector2(-15, -7), Vector2(30, 32)), Color('e5d8b3'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-12, 20), Vector2(10, 10)), Color('9b755e'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(3, 20), Vector2(10, 10)), Color('9b755e'))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-33, -9), p + Vector2(-22, -31), p + Vector2(0, -42), p + Vector2(22, -31), p + Vector2(33, -9)]), Color('bd7882'))
+			for dot in [Vector2(-15, -21), Vector2(5, -32), Vector2(19, -18)]: PixelStyle32.circle(self,p + dot, 4, Color('fff2d2'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-8, 3), Vector2(4, 5)), INK)
+			PixelStyle32.rect(self,Rect2(p + Vector2(5, 3), Vector2(4, 5)), INK)
 		3: # Wolf mit Schnauze, Ohren, Schwanz und laufenden Pfoten.
-			draw_line(p + Vector2(-18, 2), p + Vector2(-41, -15 + stride), c.darkened(0.25), 11)
+			PixelStyle32.line(self,p + Vector2(-18, 2), p + Vector2(-41, -15 + stride), c.darkened(0.25), 11)
 			for side in [-1.0, 1.0]:
-				draw_rect(Rect2(p + Vector2(side * 16 - 5, 12 + stride * side), Vector2(9, 20)), c.darkened(0.27))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-27, -5), p + Vector2(-17, -27), p + Vector2(17, -28), p + Vector2(29, -2), p + Vector2(20, 19), p + Vector2(-20, 19)]), c)
+				PixelStyle32.rect(self,Rect2(p + Vector2(side * 16 - 5, 12 + stride * side), Vector2(9, 20)), c.darkened(0.27))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-27, -5), p + Vector2(-17, -27), p + Vector2(17, -28), p + Vector2(29, -2), p + Vector2(20, 19), p + Vector2(-20, 19)]), c)
 			for side in [-1.0, 1.0]:
-				draw_colored_polygon(PackedVector2Array([p + Vector2(side * 13, -23), p + Vector2(side * 27, -43), p + Vector2(side * 29, -17)]), c.darkened(0.18))
-				draw_rect(Rect2(p + Vector2(side * 9 - 2, -12), Vector2(5, 5)), Color('fff2a5'))
-			draw_rect(Rect2(p + Vector2(-10, 1), Vector2(20, 11)), Color('c1bbaa'))
+				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(side * 13, -23), p + Vector2(side * 27, -43), p + Vector2(side * 29, -17)]), c.darkened(0.18))
+				PixelStyle32.rect(self,Rect2(p + Vector2(side * 9 - 2, -12), Vector2(5, 5)), Color('fff2a5'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-10, 1), Vector2(20, 11)), Color('c1bbaa'))
 		4: # Steingolem als klarer Ruinenwächter.
-			draw_rect(Rect2(p + Vector2(-20, 17 + stride * 0.25), Vector2(14, 18)), c.darkened(0.33))
-			draw_rect(Rect2(p + Vector2(7, 17 - stride * 0.25), Vector2(14, 18)), c.darkened(0.33))
-			draw_rect(Rect2(p + Vector2(-24, -26), Vector2(48, 50)), c.darkened(0.16))
-			draw_rect(Rect2(p + Vector2(-16, -44), Vector2(32, 24)), c)
-			draw_rect(Rect2(p + Vector2(-17, -35), Vector2(34, 6)), Color('dcc88f'))
-			draw_rect(Rect2(p + Vector2(-31, -17), Vector2(15, 34)), Color('77726e'))
-			draw_rect(Rect2(p + Vector2(22, -20), Vector2(8, 42)), Color('d6c493'))
-			draw_line(p + Vector2(-6, -12), p + Vector2(6, -1), Color('8c8177'), 4)
-			draw_rect(Rect2(p + Vector2(-10, -23), Vector2(6, 5)), Color('ffe0a1'))
-			draw_rect(Rect2(p + Vector2(4, -23), Vector2(6, 5)), Color('ffe0a1'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-20, 17 + stride * 0.25), Vector2(14, 18)), c.darkened(0.33))
+			PixelStyle32.rect(self,Rect2(p + Vector2(7, 17 - stride * 0.25), Vector2(14, 18)), c.darkened(0.33))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-24, -26), Vector2(48, 50)), c.darkened(0.16))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-16, -44), Vector2(32, 24)), c)
+			PixelStyle32.rect(self,Rect2(p + Vector2(-17, -35), Vector2(34, 6)), Color('dcc88f'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-31, -17), Vector2(15, 34)), Color('77726e'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(22, -20), Vector2(8, 42)), Color('d6c493'))
+			PixelStyle32.line(self,p + Vector2(-6, -12), p + Vector2(6, -1), Color('8c8177'), 4)
+			PixelStyle32.rect(self,Rect2(p + Vector2(-10, -23), Vector2(6, 5)), Color('ffe0a1'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(4, -23), Vector2(6, 5)), Color('ffe0a1'))
 		5: # Beholder-artiger Ruinenwächter mit Stielaugen.
-			draw_circle(p + Vector2(0, 2), 28, c.darkened(0.28))
-			draw_circle(p + Vector2(0, -6), 26, c)
-			draw_circle(p + Vector2(0, -6), 15, Color('efe7cf'))
-			draw_circle(p + Vector2(0, -6), 8, Color('7d8791'))
-			draw_circle(p + Vector2(0, -6), 4, Color('26383c'))
+			PixelStyle32.circle(self,p + Vector2(0, 2), 28, c.darkened(0.28))
+			PixelStyle32.circle(self,p + Vector2(0, -6), 26, c)
+			PixelStyle32.circle(self,p + Vector2(0, -6), 15, Color('efe7cf'))
+			PixelStyle32.circle(self,p + Vector2(0, -6), 8, Color('7d8791'))
+			PixelStyle32.circle(self,p + Vector2(0, -6), 4, Color('26383c'))
 			for angle in [-1.9, -1.15, -0.35, 0.45, 1.2, 1.95]:
 				var dir := Vector2.RIGHT.rotated(angle)
-				draw_line(p + dir * 18 + Vector2(0, -6), p + dir * 34 + Vector2(0, -16 + sin(world_time * 4.0 + angle) * 3.0), c.lightened(0.08), 4)
-				draw_circle(p + dir * 38 + Vector2(0, -18 + sin(world_time * 4.0 + angle) * 3.0), 6, Color('e9d9b8'))
-				draw_circle(p + dir * 38 + Vector2(0, -18 + sin(world_time * 4.0 + angle) * 3.0), 2.5, Color('394c5d'))
-			draw_arc(p + Vector2(0, 4), 17, 0.3, PI - 0.3, 12, Color('e9d4a8'), 3)
+				PixelStyle32.line(self,p + dir * 18 + Vector2(0, -6), p + dir * 34 + Vector2(0, -16 + sin(world_time * 4.0 + angle) * 3.0), c.lightened(0.08), 4)
+				PixelStyle32.circle(self,p + dir * 38 + Vector2(0, -18 + sin(world_time * 4.0 + angle) * 3.0), 6, Color('e9d9b8'))
+				PixelStyle32.circle(self,p + dir * 38 + Vector2(0, -18 + sin(world_time * 4.0 + angle) * 3.0), 2.5, Color('394c5d'))
+			PixelStyle32.arc(self,p + Vector2(0, 4), 17, 0.3, PI - 0.3, 12, Color('e9d4a8'), 3)
 		6: # Krabbe mit kristallisiertem Panzer und Scheren.
 			draw_crab_model(p, c, stride, true)
 		7: # Kristallgolem: massiver Körper mit facettierten Schultern und Kern.
 			for side in [-1.0, 1.0]:
-				draw_rect(Rect2(p + Vector2(side * 27 - 9, -8 + stride * side * 0.2), Vector2(18, 39)), c.darkened(0.28))
-				draw_colored_polygon(PackedVector2Array([p + Vector2(side * 22, -20), p + Vector2(side * 39, -39), p + Vector2(side * 43, -8), p + Vector2(side * 25, 5)]), Color('d9faff'))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-28, 18), p + Vector2(-24, -28), p + Vector2(0, -44), p + Vector2(25, -28), p + Vector2(29, 18), p + Vector2(0, 34)]), c.darkened(0.12))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -34), p + Vector2(15, -8), p + Vector2(0, 19), p + Vector2(-15, -8)]), Color('bcefff'))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -27), p + Vector2(8, -7), p + Vector2(0, 9), p + Vector2(-8, -7)]), Color('f4ffff'))
-			draw_rect(Rect2(p + Vector2(-12, -24), Vector2(6, 5)), Color('365f78'))
-			draw_rect(Rect2(p + Vector2(6, -24), Vector2(6, 5)), Color('365f78'))
+				PixelStyle32.rect(self,Rect2(p + Vector2(side * 27 - 9, -8 + stride * side * 0.2), Vector2(18, 39)), c.darkened(0.28))
+				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(side * 22, -20), p + Vector2(side * 39, -39), p + Vector2(side * 43, -8), p + Vector2(side * 25, 5)]), Color('d9faff'))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-28, 18), p + Vector2(-24, -28), p + Vector2(0, -44), p + Vector2(25, -28), p + Vector2(29, 18), p + Vector2(0, 34)]), c.darkened(0.12))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(0, -34), p + Vector2(15, -8), p + Vector2(0, 19), p + Vector2(-15, -8)]), Color('bcefff'))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(0, -27), p + Vector2(8, -7), p + Vector2(0, 9), p + Vector2(-8, -7)]), Color('f4ffff'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-12, -24), Vector2(6, 5)), Color('365f78'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(6, -24), Vector2(6, 5)), Color('365f78'))
 		8: # Schneller Ascheläufer mit glühender Spur und Hörnern.
 			for side in [-1.0, 1.0]:
-				draw_line(p + Vector2(side * 9, 11), p + Vector2(side * 19, 32 + stride * side), c.darkened(0.3), 8)
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-22, 13), p + Vector2(-15, -23), p + Vector2(15, -23), p + Vector2(23, 14)]), c.darkened(0.16))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-12, -22), p + Vector2(-20, -43), p + Vector2(-2, -29), p + Vector2(10, -23), p + Vector2(19, -43), p + Vector2(17, -11)]), Color('e8a374'))
-			draw_rect(Rect2(p + Vector2(-8, -18), Vector2(5, 6)), Color('ffe388'))
-			draw_rect(Rect2(p + Vector2(5, -18), Vector2(5, 6)), Color('ffe388'))
-			draw_line(p + Vector2(-22, 15), p + Vector2(-35, 25 + stride), Color('f7ab6a'), 5)
+				PixelStyle32.line(self,p + Vector2(side * 9, 11), p + Vector2(side * 19, 32 + stride * side), c.darkened(0.3), 8)
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-22, 13), p + Vector2(-15, -23), p + Vector2(15, -23), p + Vector2(23, 14)]), c.darkened(0.16))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-12, -22), p + Vector2(-20, -43), p + Vector2(-2, -29), p + Vector2(10, -23), p + Vector2(19, -43), p + Vector2(17, -11)]), Color('e8a374'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-8, -18), Vector2(5, 6)), Color('ffe388'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(5, -18), Vector2(5, 6)), Color('ffe388'))
+			PixelStyle32.line(self,p + Vector2(-22, 15), p + Vector2(-35, 25 + stride), Color('f7ab6a'), 5)
 		9: # Lavagolem: weiterentwickelter Glutgolem mit schwerem Basaltkörper und Lavarissen.
-			draw_rect(Rect2(p + Vector2(-31, -31), Vector2(62, 58)), Color('4f3f44'))
-			draw_rect(Rect2(p + Vector2(-24, -45), Vector2(48, 25)), c)
+			PixelStyle32.rect(self,Rect2(p + Vector2(-31, -31), Vector2(62, 58)), Color('4f3f44'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-24, -45), Vector2(48, 25)), c)
 			for side in [-1.0, 1.0]:
-				draw_rect(Rect2(p + Vector2(side * 27 - 10, -11), Vector2(20, 39)), c.darkened(0.25))
-				draw_rect(Rect2(p + Vector2(side * 14 - 5, 23), Vector2(12, 15)), Color('55464b'))
-			draw_line(p + Vector2(-18, -9), p + Vector2(3, 12), Color('f5a76a'), 5)
-			draw_line(p + Vector2(4, 12), p + Vector2(23, -8), Color('f5a76a'), 4)
-			draw_line(p + Vector2(-7, -24), p + Vector2(-2, 12), Color('ffbf74'), 3)
-			draw_line(p + Vector2(8, -24), p + Vector2(13, 8), Color('ffbf74'), 3)
-			draw_rect(Rect2(p + Vector2(-10, -25), Vector2(6, 6)), Color('ffdb78'))
-			draw_rect(Rect2(p + Vector2(4, -25), Vector2(6, 6)), Color('ffdb78'))
+				PixelStyle32.rect(self,Rect2(p + Vector2(side * 27 - 10, -11), Vector2(20, 39)), c.darkened(0.25))
+				PixelStyle32.rect(self,Rect2(p + Vector2(side * 14 - 5, 23), Vector2(12, 15)), Color('55464b'))
+			PixelStyle32.line(self,p + Vector2(-18, -9), p + Vector2(3, 12), Color('f5a76a'), 5)
+			PixelStyle32.line(self,p + Vector2(4, 12), p + Vector2(23, -8), Color('f5a76a'), 4)
+			PixelStyle32.line(self,p + Vector2(-7, -24), p + Vector2(-2, 12), Color('ffbf74'), 3)
+			PixelStyle32.line(self,p + Vector2(8, -24), p + Vector2(13, 8), Color('ffbf74'), 3)
+			PixelStyle32.rect(self,Rect2(p + Vector2(-10, -25), Vector2(6, 6)), Color('ffdb78'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(4, -25), Vector2(6, 6)), Color('ffdb78'))
 		10: # Strandkrabbe mit Sandpanzer.
 			draw_crab_model(p, c, stride, false)
 		11: # Wassergeist als Tropfen mit Wellenarmen.
-			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -46), p + Vector2(21, -16), p + Vector2(24, 15), p + Vector2(0, 29), p + Vector2(-24, 15), p + Vector2(-21, -16)]), Color(c, 0.8))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(0, -46), p + Vector2(21, -16), p + Vector2(24, 15), p + Vector2(0, 29), p + Vector2(-24, 15), p + Vector2(-21, -16)]), Color(c, 0.8))
 			for side in [-1.0, 1.0]:
-				draw_arc(p + Vector2(side * 24, 0), 12, world_time, world_time + PI, 12, Color('d1f7f0'), 4)
-			draw_circle(p + Vector2(-7, -8), 4, Color.WHITE)
-			draw_circle(p + Vector2(8, -8), 4, Color.WHITE)
-			draw_line(p + Vector2(-11, 12), p + Vector2(12, 12), Color('b6eaf5'), 3)
+				PixelStyle32.arc(self,p + Vector2(side * 24, 0), 12, world_time, world_time + PI, 12, Color('d1f7f0'), 4)
+			PixelStyle32.circle(self,p + Vector2(-7, -8), 4, Color.WHITE)
+			PixelStyle32.circle(self,p + Vector2(8, -8), 4, Color.WHITE)
+			PixelStyle32.line(self,p + Vector2(-11, 12), p + Vector2(12, 12), Color('b6eaf5'), 3)
 		15: # Sternenschatten: dunkle Gestalt mit schwebenden Sternsplittern.
-			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -45), p + Vector2(22, -19), p + Vector2(25, 20), p + Vector2(0, 31), p + Vector2(-26, 20), p + Vector2(-22, -19)]), c.darkened(0.36))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(0, -45), p + Vector2(22, -19), p + Vector2(25, 20), p + Vector2(0, 31), p + Vector2(-26, 20), p + Vector2(-22, -19)]), c.darkened(0.36))
 			for side in [-1.0, 1.0]:
-				draw_colored_polygon(PackedVector2Array([p + Vector2(side * 30, -35 + stride), p + Vector2(side * 39, -19 + stride), p + Vector2(side * 27, -16 + stride)]), Color('e8d1ec'))
-			draw_rect(Rect2(p + Vector2(-11, -19), Vector2(7, 5)), Color('fff1c3'))
-			draw_rect(Rect2(p + Vector2(5, -19), Vector2(7, 5)), Color('fff1c3'))
+				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(side * 30, -35 + stride), p + Vector2(side * 39, -19 + stride), p + Vector2(side * 27, -16 + stride)]), Color('e8d1ec'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-11, -19), Vector2(7, 5)), Color('fff1c3'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(5, -19), Vector2(7, 5)), Color('fff1c3'))
 		16: # Bruchwächter: Steinrüstung mit glühendem Kern.
-			draw_rect(Rect2(p + Vector2(-27, -35), Vector2(54, 66)), c.darkened(0.48))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-27, -35), Vector2(54, 66)), c.darkened(0.48))
 			for side in [-1.0, 1.0]:
-				draw_rect(Rect2(p + Vector2(side * 30 - 8, -14), Vector2(17, 36)), c)
-				draw_rect(Rect2(p + Vector2(side * 13 - 6, 28 + stride * side * 0.3), Vector2(13, 14)), Color('605e75'))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -23), p + Vector2(13, -2), p + Vector2(0, 17), p + Vector2(-13, -2)]), Color('f9c49c'))
-			draw_rect(Rect2(p + Vector2(-17, -40), Vector2(34, 12)), Color('a094a3'))
+				PixelStyle32.rect(self,Rect2(p + Vector2(side * 30 - 8, -14), Vector2(17, 36)), c)
+				PixelStyle32.rect(self,Rect2(p + Vector2(side * 13 - 6, 28 + stride * side * 0.3), Vector2(13, 14)), Color('605e75'))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(0, -23), p + Vector2(13, -2), p + Vector2(0, 17), p + Vector2(-13, -2)]), Color('f9c49c'))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-17, -40), Vector2(34, 12)), Color('a094a3'))
 		17: # Nebelhirsch: langer Hals, vier Läufe und verzweigte Geweihkrone.
 			for side in [-1.0,1.0]:
-				draw_line(p+Vector2(side*12,4),p+Vector2(side*15,30+stride*side),c.darkened(0.38),7)
-				draw_line(p+Vector2(side*5,-20),p+Vector2(side*14,-43),c.lightened(0.12),10)
-				draw_line(p+Vector2(side*11,-39),p+Vector2(side*20,-53),Color('dfd4bd'),4)
-				draw_line(p+Vector2(side*17,-48),p+Vector2(side*22,-61),Color('e8dec9'),3)
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-26,10),p+Vector2(-23,-8),p+Vector2(-12,-20),p+Vector2(12,-20),p+Vector2(26,-5),p+Vector2(20,17),p+Vector2(-17,18)]),c.darkened(0.2))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-14,-17),p+Vector2(1,-28),p+Vector2(17,-18),p+Vector2(9,-2),p+Vector2(-10,-2)]),c.lightened(0.15))
-			draw_rect(Rect2(p+Vector2(4,-22),Vector2(5,4)),Color('fff0bf'))
+				PixelStyle32.line(self,p+Vector2(side*12,4),p+Vector2(side*15,30+stride*side),c.darkened(0.38),7)
+				PixelStyle32.line(self,p+Vector2(side*5,-20),p+Vector2(side*14,-43),c.lightened(0.12),10)
+				PixelStyle32.line(self,p+Vector2(side*11,-39),p+Vector2(side*20,-53),Color('dfd4bd'),4)
+				PixelStyle32.line(self,p+Vector2(side*17,-48),p+Vector2(side*22,-61),Color('e8dec9'),3)
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-26,10),p+Vector2(-23,-8),p+Vector2(-12,-20),p+Vector2(12,-20),p+Vector2(26,-5),p+Vector2(20,17),p+Vector2(-17,18)]),c.darkened(0.2))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-14,-17),p+Vector2(1,-28),p+Vector2(17,-18),p+Vector2(9,-2),p+Vector2(-10,-2)]),c.lightened(0.15))
+			PixelStyle32.rect(self,Rect2(p+Vector2(4,-22),Vector2(5,4)),Color('fff0bf'))
 		18: # Irrlicht: leuchtender Kern in drei flatternden Schleiern.
 			for side in [-1.0,1.0]:
-				draw_colored_polygon(PackedVector2Array([p+Vector2(0,-20),p+Vector2(side*28,-34+stride),p+Vector2(side*21,-4),p+Vector2(side*34,15+stride),p+Vector2(0,24)]),Color(c.lightened(0.15),0.72))
-				draw_line(p+Vector2(side*9,12),p+Vector2(side*20,31+stride),Color(c.lightened(0.28),0.82),5)
-			draw_circle(p+Vector2(0,-9),19,c.darkened(0.18))
-			draw_circle(p+Vector2(0,-11),14,c.lightened(0.2))
-			draw_circle(p+Vector2(0,-11),8,Color('f4ffff'))
-			draw_circle(p+Vector2(0,-11),4,Color('70a9b1'))
+				PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(0,-20),p+Vector2(side*28,-34+stride),p+Vector2(side*21,-4),p+Vector2(side*34,15+stride),p+Vector2(0,24)]),Color(c.lightened(0.15),0.72))
+				PixelStyle32.line(self,p+Vector2(side*9,12),p+Vector2(side*20,31+stride),Color(c.lightened(0.28),0.82),5)
+			PixelStyle32.circle(self,p+Vector2(0,-9),19,c.darkened(0.18))
+			PixelStyle32.circle(self,p+Vector2(0,-11),14,c.lightened(0.2))
+			PixelStyle32.circle(self,p+Vector2(0,-11),8,Color('f4ffff'))
+			PixelStyle32.circle(self,p+Vector2(0,-11),4,Color('70a9b1'))
 		19: # Harzbestie: gepanzerter Waldkäfer mit bernsteinfarbenem Rücken.
 			for side in [-1.0,1.0]:
-				for leg in 3: draw_line(p+Vector2(side*13,-5+leg*9),p+Vector2(side*(29+leg*2),4+leg*10+stride*side),c.darkened(0.37),5)
-				draw_line(p+Vector2(side*8,-17),p+Vector2(side*19,-34),c.darkened(0.24),5)
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-22,9),p+Vector2(-20,-14),p+Vector2(-11,-27),p+Vector2(11,-27),p+Vector2(22,-13),p+Vector2(20,11),p+Vector2(0,21)]),c.darkened(0.32))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-16,-13),p+Vector2(-9,-29),p+Vector2(8,-31),p+Vector2(18,-13),p+Vector2(11,5),p+Vector2(-11,5)]),c)
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-9,-17),p+Vector2(-5,-26),p+Vector2(1,-27),p+Vector2(5,-12),p+Vector2(0,-4)]),Color('f0d17c'))
-			draw_line(p+Vector2(-14,-11),p+Vector2(12,-10),Color('fff0b0'),3)
-			draw_rect(Rect2(p+Vector2(-9,2),Vector2(5,4)),Color('ffe7a0')); draw_rect(Rect2(p+Vector2(6,2),Vector2(5,4)),Color('ffe7a0'))
+				for leg in 3: PixelStyle32.line(self,p+Vector2(side*13,-5+leg*9),p+Vector2(side*(29+leg*2),4+leg*10+stride*side),c.darkened(0.37),5)
+				PixelStyle32.line(self,p+Vector2(side*8,-17),p+Vector2(side*19,-34),c.darkened(0.24),5)
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-22,9),p+Vector2(-20,-14),p+Vector2(-11,-27),p+Vector2(11,-27),p+Vector2(22,-13),p+Vector2(20,11),p+Vector2(0,21)]),c.darkened(0.32))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-16,-13),p+Vector2(-9,-29),p+Vector2(8,-31),p+Vector2(18,-13),p+Vector2(11,5),p+Vector2(-11,5)]),c)
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-9,-17),p+Vector2(-5,-26),p+Vector2(1,-27),p+Vector2(5,-12),p+Vector2(0,-4)]),Color('f0d17c'))
+			PixelStyle32.line(self,p+Vector2(-14,-11),p+Vector2(12,-10),Color('fff0b0'),3)
+			PixelStyle32.rect(self,Rect2(p+Vector2(-9,2),Vector2(5,4)),Color('ffe7a0')); PixelStyle32.rect(self,Rect2(p+Vector2(6,2),Vector2(5,4)),Color('ffe7a0'))
 		20: # Wurzelhexe: knorrige Wurzelrobe, Blattkapuze und Runenstab.
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-29,25),p+Vector2(-20,-19),p+Vector2(-12,-36),p+Vector2(13,-36),p+Vector2(23,-16),p+Vector2(30,25),p+Vector2(15,18),p+Vector2(5,29),p+Vector2(-7,18),p+Vector2(-20,28)]),Color('515c43'))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-22,-22),p+Vector2(-16,-43),p+Vector2(0,-54),p+Vector2(17,-43),p+Vector2(23,-22)]),c.darkened(0.18))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-15,-22),p+Vector2(0,-43),p+Vector2(15,-22)]),c.lightened(0.13))
-			draw_rect(Rect2(p+Vector2(-11,-19),Vector2(7,6)),Color('dff1b1')); draw_rect(Rect2(p+Vector2(5,-19),Vector2(7,6)),Color('dff1b1'))
-			draw_line(p+Vector2(26,20),p+Vector2(36,-41),Color('674c37'),7); draw_line(p+Vector2(30,-33),p+Vector2(43,-47),Color('b0a16b'),4)
-			draw_circle(p+Vector2(37,-46),5,Color('b7e38c'))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-29,25),p+Vector2(-20,-19),p+Vector2(-12,-36),p+Vector2(13,-36),p+Vector2(23,-16),p+Vector2(30,25),p+Vector2(15,18),p+Vector2(5,29),p+Vector2(-7,18),p+Vector2(-20,28)]),Color('515c43'))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-22,-22),p+Vector2(-16,-43),p+Vector2(0,-54),p+Vector2(17,-43),p+Vector2(23,-22)]),c.darkened(0.18))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-15,-22),p+Vector2(0,-43),p+Vector2(15,-22)]),c.lightened(0.13))
+			PixelStyle32.rect(self,Rect2(p+Vector2(-11,-19),Vector2(7,6)),Color('dff1b1')); PixelStyle32.rect(self,Rect2(p+Vector2(5,-19),Vector2(7,6)),Color('dff1b1'))
+			PixelStyle32.line(self,p+Vector2(26,20),p+Vector2(36,-41),Color('674c37'),7); PixelStyle32.line(self,p+Vector2(30,-33),p+Vector2(43,-47),Color('b0a16b'),4)
+			PixelStyle32.circle(self,p+Vector2(37,-46),5,Color('b7e38c'))
 		21: # Quellkriecher: breiter Amphibienkörper, Sprungbeine und Wasserdrüsen.
 			for side in [-1.0,1.0]:
-				draw_line(p+Vector2(side*13,3),p+Vector2(side*30,18+stride*side),c.darkened(0.28),9)
-				draw_line(p+Vector2(side*25,17+stride*side),p+Vector2(side*33,29+stride*side),c,5)
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-27,-5),p+Vector2(-22,-21),p+Vector2(-12,-29),p+Vector2(9,-29),p+Vector2(23,-19),p+Vector2(28,-4),p+Vector2(20,13),p+Vector2(0,20),p+Vector2(-20,13)]),c.darkened(0.24))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-24,-6),p+Vector2(-18,-21),p+Vector2(-9,-25),p+Vector2(8,-25),p+Vector2(20,-17),p+Vector2(24,-4),p+Vector2(17,10),p+Vector2(0,16),p+Vector2(-18,10)]),c)
+				PixelStyle32.line(self,p+Vector2(side*13,3),p+Vector2(side*30,18+stride*side),c.darkened(0.28),9)
+				PixelStyle32.line(self,p+Vector2(side*25,17+stride*side),p+Vector2(side*33,29+stride*side),c,5)
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-27,-5),p+Vector2(-22,-21),p+Vector2(-12,-29),p+Vector2(9,-29),p+Vector2(23,-19),p+Vector2(28,-4),p+Vector2(20,13),p+Vector2(0,20),p+Vector2(-20,13)]),c.darkened(0.24))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-24,-6),p+Vector2(-18,-21),p+Vector2(-9,-25),p+Vector2(8,-25),p+Vector2(20,-17),p+Vector2(24,-4),p+Vector2(17,10),p+Vector2(0,16),p+Vector2(-18,10)]),c)
 			for side in [-1.0,1.0]:
-				draw_circle(p+Vector2(side*13,-25),8,c.lightened(0.2)); draw_circle(p+Vector2(side*13,-26),3,Color('f6efc6'))
-			draw_line(p+Vector2(-15,-6),p+Vector2(14,-5),Color('c7f2df'),3)
+				PixelStyle32.circle(self,p+Vector2(side*13,-25),8,c.lightened(0.2)); PixelStyle32.circle(self,p+Vector2(side*13,-26),3,Color('f6efc6'))
+			PixelStyle32.line(self,p+Vector2(-15,-6),p+Vector2(14,-5),Color('c7f2df'),3)
 		22: # Perlengeist: schwebende Muschelschichten um eine helle Perle.
-			draw_arc(p+Vector2(0,2),27,0.1,PI-0.1,24,c.darkened(0.25),8)
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-27,-1),p+Vector2(-21,-24),p+Vector2(-9,-36),p+Vector2(0,-27),p+Vector2(9,-36),p+Vector2(22,-22),p+Vector2(28,-1),p+Vector2(16,20),p+Vector2(0,28),p+Vector2(-17,20)]),Color(c,0.83))
+			PixelStyle32.arc(self,p+Vector2(0,2),27,0.1,PI-0.1,24,c.darkened(0.25),8)
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-27,-1),p+Vector2(-21,-24),p+Vector2(-9,-36),p+Vector2(0,-27),p+Vector2(9,-36),p+Vector2(22,-22),p+Vector2(28,-1),p+Vector2(16,20),p+Vector2(0,28),p+Vector2(-17,20)]),Color(c,0.83))
 			for side in [-1.0,1.0]:
-				draw_colored_polygon(PackedVector2Array([p+Vector2(0,-5),p+Vector2(side*21,-19),p+Vector2(side*17,9)]),c.lightened(0.3))
-			draw_circle(p+Vector2(0,-4),10,Color('d3eff0')); draw_circle(p+Vector2(-3,-7),4,Color('fffef2'))
+				PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(0,-5),p+Vector2(side*21,-19),p+Vector2(side*17,9)]),c.lightened(0.3))
+			PixelStyle32.circle(self,p+Vector2(0,-4),10,Color('d3eff0')); PixelStyle32.circle(self,p+Vector2(-3,-7),4,Color('fffef2'))
 		23: # Gratgreif: gefiederte Flügel, Hakenschnabel und kräftige Läufe.
 			for side in [-1.0,1.0]:
-				draw_colored_polygon(PackedVector2Array([p+Vector2(side*9,-21),p+Vector2(side*38,-44+stride),p+Vector2(side*34,-11),p+Vector2(side*23,4),p+Vector2(side*13,1)]),c.darkened(0.16))
-				for feather in range(3): draw_line(p+Vector2(side*(17+feather*5),-25-feather*3),p+Vector2(side*(38-feather*3),-37+feather*9+stride),Color('d8d2df'),4)
-				draw_line(p+Vector2(side*12,10),p+Vector2(side*15,30+stride*side),c.darkened(0.38),7)
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-17,13),p+Vector2(-24,-7),p+Vector2(-12,-30),p+Vector2(12,-29),p+Vector2(24,-7),p+Vector2(18,14)]),c)
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-9,-23),p+Vector2(1,-39),p+Vector2(15,-25),p+Vector2(8,-8)]),Color('d6c4a0'))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(15,-20),p+Vector2(34,-12),p+Vector2(16,-8)]),Color('e9c36f'))
+				PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(side*9,-21),p+Vector2(side*38,-44+stride),p+Vector2(side*34,-11),p+Vector2(side*23,4),p+Vector2(side*13,1)]),c.darkened(0.16))
+				for feather in range(3): PixelStyle32.line(self,p+Vector2(side*(17+feather*5),-25-feather*3),p+Vector2(side*(38-feather*3),-37+feather*9+stride),Color('d8d2df'),4)
+				PixelStyle32.line(self,p+Vector2(side*12,10),p+Vector2(side*15,30+stride*side),c.darkened(0.38),7)
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-17,13),p+Vector2(-24,-7),p+Vector2(-12,-30),p+Vector2(12,-29),p+Vector2(24,-7),p+Vector2(18,14)]),c)
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-9,-23),p+Vector2(1,-39),p+Vector2(15,-25),p+Vector2(8,-8)]),Color('d6c4a0'))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(15,-20),p+Vector2(34,-12),p+Vector2(16,-8)]),Color('e9c36f'))
 		24: # Schattenritter: geschlossene Plattenrüstung, Visier, Schild und Runenklinge.
-			for side in [-1.0,1.0]: draw_rect(Rect2(p+Vector2(side*14-7,18+stride*side*0.3),Vector2(14,20)),Color('393c4f'))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-25,16),p+Vector2(-22,-22),p+Vector2(0,-35),p+Vector2(23,-22),p+Vector2(25,16),p+Vector2(0,28)]),c.darkened(0.28))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-17,-22),p+Vector2(0,-37),p+Vector2(17,-22),p+Vector2(13,-2),p+Vector2(-13,-2)]),Color('5c5b75'))
-			draw_rect(Rect2(p+Vector2(-12,-20),Vector2(24,6)),Color('292b3b')); draw_rect(Rect2(p+Vector2(-8,-19),Vector2(6,3)),Color('c5b8ff')); draw_rect(Rect2(p+Vector2(3,-19),Vector2(6,3)),Color('c5b8ff'))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-25,-9),p+Vector2(-40,-17),p+Vector2(-38,18),p+Vector2(-22,22)]),Color('77748f'))
-			draw_line(p+Vector2(30,17),p+Vector2(44,-42),Color('d9e0e8'),7); draw_line(p+Vector2(31,4),p+Vector2(42,0),Color('c7b4ed'),3)
+			for side in [-1.0,1.0]: PixelStyle32.rect(self,Rect2(p+Vector2(side*14-7,18+stride*side*0.3),Vector2(14,20)),Color('393c4f'))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-25,16),p+Vector2(-22,-22),p+Vector2(0,-35),p+Vector2(23,-22),p+Vector2(25,16),p+Vector2(0,28)]),c.darkened(0.28))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-17,-22),p+Vector2(0,-37),p+Vector2(17,-22),p+Vector2(13,-2),p+Vector2(-13,-2)]),Color('5c5b75'))
+			PixelStyle32.rect(self,Rect2(p+Vector2(-12,-20),Vector2(24,6)),Color('292b3b')); PixelStyle32.rect(self,Rect2(p+Vector2(-8,-19),Vector2(6,3)),Color('c5b8ff')); PixelStyle32.rect(self,Rect2(p+Vector2(3,-19),Vector2(6,3)),Color('c5b8ff'))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-25,-9),p+Vector2(-40,-17),p+Vector2(-38,18),p+Vector2(-22,22)]),Color('77748f'))
+			PixelStyle32.line(self,p+Vector2(30,17),p+Vector2(44,-42),Color('d9e0e8'),7); PixelStyle32.line(self,p+Vector2(31,4),p+Vector2(42,0),Color('c7b4ed'),3)
 		25: # Himmelsfalter: vier geschichtete Flügel mit Augenzeichnung und Körperpelz.
 			for side in [-1.0,1.0]:
-				draw_colored_polygon(PackedVector2Array([p+Vector2(side*3,-13),p+Vector2(side*31,-42+stride),p+Vector2(side*35,-8),p+Vector2(side*15,3)]),c.darkened(0.15))
-				draw_colored_polygon(PackedVector2Array([p+Vector2(side*4,0),p+Vector2(side*30,5),p+Vector2(side*24,27),p+Vector2(side*7,16)]),c.lightened(0.16))
-				draw_circle(p+Vector2(side*21,-19),6,Color('75618d')); draw_circle(p+Vector2(side*21,-19),3,Color('f5e7bf'))
-				draw_line(p+Vector2(side*4,-24),p+Vector2(side*13,-43),Color('d7c6e3'),3)
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-7,-20),p+Vector2(0,-29),p+Vector2(7,-20),p+Vector2(6,19),p+Vector2(0,27),p+Vector2(-6,19)]),Color('5a4c6d'))
-			draw_line(p+Vector2(-3,-21),p+Vector2(-13,-37),Color('b8a1d4'),2); draw_line(p+Vector2(3,-21),p+Vector2(13,-37),Color('b8a1d4'),2)
+				PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(side*3,-13),p+Vector2(side*31,-42+stride),p+Vector2(side*35,-8),p+Vector2(side*15,3)]),c.darkened(0.15))
+				PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(side*4,0),p+Vector2(side*30,5),p+Vector2(side*24,27),p+Vector2(side*7,16)]),c.lightened(0.16))
+				PixelStyle32.circle(self,p+Vector2(side*21,-19),6,Color('75618d')); PixelStyle32.circle(self,p+Vector2(side*21,-19),3,Color('f5e7bf'))
+				PixelStyle32.line(self,p+Vector2(side*4,-24),p+Vector2(side*13,-43),Color('d7c6e3'),3)
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-7,-20),p+Vector2(0,-29),p+Vector2(7,-20),p+Vector2(6,19),p+Vector2(0,27),p+Vector2(-6,19)]),Color('5a4c6d'))
+			PixelStyle32.line(self,p+Vector2(-3,-21),p+Vector2(-13,-37),Color('b8a1d4'),2); PixelStyle32.line(self,p+Vector2(3,-21),p+Vector2(13,-37),Color('b8a1d4'),2)
 		26: # Sternenwächterin: Elfenbeinrüstung, goldene Krone und leuchtender Sternkern.
 			for side in [-1.0,1.0]:
-				draw_colored_polygon(PackedVector2Array([p+Vector2(side*18,-24),p+Vector2(side*35,-37),p+Vector2(side*39,-1),p+Vector2(side*23,10)]),Color('b6a97e'))
-				draw_rect(Rect2(p+Vector2(side*14-6,17+stride*side*0.25),Vector2(12,19)),Color('75674e'))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-28,17),p+Vector2(-23,-26),p+Vector2(-11,-36),p+Vector2(11,-36),p+Vector2(23,-26),p+Vector2(28,17),p+Vector2(0,29)]),c.darkened(0.18))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-17,-19),p+Vector2(0,-31),p+Vector2(17,-19),p+Vector2(14,8),p+Vector2(0,20),p+Vector2(-14,8)]),Color('f1e8c5'))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(0,-15),p+Vector2(6,-4),p+Vector2(0,8),p+Vector2(-6,-4)]),Color('ffd777'))
-			draw_colored_polygon(PackedVector2Array([p+Vector2(-13,-35),p+Vector2(-15,-50),p+Vector2(-3,-41),p+Vector2(0,-58),p+Vector2(5,-41),p+Vector2(17,-50),p+Vector2(13,-35)]),Color('c7a762'))
+				PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(side*18,-24),p+Vector2(side*35,-37),p+Vector2(side*39,-1),p+Vector2(side*23,10)]),Color('b6a97e'))
+				PixelStyle32.rect(self,Rect2(p+Vector2(side*14-6,17+stride*side*0.25),Vector2(12,19)),Color('75674e'))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-28,17),p+Vector2(-23,-26),p+Vector2(-11,-36),p+Vector2(11,-36),p+Vector2(23,-26),p+Vector2(28,17),p+Vector2(0,29)]),c.darkened(0.18))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-17,-19),p+Vector2(0,-31),p+Vector2(17,-19),p+Vector2(14,8),p+Vector2(0,20),p+Vector2(-14,8)]),Color('f1e8c5'))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(0,-15),p+Vector2(6,-4),p+Vector2(0,8),p+Vector2(-6,-4)]),Color('ffd777'))
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-13,-35),p+Vector2(-15,-50),p+Vector2(-3,-41),p+Vector2(0,-58),p+Vector2(5,-41),p+Vector2(17,-50),p+Vector2(13,-35)]),Color('c7a762'))
 		_:
 			if type in [17, 19, 21, 23, 25]:
 				for side in [-1.0, 1.0]:
-					draw_line(p + Vector2(side * 13, 14), p + Vector2(side * 23, 29 + stride * side), c.darkened(0.4), 7)
-					draw_line(p + Vector2(side * 16, -26), p + Vector2(side * 30, -49), c.lightened(0.15), 5)
-				draw_colored_polygon(PackedVector2Array([p + Vector2(-27,4),p + Vector2(-20,-27),p + Vector2(0,-38),p + Vector2(22,-26),p + Vector2(28,6),p + Vector2(0,25)]), c)
+					PixelStyle32.line(self,p + Vector2(side * 13, 14), p + Vector2(side * 23, 29 + stride * side), c.darkened(0.4), 7)
+					PixelStyle32.line(self,p + Vector2(side * 16, -26), p + Vector2(side * 30, -49), c.lightened(0.15), 5)
+				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-27,4),p + Vector2(-20,-27),p + Vector2(0,-38),p + Vector2(22,-26),p + Vector2(28,6),p + Vector2(0,25)]), c)
 			else:
-				draw_colored_polygon(PackedVector2Array([p + Vector2(-23,18),p + Vector2(-26,-13),p + Vector2(-9,-36),p + Vector2(11,-36),p + Vector2(27,-13),p + Vector2(22,24),p + Vector2(0,13)]), Color(c,0.87))
+				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-23,18),p + Vector2(-26,-13),p + Vector2(-9,-36),p + Vector2(11,-36),p + Vector2(27,-13),p + Vector2(22,24),p + Vector2(0,13)]), Color(c,0.87))
 				for side in [-1.0, 1.0]:
-					draw_colored_polygon(PackedVector2Array([p + Vector2(side * 25,-14),p + Vector2(side * 38,-22 + stride),p + Vector2(side * 31,8)]), c.lightened(0.25))
-			for side in [-1.0, 1.0]: draw_circle(p + Vector2(side * 9,-13), 4, Color('fff4d0'))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(0,-35),p + Vector2(6,-25),p + Vector2(0,-16),p + Vector2(-6,-25)]), c.lightened(0.5))
+					PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(side * 25,-14),p + Vector2(side * 38,-22 + stride),p + Vector2(side * 31,8)]), c.lightened(0.25))
+			for side in [-1.0, 1.0]: PixelStyle32.circle(self,p + Vector2(side * 9,-13), 4, Color('fff4d0'))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(0,-35),p + Vector2(6,-25),p + Vector2(0,-16),p + Vector2(-6,-25)]), c.lightened(0.5))
 
 func draw_crab_model(p: Vector2, c: Color, stride: float, crystal: bool) -> void:
 	for side in [-1.0, 1.0]:
 		for leg in 3:
-			draw_line(p + Vector2(side * 17, -8 + leg * 10), p + Vector2(side * (30 + leg * 5), 6 + leg * 9 + stride * side), c.darkened(0.26), 5)
-		draw_line(p + Vector2(side * 22, -14), p + Vector2(side * 38, -27), c.darkened(0.22), 7)
-		draw_circle(p + Vector2(side * 39, -28), 10, c.lightened(0.12))
-	draw_circle(p, 23, c.darkened(0.28))
-	draw_circle(p + Vector2(0, -5), 20, c)
+			PixelStyle32.line(self,p + Vector2(side * 17, -8 + leg * 10), p + Vector2(side * (30 + leg * 5), 6 + leg * 9 + stride * side), c.darkened(0.26), 5)
+		PixelStyle32.line(self,p + Vector2(side * 22, -14), p + Vector2(side * 38, -27), c.darkened(0.22), 7)
+		PixelStyle32.circle(self,p + Vector2(side * 39, -28), 10, c.lightened(0.12))
+	PixelStyle32.circle(self,p, 23, c.darkened(0.28))
+	PixelStyle32.circle(self,p + Vector2(0, -5), 20, c)
 	if crystal:
-		draw_colored_polygon(PackedVector2Array([p + Vector2(-15, -12), p + Vector2(0, -33), p + Vector2(16, -11), p + Vector2(0, 6)]), Color("d2f7ff"))
+		PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-15, -12), p + Vector2(0, -33), p + Vector2(16, -11), p + Vector2(0, 6)]), Color("d2f7ff"))
 	else:
-		draw_rect(Rect2(p + Vector2(-14, -16), Vector2(28, 6)), Color("f7d5a1"))
-	draw_rect(Rect2(p + Vector2(-10, -9), Vector2(5, 5)), INK)
-	draw_rect(Rect2(p + Vector2(6, -9), Vector2(5, 5)), INK)
+		PixelStyle32.rect(self,Rect2(p + Vector2(-14, -16), Vector2(28, 6)), Color("f7d5a1"))
+	PixelStyle32.rect(self,Rect2(p + Vector2(-10, -9), Vector2(5, 5)), INK)
+	PixelStyle32.rect(self,Rect2(p + Vector2(6, -9), Vector2(5, 5)), INK)
 
 func draw_boss_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 	var aura := Color("e9c592") if type == 12 else (Color("a9eefa") if type == 13 else Color("f4a16f"))
-	draw_arc(p, 58, 0, TAU, 32, Color(aura, 0.6), 5)
+	PixelStyle32.arc(self,p, 58, 0, TAU, 32, Color(aura, 0.6), 5)
 	match type:
 		12: # Turmwächter: Ritter mit Helm, Schild und Zweihänder.
 			for side in [-1.0, 1.0]:
-				draw_rect(Rect2(p + Vector2(side * 20 - 10, 20 + stride * side * 0.3), Vector2(20, 21)), Color("59666a"))
-			draw_rect(Rect2(p + Vector2(-35, -39), Vector2(70, 64)), c.darkened(0.25))
-			draw_rect(Rect2(p + Vector2(-24, -37), Vector2(48, 54)), c)
-			draw_rect(Rect2(p + Vector2(-23, -65), Vector2(46, 31)), Color("89989b"))
-			draw_rect(Rect2(p + Vector2(-28, -70), Vector2(56, 12)), Color("dbc98f"))
-			draw_rect(Rect2(p + Vector2(-19, -49), Vector2(38, 7)), Color("233b43"))
-			draw_rect(Rect2(p + Vector2(-10, -48), Vector2(21, 5)), aura)
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-49, -35), p + Vector2(-26, -42), p + Vector2(-20, 12), p + Vector2(-43, 27)]), Color("6d8182"))
-			draw_line(p + Vector2(42, 18), p + Vector2(59, -84), Color("eef0df"), 11)
-			draw_line(p + Vector2(30, -7), p + Vector2(59, -4), Color("eac77b"), 8)
+				PixelStyle32.rect(self,Rect2(p + Vector2(side * 20 - 10, 20 + stride * side * 0.3), Vector2(20, 21)), Color("59666a"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-35, -39), Vector2(70, 64)), c.darkened(0.25))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-24, -37), Vector2(48, 54)), c)
+			PixelStyle32.rect(self,Rect2(p + Vector2(-23, -65), Vector2(46, 31)), Color("89989b"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-28, -70), Vector2(56, 12)), Color("dbc98f"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-19, -49), Vector2(38, 7)), Color("233b43"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-10, -48), Vector2(21, 5)), aura)
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-49, -35), p + Vector2(-26, -42), p + Vector2(-20, 12), p + Vector2(-43, 27)]), Color("6d8182"))
+			PixelStyle32.line(self,p + Vector2(42, 18), p + Vector2(59, -84), Color("eef0df"), 11)
+			PixelStyle32.line(self,p + Vector2(30, -7), p + Vector2(59, -4), Color("eac77b"), 8)
 		13: # Kristallhüter: großer facettierter Körper mit schwebenden Splittern.
 			for side in [-1.0, 1.0]:
 				var shard := p + Vector2(side * 55, -35 + stride * side)
-				draw_colored_polygon(PackedVector2Array([shard + Vector2(0, -33), shard + Vector2(20, 0), shard + Vector2(0, 33), shard + Vector2(-20, 0)]), Color("d9faff"))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -81), p + Vector2(38, -37), p + Vector2(43, 13), p + Vector2(0, 39), p + Vector2(-43, 13), p + Vector2(-38, -37)]), c)
-			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -69), p + Vector2(22, -21), p + Vector2(0, 23), p + Vector2(-22, -21)]), Color("d5faff"))
-			draw_rect(Rect2(p + Vector2(-22, -36), Vector2(9, 8)), Color("365f78"))
-			draw_rect(Rect2(p + Vector2(13, -36), Vector2(9, 8)), Color("365f78"))
+				PixelStyle32.polygon(self,PackedVector2Array([shard + Vector2(0, -33), shard + Vector2(20, 0), shard + Vector2(0, 33), shard + Vector2(-20, 0)]), Color("d9faff"))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(0, -81), p + Vector2(38, -37), p + Vector2(43, 13), p + Vector2(0, 39), p + Vector2(-43, 13), p + Vector2(-38, -37)]), c)
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(0, -69), p + Vector2(22, -21), p + Vector2(0, 23), p + Vector2(-22, -21)]), Color("d5faff"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-22, -36), Vector2(9, 8)), Color("365f78"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(13, -36), Vector2(9, 8)), Color("365f78"))
 		14: # Aschefürst: hornbewehrte Rüstung, Feuerkrone und Lavaadern.
 			for side in [-1.0, 1.0]:
-				draw_rect(Rect2(p + Vector2(side * 19 - 10, 13 + stride * side * 0.2), Vector2(20, 30)), Color("564047"))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-43, 23), p + Vector2(-34, -42), p + Vector2(0, -60), p + Vector2(34, -42), p + Vector2(43, 23)]), Color("6c4449"))
-			draw_rect(Rect2(p + Vector2(-27, -33), Vector2(54, 51)), c)
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-27, -55), p + Vector2(-38, -88), p + Vector2(-10, -67), p + Vector2(10, -67), p + Vector2(38, -88), p + Vector2(27, -55)]), Color("e2a074"))
-			draw_rect(Rect2(p + Vector2(-16, -51), Vector2(32, 8)), Color("2f333d"))
-			draw_rect(Rect2(p + Vector2(-13, -50), Vector2(9, 6)), Color("ffdc82"))
-			draw_rect(Rect2(p + Vector2(6, -50), Vector2(9, 6)), Color("ffdc82"))
-			draw_line(p + Vector2(-20, -10), p + Vector2(7, 21), Color("ffc06e"), 6)
-			draw_line(p + Vector2(7, 21), p + Vector2(23, -8), Color("ffc06e"), 5)
+				PixelStyle32.rect(self,Rect2(p + Vector2(side * 19 - 10, 13 + stride * side * 0.2), Vector2(20, 30)), Color("564047"))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-43, 23), p + Vector2(-34, -42), p + Vector2(0, -60), p + Vector2(34, -42), p + Vector2(43, 23)]), Color("6c4449"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-27, -33), Vector2(54, 51)), c)
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(-27, -55), p + Vector2(-38, -88), p + Vector2(-10, -67), p + Vector2(10, -67), p + Vector2(38, -88), p + Vector2(27, -55)]), Color("e2a074"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-16, -51), Vector2(32, 8)), Color("2f333d"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(-13, -50), Vector2(9, 6)), Color("ffdc82"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(6, -50), Vector2(9, 6)), Color("ffdc82"))
+			PixelStyle32.line(self,p + Vector2(-20, -10), p + Vector2(7, 21), Color("ffc06e"), 6)
+			PixelStyle32.line(self,p + Vector2(7, 21), p + Vector2(23, -8), Color("ffc06e"), 5)
 
 func draw_shadow(p: Vector2) -> void:
 	for band in 3:
@@ -6417,14 +6483,11 @@ func equipped_weapon_design() -> int:
 func draw_item_icon(origin: Vector2, kind: String, accent: Color, scale_factor: float = 1.0, stage: int = 0, design: int = 0) -> void:
 	var p := origin
 	var s := scale_factor
+	if kind in ["armor","essence"]:
+		ItemStyle32.paint(self,origin,kind,accent,scale_factor,design)
+		return
 	if kind == "food":
 		FoodSystem.icon(self,origin,design,scale_factor)
-		return
-	if kind in ["sword", "staff", "bow"] and weapon_sprites != null:
-		var family := ["sword", "staff", "bow"].find(kind)
-		var src := Rect2(Vector2(clampi(design,0,11) * 32, family * 32), Vector2(32,32))
-		draw_texture_rect_region(weapon_sprites, Rect2(p, Vector2(32,32) * s), src)
-		if stage >= 3: draw_rect(Rect2(p + Vector2(25,3)*s, Vector2(4,4)*s), accent)
 		return
 	match kind:
 		"sword":
@@ -6432,109 +6495,109 @@ func draw_item_icon(origin: Vector2, kind: String, accent: Color, scale_factor: 
 			var tip := p + Vector2(30 + (3 if design == 1 else 0), 1 + (4 if design == 1 else 0)) * s
 			var base := p + Vector2(13, 19) * s
 			var width := float(3 + mini(stage, 3) + (3 if design == 2 else 0))
-			draw_colored_polygon(PackedVector2Array([base + Vector2(-width, -width) * s, p + Vector2(24, 3) * s, tip, p + Vector2(29, 9) * s, base + Vector2(width, width) * s]), Color("30283d"))
-			draw_colored_polygon(PackedVector2Array([base + Vector2(-2, -2) * s, p + Vector2(25, 4) * s, tip - Vector2(2, 0) * s, base + Vector2(3, 2) * s]), accent if stage >= 3 else Color("cedee9"))
-			if design == 1: draw_colored_polygon(PackedVector2Array([tip, p + Vector2(20, 4) * s, p + Vector2(18, 12) * s, p + Vector2(27, 9) * s]), accent)
+			PixelStyle32.polygon(self,PackedVector2Array([base + Vector2(-width, -width) * s, p + Vector2(24, 3) * s, tip, p + Vector2(29, 9) * s, base + Vector2(width, width) * s]), Color("30283d"))
+			PixelStyle32.polygon(self,PackedVector2Array([base + Vector2(-2, -2) * s, p + Vector2(25, 4) * s, tip - Vector2(2, 0) * s, base + Vector2(3, 2) * s]), accent if stage >= 3 else Color("cedee9"))
+			if design == 1: PixelStyle32.polygon(self,PackedVector2Array([tip, p + Vector2(20, 4) * s, p + Vector2(18, 12) * s, p + Vector2(27, 9) * s]), accent)
 			elif design == 2:
-				draw_colored_polygon(PackedVector2Array([base, p + Vector2(18, 5) * s, p + Vector2(29, 1) * s, p + Vector2(26, 12) * s]), accent)
+				PixelStyle32.polygon(self,PackedVector2Array([base, p + Vector2(18, 5) * s, p + Vector2(29, 1) * s, p + Vector2(26, 12) * s]), accent)
 			elif design == 3:
-				draw_line(p + Vector2(20, 6) * s, tip, Color("314452"), 3 * s)
-				draw_rect(Rect2(p + Vector2(24, 1) * s, Vector2(3, 4) * s), Color("314452"))
-			draw_line(base + Vector2(1, -1) * s, p + Vector2(27, 5) * s, Color("f5f8f0"), 2 * s)
-			draw_line(p + Vector2(7, 16) * s, p + Vector2(17, 26) * s, Color("352a42"), 5 * s)
-			draw_line(p + Vector2(7, 16) * s, p + Vector2(17, 26) * s, Color("dcb45e") if stage >= 1 else Color("aa8559"), 3 * s)
-			draw_line(p + Vector2(3, 28) * s, base, Color("342b3e"), 6 * s)
-			draw_line(p + Vector2(3, 28) * s, base, Color("694857"), 3 * s)
-			draw_circle(p + Vector2(3, 28) * s, 3 * s, Color("d2a253"))
+				PixelStyle32.line(self,p + Vector2(20, 6) * s, tip, Color("314452"), 3 * s)
+				PixelStyle32.rect(self,Rect2(p + Vector2(24, 1) * s, Vector2(3, 4) * s), Color("314452"))
+			PixelStyle32.line(self,base + Vector2(1, -1) * s, p + Vector2(27, 5) * s, Color("f5f8f0"), 2 * s)
+			PixelStyle32.line(self,p + Vector2(7, 16) * s, p + Vector2(17, 26) * s, Color("352a42"), 5 * s)
+			PixelStyle32.line(self,p + Vector2(7, 16) * s, p + Vector2(17, 26) * s, Color("dcb45e") if stage >= 1 else Color("aa8559"), 3 * s)
+			PixelStyle32.line(self,p + Vector2(3, 28) * s, base, Color("342b3e"), 6 * s)
+			PixelStyle32.line(self,p + Vector2(3, 28) * s, base, Color("694857"), 3 * s)
+			PixelStyle32.circle(self,p + Vector2(3, 28) * s, 3 * s, Color("d2a253"))
 			if stage >= 2:
-				draw_circle(base, 2.5 * s, accent)
-			if design == 1: draw_line(p + Vector2(5, 17) * s, p + Vector2(18, 25) * s, Color("e6c37a"), 3 * s)
+				PixelStyle32.circle(self,base, 2.5 * s, accent)
+			if design == 1: PixelStyle32.line(self,p + Vector2(5, 17) * s, p + Vector2(18, 25) * s, Color("e6c37a"), 3 * s)
 			elif design == 2:
-				draw_line(p + Vector2(8, 13) * s, p + Vector2(22, 23) * s, Color("b9a8a1"), 4 * s)
-			elif design == 3: draw_circle(base, 4 * s, accent)
+				PixelStyle32.line(self,p + Vector2(8, 13) * s, p + Vector2(22, 23) * s, Color("b9a8a1"), 4 * s)
+			elif design == 3: PixelStyle32.circle(self,base, 4 * s, accent)
 			if stage >= 4:
-				draw_line(p + Vector2(15, 11) * s, p + Vector2(25, 2) * s, Color("ffe89b"), 2 * s)
+				PixelStyle32.line(self,p + Vector2(15, 11) * s, p + Vector2(25, 2) * s, Color("ffe89b"), 2 * s)
 		"staff":
-			draw_line(p + Vector2(8, 32) * s, p + Vector2(20, 8) * s, Color("352b41"), 7 * s)
-			draw_line(p + Vector2(8, 32) * s, p + Vector2(20, 8) * s, Color("8d6048") if stage < 2 else Color("bca47a"), 4 * s)
-			draw_line(p + Vector2(11, 27) * s, p + Vector2(16, 17) * s, Color("efcf83"), 2 * s)
+			PixelStyle32.line(self,p + Vector2(8, 32) * s, p + Vector2(20, 8) * s, Color("352b41"), 7 * s)
+			PixelStyle32.line(self,p + Vector2(8, 32) * s, p + Vector2(20, 8) * s, Color("8d6048") if stage < 2 else Color("bca47a"), 4 * s)
+			PixelStyle32.line(self,p + Vector2(11, 27) * s, p + Vector2(16, 17) * s, Color("efcf83"), 2 * s)
 			if stage >= 1:
-				draw_line(p + Vector2(13, 15) * s, p + Vector2(27, 13) * s, Color("d9bb78"), 3 * s)
+				PixelStyle32.line(self,p + Vector2(13, 15) * s, p + Vector2(27, 13) * s, Color("d9bb78"), 3 * s)
 			if design == 1:
-				draw_arc(p + Vector2(20, 7) * s, 9 * s, -PI * 0.8, PI * 0.55, 12, Color("e4c98b"), 4 * s)
+				PixelStyle32.arc(self,p + Vector2(20, 7) * s, 9 * s, -PI * 0.8, PI * 0.55, 12, Color("e4c98b"), 4 * s)
 			elif design == 2:
-				for branch in [-1.0, 1.0]: draw_line(p + Vector2(18, 15) * s, p + Vector2(20 + branch * 12, 2) * s, Color("ad815e"), 3 * s)
+				for branch in [-1.0, 1.0]: PixelStyle32.line(self,p + Vector2(18, 15) * s, p + Vector2(20 + branch * 12, 2) * s, Color("ad815e"), 3 * s)
 			elif design == 3:
-				for prong in [-1.0, 0.0, 1.0]: draw_line(p + Vector2(20 + prong * 8, 12) * s, p + Vector2(20 + prong * 8, 0) * s, Color("aebec2"), 3 * s)
+				for prong in [-1.0, 0.0, 1.0]: PixelStyle32.line(self,p + Vector2(20 + prong * 8, 12) * s, p + Vector2(20 + prong * 8, 0) * s, Color("aebec2"), 3 * s)
 			if stage >= 3 and design == 0:
-				draw_colored_polygon(PackedVector2Array([p + Vector2(19, 8) * s, p + Vector2(11, 1) * s, p + Vector2(10, 11) * s]), Color("e8ce8a"))
-				draw_colored_polygon(PackedVector2Array([p + Vector2(21, 8) * s, p + Vector2(29, 1) * s, p + Vector2(29, 11) * s]), Color("e8ce8a"))
-			draw_circle(p + Vector2(20, 7) * s, (4 + mini(stage, 4)) * s, Color("302841"))
-			draw_circle(p + Vector2(20, 7) * s, (3 + mini(stage, 4)) * s, accent)
-			draw_circle(p + Vector2(18, 5) * s, 2 * s, Color("f7f6df"))
+				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(19, 8) * s, p + Vector2(11, 1) * s, p + Vector2(10, 11) * s]), Color("e8ce8a"))
+				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(21, 8) * s, p + Vector2(29, 1) * s, p + Vector2(29, 11) * s]), Color("e8ce8a"))
+			PixelStyle32.circle(self,p + Vector2(20, 7) * s, (4 + mini(stage, 4)) * s, Color("302841"))
+			PixelStyle32.circle(self,p + Vector2(20, 7) * s, (3 + mini(stage, 4)) * s, accent)
+			PixelStyle32.circle(self,p + Vector2(18, 5) * s, 2 * s, Color("f7f6df"))
 			if stage >= 4:
-				draw_circle(p + Vector2(27, 20) * s, 2 * s, accent)
-				draw_circle(p + Vector2(9, 12) * s, 2 * s, accent)
+				PixelStyle32.circle(self,p + Vector2(27, 20) * s, 2 * s, accent)
+				PixelStyle32.circle(self,p + Vector2(9, 12) * s, 2 * s, accent)
 		"bow":
 			if design == 3:
-				draw_line(p + Vector2(5, 17) * s, p + Vector2(29, 17) * s, Color("8d674a"), 5 * s)
-				draw_line(p + Vector2(5, 17) * s, p + Vector2(29, 17) * s, accent, 3 * s)
-				draw_line(p + Vector2(17, 5) * s, p + Vector2(17, 29) * s, Color("efe7d0"), 2 * s)
-				for horn in [-1.0,1.0]: draw_line(p+Vector2(10,17+horn*8)*s,p+Vector2(4,17+horn*12)*s,Color("e9d5b4"),3*s)
-				draw_rect(Rect2(p+Vector2(13,13)*s,Vector2(9,9)*s),accent)
-				draw_colored_polygon(PackedVector2Array([p + Vector2(31,17) * s, p + Vector2(25,14) * s, p + Vector2(25,20) * s]), Color("f6eedc"))
+				PixelStyle32.line(self,p + Vector2(5, 17) * s, p + Vector2(29, 17) * s, Color("8d674a"), 5 * s)
+				PixelStyle32.line(self,p + Vector2(5, 17) * s, p + Vector2(29, 17) * s, accent, 3 * s)
+				PixelStyle32.line(self,p + Vector2(17, 5) * s, p + Vector2(17, 29) * s, Color("efe7d0"), 2 * s)
+				for horn in [-1.0,1.0]: PixelStyle32.line(self,p+Vector2(10,17+horn*8)*s,p+Vector2(4,17+horn*12)*s,Color("e9d5b4"),3*s)
+				PixelStyle32.rect(self,Rect2(p+Vector2(13,13)*s,Vector2(9,9)*s),accent)
+				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(31,17) * s, p + Vector2(25,14) * s, p + Vector2(25,20) * s]), Color("f6eedc"))
 			else:
-				draw_arc(p + Vector2(17, 17) * s, (14 + design * 1.5) * s, -PI * 0.62, PI * 0.62, 18, Color("aa764e") if design != 2 else Color("849b88"), 5 * s)
-				if design == 1: draw_arc(p + Vector2(21,17) * s, 10 * s, -PI * 0.7, PI * 0.7, 16, Color("ead1a1"), 2 * s)
+				PixelStyle32.arc(self,p + Vector2(17, 17) * s, (14 + design * 1.5) * s, -PI * 0.62, PI * 0.62, 18, Color("aa764e") if design != 2 else Color("849b88"), 5 * s)
+				if design == 1: PixelStyle32.arc(self,p + Vector2(21,17) * s, 10 * s, -PI * 0.7, PI * 0.7, 16, Color("ead1a1"), 2 * s)
 				elif design == 2:
-					for horn in [-1.0,1.0]: draw_line(p+Vector2(14,17+horn*14)*s,p+Vector2(8,17+horn*17)*s,Color("e9d5b4"),3*s)
-				draw_line(p + Vector2(12, 4) * s, p + Vector2(12, 30) * s, Color("efe7d0"), 2 * s)
-				draw_line(p + Vector2(4, 17) * s, p + Vector2(28, 17) * s, accent, 3 * s)
-				draw_colored_polygon(PackedVector2Array([p + Vector2(30,17) * s, p + Vector2(23,13) * s, p + Vector2(23,21) * s]), Color("f6eedc"))
+					for horn in [-1.0,1.0]: PixelStyle32.line(self,p+Vector2(14,17+horn*14)*s,p+Vector2(8,17+horn*17)*s,Color("e9d5b4"),3*s)
+				PixelStyle32.line(self,p + Vector2(12, 4) * s, p + Vector2(12, 30) * s, Color("efe7d0"), 2 * s)
+				PixelStyle32.line(self,p + Vector2(4, 17) * s, p + Vector2(28, 17) * s, accent, 3 * s)
+				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(30,17) * s, p + Vector2(23,13) * s, p + Vector2(23,21) * s]), Color("f6eedc"))
 		"potion":
-			draw_rect(Rect2(p + Vector2(10, 1) * s, Vector2(12, 7) * s), Color("dac7a6"))
-			draw_rect(Rect2(p + Vector2(5, 9) * s, Vector2(23, 23) * s), Color("f2e8da"))
-			draw_rect(Rect2(p + Vector2(8, 17) * s, Vector2(17, 12) * s), accent)
-			draw_rect(Rect2(p + Vector2(12, 11) * s, Vector2(4, 4) * s), Color.WHITE)
+			PixelStyle32.rect(self,Rect2(p + Vector2(10, 1) * s, Vector2(12, 7) * s), Color("dac7a6"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(5, 9) * s, Vector2(23, 23) * s), Color("f2e8da"))
+			PixelStyle32.rect(self,Rect2(p + Vector2(8, 17) * s, Vector2(17, 12) * s), accent)
+			PixelStyle32.rect(self,Rect2(p + Vector2(12, 11) * s, Vector2(4, 4) * s), Color.WHITE)
 		"gem":
-			draw_colored_polygon(PackedVector2Array([p + Vector2(15, 1) * s, p + Vector2(30, 15) * s, p + Vector2(15, 32) * s, p + Vector2(1, 15) * s]), accent)
-			draw_rect(Rect2(p + Vector2(12, 7) * s, Vector2(5, 10) * s), Color("eefaf2"))
+			PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(15, 1) * s, p + Vector2(30, 15) * s, p + Vector2(15, 32) * s, p + Vector2(1, 15) * s]), accent)
+			PixelStyle32.rect(self,Rect2(p + Vector2(12, 7) * s, Vector2(5, 10) * s), Color("eefaf2"))
 		"ring":
-			draw_arc(p + Vector2(16, 21) * s, 10 * s, 0, TAU, 16, Color("e6bd75"), 6 * s)
-			draw_rect(Rect2(p + Vector2(11, 4) * s, Vector2(10, 9) * s), accent)
+			PixelStyle32.arc(self,p + Vector2(16, 21) * s, 10 * s, 0, TAU, 16, Color("e6bd75"), 6 * s)
+			PixelStyle32.rect(self,Rect2(p + Vector2(11, 4) * s, Vector2(10, 9) * s), accent)
 		"armor":
 			match class_id:
 				0:
-					draw_colored_polygon(PackedVector2Array([p+Vector2(5,3)*s,p+Vector2(13,8)*s,p+Vector2(20,8)*s,p+Vector2(28,3)*s,p+Vector2(28,27)*s,p+Vector2(16,33)*s,p+Vector2(4,27)*s]),Color("8fa6b0"))
-					if design == 1: draw_rect(Rect2(p+Vector2(1,6)*s,Vector2(31,5)*s),Color("c5d0c7"))
-					elif design == 2: draw_colored_polygon(PackedVector2Array([p+Vector2(8,8)*s,p+Vector2(16,1)*s,p+Vector2(24,8)*s]),Color("ecd099"))
+					PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(5,3)*s,p+Vector2(13,8)*s,p+Vector2(20,8)*s,p+Vector2(28,3)*s,p+Vector2(28,27)*s,p+Vector2(16,33)*s,p+Vector2(4,27)*s]),Color("8fa6b0"))
+					if design == 1: PixelStyle32.rect(self,Rect2(p+Vector2(1,6)*s,Vector2(31,5)*s),Color("c5d0c7"))
+					elif design == 2: PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(8,8)*s,p+Vector2(16,1)*s,p+Vector2(24,8)*s]),Color("ecd099"))
 					elif design == 3:
-						for rib in [10,16,22]: draw_line(p+Vector2(rib,10)*s,p+Vector2(rib,26)*s,Color("5e7d8e"),2*s)
-					draw_rect(Rect2(p+Vector2(8,10)*s,Vector2(17,15)*s),accent)
-					draw_line(p+Vector2(9,13)*s,p+Vector2(22,24)*s,Color("f4e2ba"),2*s)
+						for rib in [10,16,22]: PixelStyle32.line(self,p+Vector2(rib,10)*s,p+Vector2(rib,26)*s,Color("5e7d8e"),2*s)
+					PixelStyle32.rect(self,Rect2(p+Vector2(8,10)*s,Vector2(17,15)*s),accent)
+					PixelStyle32.line(self,p+Vector2(9,13)*s,p+Vector2(22,24)*s,Color("f4e2ba"),2*s)
 				1:
-					draw_colored_polygon(PackedVector2Array([p+Vector2(10,3)*s,p+Vector2(22,3)*s,p+Vector2(29,31)*s,p+Vector2(16,26)*s,p+Vector2(3,31)*s]),Color("3e5a91"))
-					if design == 1: draw_rect(Rect2(p+Vector2(2,4)*s,Vector2(27,4)*s),Color("e0d5af"))
-					elif design == 2: draw_line(p+Vector2(16,5)*s,p+Vector2(16,28)*s,Color("edc998"),3*s)
-					elif design == 3: draw_arc(p+Vector2(16,16)*s,8*s,0,TAU,12,Color("c0b0e2"),3*s)
-					draw_rect(Rect2(p+Vector2(5,7)*s,Vector2(6,15)*s),accent)
-					draw_rect(Rect2(p+Vector2(22,7)*s,Vector2(6,15)*s),accent)
-					draw_circle(p+Vector2(16,14)*s,3*s,Color("9ee6ee"))
+					PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(10,3)*s,p+Vector2(22,3)*s,p+Vector2(29,31)*s,p+Vector2(16,26)*s,p+Vector2(3,31)*s]),Color("3e5a91"))
+					if design == 1: PixelStyle32.rect(self,Rect2(p+Vector2(2,4)*s,Vector2(27,4)*s),Color("e0d5af"))
+					elif design == 2: PixelStyle32.line(self,p+Vector2(16,5)*s,p+Vector2(16,28)*s,Color("edc998"),3*s)
+					elif design == 3: PixelStyle32.arc(self,p+Vector2(16,16)*s,8*s,0,TAU,12,Color("c0b0e2"),3*s)
+					PixelStyle32.rect(self,Rect2(p+Vector2(5,7)*s,Vector2(6,15)*s),accent)
+					PixelStyle32.rect(self,Rect2(p+Vector2(22,7)*s,Vector2(6,15)*s),accent)
+					PixelStyle32.circle(self,p+Vector2(16,14)*s,3*s,Color("9ee6ee"))
 				2:
-					draw_colored_polygon(PackedVector2Array([p+Vector2(7,3)*s,p+Vector2(25,3)*s,p+Vector2(28,27)*s,p+Vector2(16,33)*s,p+Vector2(4,27)*s]),Color("587d5e"))
-					if design == 1: draw_colored_polygon(PackedVector2Array([p+Vector2(6,4)*s,p+Vector2(0,20)*s,p+Vector2(10,24)*s]),Color("d5bd80"))
-					elif design == 2: draw_rect(Rect2(p+Vector2(4,11)*s,Vector2(24,5)*s),Color("ab8e61"))
-					elif design == 3: draw_line(p+Vector2(4,20)*s,p+Vector2(28,7)*s,Color("e0c188"),4*s)
-					draw_line(p+Vector2(7,8)*s,p+Vector2(24,26)*s,Color("d4b77b"),4*s)
-					draw_rect(Rect2(p+Vector2(8,20)*s,Vector2(17,4)*s),Color("735646"))
+					PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(7,3)*s,p+Vector2(25,3)*s,p+Vector2(28,27)*s,p+Vector2(16,33)*s,p+Vector2(4,27)*s]),Color("587d5e"))
+					if design == 1: PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(6,4)*s,p+Vector2(0,20)*s,p+Vector2(10,24)*s]),Color("d5bd80"))
+					elif design == 2: PixelStyle32.rect(self,Rect2(p+Vector2(4,11)*s,Vector2(24,5)*s),Color("ab8e61"))
+					elif design == 3: PixelStyle32.line(self,p+Vector2(4,20)*s,p+Vector2(28,7)*s,Color("e0c188"),4*s)
+					PixelStyle32.line(self,p+Vector2(7,8)*s,p+Vector2(24,26)*s,Color("d4b77b"),4*s)
+					PixelStyle32.rect(self,Rect2(p+Vector2(8,20)*s,Vector2(17,4)*s),Color("735646"))
 			if stage >= 2:
-				draw_circle(p+Vector2(16,18)*s,2*s,accent.lightened(0.4))
+				PixelStyle32.circle(self,p+Vector2(16,18)*s,2*s,accent.lightened(0.4))
 		"herb":
-			draw_line(p + Vector2(16, 31) * s, p + Vector2(16, 4) * s, Color("597e5b"), 4 * s)
-			draw_rect(Rect2(p + Vector2(4, 8) * s, Vector2(12, 9) * s), accent)
-			draw_rect(Rect2(p + Vector2(16, 14) * s, Vector2(13, 8) * s), accent.lightened(0.2))
+			PixelStyle32.line(self,p + Vector2(16, 31) * s, p + Vector2(16, 4) * s, Color("597e5b"), 4 * s)
+			PixelStyle32.rect(self,Rect2(p + Vector2(4, 8) * s, Vector2(12, 9) * s), accent)
+			PixelStyle32.rect(self,Rect2(p + Vector2(16, 14) * s, Vector2(13, 8) * s), accent.lightened(0.2))
 		_:
-			draw_rect(Rect2(p + Vector2(5, 5) * s, Vector2(22, 22) * s), accent)
+			PixelStyle32.rect(self,Rect2(p + Vector2(5, 5) * s, Vector2(22, 22) * s), accent)
 
 func text_at(p: Vector2, value: String, size: int = 17, color: Color = FONT_COLOR, alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: int = -1) -> void:
 	draw_string(font, p, value, alignment, width, size, color)
@@ -7965,7 +8028,7 @@ func paint_village_prop(prop: Dictionary) -> void:
 		"barrel": StartScenery32.barrel(self,p)
 		"fence": StartScenery32.fence(self,p,p+Vector2(100,0))
 		"bush": food_system.bush(self,p)
-		"cart": StartScenery32.cart(self,p,prop["goods"])
+		"cart": Wagon32.paint(self,p,prop["goods"])
 
 func prop_cache_key(prop: Dictionary) -> String:
 	return "%s:%d:%d" % [prop["kind"],prop["point"].x,prop["point"].y]
@@ -8784,6 +8847,8 @@ func update_network_interpolation(delta: float) -> void:
 	if uses_server_world():
 		var mob_blend := 1.0-exp(-15.0*delta)
 		for enemy in enemies:
+			var attack:Dictionary=enemy.get("attack_state",{})
+			if not attack.is_empty():attack["age"]=float(attack.get("age",0))+delta
 			if not enemy.has("net_target_pos"): continue
 			var target: Vector2 = enemy["net_target_pos"]
 			var current: Vector2 = enemy["pos"]
@@ -9270,6 +9335,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 		return false
 	var changed := false
 	var shared := bool(payload.get("shared",false))
+	if payload.has("boss"): changed=register_boss_defeat(int(payload["boss"]),shared)
 	for raw_id in (payload.get("quests",[]) as Array):
 		var quest_id := int(raw_id)
 		if quest_id < 0 or quest_id >= quests.size(): continue
@@ -9359,11 +9425,12 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 			if event_id >= 0 and event_id < WORLD_EVENTS.size() and enemy_pos.distance_to(WORLD_EVENTS[event_id]["pos"]) <= 560.0:
 				matched_events.append(event_id)
 		var rescue_match := bool(enemy.get("invasion",false)) and int(state.get("rescue_state",0)) == 1
-		if matched_quests.is_empty() and matched_events.is_empty() and not rescue_match: continue
+		var boss_index:int=enemy_type-12 if enemy_type in [12,13,14] else -1
+		if matched_quests.is_empty() and matched_events.is_empty() and not rescue_match and boss_index<0: continue
 		var uuid := str(state.get("uuid","peer%d" % peer_id))
 		var tx := "quest:%d:%s" % [mob_uid,uuid]
 		server_register_transaction(peer_id,tx)
-		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer})
+		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer,"boss":boss_index})
 
 func server_party_member_xp(type: int, elite_kind: int, member: int) -> int:
 	if not remote_players.has(member): return 0

@@ -1,9 +1,10 @@
 extends RefCounted
 ## Reference-inspired environment rendered as geometry, with no image assets.
 const House = preload("res://components/reference_house.gd")
+const PixelStyle32=preload("res://components/pixel_style_32.gd")
 const Hero = preload("res://components/rpg_hero.gd")
 static func rect(c: CanvasItem, p: Vector2, x: float, y: float, w: float, h: float, color: String) -> void:
-	c.draw_rect(Rect2(p+Vector2(x,y),Vector2(w,h)),Color(color))
+	PixelStyle32.rect(c,Rect2(p+Vector2(x,y),Vector2(w,h)),Color(color))
 
 static func ground(c: CanvasItem, p: Vector2, seed_value: int) -> void:
 	rect(c,p,0,0,64,64,"659349")

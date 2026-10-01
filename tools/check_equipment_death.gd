@@ -9,9 +9,9 @@ class TestGame:
 func _initialize() -> void:
 	var game := TestGame.new()
 	game.refresh_shop_stock()
-	assert(game.shop_stock["merchant"].size()==11)
+	assert(game.shop_stock["merchant"].filter(func(item):return item.get("icon","")!="food").size()==11)
 	game.append_new_equipment()
-	assert(game.shop_stock["merchant"].size()==11)
+	assert(game.shop_stock["merchant"].filter(func(item):return item.get("icon","")!="food").size()==11)
 	var names := ["Reisendenleder","Wachtpanzer","Arkanrobe","Waldläufermantel","Sonnenrüstung","Kristallharnisch"]
 	for i in names.size():
 		var item: Dictionary = game.make_item(names[i],"armor",1,4,100)

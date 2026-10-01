@@ -1,4 +1,5 @@
 extends RefCounted
+const PixelStyle32=preload("res://components/pixel_style_32.gd")
 # One registry controls food names, visible fruit colours and nutrition.
 const FOODS = [
  {"name":"Apfel","color":"c94a3d","heal":6,"regen":1.0,"duration":12,"price":5},
@@ -139,19 +140,67 @@ func regional_props(g)->Array:
   if plant["point"] not in BUSHES+TREES:
    result.append({"kind":"bush","point":plant["point"],"depth":plant["point"].y+20})
  return result
+static func food_rect(c:CanvasItem,p:Vector2,s:float,x:float,y:float,w:float,h:float,col:Color)->void:
+ PixelStyle32.rect(c,Rect2(p+Vector2(x,y)*s,Vector2(w,h)*s),col)
 static func icon(c:CanvasItem,p:Vector2,id:int,s:float=1.0)->void:
  var info:Dictionary=FOODS[clampi(id,0,FOODS.size()-1)]
  var col:=Color(info["color"])
- if id>=11 and id<23:
-  c.draw_rect(Rect2(p+Vector2(5,8)*s,Vector2(23,21)*s),col.darkened(0.28))
-  c.draw_rect(Rect2(p+Vector2(7,6)*s,Vector2(19,19)*s),col)
-  c.draw_rect(Rect2(p+Vector2(10,9)*s,Vector2(6,4)*s),col.lightened(0.25))
-  return
- c.draw_rect(Rect2(p+Vector2(6,12)*s,Vector2(21,15)*s),col.darkened(0.2))
- c.draw_rect(Rect2(p+Vector2(9,8)*s,Vector2(15,21)*s),col)
- c.draw_rect(Rect2(p+Vector2(9,11)*s,Vector2(5,5)*s),col.lightened(0.3))
- c.draw_rect(Rect2(p+Vector2(16,3)*s,Vector2(3,6)*s),Color("765238"))
- c.draw_rect(Rect2(p+Vector2(19,4)*s,Vector2(8,3)*s),Color("6f9145"))
+ var edge:=Color("263b37")
+ if id in [6,7,8,9,10,23,24,26,27,29,30,2]:
+  for off in [Vector2(6,15),Vector2(14,9),Vector2(19,18)]:
+   food_rect(c,p+off*s,s,0,0,9,10,edge)
+   food_rect(c,p+off*s,s,1,1,7,7,col)
+   food_rect(c,p+off*s,s,2,1,2,2,col.lightened(.4))
+  food_rect(c,p,s,14,3,2,7,Color("71513d"))
+  food_rect(c,p,s,17,4,7,3,Color("729a53"))
+ elif id in [11,12]:
+  food_rect(c,p,s,4,12,24,16,edge)
+  food_rect(c,p,s,6,10,20,15,col)
+  for mark in 3:
+   food_rect(c,p,s,9+mark*5,12,2,4,col.darkened(.25))
+  food_rect(c,p,s,7,11,17,2,col.lightened(.3))
+ elif id in [13,21]:
+  food_rect(c,p,s,10,3,12,5,Color("a78f65"))
+  food_rect(c,p,s,7,9,19,20,edge)
+  food_rect(c,p,s,9,10,15,17,col)
+  food_rect(c,p,s,10,11,3,11,col.lightened(.35))
+  food_rect(c,p,s,9,17,15,6,Color("d8c496"))
+ elif id==15:
+  food_rect(c,p,s,14,3,3,8,Color("609548"))
+  food_rect(c,p,s,9,5,7,3,Color("609548"))
+  food_rect(c,p,s,10,11,12,9,col)
+  food_rect(c,p,s,12,20,8,5,col)
+  food_rect(c,p,s,14,25,4,4,col.darkened(.2))
+ elif id==16:
+  food_rect(c,p,s,7,11,18,12,col.darkened(.2))
+  food_rect(c,p,s,8,12,14,8,col)
+  food_rect(c,p,s,24,12,6,10,col)
+  food_rect(c,p,s,10,13,2,2,edge)
+  food_rect(c,p,s,14,21,5,3,col.lightened(.3))
+ elif id in [18,19,20]:
+  food_rect(c,p,s,3,16,26,10,edge)
+  food_rect(c,p,s,5,18,22,6,Color("a89877"))
+  food_rect(c,p,s,5,12,22,8,col)
+  for off in [Vector2(9,12),Vector2(17,15),Vector2(21,11)]:
+   food_rect(c,p+off*s,s,0,0,3,3,col.lightened(.3))
+  food_rect(c,p,s,11,5,2,5,Color("a6b7ad"))
+ elif id==17:
+  food_rect(c,p,s,5,10,18,16,edge)
+  food_rect(c,p,s,7,11,14,12,col)
+  food_rect(c,p,s,9,12,5,3,col.lightened(.3))
+  food_rect(c,p,s,21,17,7,4,Color("e5d8b6"))
+ elif id in [14,22]:
+  food_rect(c,p,s,10,7,12,20,col.darkened(.25))
+  food_rect(c,p,s,8,11,16,14,col)
+  food_rect(c,p,s,12,9,5,6,col.lightened(.25))
+ else:
+  food_rect(c,p,s,6,12,22,15,edge)
+  food_rect(c,p,s,8,10,18,15,col.darkened(.2))
+  food_rect(c,p,s,10,8,14,17,col)
+  food_rect(c,p,s,11,10,4,5,col.lightened(.35))
+  food_rect(c,p,s,16,3,2,6,Color("765238"))
+  food_rect(c,p,s,19,4,7,3,Color("6f9145"))
+
 func fruit(c:CanvasItem,p:Vector2,tree:bool)->void:
  var id:int=int(plant_foods.get(key(p),at_plant(p,tree)))
  if id<0 or not ready_at(p,Time.get_unix_time_from_system()):return
