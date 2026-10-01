@@ -540,7 +540,7 @@ func preload_camera_chunks(g, force: bool=false) -> void:
 		chunk_preload_queue.sort_custom(func(a,b): return a.distance_squared_to(center)<b.distance_squared_to(center))
 	var budget:=CHUNKS_PER_PRELOAD_TICK*2 if force else CHUNKS_PER_PRELOAD_TICK
 	while budget>0 and not chunk_preload_queue.is_empty():
-		var key:=chunk_preload_queue.pop_front()
+		var key: Vector2i=chunk_preload_queue.pop_front()
 		if not chunks.has(key): get_chunk(key)
 		budget-=1
 
@@ -562,7 +562,7 @@ func make_chunk(key: Vector2i) -> Texture2D:
 	chunks[key]=texture
 	touch_chunk(key)
 	while chunk_order.size()>MAX_CHUNKS:
-		var expired:=chunk_order.pop_front()
+		var expired: Vector2i=chunk_order.pop_front()
 		chunks.erase(expired)
 	return texture
 
