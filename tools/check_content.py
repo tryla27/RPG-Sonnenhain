@@ -69,7 +69,7 @@ for index, row in enumerate(portals):
     assert int(re.search(r',\s*(\d+)\s*\]', row).group(1)) == index + 8
 # Contents, navigation, UI and save state must be connected to usable calls.
 for token in [
-    'pending_class = candidate', 'class_id = pending_class',
+    'pending_class=cls', 'class_id = pending_class',
     'reset_class_skills()', 'slots = [-1, -1, -1]',
     'event_matches_binding(event, "ability_%d" % (slot + 1))', 'func explode_fireball',
     'func update_impact_zones', 'impact_zones.append',
