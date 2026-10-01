@@ -83,6 +83,10 @@ def main():
             status, headers, body = request("/login", "POST", {"password": password, "csrf": csrf, "next": "/game/"})
             assert status == 303 and headers["Location"] == "/game/" and cookie != old_cookie
             assert request("/game/")[2] == b"SONNENHAIN GAME"
+            valid_cookie = cookie
+            cookie = cookie[:-1] + ("0" if cookie[-1] != "0" else "1")
+            assert request("/game/")[0] == 302
+            cookie = valid_cookie
             assert request("/patches/")[2] == b"PATCH NOTES"
             assert request("/version.json")[0] == 200
             status, headers, body = request("/game/index.wasm", "HEAD")
@@ -111,7 +115,7 @@ def main():
             _, _, body = request("/login")
             csrf = re.search(rb'name="csrf" value="([^"]+)"', body).group(1).decode()
             assert request("/login", "POST", {"password": password, "csrf": csrf})[0] == 429
-            print("WEBSITE_ACCESS_OK password-only form, CSRF, session rotation, shared rate limit, protected pages/assets, HEAD/range/full WASM, traversal rejection and password rotation")
+            print("WEBSITE_ACCESS_OK password-only form, CSRF, signed-cookie tampering rejection, cookie rotation, shared rate limit, protected pages/assets, HEAD/range/full WASM, traversal rejection and password rotation")
         finally:
             server.terminate()
             server.wait(timeout=10)
