@@ -8,7 +8,7 @@ const SHOPS := [
 	{"name":"Fenna","house":Vector2(500,1430),"kind":"merchant","sign":"HANDELSHAUS","cart":Vector2(714,1581)},
 	{"name":"Pip","house":Vector2(1110,1380),"kind":"alchemy","sign":"ALCHEMIE","cart":Vector2(1324,1531)},
 	{"name":"Elara","house":Vector2(1440,1300),"kind":"healer","sign":"HEILHAUS","cart":Vector2(1364,1451)},
-	{"name":"Borin","house":Vector2(1390,1790),"kind":"watch","sign":"WACHHAUS","cart":Vector2(1314,1941)}
+	{"name":"Borin","house":Vector2(1330,230),"kind":"borin","sign":"SKILLZAUBERER","cart":Vector2(1458,540)}
 ]
 
 static func plaza(c: CanvasItem) -> void:
