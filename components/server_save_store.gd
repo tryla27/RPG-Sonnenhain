@@ -55,23 +55,32 @@ func open(peer: int, token: String, uuid: String) -> Dictionary:
 	return {"ok":true,"kind":"open","uuid":uuid,"revision":int(record.get("revision",0)),"request":record.get("request",""),"data":record.get("data",{})}
 
 func valid_food_state(raw:Variant)->bool:
-	if not raw is Dictionary or raw.size()>6:return false
+	if not raw is Dictionary or raw.size()>12:return false
 	var plants:Variant=raw.get("plants",{})
 	if not plants is Dictionary or plants.size()>64:return false
 	for key in plants:
 		var value:Variant=plants[key]
 		if not key is String or key.length()>32 or not (value is float or value is int) or not is_finite(float(value)) or float(value)<0:return false
-	for field in ["regen_rate","regen_until","buff_value","buff_until"]:
+	for field in ["regen_rate","regen_until","meal_hp_regen","meal_mana_regen","meal_until","buff_value","buff_until"]:
 		var value:Variant=raw.get(field,0)
 		if not (value is float or value is int) or not is_finite(float(value)) or float(value)<0:return false
+	if float(raw.get("regen_rate",0))>3 or float(raw.get("meal_hp_regen",0))>4 or float(raw.get("meal_mana_regen",0))>6:return false
+	if float(raw.get("buff_value",0))>0.05:return false
+	var food_name:Variant=raw.get("active_food_name","")
+	if not food_name is String or String(food_name).length()>80:return false
+	if String(food_name)!="":
+		var food:Dictionary=preload("res://components/food_system.gd").by_name(String(food_name))
+		if food.is_empty() or not bool(food.get("meal",false)):return false
 	var buff_kind:Variant=raw.get("buff_kind","")
-	if not buff_kind is String or String(buff_kind) not in ["","energy_regen","armor","cooldown","move","power_speed"]:return false
-	return float(raw.get("regen_rate",0))<=3 and float(raw.get("buff_value",0))<=0.25
+	if not buff_kind is String or String(buff_kind) not in ["","armor","cooldown","move","damage","gather"]:return false
+	var now:=Time.get_unix_time_from_system()
+	if float(raw.get("meal_until",0))>now+365 or float(raw.get("buff_until",0))>now+365:return false
+	return true
 
 func valid_steinrose_state(raw:Variant)->bool:
 	if not raw is Dictionary or raw.size()>2:return false
 	var learned:Variant=raw.get("learned",[])
-	if not learned is Array or learned.size()>6:return false
+	if not learned is Array or learned.size()>12:return false
 	for value in learned:
 		if not value is bool:return false
 	return true
