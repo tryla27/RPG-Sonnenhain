@@ -323,6 +323,7 @@ var ranger_hunt_buff := 0.0
 var ranger_ultimate_speed_timer := 0.0
 var ranger_ultimate_speed_mult := 1.0
 var ranger_stealth_timer := 0.0
+var ranger_falcon_rune := false
 var robotics_overclock_timer := 0.0
 const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
@@ -834,7 +835,7 @@ func _on_peer_connected(id: int) -> void:
 	if network_mode == "host":
 		push_world_snapshot()
 		if not dedicated_server_mode:
-			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id,"ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
@@ -1923,7 +1924,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		MobCombat.cancel(enemy)
 		for index in range(enemy_projectiles.size()-1,-1,-1):
 			if int(enemy_projectiles[index].get("owner_uid",-2))==int(enemy.get("uid",-1)):enemy_projectiles.remove_at(index)
-	for key in ["flash","hit","stun","slow","marked","shot"]:
+	for key in ["flash","hit","stun","slow","marked","falcon_mark","shot"]:
 		enemy[key]=maxf(0.0,float(enemy.get(key,0.0))-delta)
 	if float(enemy.get("poison",0))>0:
 		enemy["poison"]=maxf(0,float(enemy["poison"])-delta)
@@ -1976,6 +1977,23 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 				enemy["walking"]=true
 				moved=true;break
 	else:enemy["walking"]=false
+	if movement.length_squared()>.001 and not moved:
+		enemy["stuck_time"]=float(enemy.get("stuck_time",0.0))+delta
+		if float(enemy["stuck_time"])>=0.35:
+			var origin_retry:Vector2=enemy["pos"]
+			var seed_angle:=float(enemy.get("seed",0.0))+float(Time.get_ticks_msec()%997)*0.001
+			for step in 12:
+				var dir:=Vector2.RIGHT.rotated(seed_angle+float(step)*TAU/12.0)
+				var candidate:=origin_retry+dir*float(profile["movement_speed"])*delta*1.35
+				var ok:=not terrain_blocked(candidate,mob_hit_radius(enemy)) and not blocked_by_region_wall(candidate) and region_at(candidate)==region_at(origin_retry)
+				if ok and (server or not waystone_safe_at(candidate)):
+					enemy["pos"]=candidate
+					enemy["walking"]=true
+					moved=true
+					break
+			enemy["stuck_time"]=0.0
+	else:
+		enemy["stuck_time"]=0.0
 	# Klassenbosse dürfen sich weder aus ihrer Kampflichtung ziehen lassen noch
 	# dauerhaft an prozeduralen Kanten festfahren.
 	if int(enemy["type"]) in [12,13,14]:
@@ -2862,6 +2880,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				elif inventory_drag_index>=0 and event.position.distance_to(inventory_drag_origin)>8.0:
 					finish_inventory_drag(event.position)
 					return
+	if panel=="steinrose" and steinrose.keyboard_input(self,event):
+		return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			panel = "start"
@@ -3210,6 +3230,13 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 		enemy["flash"] = 0.16
 		effect(enemy["pos"] + Vector2(0, -25), str(maxi(0, amount)), Color("fff1a1"), 0.55)
 		return
+	var falcon_active:=ranger_falcon_rune if source_peer<=0 else bool(remote_players.get(source_peer,{}).get("ranger_falcon_rune",false))
+	if falcon_active and (class_id==2 or source_peer>0):
+		if float(enemy.get("falcon_mark",0.0))>0.0:
+			amount=int(amount*1.22)
+			enemy["falcon_mark"]=0.0
+		else:
+			enemy["falcon_mark"]=4.0
 	if float(enemy.get("marked", 0.0)) > 0.0:
 		amount = int(amount * 1.22)
 	match element:
@@ -4183,6 +4210,13 @@ func respawn() -> void:
 	message("Du wurdest im Dorf wiederbelebt. -20 Gold")
 	save_game()
 
+func ranger_falcon_rune_item()->Dictionary:
+	var item:=make_item("Rune des Falken","gem",4,0,2200,"",maxi(1,level))
+	item["rune_class"]=2
+	item["rune_id"]="falcon"
+	item["tooltip"]="Pfeile markieren Ziele 4s. Der nächste Treffer auf ein markiertes Ziel verursacht +22% Schaden."
+	return item
+
 func class_relic_item(boss_index:int) -> Dictionary:
 	boss_index=clampi(boss_index,0,2)
 	var item:=make_item(CLASS_RELIC_NAMES[boss_index],"gem",4,0,2500+boss_index*1250)
@@ -4266,6 +4300,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 		var relic:=class_relic_item(type-12)
 		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)),"item":relic,"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		drops.append({"pos":safe_drop_position(pos,Vector2(-25,8)),"item":class_boss_hat_item(type-12),"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
+		if type==14:drops.append({"pos":safe_drop_position(pos,Vector2(0,34)),"item":ranger_falcon_rune_item(),"life":180.0,"reserved_class":2,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		message("%s besiegt! %s und sein Klassenhut liegen als Beute am Boden." % [ENEMY_TYPES[type]["name"],CLASS_RELIC_NAMES[type-12]])
 		if bosses_defeated.count(true) == bosses_defeated.size() and not final_completed and final_countdown < 0.0:
 			final_countdown = 8.0
@@ -4847,6 +4882,7 @@ func capture_save_data() -> Dictionary:
 	data["warrior_rage"] = warrior_rage
 	data["ranger_hunt_meter"] = ranger_hunt_meter
 	data["ranger_hunt_buff"] = ranger_hunt_buff
+	data["ranger_falcon_rune"] = ranger_falcon_rune
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
@@ -5842,6 +5878,17 @@ func use_item(index: int) -> void:
 	if food_system.eat(self,index): return
 	var item: Dictionary = inventory[index]
 	var name: String = item["name"]
+	if str(item.get("rune_id",""))=="falcon":
+		if class_id!=2:
+			message("Rune des Falken kann nur der Bogenschütze binden.")
+			return
+		if ranger_falcon_rune:
+			message("Rune des Falken ist bereits aktiv.")
+			return
+		ranger_falcon_rune=true
+		inventory.remove_at(index);selected_item=-1
+		message("Rune des Falken gebunden: Pfeile markieren Ziele.")
+		play_sound("level");save_game();return
 	if bool(item.get("class_relic",false)):
 		var required:=clampi(int(item.get("mastery_class",-1)),0,2)
 		if class_id!=required:
@@ -9394,8 +9441,8 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var attribute_diff := int(item.get(primary_key, 0)) - int(worn.get(primary_key, 0))
 		var arrow := "▲ +" if attribute_diff > 0 else ("▼ " if attribute_diff < 0 else "= ")
 		text_at(pos + Vector2(14, 145), "%s für %s: %s%d" % [primary_key.to_upper(), CLASS_NAMES[class_id], arrow, attribute_diff], 13, Color("83e4a0") if attribute_diff > 0 else (Color("ee8a86") if attribute_diff < 0 else Color("dfdcc3")))
-	if bool(item.get("boss_relic",false)):
-		text_at(pos+Vector2(14,168),str(item.get("tooltip","Bossrelikt")),11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	if bool(item.get("boss_relic",false)) or str(item.get("rune_id",""))!="":
+		text_at(pos+Vector2(14,168),str(item.get("tooltip","Spezialgegenstand")),11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
 	elif bool(item.get("locked",false)):
 		text_at(pos+Vector2(14,168),"UNVERKÄUFLICH · Doppelklick zum Entsperren",10,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
 	var price_text := "Kaufpreis: %d Gold" % purchase_price if purchase_price >= 0 else "Verkauf: %d Gold" % item_sale_value(item)
@@ -11636,6 +11683,7 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	if is_boss:
 		server_spawn_world_drop(class_relic_item(type-12),Vector2(enemy["pos"])+Vector2(25,0),type-12,180.0)
 		server_spawn_world_drop(class_boss_hat_item(type-12),Vector2(enemy["pos"])+Vector2(-25,8),type-12,180.0)
+		if type==14:server_spawn_world_drop(ranger_falcon_rune_item(),Vector2(enemy["pos"])+Vector2(0,34),2,180.0)
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
 		server_spawn_world_drop(random_loot(type,reward_class),Vector2(enemy["pos"]),-1,90.0)
 	if randf() < 0.03:
