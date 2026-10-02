@@ -157,8 +157,8 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 			if not bool(learned[fusion[1]]) or not bool(learned[fusion[2]]):return false
 	# Klassenmeisterschaft ist erst nach der Map-8-Finalquest zulässig. Bereits
 	# abgeschlossene alte Endspielstände bleiben als Migrationspfad gültig.
-	var mastery:=data.get("class_mastery_unlocked",false)
-	var arcane:=data.get("arcane_step_learned",false)
+	var mastery:Variant=data.get("class_mastery_unlocked",false)
+	var arcane:Variant=data.get("arcane_step_learned",false)
 	if not mastery is bool or not arcane is bool:return false
 	if bool(mastery):
 		var mastery_ready:=false
