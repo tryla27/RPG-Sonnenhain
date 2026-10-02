@@ -48,6 +48,8 @@ func run():
 	var heart:=g.class_relic_item(0)
 	assert(str(helm["icon"])=="head" and str(helm["name"]).contains("Kriegsherr"))
 	assert(str(heart.get("tooltip","")).contains("WUT"))
+	var net_helm:=g.sanitize_network_reward_item(g.network_reward_payload(helm))
+	assert(str(net_helm["icon"])=="head" and bool(net_helm.get("boss_hat",false)))
 
 	# Falcon rune can only be bound by ranger and marks/consumes on consecutive hits.
 	var rune:=g.ranger_falcon_rune_item()
