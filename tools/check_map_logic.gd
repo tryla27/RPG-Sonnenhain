@@ -29,13 +29,13 @@ func _initialize() -> void:
 	check(not g.is_blocked(Vector2(875,2600),Vector2(875,2500)),"Ordinary gate still blocked by level")
 	check(g.region_available(2),"Low-level player cannot access ordinary region")
 	g.bosses_defeated=[false,false,false]
-	check(g.is_blocked(Vector2(5000,6200),Vector2(4900,6200)),"Turmwaechter boss gate not sealed")
-	check(g.boss_gate_name(0)=="Turmwächter","Boss gate 0 label names wrong boss")
-	check(g.boss_gate_name(1)=="Kristallhüter","Boss gate 1 label names wrong boss")
-	check(not g.region_available(4),"Boss-locked region opened before Turmwaechter")
+	check(g.is_blocked(Vector2(8500,6200),Vector2(8400,6200)),"Kriegsherr boss gate not sealed")
+	check(g.boss_gate_name(0)=="Kriegsherr","Boss gate 0 label names wrong boss")
+	check(g.boss_gate_name(1)=="Arkanhüter","Boss gate 1 label names wrong boss")
+	check(not g.region_available(7),"Map 07 opened before Kriegsherr")
 	g.bosses_defeated[0]=true
-	check(not g.is_blocked(Vector2(5000,6200),Vector2(4900,6200)),"Turmwaechter victory did not open gate")
-	check(g.region_available(4),"Turmwaechter victory did not unlock region")
+	check(not g.is_blocked(Vector2(8500,6200),Vector2(8400,6200)),"Kriegsherr victory did not open gate")
+	check(g.region_available(7),"Kriegsherr victory did not unlock Map 07")
 	g.level=1
 	check(g.region_available(12),"High recommended level still blocks an ungated region")
 	for i in g.WAYSTONES.size():
