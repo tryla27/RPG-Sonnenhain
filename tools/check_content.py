@@ -112,7 +112,10 @@ assert '"name":"Elara"' in source
 assert 'const MUSIC_FADE_SECONDS := 1.35' in source
 assert 'music_incoming.volume_db' in source and 'music_player.volume_db' in source
 assert 'AudioStreamOggVorbis: stream.loop = true' in source
-assert '"res://music/%s.ogg" % desired' in source
+assert 'func music_path_for_theme(theme:String)->String:' in source
+assert 'return "res://music/%s.ogg" % theme' in source
+for boss_theme in ['boss_kriegsherr','boss_arkanhueter','boss_jagdmeister']:
+    assert boss_theme in source, f'missing boss music routing: {boss_theme}'
 sfx = re.findall(r'"([^"]+)"', block('SFX_NAMES'))
 for name in sfx + ['nebel', 'bernstein', 'quelle', 'daemmer', 'himmel', 'boss']:
     path = root / 'audio' / f'{name}.wav'
