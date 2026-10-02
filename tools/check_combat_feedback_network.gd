@@ -69,7 +69,7 @@ func run()->void:
 	print("FEEDBACK_MAPS_NETWORK_OK maps1-12 shared IDs, authoritative HP, hurt and death over real WebSocket")
 	left.player_pos=Vector2(825,1095);right.player_pos=Vector2(825,1095)
 	server.remote_players[a]["pos"]=[825.0,1095.0];server.remote_players[b]["pos"]=[825.0,1095.0]
-	var home:=Vector2(500,1430)
+	var home:Vector2=server.village_house("Fenna")["house"]
 	for kind in [0,1,2,3]:
 		var before_left:int=left.combat_feedback.breaks.size();var before_right:int=right.combat_feedback.breaks.size()
 		server.projectiles=[{"pos":home+Vector2(96,190),"dir":Vector2.UP,"speed":2000.0,"life":1.0,"damage":10,"kind":kind,"owner_peer":a,"hits":[]}]
