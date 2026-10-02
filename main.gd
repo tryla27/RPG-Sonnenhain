@@ -1,4 +1,4 @@
-# Release marker: class bosses, shared loot, boss arenas/houses, harvest visuals/timers and audiovisual combat.
+# Release marker: [deploy] class bosses, shared loot, boss arenas/houses, harvest visuals/timers, HUD separation and audiovisual combat.
 extends Node2D
 const PatchNotice = preload("res://components/patch_notice.gd")
 var patch_notice = PatchNotice.new()
