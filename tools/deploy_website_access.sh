@@ -42,9 +42,22 @@ ssh -4 -i "$HOME/.ssh/manitu_deploy" -p 22 \
 access_file=/home/sites/site100047525/web/sonnenhain-access.htpasswd
 if [ -n "${SONNENHAIN_ACCESS_HTPASSWD:-}" ]; then
   entry="$SONNENHAIN_ACCESS_HTPASSWD"
-  if [[ "$entry" != *:* ]]; then
-    entry="sonnenhain:$entry"
+  if [[ "$entry" == *:* ]]; then
+    user="${entry%%:*}"
+    hash="${entry#*:}"
+    [ -n "$user" ] || user="sonnenhain"
+  else
+    user="sonnenhain"
+    hash="$entry"
   fi
+
+  if [[ "$hash" != \$2a\$* && "$hash" != \$2b\$* && "$hash" != \$2y\$* ]]; then
+    export SONNENHAIN_ACCESS_RAW="$hash"
+    hash="$(php -r '$p=getenv("SONNENHAIN_ACCESS_RAW"); $h=password_hash($p, PASSWORD_BCRYPT, ["cost"=>12]); if ($h===false) exit(2); echo $h;')"
+    unset SONNENHAIN_ACCESS_RAW
+  fi
+
+  entry="$user:$hash"
   printf '%s\n' "$entry" > /tmp/sonnenhain-access.htpasswd
   chmod 600 /tmp/sonnenhain-access.htpasswd
   scp -4 -i "$HOME/.ssh/manitu_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new /tmp/sonnenhain-access.htpasswd ssh300011111@ngcobalt378.manitu.net:"$access_file"
