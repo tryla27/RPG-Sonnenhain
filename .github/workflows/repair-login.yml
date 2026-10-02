@@ -35,9 +35,132 @@ jobs:
           entry="$SONNENHAIN_ACCESS_HTPASSWD"
           if [[ "$entry" != *:* ]]; then
             echo "ACCESS_ENTRY_FORMAT=missing-user-prefix"
+            hash="$entry"
           else
             echo "ACCESS_ENTRY_FORMAT=user-prefixed"
+            hash="${entry#*:}"
           fi
+          case "$hash" in
+            '$2a
+
+      - name: Repair live password gate only
+        shell: bash
+        run: bash tools/deploy_website_access.sh
+
+      - name: Verify live password gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            root_code="$(curl -sS -o /tmp/sonnenhain-root -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/ || true)"
+            login_code="$(curl -sS -o /tmp/sonnenhain-login -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/login || true)"
+            if [ "$root_code" = "302" ] && [ "$login_code" = "200" ] && grep -q 'name="password"' /tmp/sonnenhain-login; then
+              echo "LIVE_LOGIN_OK root=302 login=200 password-only"
+              exit 0
+            fi
+            echo "Login gate not ready: root=$root_code login=$login_code"
+            sleep 5
+          done
+          cat /tmp/sonnenhain-root || true
+          cat /tmp/sonnenhain-login || true
+          exit 1
+*|'$2b
+
+      - name: Repair live password gate only
+        shell: bash
+        run: bash tools/deploy_website_access.sh
+
+      - name: Verify live password gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            root_code="$(curl -sS -o /tmp/sonnenhain-root -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/ || true)"
+            login_code="$(curl -sS -o /tmp/sonnenhain-login -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/login || true)"
+            if [ "$root_code" = "302" ] && [ "$login_code" = "200" ] && grep -q 'name="password"' /tmp/sonnenhain-login; then
+              echo "LIVE_LOGIN_OK root=302 login=200 password-only"
+              exit 0
+            fi
+            echo "Login gate not ready: root=$root_code login=$login_code"
+            sleep 5
+          done
+          cat /tmp/sonnenhain-root || true
+          cat /tmp/sonnenhain-login || true
+          exit 1
+*|'$2y
+
+      - name: Repair live password gate only
+        shell: bash
+        run: bash tools/deploy_website_access.sh
+
+      - name: Verify live password gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            root_code="$(curl -sS -o /tmp/sonnenhain-root -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/ || true)"
+            login_code="$(curl -sS -o /tmp/sonnenhain-login -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/login || true)"
+            if [ "$root_code" = "302" ] && [ "$login_code" = "200" ] && grep -q 'name="password"' /tmp/sonnenhain-login; then
+              echo "LIVE_LOGIN_OK root=302 login=200 password-only"
+              exit 0
+            fi
+            echo "Login gate not ready: root=$root_code login=$login_code"
+            sleep 5
+          done
+          cat /tmp/sonnenhain-root || true
+          cat /tmp/sonnenhain-login || true
+          exit 1
+*) echo "ACCESS_ENTRY_KIND=bcrypt" ;;
+            '$apr1
+
+      - name: Repair live password gate only
+        shell: bash
+        run: bash tools/deploy_website_access.sh
+
+      - name: Verify live password gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            root_code="$(curl -sS -o /tmp/sonnenhain-root -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/ || true)"
+            login_code="$(curl -sS -o /tmp/sonnenhain-login -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/login || true)"
+            if [ "$root_code" = "302" ] && [ "$login_code" = "200" ] && grep -q 'name="password"' /tmp/sonnenhain-login; then
+              echo "LIVE_LOGIN_OK root=302 login=200 password-only"
+              exit 0
+            fi
+            echo "Login gate not ready: root=$root_code login=$login_code"
+            sleep 5
+          done
+          cat /tmp/sonnenhain-root || true
+          cat /tmp/sonnenhain-login || true
+          exit 1
+*) echo "ACCESS_ENTRY_KIND=apr1" ;;
+            '$1
+
+      - name: Repair live password gate only
+        shell: bash
+        run: bash tools/deploy_website_access.sh
+
+      - name: Verify live password gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            root_code="$(curl -sS -o /tmp/sonnenhain-root -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/ || true)"
+            login_code="$(curl -sS -o /tmp/sonnenhain-login -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/login || true)"
+            if [ "$root_code" = "302" ] && [ "$login_code" = "200" ] && grep -q 'name="password"' /tmp/sonnenhain-login; then
+              echo "LIVE_LOGIN_OK root=302 login=200 password-only"
+              exit 0
+            fi
+            echo "Login gate not ready: root=$root_code login=$login_code"
+            sleep 5
+          done
+          cat /tmp/sonnenhain-root || true
+          cat /tmp/sonnenhain-login || true
+          exit 1
+*) echo "ACCESS_ENTRY_KIND=md5crypt" ;;
+            *) echo "ACCESS_ENTRY_KIND=other" ;;
+          esac
 
       - name: Repair live password gate only
         shell: bash
