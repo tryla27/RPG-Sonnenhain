@@ -452,6 +452,7 @@ var intro_timer := 0.0
 var event_states: Array = []
 var event_progress: Array = []
 var creative_mode := false
+var test_level_lock := 0
 var pause_status := "Das Spiel ist angehalten."
 var touch_enabled := false
 var mobile_performance_mode := false
@@ -1356,6 +1357,13 @@ func start_coop_world() -> void:
 	active_save_slot = selected_save_slot
 	if FileAccess.file_exists(slot_save_path(active_save_slot)):
 		load_game()
+		if keep_level_lock>0:
+			test_level_lock=clampi(keep_level_lock,1,40)
+			level=test_level_lock
+			xp=0
+			hp=max_hp()
+			energy=max_energy()
+			save_game()
 		enemies.clear()
 		drops.clear()
 		battle_zones.clear()
@@ -3111,6 +3119,12 @@ func equipped_weapon_variant() -> String:
 	if class_id == 2 and design % 4 == 3: return "crossbow"
 	return class_weapon_icon()
 
+func warrior_crit_chance(for_level:int=level)->float:
+	return clampf(0.08+float(clampi(for_level,1,99)-1)*0.0015,0.08,0.20)
+
+func warrior_crit_multiplier()->float:
+	return 1.75
+
 func normal_attack_power() -> int:
 	# Grundtreffer bleiben schwächer als Fähigkeiten, brauchen aber keine zähen Serien.
 	var base := 7.0 + level * 1.6 + weapon_power() * 0.86 + int(skill_levels[9]) * 4.0
@@ -3231,6 +3245,12 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 		enemy["flash"] = 0.16
 		effect(enemy["pos"] + Vector2(0, -25), str(maxi(0, amount)), Color("fff1a1"), 0.55)
 		return
+	var attacker_class:=class_id if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("class",-1)),0,2)
+	var attacker_level:=level if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("level",1)),1,99)
+	var critical:=attacker_class==0 and randf()<warrior_crit_chance(attacker_level)
+	if critical:
+		amount=maxi(1,roundi(float(amount)*warrior_crit_multiplier()))
+		effect(enemy["pos"]+Vector2(0,-48),"KRIT!",Color("ffd36f"),0.7)
 	var falcon_active:=ranger_falcon_rune if source_peer<=0 else bool(remote_players.get(source_peer,{}).get("ranger_falcon_rune",false))
 	if falcon_active and (class_id==2 or source_peer>0):
 		if float(enemy.get("falcon_mark",0.0))>0.0:
@@ -4344,6 +4364,10 @@ func register_boss_defeat(boss_index:int,shared:bool=false)->bool:
 	return true
 
 func gain_xp(amount: int) -> void:
+	if test_level_lock>0:
+		level=clampi(test_level_lock,1,40)
+		xp=0
+		return
 	xp += amount
 	while xp >= xp_required():
 		xp -= xp_required()
@@ -4877,7 +4901,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -4970,6 +4994,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	sprint_heading = Vector2.ZERO
 	sprint_exhausted = false
 	character_created = bool(data.get("character_created", data.has("class_id")))
+	test_level_lock = clampi(int(data.get("test_level_lock",0)),0,40)
 	player_uuid = str(data.get("player_uuid",""))
 	ensure_player_uuid()
 	if not from_server and not creative_mode: server_save.restore(data)
@@ -5335,6 +5360,11 @@ func handle_panel_click(mouse: Vector2) -> void:
 				JavaScriptBridge.get_interface("window").location.assign("/")
 				return
 		elif creative_mode:
+			if Rect2(760,478,182,28).has_point(mouse):
+				test_level_lock=0 if test_level_lock>0 else level
+				pause_status="Level-Lock aufgehoben." if test_level_lock==0 else "Level %d bleibt auch nach Testmodus fixiert." % test_level_lock
+				save_game()
+				return
 			for index in 4:
 				if Rect2(300 + index * 113, 510, 105, 38).has_point(mouse):
 					set_creative_level(level + [-10, -1, 1, 10][index])
@@ -5420,6 +5450,7 @@ func start_new_game() -> void:
 	equipped_head_uid=-1
 	quest_guide.tracked_id = QuestGuide.AUTO
 	creative_mode = false
+	test_level_lock = 0
 	opened_village_gates.clear()
 	dash_timer = 0.0
 	invulnerable = 0.0
@@ -5542,6 +5573,7 @@ func toggle_creative_mode() -> void:
 		pause_status = "Testmodus aktiv · eigener Spielstand, alle Wege offen."
 		save_game()
 	else:
+		var keep_level_lock:=test_level_lock
 		creative_mode = false
 		reset_class_skills()
 		for i in WORLD_EVENTS.size():
@@ -5571,6 +5603,7 @@ func toggle_creative_mode() -> void:
 func set_creative_level(target: int) -> void:
 	if not creative_mode: return
 	level = clampi(target, 1, 40)
+	if test_level_lock>0:test_level_lock=level
 	xp = 0
 	skill_points = maxi(skill_points, 60)
 	if level >= 20:
@@ -5716,6 +5749,30 @@ func click_skill_loadout(mouse:Vector2)->void:
 func upgrade_skill(index: int) -> void:
 	buy_skill(index)
 
+func inventory_sort_key(item:Dictionary)->Array:
+	var uid:=int(item.get("uid",-1))
+	var equipped_rank:=0 if uid in equipped_item_uids() else 1
+	var locked_rank:=0 if bool(item.get("locked",false)) else 1
+	var type_order:={"sword":0,"staff":0,"bow":0,"head":1,"armor":2,"ring":3,"potion":4,"food":5,"gem":6,"essence":7,"herb":8}
+	var icon:=str(item.get("icon",""))
+	return [equipped_rank,locked_rank,int(type_order.get(icon,9)),-int(item.get("rarity",0)),-int(item.get("level",1)),-int(item.get("power",0)),str(item.get("name","")).to_lower()]
+
+func auto_sort_inventory()->void:
+	if inventory.size()<2:
+		message("Inventar ist bereits sortiert.")
+		return
+	inventory.sort_custom(func(a:Dictionary,b:Dictionary)->bool:
+		var ka:=inventory_sort_key(a);var kb:=inventory_sort_key(b)
+		for i in ka.size():
+			if ka[i]==kb[i]:continue
+			return ka[i]<kb[i]
+		return int(a.get("uid",-1))<int(b.get("uid",-1))
+	)
+	selected_item=-1
+	inventory_page=0
+	message("Inventar sortiert: ausgerüstet · gesperrt · Typ · Seltenheit · Level.")
+	save_game();queue_redraw()
+
 func inventory_index_at(mouse:Vector2)->int:
 	for cell in 25:
 		var col:=cell%5
@@ -5773,6 +5830,9 @@ func finish_inventory_drag(mouse:Vector2)->void:
 	save_game();queue_redraw()
 
 func click_inventory(mouse: Vector2) -> void:
+	if Rect2(641,157,145,30).has_point(mouse):
+		auto_sort_inventory()
+		return
 	if Rect2(180,205,98,60).has_point(mouse) and equipped_head_uid>=0:
 		unequip_slot("head")
 		return
@@ -9153,9 +9213,12 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(590, 480, 260, 38), "BACKUP IMPORT")
 	if creative_mode:
 		text_at(Vector2(302, 504), "LEVEL %d · %d Skillpunkte" % [level, skill_points], 14, Color("fff0bd"))
+		ui_button(Rect2(760,478,182,28),"LEVEL-LOCK AN" if test_level_lock>0 else "LEVEL-LOCK AUS")
 		for index in 4:
 			ui_button(Rect2(300 + index * 113, 510, 105, 38), ["-10", "-1", "+1", "+10"][index])
 		ui_button(Rect2(762, 510, 180, 38), "REISEN")
+	elif test_level_lock>0:
+		text_at(Vector2(302,504),"LEVEL %d FIXIERT · XP verändert das Level nicht." % test_level_lock,13,Color("ffd98a"))
 	text_at(Vector2(302, 538 if not creative_mode else 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
 	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUR STARTSEITE" if is_web_platform() else "SPEICHERN & ZUM HAUPTMENÜ")
 
@@ -9365,7 +9428,7 @@ func draw_inventory_panel() -> void:
 	if class_id == 1: draw_equipment_slot(Vector2(405,440),"RING 2",equipped_ring2_uid,"ring")
 	text_at(Vector2(186, 534), "HP %d  ·  ANGRIFF %d  ·  SCHUTZ %d" % [int(max_hp()), normal_attack_power(), equipment_power(equipped_armor_uid)], 15, Color("e6efdd"))
 	ui_box(Rect2(625, 153, 352, 426), Color("16344b"))
-	text_at(Vector2(644, 179), "INVENTAR · Doppelklick", 12, Color("ffeda9"))
+	ui_button(Rect2(641,157,145,30),"AUTO-SORT")
 	text_at(Vector2(807, 179), "%d/2" % (inventory_page + 1), 16)
 	ui_button(Rect2(850, 157, 32, 30), "<", inventory_page > 0)
 	ui_button(Rect2(931, 157, 32, 30), ">", inventory_page < 1)
