@@ -5084,17 +5084,17 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if stored_quests.size() > 0:
 		for i in mini(stored_quests.size(), QUESTS.size()):
 			quests[i] = stored_quests[i]
-	var stored_borin_quests:Variant=data.get("borin_quests",[])
-	if stored_borin_quests is Array:
-		for i in mini(stored_borin_quests.size(),BORIN_QUESTS.size()):
-			if stored_borin_quests[i] is Dictionary: borin_quests[i]=stored_borin_quests[i]
-	pip_loan_received=bool(data.get("pip_loan_received",false))
 		if stored_bosses.size() != bosses_defeated.size():
 			for i in 3: bosses_defeated[i] = int(quests[12 + i].get("state", 0)) >= 2
 	# Ältere Spielstände aus der ersten Version übernehmen.
 	elif data.has("quest_state"):
 		quests[0]["state"] = clampi(int(data["quest_state"]), 0, 3)
 		quests[0]["progress"] = clampi(int(data.get("quest_kills", 0)), 0, 5)
+	var stored_borin_quests:Variant=data.get("borin_quests",[])
+	if stored_borin_quests is Array:
+		for i in mini(stored_borin_quests.size(),BORIN_QUESTS.size()):
+			if stored_borin_quests[i] is Dictionary: borin_quests[i]=stored_borin_quests[i]
+	pip_loan_received=bool(data.get("pip_loan_received",false))
 	# Older multiplayer saves may contain completed boss quests but missing boss flags.
 	for q in mini(quests.size(),QUESTS.size()):
 		var target:int=int(QUESTS[q]["target"])
