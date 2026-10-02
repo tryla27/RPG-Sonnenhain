@@ -5043,6 +5043,20 @@ func handle_panel_click(mouse: Vector2) -> void:
 				claim_local_save(int(rows[i]["slot"]));return
 		if Rect2(220,535,280,44).has_point(mouse):finish_account_entry()
 		return
+	if panel=="account_characters":
+		for i in mini(3,account_characters.size()):
+			var y:=235+i*90
+			if Rect2(720,y+14,190,42).has_point(mouse) and not account_pending_load:
+				open_account_character(i)
+				return
+		if account_characters.is_empty() and Rect2(220,520,330,44).has_point(mouse):
+			active_save_slot=selected_save_slot
+			begin_character_creation()
+			return
+		if Rect2(590,520,340,44).has_point(mouse):
+			panel="start"
+			return
+		return
 	if panel == "start":
 		for candidate in 3:
 			if Rect2(168 + candidate * 273, 530, 260, 57).has_point(mouse):
@@ -8550,12 +8564,13 @@ func draw_panel() -> void:
 	draw_rect(Rect2(164, 598, 824, 2), Color("9d845e"))
 	for index in 7:
 		draw_rect(Rect2(172 + index * 116, 101, 5, 5), Color("c6aa79", 0.6))
-	if panel not in ["account_gate","account_login","account_register","account_migrate","start", "creation", "multiplayer", "arena_reward", "victory"]: ui_button(Rect2(965, 91, 41, 35), "X")
+	if panel not in ["account_gate","account_login","account_register","account_migrate","account_characters","start", "creation", "multiplayer", "arena_reward", "victory"]: ui_button(Rect2(965, 91, 41, 35), "X")
 	match panel:
 		"account_gate": draw_account_gate()
 		"account_login": draw_account_form(false)
 		"account_register": draw_account_form(true)
 		"account_migrate": draw_account_migrate()
+		"account_characters": draw_account_characters()
 		"start": draw_start_panel()
 		"creation": draw_creation_panel()
 		"creation_review": draw_creation_review_panel()
@@ -8760,9 +8775,9 @@ func draw_account_migrate()->void:
 
 func finish_account_entry()->void:
 	account_migration_checked=true
-	panel="start"
 	account_status=""
 	refresh_save_slot_labels()
+	panel="account_characters" if not account_characters.is_empty() else "start"
 
 func request_account(registering:bool)->void:
 	if not account_form_valid(registering):
@@ -8793,16 +8808,40 @@ func claim_local_save(slot:int)->void:
 func open_account_character(index:int)->void:
 	if index<0 or index>=account_characters.size():return
 	var c:Dictionary=account_characters[index]
+	active_save_slot=clampi(int(c.get("slot",1)),1,3)
 	player_uuid=str(c.get("uuid",""))
 	server_save.uuid=player_uuid
 	server_save.token=str(c.get("token",""))
 	server_save.revision=0
+	server_save.dirty=false
 	server_save.ready=false
 	server_save.loading=true
 	server_save.latest={}
+	server_save.inflight.clear()
+	server_save.last_request=""
+	server_save.submitted_hash=""
 	account_pending_load=true
-	panel="start"
+	account_status="Lade deinen Server-Spielstand …"
+	panel="account_characters"
 	rpc_zz_save_open.rpc_id(1,server_save.token,player_uuid)
+
+func draw_account_characters()->void:
+	text_at(Vector2(220,145),"DEINE CHARAKTERE",30,Color("ffe2aa"))
+	text_at(Vector2(220,184),"Wähle den Spielstand, der zu deinem Sonnenhain-Konto gehört.",14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,720)
+	if account_characters.is_empty():
+		text_at(Vector2(220,250),"Dieses Konto hat noch keinen verknüpften Charakter.",17,Color("b8cbc5"))
+		ui_button(Rect2(220,520,330,44),"NEUEN CHARAKTER ERSTELLEN")
+	else:
+		for i in mini(3,account_characters.size()):
+			var ch:Dictionary=account_characters[i]
+			var y:=235+i*90
+			ui_box(Rect2(220,y,710,70),Color("31474e"))
+			var cls:=clampi(int(ch.get("class_id",0)),0,CLASS_NAMES.size()-1)
+			text_at(Vector2(242,y+27),str(ch.get("name","Held")),20,Color("fff0ce"))
+			text_at(Vector2(242,y+51),"%s · Level %d · Speicherplatz %d" % [CLASS_NAMES[cls],maxi(1,int(ch.get("level",1))),clampi(int(ch.get("slot",1)),1,3)],14,Color("d8e6dc"))
+			ui_button(Rect2(720,y+14,190,42),"LADEN",not account_pending_load)
+	ui_button(Rect2(590,520,340,44),"ZUM STARTMENÜ")
+	if account_status!="":text_at(Vector2(220,585),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,710)
 
 func draw_start_panel() -> void:
 	preload("res://components/start_emblem.gd").background(self)
@@ -11572,7 +11611,12 @@ func rpc_account_reply(response:Dictionary)->void:
 		finish_account_entry()
 	else:
 		account_status="Angemeldet ✓"
-		panel="account_migrate" if not local_migration_slots().is_empty() else "start"
+		if not local_migration_slots().is_empty() and not account_migration_checked:
+			panel="account_migrate"
+		elif not account_characters.is_empty():
+			panel="account_characters"
+		else:
+			panel="start"
 	queue_redraw()
 
 @rpc("any_peer","call_remote","reliable")
@@ -11601,8 +11645,10 @@ func rpc_zz_save_reply(response: Dictionary) -> void:
 	server_save.reply(self,response)
 	if account_pending_load and server_save.ready:
 		account_pending_load=false
+		account_status=""
 		panel=""
 		previous_region=region_at(player_pos)
+		refresh_save_slot_labels()
 		ensure_live_multiplayer()
 		message("Server-Spielstand geladen. Willkommen zurück!")
 
