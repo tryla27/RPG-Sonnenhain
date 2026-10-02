@@ -3881,6 +3881,24 @@ func open_chest(index: int) -> void:
 	message("Schatztruhe geöffnet: %s (%s)!" % [item["name"], RARITY_NAMES[rarity]])
 	save_game()
 
+func waystone_arrival(index: int) -> Vector2:
+	var safe_index := clampi(index, 0, WAYSTONES.size() - 1)
+	var stone: Vector2 = WAYSTONES[safe_index]
+	var region := region_at(stone)
+	var base := stone + Vector2(0, 180)
+	var offsets := [
+		Vector2.ZERO, Vector2(-70,0), Vector2(70,0), Vector2(0,-70),
+		Vector2(-70,-70), Vector2(70,-70), Vector2(0,70),
+		Vector2(-140,0), Vector2(140,0), Vector2(-140,-70), Vector2(140,-70),
+		Vector2(0,-140), Vector2(-70,-140), Vector2(70,-140), Vector2(0,140)
+	]
+	for offset in offsets:
+		var candidate: Vector2 = (base + offset).clamp(Vector2(30,30), WORLD - Vector2(30,30))
+		if region_at(candidate) != region: continue
+		if is_blocked(candidate, candidate): continue
+		return candidate
+	return safe_world_teleport_destination(base, region)
+
 func use_waystone() -> void:
 	if konflux.active:
 		if konflux.room<0 and player_pos.distance_to(KonfluxMap.CENTER)<185: konflux.leave(self, true)
@@ -3894,7 +3912,7 @@ func use_waystone() -> void:
 			else:
 				waystone_unlocked[i] = true
 				last_waystone = i
-				player_pos = WAYSTONES[0] + Vector2(0, 180)
+				player_pos = waystone_arrival(0)
 				mark_network_teleport()
 				message("Wegstein %s aktiviert. Reise vom Dorf aus jederzeit zurück." % region_name(region_at(WAYSTONES[i])))
 			enemy_projectiles.clear()
@@ -3910,7 +3928,7 @@ func click_travel(mouse: Vector2) -> void:
 				message("Diesen Wegstein musst du zunächst vor Ort aktivieren.")
 				return
 			if dungeon_id >= 0: dungeon_id = -1
-			player_pos = WAYSTONES[i] + Vector2(0, 180)
+			player_pos = waystone_arrival(i)
 			mark_network_teleport()
 			last_waystone = i
 			panel = ""
@@ -10239,8 +10257,8 @@ func valid_network_teleport(origin:Vector2,target:Vector2,previous:Dictionary,co
 	if float(previous.get("hp",1))<=0 and target.distance_to(Vector2(825,1020))<80:return true
 	for stone in WAYSTONES:
 		if origin.distance_to(stone)>210:continue
-		for destination in WAYSTONES:
-			if target.distance_to(destination+Vector2(0,180))<80:return true
+		for destination_index in WAYSTONES.size():
+			if target.distance_to(waystone_arrival(destination_index))<95:return true
 	for portal in PORTALS:
 		if origin.distance_to(portal[0])<160 and target.distance_to(portal[1])<280:return true
 		if origin.distance_to(portal[1])<160 and target.distance_to(portal[0])<280:return true
