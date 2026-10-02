@@ -154,7 +154,9 @@ const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
 const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200},{"id":41,"a":1,"b":36,"gold":2200},{"id":42,"a":18,"b":37,"gold":4200}]
 const BORIN_CRYSTAL_POS := Vector2(1608,1970)
-const CLASS_BOSS_SITES := [Vector2(750,6100),Vector2(9700,6500),Vector2(14100,1020)] # Map 06 / 07 / 08
+const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14100,1020)] # Map 06 / 07 / 08
+const CLASS_BOSS_ARENA_RADIUS := 410.0
+const CLASS_BOSS_ARENA_CLEAR_RADIUS := 475.0
 const CLASS_RELIC_NAMES := ["Herz des Kriegsherrn","Arkansplitter","Herz der Jagd"]
 const CLASS_RELIC_SKILLS := ["WUT + BLUTRAUSCH","ARKANER SCHRITT","JAGDRAUSCH + SCHATTENROLLE"]
 const CLASS_RELIC_RESERVE_MS := 15000
@@ -1778,13 +1780,32 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 				enemy["walking"]=true
 				moved=true;break
 	else:enemy["walking"]=false
+	# Klassenbosse dürfen sich weder aus ihrer Kampflichtung ziehen lassen noch
+	# dauerhaft an prozeduralen Kanten festfahren.
+	if int(enemy["type"]) in [12,13,14]:
+		var arena_center:Vector2=CLASS_BOSS_SITES[int(enemy["type"])-12]
+		if Vector2(enemy["pos"]).distance_to(arena_center)>CLASS_BOSS_ARENA_RADIUS-38.0:
+			var inward:Vector2=(arena_center-Vector2(enemy["pos"])).normalized()
+			var correction:=Vector2(enemy["pos"])+inward*minf(150.0,Vector2(enemy["pos"]).distance_to(arena_center)-(CLASS_BOSS_ARENA_RADIUS-70.0))
+			if class_boss_arena_walkable(correction,mob_hit_radius(enemy)):enemy["pos"]=correction
+		var previous_probe:Vector2=Vector2(enemy.get("stuck_probe_pos",enemy["pos"]))
+		var intended:=movement.length_squared()>.001
+		if intended and Vector2(enemy["pos"]).distance_to(previous_probe)<2.0:
+			enemy["stuck_time"]=float(enemy.get("stuck_time",0.0))+delta
+		else:
+			enemy["stuck_time"]=maxf(0.0,float(enemy.get("stuck_time",0.0))-delta*2.0)
+		enemy["stuck_probe_pos"]=enemy["pos"]
+		if float(enemy.get("stuck_time",0.0))>=.8:
+			enemy["pos"]=class_boss_recovery_point(enemy)
+			enemy["stuck_time"]=0.0
+			MobCombat.cancel(enemy,.35)
 	for event in action["events"]:
 		if event["kind"]=="projectile":
 			enemy_projectiles.append({"pos":enemy["pos"],"dir":event["dir"],"speed":profile["projectile_speed"],"life":2.3,"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"hit_radius":profile["hit_radius"],"source_region":region_at(enemy["pos"])})
 		elif event["kind"]=="boss_move":
 			var move_dir:Vector2=Vector2(event.get("dir",Vector2.ZERO)).normalized()
 			var desired:Vector2=Vector2(enemy["pos"])+move_dir*float(event.get("distance",0.0))
-			if region_at(desired)==region_at(enemy["pos"]) and not terrain_blocked(desired,mob_hit_radius(enemy)) and not blocked_by_region_wall(desired) and not waystone_safe_at(desired):
+			if (int(enemy["type"]) not in [12,13,14] or class_boss_arena_walkable(desired,mob_hit_radius(enemy))) and region_at(desired)==region_at(enemy["pos"]) and not terrain_blocked(desired,mob_hit_radius(enemy)) and not blocked_by_region_wall(desired) and not waystone_safe_at(desired):
 				enemy["pos"]=desired
 				enemy["walking"]=true
 		elif server:
@@ -2075,6 +2096,31 @@ func distance_to_trail(p: Vector2) -> float:
 			best = minf(best, p.distance_to(a + segment * t))
 	return best
 
+func class_boss_arena_index_at(p:Vector2,extra:float=0.0) -> int:
+	for i in CLASS_BOSS_SITES.size():
+		if p.distance_to(CLASS_BOSS_SITES[i]) <= CLASS_BOSS_ARENA_RADIUS+extra:return i
+	return -1
+
+func class_boss_arena_walkable(p:Vector2,radius:float=0.0) -> bool:
+	var index:=class_boss_arena_index_at(p,0.0)
+	if index<0:return false
+	var center:Vector2=CLASS_BOSS_SITES[index]
+	if p.distance_to(center)>CLASS_BOSS_ARENA_RADIUS-radius:return false
+	if region_at(p)!=6+index:return false
+	if waystone_safe_at(p):return false
+	return true
+
+func class_boss_recovery_point(enemy:Dictionary) -> Vector2:
+	var type:=int(enemy.get("type",-1))
+	if type not in [12,13,14]:return Vector2(enemy.get("home",enemy.get("pos",Vector2.ZERO)))
+	var center:Vector2=CLASS_BOSS_SITES[type-12]
+	var facing:Vector2=Vector2(enemy.get("facing",Vector2.DOWN)).normalized()
+	if facing.length_squared()<.01:facing=Vector2.DOWN
+	var candidates:Array=[center,center-facing*90.0,center+facing.rotated(PI*.5)*120.0,center+facing.rotated(-PI*.5)*120.0]
+	for point in candidates:
+		if class_boss_arena_walkable(point,mob_hit_radius(enemy)) and not terrain_blocked(point,mob_hit_radius(enemy)):return point
+	return center
+
 func obstacle_in_cell(cx: int, cy: int) -> Dictionary:
 	var cell := Vector2i(cx, cy)
 	if obstacle_cache.has(cell): return obstacle_cache[cell]
@@ -2086,6 +2132,7 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	var key := hash_cell(cx + 37, cy + 61)
 	if key % 3 == 0: return {}
 	var p := Vector2(cx * 250 + 55 + key % 130, cy * 250 + 45 + (key / 17) % 125)
+	if class_boss_arena_index_at(p,65.0)>=0:return {}
 	if p.x < 1900 and p.y < 2700: return {}
 	if p.x < 80 or p.y < 80 or p.x > WORLD.x - 80 or p.y > WORLD.y - 80: return {}
 	var zone := region_at(p)
@@ -2109,6 +2156,7 @@ func decorative_tree_in_cell(tx:int,ty:int) -> Dictionary:
 	if zone == 0: return {}
 	var wet := zone==6 and center.y>6850+sin(center.x/220.0)*125.0
 	var point := Vector2(tx*64+(key%23),ty*64+((key/23)%25))
+	if class_boss_arena_index_at(point+Vector2(24,42),70.0)>=0:return {}
 	if not region_rect(zone).grow(-45).encloses(Rect2(point-Vector2(100,160),Vector2(200,210))): return {}
 	if distance_to_trail(point)<120.0:return {}
 	var tree := false
@@ -3474,7 +3522,7 @@ func spawn_dedicated_bosses()->void:
 		for mob in enemies:
 			if int(mob["type"])==type:exists=true
 		if exists:continue
-		var boss:=make_enemy(type,site+Vector2(0,125))
+		var boss:=make_enemy(type,site)
 		boss["uid"]=server_next_mob_uid;server_next_mob_uid+=1
 		boss["hp"]=boss_max_hp(type);boss["max_hp"]=boss["hp"]
 		boss["context"]="world";boss["instance_id"]="world"
@@ -3495,7 +3543,7 @@ func spawn_nearby_boss() -> void:
 		if exists: continue
 		var info: Dictionary = ENEMY_TYPES[boss_type]
 		var boss_hp: float = boss_max_hp(boss_type)
-		enemies.append({"uid":randi(), "type":boss_type, "pos":site + Vector2(0, 125), "home":site + Vector2(0,125), "facing":Vector2.DOWN, "hp":boss_hp, "max_hp":boss_hp, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":1.5, "seed":randf() * 6.28})
+		enemies.append({"uid":randi(), "type":boss_type, "pos":site, "home":site, "facing":Vector2.DOWN, "hp":boss_hp, "max_hp":boss_hp, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":1.5, "seed":randf() * 6.28})
 		spawn_tower_guardians(enemies.back())
 		message("Boss entdeckt: %s!" % info["name"])
 
@@ -5898,7 +5946,24 @@ func draw_world() -> void:
 		return
 	if not draw_cached_overworld():
 		draw_static_overworld(Rect2(camera_pos,VIEW))
+	draw_class_boss_arenas()
 	draw_region_gates()
+
+func draw_class_boss_arenas() -> void:
+	for i in CLASS_BOSS_SITES.size():
+		var center:Vector2=CLASS_BOSS_SITES[i]
+		if not visible_world(center,CLASS_BOSS_ARENA_RADIUS+80.0):continue
+		var accent:Color=[Color("b65c48"),Color("8062c7"),Color("6f9f56")][i]
+		# Der Boden bleibt vollständig begehbar; Steine/Runen zeigen nur den Kampfraum.
+		draw_circle(center,CLASS_BOSS_ARENA_RADIUS,Color(accent,.055))
+		draw_arc(center,CLASS_BOSS_ARENA_RADIUS,0,TAU,64,Color(accent,.55),5)
+		draw_arc(center,CLASS_BOSS_ARENA_RADIUS-26,0,TAU,64,Color(accent,.20),2)
+		for rune in 12:
+			var angle:=float(rune)*TAU/12.0
+			var pos:=center+Vector2.RIGHT.rotated(angle)*(CLASS_BOSS_ARENA_RADIUS-18.0)
+			var tangent:=Vector2.RIGHT.rotated(angle+PI*.5)
+			draw_line(pos-tangent*10.0,pos+tangent*10.0,Color(accent,.72),3)
+		text_at(center+Vector2(-140,-CLASS_BOSS_ARENA_RADIUS+42),["KRIEGSHERR","ARKANHÜTER","JAGDMEISTER"][i],14,accent.lightened(.35),HORIZONTAL_ALIGNMENT_CENTER,280)
 
 func draw_static_overworld(bounds: Rect2) -> void:
 	if not start_tilemap_32_attached and bounds.intersects(StartTileMap32.BOUNDS):
@@ -5938,6 +6003,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 			elif zone == 5 and key % 8 == 0:
 				draw_rect(Rect2(tile_origin + Vector2(8, 41), Vector2(44, 7)), Color('f0af71', 0.18))
 			var p := Vector2(tx * 64 + (key % 23), ty * 64 + ((key / 23) % 25))
+			if class_boss_arena_index_at(p,55.0)>=0:continue
 			if not region_rect(zone).grow(-45).encloses(Rect2(p-Vector2(100,160),Vector2(200,210))): continue
 			if distance_to_trail(p) < 120.0: continue
 			if zone == 0:
@@ -5996,7 +6062,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 	for cx in range(cell_min_x, cell_max_x):
 		for cy in range(cell_min_y, cell_max_y):
 			var obstacle := obstacle_in_cell(cx, cy)
-			if not obstacle.is_empty() and visible_world(obstacle['pos'], 110): draw_obstacle(obstacle)
+			if not obstacle.is_empty() and class_boss_arena_index_at(obstacle['pos'],65.0)<0 and visible_world(obstacle['pos'], 110): draw_obstacle(obstacle)
 	
 	draw_village_ground()
 	if bounds.intersects(Rect2(WAYSTONES[0]-Vector2(280,280),Vector2(560,560))):SpawnPlatform32.platform(self,WAYSTONES[0])
