@@ -1,16 +1,16 @@
 extends RefCounted
 const H = preload("res://components/reference_house.gd")
 const SHOPS := [
-	{"name":"Mira","house":Vector2(220,650),"kind":"quest","sign":"RATSHALLE","cart":Vector2(434,801)},
-	{"name":"Liora","house":Vector2(540,460),"kind":"research","sign":"ARCHIV","cart":Vector2(754,611)},
-	{"name":"Arven","house":Vector2(1100,450),"kind":"arena","sign":"KÄMPFERGILDE","cart":Vector2(1314,601)},
-	{"name":"Torvald","house":Vector2(220,1240),"kind":"smith","sign":"SCHMIEDE","cart":Vector2(434,1391)},
-	{"name":"Fenna","house":Vector2(500,1430),"kind":"merchant","sign":"HANDELSHAUS","cart":Vector2(714,1581)},
-	{"name":"Pip","house":Vector2(1110,1380),"kind":"alchemy","sign":"ALCHEMIE","cart":Vector2(1324,1531)},
-	{"name":"Elara","house":Vector2(1440,1300),"kind":"healer","sign":"HEILHAUS","cart":Vector2(1364,1451)},
+	{"name":"Liora","house":Vector2(180,240),"kind":"research","sign":"ARCHIV","cart":Vector2(80,520)},
+	{"name":"Fenna","house":Vector2(180,820),"kind":"style","sign":"ATELIER","cart":Vector2(86,1110)},
+	{"name":"Elara","house":Vector2(450,1220),"kind":"healer","sign":"HEILHAUS","cart":Vector2(378,1510)},
+	{"name":"Alma","house":Vector2(720,1320),"kind":"innkeeper","sign":"STEINROSE","cart":Vector2(826,1608)},
+	{"name":"Mira","house":Vector2(1320,1030),"kind":"elder","sign":"RATSHALLE","cart":Vector2(1530,1310)},
+	{"name":"Pip","house":Vector2(1030,300),"kind":"apprentice","sign":"LEHRLING","cart":Vector2(1126,600)},
+	{"name":"Torvald","house":Vector2(180,1850),"kind":"smith","sign":"SCHMIEDE","cart":Vector2(390,2135)},
+	{"name":"Arven","house":Vector2(1220,1860),"kind":"arena","sign":"ARENA","cart":Vector2(1430,2140)},
 	{"name":"Borin","house":Vector2(1330,230),"kind":"borin","sign":"SKILLZAUBERER","cart":Vector2(1458,540)}
 ]
-
 static func plaza(c: CanvasItem) -> void:
 	c.draw_rect(Rect2(480,680,690,650),Color("697563"))
 	c.draw_rect(Rect2(490,690,670,630),Color("b2ae90"))
