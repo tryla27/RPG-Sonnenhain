@@ -37,6 +37,7 @@ const FOODS = [
 const BUSHES=[Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]
 const TREES=[Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680)]
 const REGROW_SECONDS=300
+const BODY_RADIUS=34.0
 const REGION_FOOD=[-1,6,30,29,23,5,7,3,24,25,26,27,28]
 var harvested:Dictionary={}
 var plants:Array=[]
@@ -47,9 +48,25 @@ func configure(g)->void:
   var bounds:Rect2=g.region_rect(region).intersection(Rect2(Vector2.ZERO,g.WORLD))
   for offset in [Vector2(-160,-140),Vector2(160,-140),Vector2(0,180)]:
    var desired:Vector2=bounds.get_center()+offset
-   var p:Vector2=g.safe_world_teleport_destination(desired,region)
+   var p:Vector2=safe_plant_position(g,desired,region)
    plants.append({"point":p,"food":REGION_FOOD[region],"tree":false})
    plant_foods[key(p)]=REGION_FOOD[region]
+func safe_plant_position(g,desired:Vector2,region:int)->Vector2:
+ var offsets=[Vector2.ZERO,Vector2(96,0),Vector2(-96,0),Vector2(0,96),Vector2(0,-96),Vector2(96,96),Vector2(-96,96),Vector2(96,-96),Vector2(-96,-96),Vector2(192,0),Vector2(-192,0),Vector2(0,192),Vector2(0,-192)]
+ for offset in offsets:
+  var candidate:Vector2=(desired+offset).clamp(Vector2(64,64),g.WORLD-Vector2(64,64))
+  if g.region_at(candidate)!=region or g.terrain_blocked(candidate) or g.blocked_by_region_wall(candidate):continue
+  var occupied:=false
+  for stone in g.WAYSTONES:
+   if candidate.distance_to(stone)<260.0:occupied=true;break
+  if occupied:continue
+  for landmark in g.LANDMARKS:
+   if candidate.distance_to(landmark["pos"])<190.0:occupied=true;break
+  if occupied:continue
+  for plant in plants:
+   if candidate.distance_to(plant["point"])<110.0:occupied=true;break
+  if not occupied:return candidate
+ return g.safe_world_teleport_destination(desired,region)
 var regen_rate:=0.0
 var regen_until:=0.0
 static func by_name(food_name:String)->Dictionary:
@@ -93,6 +110,27 @@ func nearest(g)->Dictionary:
    found={"point":p,"food":plant["food"]}
    distance=d
  return found
+func plant_by_key(g,plant_key:String)->Dictionary:
+ configure(g)
+ for plant in plants:
+  if key(plant["point"])==plant_key:return plant
+ return {}
+func blocks(g,p:Vector2,radius:float=0.0)->bool:
+ configure(g)
+ for plant in plants:
+  var center:Vector2=plant["point"]+Vector2(0,8)
+  if p.distance_to(center)<BODY_RADIUS+maxf(0.0,radius):return true
+ return false
+func accepted_move(g,from_pos:Vector2,to_pos:Vector2,radius:float)->Vector2:
+ configure(g)
+ var distance:=from_pos.distance_to(to_pos)
+ var steps:=maxi(1,ceili(distance/10.0))
+ var accepted:=from_pos
+ for step in range(1,steps+1):
+  var target:=from_pos.lerp(to_pos,float(step)/steps)
+  if blocks(g,target,radius):break
+  accepted=target
+ return accepted
 func harvest(g)->bool:
  var plant:=nearest(g)
  if plant.is_empty():return false
@@ -105,6 +143,9 @@ func harvest(g)->bool:
  item["count"]=3
  if not g.can_add_item(item):
   g.message("Dein Inventar ist voll. Die Fruechte bleiben an der Pflanze.");return true
+ if g.network_mode=="client":
+  g.request_server_food_harvest(key(p))
+  return true
  if not g.add_item(item):return true
  harvested[key(p)]=now+REGROW_SECONDS
  g.message("3x %s gepflueckt. Nachwachsen in 5 Minuten." % info["name"])
@@ -137,8 +178,7 @@ func regional_props(g)->Array:
  configure(g)
  var result:Array=[]
  for plant in plants:
-  if plant["point"] not in BUSHES+TREES:
-   result.append({"kind":"bush","point":plant["point"],"depth":plant["point"].y+20})
+  result.append({"kind":"bush","point":plant["point"],"depth":plant["point"].y+20,"plant_key":key(plant["point"])})
  return result
 static func food_rect(c:CanvasItem,p:Vector2,s:float,x:float,y:float,w:float,h:float,col:Color)->void:
  PixelStyle32.rect(c,Rect2(p+Vector2(x,y)*s,Vector2(w,h)*s),col)
@@ -221,3 +261,4 @@ func bush(c:CanvasItem,p:Vector2)->void:
  if not ready_at(p,Time.get_unix_time_from_system()):
   var seconds:=maxi(0,ceili(float(harvested.get(key(p),0))-Time.get_unix_time_from_system()))
   c.draw_string(ThemeDB.fallback_font,p+Vector2(-22,30),"%02d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("e4cf8b"))
+
