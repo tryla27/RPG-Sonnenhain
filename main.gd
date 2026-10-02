@@ -3632,6 +3632,7 @@ func finish_survival_run() -> void:
 	enemies.clear()
 	projectiles.clear()
 	enemy_projectiles.clear()
+	ensure_arena_reward_item()
 	panel = "arena_reward"
 	play_sound("level")
 	save_game()
@@ -3651,17 +3652,19 @@ func make_arena_weapon(wave:int) -> Dictionary:
 	item["design"]=2 if class_id==0 and choice in [1,2] else (3 if class_id==2 and choice==3 else choice%4)
 	return item
 
-func claim_arena_chest() -> void:
-	if arena_reward_claimed: return
+func ensure_arena_reward_item() -> void:
+	if not arena_reward_item.is_empty(): return
 	var tier := clampi(int(arena_reward_wave / 5.0), 0, 3)
 	if arena_reward_wave >= 25 and level >= 30: tier = 4
-	if arena_reward_item.is_empty():
-		arena_reward_item = make_item("Truhe der Ewigen Wacht · Welle %d" % arena_reward_wave, class_weapon_icon(), tier, 6 + level * 2 + arena_reward_wave, 0, ["eis", "blitz", "gift"][arena_reward_wave % 3], level)
-		var roll:float=randf()
-		var head_chance:float=0.0 if arena_reward_wave<5 else minf(.08,.02+floorf(arena_reward_wave/10.0)*.02)
-		if roll<head_chance:arena_reward_item=make_class_head(level)
-		elif roll<head_chance+arena_new_weapon_chance(arena_reward_wave):arena_reward_item=make_arena_weapon(arena_reward_wave)
-		save_game()
+	arena_reward_item = make_item("Truhe der Ewigen Wacht · Welle %d" % arena_reward_wave, class_weapon_icon(), tier, 6 + level * 2 + arena_reward_wave, 0, ["eis", "blitz", "gift"][arena_reward_wave % 3], level)
+	var roll:float=randf()
+	var head_chance:float=0.0 if arena_reward_wave<5 else minf(.08,.02+floorf(arena_reward_wave/10.0)*.02)
+	if roll<head_chance:arena_reward_item=make_class_head(level)
+	elif roll<head_chance+arena_new_weapon_chance(arena_reward_wave):arena_reward_item=make_arena_weapon(arena_reward_wave)
+
+func claim_arena_chest() -> void:
+	if arena_reward_claimed: return
+	ensure_arena_reward_item()
 	var reward:Dictionary=arena_reward_item
 	if not can_add_item(reward):
 		message("Inventar voll. Für die Arenabelohnung brauchst du einen freien Platz.")
@@ -8913,13 +8916,25 @@ func draw_arena_entry_panel() -> void:
 func draw_arena_reward_panel() -> void:
 	text_at(Vector2(255, 154), "DIE PRÜFUNG IST VORBEI", 28, Color("ffe0a2"))
 	text_at(Vector2(260, 190), "Erreicht: Welle %d  ·  Bestleistung: %d" % [arena_reward_wave, arena_best], 19, Color("d9e8dd"))
-	text_at(Vector2(260, 225), "Arvens Truhe wartet auf dich. Ihre Stärke folgt deinem Level und deiner Welle.", 16, Color("edddba"))
-	draw_chest(Vector2(760, 321), arena_reward_claimed)
-	text_at(Vector2(260, 266), "BESTENLISTE", 17, Color("f3d393"))
-	for index in mini(10, arena_leaderboard.size()):
+	ensure_arena_reward_item()
+	var reward:Dictionary=arena_reward_item
+	var rarity:=clampi(int(reward.get("rarity",0)),0,RARITY_COLORS.size()-1)
+	var reward_color:Color=RARITY_COLORS[rarity]
+	text_at(Vector2(260, 225), "ARENABELOHNUNG", 16, Color("f3d393"))
+	ui_box(Rect2(260, 245, 430, 118), Color("1d3542"))
+	draw_rect(Rect2(268,253,414,4),reward_color)
+	draw_item_icon(Vector2(282,272),str(reward.get("icon","gem")),reward_color,1.35,weapon_visual_stage(reward),item_design(reward))
+	draw_item_signature(Vector2(282,272),reward)
+	text_at(Vector2(350,281),str(reward.get("name","Arenabelohnung")),18,reward_color,HORIZONTAL_ALIGNMENT_LEFT,320)
+	text_at(Vector2(350,309),"%s · LV %d · %s" % [RARITY_NAMES[rarity],int(reward.get("level",level)),item_type(str(reward.get("icon","gem")))],13,Color("dce7d9"),HORIZONTAL_ALIGNMENT_LEFT,320)
+	var reward_detail:="Schaden" if str(reward.get("icon","")) in ["sword","staff","bow"] else ("Schutz" if str(reward.get("icon","")) in ["armor","head"] else ("Leben" if str(reward.get("icon",""))=="ring" else "Stärke"))
+	text_at(Vector2(350,336),"%s +%d%s" % [reward_detail,int(reward.get("power",0))," · "+str(reward.get("element","")).capitalize() if str(reward.get("element",""))!="" else ""],14,Color("e9dfbd"),HORIZONTAL_ALIGNMENT_LEFT,320)
+	draw_chest(Vector2(760, 315), arena_reward_claimed)
+	text_at(Vector2(260, 388), "BESTENLISTE", 17, Color("f3d393"))
+	for index in mini(5, arena_leaderboard.size()):
 		var record: Dictionary = arena_leaderboard[index]
-		text_at(Vector2(265, 290 + index * 19), "%d. Welle %d · LV %d %s" % [index + 1, int(record["wave"]), int(record["level"]), str(record["class"])], 13, Color("dce7d9"))
-	ui_button(Rect2(307, 510, 260, 48), "TRUHE GEÖFFNET" if arena_reward_claimed else "TRUHE ÖFFNEN", not arena_reward_claimed)
+		text_at(Vector2(265, 412 + index * 19), "%d. Welle %d · LV %d %s" % [index + 1, int(record["wave"]), int(record["level"]), str(record["class"])], 13, Color("dce7d9"))
+	ui_button(Rect2(307, 510, 260, 48), "ITEM ERHALTEN" if not arena_reward_claimed else "ITEM ERHALTEN", not arena_reward_claimed)
 	ui_button(Rect2(585, 510, 260, 48), "ZURÜCK INS DORF", arena_reward_claimed)
 
 func draw_victory_panel() -> void:
