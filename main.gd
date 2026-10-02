@@ -28,6 +28,8 @@ var teleport_serial:=0
 var hurt_until:=0.0
 var mob_deaths:Array=[]
 var dead_mob_uids:Dictionary={}
+var boss_spawn_sound_seen:Dictionary={}
+var boss_death_end_queue:Array=[]
 const INVENTORY_HUD_RECT:=Rect2(584,590,98,42)
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
@@ -1117,7 +1119,7 @@ func push_world_snapshot() -> void:
 		var state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
 		if state.has("dir"):state["dir"]=[state["dir"].x,state["dir"].y]
 		var face:Vector2=enemy.get("facing",Vector2.DOWN)
-		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0)})
+		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0),"boss_spawn_timer":enemy.get("boss_spawn_timer",0.0)})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
 		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0)})
@@ -1163,6 +1165,9 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 			if float(copy.get("hp",1))<float(old.get("hp",1)):copy["flash"]=.18
 		else:
 			copy["pos"] = target
+			if int(copy.get("type",-1)) in [12,13,14] and float(copy.get("boss_spawn_timer",0.0))>0.0 and not boss_spawn_sound_seen.has(uid):
+				boss_spawn_sound_seen[uid]=true
+				play_sound("menu")
 		rebuilt.append(copy)
 	enemies = rebuilt
 	var rebuilt_shots: Array = []
@@ -1451,6 +1456,11 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 
 func _process(delta: float) -> void:
 	combat_feedback.step(delta)
+	for boss_fx_index in range(boss_death_end_queue.size()-1,-1,-1):
+		boss_death_end_queue[boss_fx_index]["remaining"]=float(boss_death_end_queue[boss_fx_index].get("remaining",0.0))-delta
+		if float(boss_death_end_queue[boss_fx_index]["remaining"])<=0.0:
+			play_sound("level")
+			boss_death_end_queue.remove_at(boss_fx_index)
 	if character_created and Vector2(hp,max_hp())!=last_vitals:push_vital_state()
 	if not dedicated_server_mode: food_system.tick(self,delta)
 	update_connection_health(delta)
@@ -1731,6 +1741,11 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 	return result
 
 func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
+	if int(enemy.get("type",-1)) in [12,13,14] and float(enemy.get("boss_spawn_timer",0.0))>0.0:
+		enemy["boss_spawn_timer"]=maxf(0.0,float(enemy["boss_spawn_timer"])-delta)
+		enemy["walking"]=false
+		MobCombat.cancel(enemy)
+		return false
 	if float(enemy.get("stun",0.0))>0.0:
 		MobCombat.cancel(enemy)
 		for index in range(enemy_projectiles.size()-1,-1,-1):
@@ -3525,7 +3540,7 @@ func spawn_dedicated_bosses()->void:
 		var boss:=make_enemy(type,site)
 		boss["uid"]=server_next_mob_uid;server_next_mob_uid+=1
 		boss["hp"]=boss_max_hp(type);boss["max_hp"]=boss["hp"]
-		boss["context"]="world";boss["instance_id"]="world"
+		boss["context"]="world";boss["instance_id"]="world";boss["boss_spawn_timer"]=1.6
 		enemies.append(boss)
 		spawn_tower_guardians(boss)
 
@@ -3543,9 +3558,10 @@ func spawn_nearby_boss() -> void:
 		if exists: continue
 		var info: Dictionary = ENEMY_TYPES[boss_type]
 		var boss_hp: float = boss_max_hp(boss_type)
-		enemies.append({"uid":randi(), "type":boss_type, "pos":site, "home":site, "facing":Vector2.DOWN, "hp":boss_hp, "max_hp":boss_hp, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":1.5, "seed":randf() * 6.28})
+		enemies.append({"uid":randi(), "type":boss_type, "pos":site, "home":site, "facing":Vector2.DOWN, "hp":boss_hp, "max_hp":boss_hp, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":1.5, "seed":randf() * 6.28,"boss_spawn_timer":1.6})
 		spawn_tower_guardians(enemies.back())
-		message("Boss entdeckt: %s!" % info["name"])
+		play_sound("menu")
+		message("Boss erscheint: %s!" % info["name"])
 
 func update_rescue() -> void:
 	if rescue_state == 3 or player_pos.distance_to(RESCUE_POS) > 650: return
@@ -6822,6 +6838,19 @@ func draw_enemy(enemy: Dictionary) -> void:
 	var enemy_color:Color=ENEMY_TYPES[type]["color"]
 	var model_pos:Vector2=p
 	var stride:float=world_time*(3.5 if bool(profile["heavy"]) else 7.0) if bool(enemy.get("walking",false)) else 0.0
+	if boss and float(enemy.get("boss_spawn_timer",0.0))>0.0:
+		var spawn_left:float=clampf(float(enemy["boss_spawn_timer"])/1.6,0.0,1.0)
+		var appear:float=1.0-spawn_left
+		scale_factor*=lerpf(.22,1.0,smoothstep(0.0,1.0,appear))
+		model_pos.y+=lerpf(42.0,0.0,appear)
+		var boss_index:int=type-12
+		var spawn_color:Color=[Color("ff6f58"),Color("ba85ff"),Color("9be46f")][boss_index]
+		draw_circle(p,48.0+appear*22.0,Color(spawn_color,.10*(1.0-appear)))
+		draw_arc(p,62.0+appear*28.0,world_time*2.0,world_time*2.0+PI*1.55,32,Color(spawn_color,.78*(1.0-spawn_left*.35)),5.0)
+		for spark in 8:
+			var a:float=float(spark)*TAU/8.0-world_time*(2.2+boss_index*.35)
+			var sp:Vector2=p+Vector2.RIGHT.rotated(a)*(30.0+spawn_left*70.0)
+			draw_rect(Rect2(sp-Vector2(3,3),Vector2(6,6)),Color(spawn_color,.7))
 	draw_set_transform(Vector2.ZERO)
 	var motion:=Vector2.ONE
 	if type==0:
@@ -10686,7 +10715,7 @@ func rpc_receive_player_vitals(peer_id:int,state:Dictionary)->void:
 	rpc_receive_player_state(peer_id,state)
 
 func announce_mob_death(enemy:Dictionary)->void:
-	var payload:Dictionary={"uid":enemy["uid"],"type":enemy["type"],"pos":[enemy["pos"].x,enemy["pos"].y],"scale":mob_visual_scale(enemy),"context":"world","instance_id":"world"}
+	var payload:Dictionary={"uid":enemy["uid"],"type":enemy["type"],"pos":[enemy["pos"].x,enemy["pos"].y],"scale":mob_visual_scale(enemy),"facing":[Vector2(enemy.get("facing",Vector2.DOWN)).x,Vector2(enemy.get("facing",Vector2.DOWN)).y],"context":"world","instance_id":"world"}
 	if not dedicated_server_mode:receive_mob_death(payload)
 	if network_mode=="host":
 		for peer in multiplayer.get_peers():
@@ -10706,6 +10735,13 @@ func receive_mob_death(payload:Dictionary)->void:
 	dead_mob_uids[uid]=combat_feedback.clock
 	var row:Dictionary=payload.duplicate()
 	row["at"]=combat_feedback.clock
+	var death_type:int=int(row.get("type",-1))
+	if death_type in [12,13,14]:
+		row["duration"]=1.45
+		play_sound("hit")
+		boss_death_end_queue.append({"uid":uid,"remaining":1.35})
+	else:
+		row["duration"]=.45
 	mob_deaths.append(row)
 	while mob_deaths.size()>24:mob_deaths.pop_front()
 	for key in dead_mob_uids.keys():
@@ -10715,11 +10751,34 @@ func draw_mob_deaths()->void:
 	for i in range(mob_deaths.size()-1,-1,-1):
 		var row:Dictionary=mob_deaths[i]
 		var age:float=combat_feedback.clock-float(row["at"])
-		if age>.45:mob_deaths.remove_at(i);continue
-		var raw:Array=row["pos"];var p:=Vector2(float(raw[0]),float(raw[1]))
-		if not visible_world(p,150):continue
+		var duration:float=float(row.get("duration",.45))
+		if age>duration:
+			mob_deaths.remove_at(i)
+			continue
+		var raw:Array=row["pos"]
+		var p:=Vector2(float(raw[0]),float(raw[1]))
+		if not visible_world(p,180):continue
 		var type:int=int(row["type"])
-		MobDesign32.paint(self,p+character_canvas_offset,type,enemy_level(type),Vector2.DOWN,ENEMY_TYPES[type]["color"].darkened(age*.9),0,-1,float(row["scale"])*(1-age*.75),Vector2(1,1-age*1.6))
+		if type in [12,13,14]:
+			var progress:float=clampf(age/duration,0.0,1.0)
+			var boss_index:int=type-12
+			var face_raw:Array=row.get("facing",[0.0,1.0])
+			var look:=Vector2(float(face_raw[0]),float(face_raw[1])).normalized()
+			if look.length_squared()<.01:look=Vector2.DOWN
+			var scale_factor:float=float(row["scale"])*lerpf(1.0,.72,progress)
+			var fall_offset:=Vector2(look.y,-look.x)*progress*22.0+Vector2(0,progress*progress*28.0)
+			var body_pos:=p+fall_offset
+			ReferenceScenery.Hero.paint(self,body_pos,boss_index,0,0,look,progress*2.4,scale_factor,character_canvas_offset,-1.0,look,-1,-1.0,progress*.65,boss_index,0)
+			var color:Color=[Color("ff6a55"),Color("bd80ff"),Color("9ee66d")][boss_index]
+			var burst:float=smoothstep(.55,1.0,progress)
+			draw_arc(p,38.0+progress*78.0,0,TAU,32,Color(color,.65*(1.0-progress)),4.0)
+			for shard in 10:
+				var angle:float=float(shard)*TAU/10.0+float(boss_index)*.35
+				var distance:float=18.0+burst*105.0
+				var point:=p+Vector2.RIGHT.rotated(angle)*distance
+				draw_rect(Rect2(point-Vector2(3,3),Vector2(6,6)),Color(color,.8*(1.0-progress)))
+		else:
+			MobDesign32.paint(self,p+character_canvas_offset,type,enemy_level(type),Vector2.DOWN,ENEMY_TYPES[type]["color"].darkened(age*.9),0,-1,float(row["scale"])*(1-age*.75),Vector2(1,1-age*1.6))
 		draw_set_transform(character_canvas_offset)
 
 func normal_mob_count()->int:
