@@ -110,14 +110,12 @@ func restore(raw:Variant)->void:
  var candidate_until:=clampf(float(raw.get("meal_until",0)),0,now+360)
  if not candidate.is_empty() and bool(candidate.get("meal",false)) and candidate_until>now:
   active_food_name=candidate_name
-  meal_hp_regen=clampf(float(raw.get("meal_hp_regen",candidate.get("meal_hp_regen",0))),0,4)
-  meal_mana_regen=clampf(float(raw.get("meal_mana_regen",candidate.get("meal_mana_regen",0))),0,6)
+  meal_hp_regen=float(candidate.get("meal_hp_regen",0))
+  meal_mana_regen=float(candidate.get("meal_mana_regen",0))
   meal_until=candidate_until
-  var candidate_kind:=str(raw.get("buff_kind",candidate.get("buff","")))
-  if candidate_kind in ["","armor","cooldown","move","damage","gather"]:
-   buff_kind=candidate_kind
-   buff_value=clampf(float(raw.get("buff_value",candidate.get("buff_value",0))),0,0.05)
-   buff_until=meal_until if buff_kind!="" else 0
+  buff_kind=str(candidate.get("buff",""))
+  buff_value=float(candidate.get("buff_value",0))
+  buff_until=meal_until if buff_kind!="" else 0
  prune(now)
 
 func clear_meal()->void:
