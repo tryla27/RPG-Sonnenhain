@@ -56,6 +56,17 @@ func run():
 	invalid["position"] = [NAN,5]
 	assert(not store.valid_data(invalid,g.player_uuid))
 	invalid = data.duplicate(true)
+	invalid["slots"] = [0,0,-1]
+	invalid["learned"][0] = true
+	assert(not store.valid_data(invalid,g.player_uuid))
+	invalid = data.duplicate(true)
+	invalid["learned"][40] = true
+	assert(not store.valid_data(invalid,g.player_uuid))
+	invalid = data.duplicate(true)
+	invalid["class_mastery_unlocked"] = true
+	invalid["arcane_step_learned"] = true
+	assert(not store.valid_data(invalid,g.player_uuid))
+	invalid = data.duplicate(true)
 	invalid["oversize"] = "x".repeat(262145)
 	assert(not store.valid_data(invalid,g.player_uuid))
 	assert(reloaded.open(5,token,"wrong-character")["error"] == "already_online")
@@ -76,6 +87,6 @@ func run():
 	g.class_id = 0
 	g.validate_equipment_slots()
 	assert(g.equipped_ring2_uid == -1)
-	print("SERVER_SAVES_OK: rings, reload, deduplication, stale/foreign writes, invalid/oversize data, backup recovery, corruption and disk failure")
+	print("SERVER_SAVES_OK: rings, reload, deduplication, stale/foreign writes, invalid skill/mastery/oversize data, backup recovery, corruption and disk failure")
 	g.queue_free()
 	quit()
