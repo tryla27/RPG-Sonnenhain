@@ -214,7 +214,7 @@ const QUESTS := [
 ]
 const NPCS := [
 	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1476, 1550), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 470), "color":Color("6783bd"), "kind":"skills"},
+	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 470), "color":Color("6783bd"), "kind":"quest"},
 	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1476, 1550), "color":Color("6bbba4"), "kind":"quest"},
 	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(276, 2030), "color":Color("ab6e60"), "kind":"smith"},
 	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(276, 1000), "color":Color("c080aa"), "kind":"stylist"},
@@ -3694,7 +3694,7 @@ func interior_actors() -> Array:
 		]
 	var pos:=INTERIOR_CENTER+Vector2(0,-95)
 	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-215,-42)
-	var npc_kind:="innkeeper" if room_name=="Alma" else ("smith" if room_name=="Torvald" else ("stylist" if room_name=="Fenna" else ("apprentice" if room_name=="Pip" else ("healer_alchemy" if room_name=="Elara" else ("arena" if room_name=="Arven" else ("skills" if room_name=="Borin" else "quest"))))))
+	var npc_kind:="innkeeper" if room_name=="Alma" else ("smith" if room_name=="Torvald" else ("stylist" if room_name=="Fenna" else ("apprentice" if room_name=="Pip" else ("healer_alchemy" if room_name=="Elara" else ("arena" if room_name=="Arven" else "quest")))))
 	return [{"name":room_name,"role":VillageInteriors32.role_for_id(interior_id),"pos":pos,"color":Color("c9b58a"),"kind":npc_kind}]
 
 func nearby_interior_actor(max_distance:float=145.0)->Dictionary:
@@ -11315,7 +11315,15 @@ func projectile_world_blocked(point:Vector2)->bool:
 	if blocked_by_region_wall(point) or terrain_blocked(point):return true
 	if region_at(point)==0:
 		for home in house_positions():
-			if Rect2(home+Vector2(8,73),Vector2(176,75)).has_point(point):return true
+			var info:Dictionary={}
+			for candidate in VillageLayout.SHOPS:
+				if candidate["house"]==home and not candidate.has("shared_with"):
+					info=candidate
+					break
+			var kind:=str(info.get("kind","home"))
+			if kind=="borin" and Rect2(home+Vector2(12,105),Vector2(232,110)).has_point(point):return true
+			if kind=="arena" and Rect2(home+Vector2(8,88),Vector2(368,136)).has_point(point):return true
+			if kind not in ["borin","arena"] and Rect2(home+Vector2(8,73),Vector2(176,75)).has_point(point):return true
 		for stone in WAYSTONES:
 			if stone==WAYSTONES[0]:
 				if SpawnStoneBody.blocks(point-stone,0):return true
