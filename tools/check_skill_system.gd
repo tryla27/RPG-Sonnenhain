@@ -36,6 +36,21 @@ func run():
 	g.use_item(0)
 	assert(not g.class_mastery_unlocked and g.inventory.size()==1)
 	# Magier-Relikt schaltet Arkanen Schritt ohne Skillpunktkosten frei.
+	# Arkaner Sprung ist kein Startskill: vor Level 15 nicht kaufbar, ab Level 15 nur gegen Skillpunkte.
+	g.class_id=1;g.reset_class_skills();g.level=1;g.skill_points=30
+	assert(not g.learned[19] and not g.buy_skill(19))
+	g.level=15
+	var jump_points_before:=g.skill_points
+	assert(g.buy_skill(19) and g.learned[19] and g.skill_levels[19]==1)
+	assert(g.skill_points<jump_points_before)
+	# Pip verleiht pro Spielstand genau eine klassenpassende Startwaffe.
+	g.inventory.clear();g.pip_loan_received=false;g.class_id=1
+	g.pip_dialogue()
+	assert(g.pip_loan_received and g.inventory.size()==1 and g.inventory[0]["icon"]=="staff")
+	var loan_count:=g.inventory.size();g.pip_dialogue();assert(g.inventory.size()==loan_count)
+	# Borin besitzt genau drei Meilensteinprüfungen auf 3 / 20 / 39.
+	assert(g.BORIN_QUESTS.size()==3)
+	assert(int(g.BORIN_QUESTS[0]["req"])==3 and int(g.BORIN_QUESTS[1]["req"])==20 and int(g.BORIN_QUESTS[2]["req"])==39)
 	g.class_id=1;g.class_mastery_unlocked=false;g.arcane_step_learned=false;g.inventory.clear()
 	assert(g.add_item(g.class_relic_item(1)))
 	var mastery_points_before:int=g.skill_points
