@@ -1,6 +1,5 @@
 extends SceneTree
 
-const Game = preload("res://main.gd")
 const Kitchen = preload("res://components/steinrose_kitchen.gd")
 const Food = preload("res://components/food_system.gd")
 const Store = preload("res://components/server_save_store.gd")
@@ -18,7 +17,7 @@ func _initialize() -> void:
 	call_deferred("run")
 
 func add_food(g, name:String, count:int) -> void:
-	var info:=Food.by_name(name)
+	var info:Dictionary=Food.by_name(name)
 	assert(not info.is_empty(), "missing food registry entry: "+name)
 	var item:Dictionary=g.make_item(name,"food",0,0,int(info.get("price",1)),"",1)
 	item["count"]=count
@@ -36,13 +35,14 @@ func run() -> void:
 	g.character_created=true
 	g.player_uuid="steinrose-test"
 	g.hero_name="Kuechentest"
-	g.class_id=0
+	g.class_id=1
 	g.level=20
 	g.gold=10000
 	g.reset_class_skills()
 
 	assert(Kitchen.BERRIES.size()==12)
-	assert(Kitchen.RECIPES.size()==6)
+	assert(Kitchen.RECIPES.size()==12)
+	assert(Food.FOODS.size()==43)
 	for berry in Kitchen.BERRIES:
 		assert(Food.index_for(berry)>=0, "regional berry missing: "+berry)
 
@@ -50,7 +50,7 @@ func run() -> void:
 	assert(g.panel=="steinrose")
 	g.panel=""
 
-	var expected_buffs:=["","energy_regen","armor","cooldown","move","power_speed"]
+	var allowed_buffs:=["","armor","cooldown","move","damage","gather"]
 	for recipe_index in Kitchen.RECIPES.size():
 		g.inventory.clear()
 		var recipe:Dictionary=Kitchen.RECIPES[recipe_index]
@@ -58,35 +58,65 @@ func run() -> void:
 			add_food(g,str(ingredient),int(recipe["ingredients"][ingredient]))
 		if recipe_index>0:
 			assert(g.steinrose.learn_recipe(g,recipe_index))
-			assert(g.steinrose.learned[recipe_index])
+		assert(g.steinrose.learned[recipe_index])
 		assert(g.steinrose.can_cook(g,recipe_index))
 		assert(g.steinrose.cook(g,recipe_index))
 		var output_index:=find_food(g,str(recipe["name"]))
 		assert(output_index>=0,"cooked meal missing: "+str(recipe["name"]))
+		var info:Dictionary=Food.by_name(str(recipe["name"]))
+		assert(bool(info.get("meal",false)))
+		assert(int(info.get("meal_duration",0))==360)
+		assert(str(info.get("buff","")) in allowed_buffs)
 		g.hp=maxf(1.0,g.max_hp()-50.0)
 		g.energy=0
 		assert(g.food_system.eat(g,output_index))
-		assert(g.hp>g.max_hp()-50.0)
-		var expected:String=expected_buffs[recipe_index]
-		if expected=="":
-			assert(not g.food_system.buff_active())
+		assert(g.food_system.active_food_name==str(recipe["name"]))
+		assert(g.food_system.meal_remaining()>=359 and g.food_system.meal_remaining()<=360)
+		assert(g.food_system.meal_until>Time.get_unix_time_from_system()+358.0)
+		if recipe_index>=10:
+			assert(float(info.get("meal_hp_regen",0))==0.0)
+			assert(float(info.get("meal_mana_regen",0))>0.0)
+			assert(str(info.get("buff",""))=="")
+			var before_hp:float=g.hp
+			var before_mana:float=g.energy
+			g.food_system.tick(g,1.0)
+			assert(is_equal_approx(g.hp,before_hp))
+			assert(g.energy>before_mana)
 		else:
-			assert(g.food_system.buff_kind==expected)
-			assert(g.food_system.buff_active(expected))
-			assert(g.food_system.buff_until>Time.get_unix_time_from_system())
+			assert(float(info.get("meal_hp_regen",0))>=2.0)
+			assert(float(info.get("meal_mana_regen",0))==0.0)
 
-	# Buffs replace each other instead of stacking.
-	g.food_system.buff_kind="armor"
-	g.food_system.buff_value=0.12
-	g.food_system.buff_until=Time.get_unix_time_from_system()+30
+	# One long meal only: a new dish replaces every effect from the previous one.
+	g.food_system.clear_meal()
+	g.inventory.clear()
+	add_food(g,"Steinbeeren-Riegel",1)
+	assert(g.food_system.eat(g,0))
+	assert(g.food_system.buff_active("armor"))
+	assert(g.food_system.active_food_name=="Steinbeeren-Riegel")
 	g.inventory.clear()
 	add_food(g,"Nebelpflaumen-Tee",1)
 	assert(g.food_system.eat(g,0))
-	assert(g.food_system.buff_kind=="move")
+	assert(g.food_system.active_food_name=="Nebelpflaumen-Tee")
+	assert(g.food_system.buff_active("move"))
 	assert(not g.food_system.buff_active("armor"))
 	assert(g.food_system.move_mult()>1.0)
 
-	# Kitchen progression and food buffs survive the same server-save payload shape.
+	# Mana food is deliberately pure mana regeneration and replaces the movement meal.
+	g.inventory.clear()
+	add_food(g,"Blauer Mondkuchen",1)
+	assert(g.food_system.eat(g,0))
+	assert(g.food_system.active_food_name=="Blauer Mondkuchen")
+	assert(g.food_system.meal_hp_regen==0)
+	assert(g.food_system.meal_mana_regen==6)
+	assert(g.food_system.buff_kind=="")
+	assert(not g.food_system.buff_active())
+	var mana_hp:float=g.hp
+	var mana_before:float=g.energy
+	g.food_system.tick(g,1.0)
+	assert(is_equal_approx(g.hp,mana_hp))
+	assert(g.energy>mana_before)
+
+	# Recipe progress and absolute expiry survive reconnect/save; time keeps running offline.
 	var kitchen_state:Dictionary=g.steinrose.snapshot()
 	var food_state:Dictionary=g.food_system.snapshot()
 	var restored:=Kitchen.new()
@@ -94,15 +124,24 @@ func run() -> void:
 	assert(restored.learned==g.steinrose.learned)
 	var restored_food:=Food.new()
 	restored_food.restore(food_state)
-	assert(restored_food.buff_kind=="move")
-	assert(restored_food.move_mult()>1.0)
+	assert(restored_food.active_food_name=="Blauer Mondkuchen")
+	assert(restored_food.meal_mana_regen==6)
+	assert(restored_food.meal_remaining()>350)
 
 	var store:=Store.new()
 	assert(store.valid_steinrose_state(kitchen_state))
 	assert(store.valid_food_state(food_state))
-	assert(not store.valid_steinrose_state({"learned":[true,true,true,true,true,true,true]}))
-	assert(not store.valid_food_state({"plants":{},"regen_rate":0,"regen_until":0,"buff_kind":"godmode","buff_value":1.0,"buff_until":9999999999.0}))
+	assert(not store.valid_steinrose_state({"learned":[true,true,true,true,true,true,true,true,true,true,true,true,true]}))
+	var bad_food:=food_state.duplicate(true)
+	bad_food["meal_mana_regen"]=50
+	assert(not store.valid_food_state(bad_food))
+	bad_food=food_state.duplicate(true)
+	bad_food["active_food_name"]="Gefälschtes Essen"
+	assert(not store.valid_food_state(bad_food))
+	bad_food=food_state.duplicate(true)
+	bad_food["meal_until"]=Time.get_unix_time_from_system()+500
+	assert(not store.valid_food_state(bad_food))
 
-	print("STEINROSE_KITCHEN_OK 12 regional berries, 6 recipes, learning, ingredient consumption, crafted foods, exclusive buffs and durable save state")
+	print("STEINROSE_KITCHEN_OK 12 regional fruits, 12 recipes, 360s single active meal, pure mana regeneration, replacement, HUD-ready timer data and durable save/reconnect state")
 	g.queue_free()
 	quit()
