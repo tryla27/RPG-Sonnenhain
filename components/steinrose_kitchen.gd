@@ -236,14 +236,14 @@ func draw(g) -> void:
 	g.text_at(Vector2(745,490),"gleichzeitig aktiv.",11,Color("aebfb9"))
 
 	if tab == 1:
-		g.ui_box(Rect2(410,465,300,65),Color("233b42"))
+		g.ui_box(Rect2(410,455,300,78),Color("233b42"))
 		for i in BERRIES.size():
-			var col := i / 6
-			var row := i % 6
+			var col: int = int(i / 6.0)
+			var row: int = i % 6
 			var x := 417.0 + col*145.0
-			var y := 480.0 + row*16.0
+			var y := 470.0 + row*10.0
 			var id := FoodSystem.index_for(BERRIES[i])
-			g.text_at(Vector2(x,y),"%s · %d" % [BERRIES[i],inventory_count(g,BERRIES[i])],9,Color(FoodSystem.FOODS[id]["color"]),HORIZONTAL_ALIGNMENT_LEFT,140)
+			g.text_at(Vector2(x,y),"%s · %d" % [BERRIES[i],inventory_count(g,BERRIES[i])],8,Color(FoodSystem.FOODS[id]["color"]),HORIZONTAL_ALIGNMENT_LEFT,140)
 	elif tab == 2:
 		g.ui_box(Rect2(410,465,300,65),Color("233b42"))
 		g.text_at(Vector2(420,484),"Buffs ersetzen einander statt zu stapeln.",10,Color("d8e6dc"))

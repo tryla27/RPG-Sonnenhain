@@ -24,8 +24,8 @@ class Board extends "res://main.gd":
 			for design in 4:
 				draw_item_icon(Vector2(35+kind*127,585+design*55),kinds[kind],Color("85cdd8"),1.0,design,design)
 			draw_string(font,Vector2(35+kind*127,820),kinds[kind],HORIZONTAL_ALIGNMENT_LEFT,-1,14,Color("eee4cd"))
-		draw_string(font,Vector2(25,868),"ALLE 31 ESSBAREN ITEMS",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("d9b964"))
-		for food in 31:
+		draw_string(font,Vector2(25,868),"ALLE 37 ESSBAREN ITEMS",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("d9b964"))
+		for food in 37:
 			FoodSystem.icon(self,Vector2(35+(food%16)*72,900+(food/16)*62),food,1.0)
 func _initialize()->void:call_deferred("capture")
 func capture()->void:

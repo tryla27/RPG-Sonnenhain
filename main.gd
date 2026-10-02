@@ -7111,7 +7111,7 @@ func draw_hud() -> void:
 	if food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system():
 		text_at(Vector2(22,126),"NAHRUNG +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],12,Color("aed48c"))
 	if food_system.buff_active():
-		text_at(Vector2(22,177),food_system.buff_label(),11,Color("d9c0ff"))
+		text_at(Vector2(22,198),food_system.buff_label(),11,Color("d9c0ff"))
 	draw_ref_panel(Rect2(10, 8, 348, 104))
 	draw_rect(Rect2(22, 16, 5, 17), [Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id])
 	text_at(Vector2(34, 32), "%s · %s · STUFE %d" % [hero_name if hero_name != "" else CLASS_NAMES[class_id].to_upper(), RACE_NAMES[hero_race], level], 15, Color("ffe9b8"))
