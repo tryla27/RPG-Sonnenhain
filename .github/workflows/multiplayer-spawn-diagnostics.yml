@@ -1,0 +1,37 @@
+name: Multiplayer spawn diagnostics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/multiplayer-spawn-diagnostics.yml"
+      - "tools/check_region_spawn_matrix.gd"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-all-errors -o /tmp/godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+      - name: Import
+        run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --editor --import --quit
+      - name: Spawn matrix
+        run: timeout 120 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_region_spawn_matrix.gd
+      - name: Spawn network
+        run: timeout 120 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_spawn_network.gd
+      - name: Combat feedback network
+        run: timeout 120 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_combat_feedback_network.gd
+      - name: Mob combat network
+        run: timeout 120 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_mob_combat_network.gd
+      - name: Party XP network
+        run: timeout 120 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_party_xp_network.gd
