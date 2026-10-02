@@ -20,18 +20,19 @@ const RECIPES := [
 	{"name":"Bernstein-Marmelade","ingredients":{"Bernsteinfrucht":2,"Himbeeren":2,"Bernsteinblatt":1},"learn_cost":11,"desc":"Zaeh und schuetzend wie Harz.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
 	{"name":"Heidelbeer-Pfannkuchen","ingredients":{"Heidelbeeren":3,"Aprikose":1,"Quellminze":1},"learn_cost":12,"desc":"Ein ruhiges Sammlerfruehstueck.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
 	{"name":"Schimmerbeeren-Suppe","ingredients":{"Kristallbeeren":2,"Heidelbeeren":2,"Daemmerkraut":1},"learn_cost":14,"desc":"Blaue Suppe fuer reine Mana-Erholung.","effect":"+4 Mana/s · nur Mana · 6:00"},
-	{"name":"Blauer Mondkuchen","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"Himmelsfrucht":1,"Himmelslavendel":1},"learn_cost":18,"desc":"Almas seltene Notration fuer Magier.","effect":"Mana sofort vollstaendig wiederherstellen"}
+	{"name":"Blauer Mondkuchen","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"Himmelsfrucht":1,"Himmelslavendel":1},"learn_cost":18,"desc":"Almas seltene Notration fuer Magier.","effect":"Mana sofort vollstaendig wiederherstellen"},
+	{"name":"Roter Sonnenkuchen","ingredients":{"Himbeeren":2,"Daemmerbeeren":1,"Sonnenkraut":1},"learn_cost":18,"desc":"Almas rote Notration fuer gefaehrliche Reisen.","effect":"HP sofort vollstaendig wiederherstellen"}
 ]
 
 var selected := 0
 var tab := 0
-var learned: Array = [true,false,false,false,false,false,false,false,false,false,false,false]
+var learned: Array = [true,false,false,false,false,false,false,false,false,false,false,false,false]
 
 func snapshot() -> Dictionary:
 	return {"learned":learned.duplicate()}
 
 func restore(raw: Variant) -> void:
-	learned = [true,false,false,false,false,false,false,false,false,false,false,false]
+	learned = [true,false,false,false,false,false,false,false,false,false,false,false,false]
 	if raw is Dictionary:
 		var stored: Variant = raw.get("learned",[])
 		if stored is Array:
@@ -195,11 +196,16 @@ func draw_recipe_detail(g, allow_cook:bool=false) -> void:
 		y+=24
 	g.text_at(Vector2(745,414),"WIRKUNG",12,Color("e9cc90"))
 	g.text_at(Vector2(745,437),str(detail["effect"]),10,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,220)
-	g.text_at(Vector2(745,467),"DAUER  06:00",11,Color("ffe1a0"))
+	if str(detail["name"]) in ["Blauer Mondkuchen","Roter Sonnenkuchen"]:
+		g.text_at(Vector2(745,467),"WIRKUNG  SOFORT",11,Color("ffe1a0"))
+	else:
+		g.text_at(Vector2(745,467),"DAUER  06:00",11,Color("ffe1a0"))
 	if str(detail["name"])=="Schimmerbeeren-Suppe":
 		g.text_at(Vector2(745,490),"Nur Mana-Regeneration, kein HP-Bonus.",9,Color("8fc4ff"),HORIZONTAL_ALIGNMENT_LEFT,220)
 	elif str(detail["name"])=="Blauer Mondkuchen":
-		g.text_at(Vector2(745,490),"Sofort 100% Mana · kein 6-Minuten-Buff.",9,Color("8fc4ff"),HORIZONTAL_ALIGNMENT_LEFT,220)
+		g.text_at(Vector2(745,490),"Sofort 100% Mana · bestehender Buff bleibt.",9,Color("8fc4ff"),HORIZONTAL_ALIGNMENT_LEFT,220)
+	elif str(detail["name"])=="Roter Sonnenkuchen":
+		g.text_at(Vector2(745,490),"Sofort 100% HP · bestehender Buff bleibt.",9,Color("ffb0ad"),HORIZONTAL_ALIGNMENT_LEFT,220)
 	elif allow_cook:
 		g.text_at(Vector2(745,490),"Deine Zutaten bestimmen den Preis.",9,Color("aebfb9"),HORIZONTAL_ALIGNMENT_LEFT,220)
 
@@ -245,7 +251,7 @@ func draw_effects_page(g) -> void:
 		g.text_at(Vector2(425,220),"Kein Langzeit-Essenseffekt aktiv.",11,Color("c9d6cf"))
 		g.text_at(Vector2(425,244),"Iss ein gekochtes Gericht, um 6:00 Minuten Regeneration zu erhalten.",9,Color("aebfb9"))
 	g.text_at(Vector2(410,296),"GRUNDREGELN",12,Color("e9cc90"))
-	var rules:=["• Immer nur 1 Langzeit-Gericht aktiv.","• Neues Langzeit-Gericht ersetzt den alten Effekt.","• HP-Gerichte regenerieren vor allem Leben.","• Schimmerbeeren-Suppe regeneriert nur Mana.","• Mondkuchen fuellt Mana sofort und ersetzt keinen Buff."]
+	var rules:=["• Immer nur 1 Langzeit-Gericht aktiv.","• Neues Langzeit-Gericht ersetzt den alten Effekt.","• HP-Gerichte regenerieren vor allem Leben.","• Schimmerbeeren-Suppe regeneriert nur Mana.","• Blaue/rote Kuchen fuellen Mana/HP sofort und lassen Buffs bestehen."]
 	for i in rules.size():g.text_at(Vector2(420,320+i*22),rules[i],10,Color("d8e6dc"))
 	g.text_at(Vector2(410,444),"GERICHTE IM UEBERBLICK",12,Color("e9cc90"))
 	for i in RECIPES.size():
@@ -282,7 +288,7 @@ func draw(g) -> void:
 	g.text_at(Vector2(178,430),"Wirtin der Steinrose.",12,Color("d8e6dc"))
 	g.text_at(Vector2(178,452),"Bring mir deine Fruechte,",12,Color("d8e6dc"))
 	g.text_at(Vector2(178,470),"ich uebernehme den Rest.",12,Color("d8e6dc"))
-	g.text_at(Vector2(178,500),"Ein Gericht wirkt 6 Minuten.",11,Color("aebfb9"))
+	g.text_at(Vector2(178,500),"Langzeitgerichte wirken 6 Minuten.",11,Color("aebfb9"))
 	match tab:
 		0:draw_recipe_page(g)
 		1:draw_berries_page(g)
