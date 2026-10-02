@@ -9,18 +9,18 @@ const BERRIES := [
 const BERRY_REGIONS := [1,2,3,4,5,6,7,8,9,10,11,12]
 
 const RECIPES := [
-	{"name":"Waldbeer-Kompott","ingredients":{"Himbeeren":2,"Heidelbeeren":2},"learn_cost":0,"desc":"Warme Waldbeeren fuer lange Wege.","effect":"+25 HP sofort · +2 HP/s · 6:00"},
-	{"name":"Moosbeeren-Eintopf","ingredients":{"Moosbeeren":3,"Aprikose":1},"learn_cost":4,"desc":"Kraeftiger Eintopf aus dem Pilzwald.","effect":"+20 HP sofort · +3 HP/s · 6:00"},
-	{"name":"Steinbeeren-Riegel","ingredients":{"Steinbeeren":3,"Bernsteinfrucht":1},"learn_cost":5,"desc":"Fest, haltbar und schuetzend.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
-	{"name":"Kristallgelee","ingredients":{"Kristallbeeren":2,"Quellbeeren":2},"learn_cost":6,"desc":"Kuehlendes Gelee fuer konzentrierte Kaempfer.","effect":"+3 HP/s · +5% Cooldown-Tempo · 6:00"},
-	{"name":"Nebelpflaumen-Tee","ingredients":{"Nebelbeeren":2,"Pflaume":2},"learn_cost":7,"desc":"Leichter Tee fuer schnelle Schritte.","effect":"+2 HP/s · +5% Bewegung · 6:00"},
-	{"name":"Daemmerhimmel-Torte","ingredients":{"Daemmerbeeren":2,"Himmelsfrucht":2},"learn_cost":9,"desc":"Almas seltenes Reisegericht.","effect":"+4 HP/s · +4% Schaden · 6:00"},
-	{"name":"Himmelsfrucht-Salat","ingredients":{"Himmelsfrucht":1,"Quellbeeren":2,"Aprikose":1},"learn_cost":10,"desc":"Frisch, leicht und ideal zum Sammeln.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
-	{"name":"Quellbeeren-Brei","ingredients":{"Quellbeeren":3,"Moosbeeren":1},"learn_cost":10,"desc":"Sanfte, reine Regeneration.","effect":"+3 HP/s · 6:00"},
-	{"name":"Bernstein-Marmelade","ingredients":{"Bernsteinfrucht":2,"Himbeeren":2},"learn_cost":11,"desc":"Zaeh und schuetzend wie Harz.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
-	{"name":"Heidelbeer-Pfannkuchen","ingredients":{"Heidelbeeren":3,"Aprikose":1},"learn_cost":12,"desc":"Ein ruhiges Sammlerfruehstueck.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
-	{"name":"Schimmerbeeren-Suppe","ingredients":{"Kristallbeeren":2,"Heidelbeeren":2},"learn_cost":14,"desc":"Blaue Suppe fuer reine Mana-Erholung.","effect":"+4 Mana/s · nur Mana · 6:00"},
-	{"name":"Blauer Mondkuchen","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"Himmelsfrucht":1},"learn_cost":18,"desc":"Almas staerkstes Mana-Gericht.","effect":"+6 Mana/s · nur Mana · 6:00"}
+	{"name":"Waldbeer-Kompott","ingredients":{"Himbeeren":2,"Heidelbeeren":2,"__herb__":1},"learn_cost":0,"desc":"Warme Waldbeeren fuer lange Wege.","effect":"+25 HP sofort · +2 HP/s · 6:00"},
+	{"name":"Moosbeeren-Eintopf","ingredients":{"Moosbeeren":3,"Aprikose":1,"__herb__":1},"learn_cost":4,"desc":"Kraeftiger Eintopf aus dem Pilzwald.","effect":"+20 HP sofort · +3 HP/s · 6:00"},
+	{"name":"Steinbeeren-Riegel","ingredients":{"Steinbeeren":3,"Bernsteinfrucht":1,"__herb__":1},"learn_cost":5,"desc":"Fest, haltbar und schuetzend.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
+	{"name":"Kristallgelee","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"__herb__":1},"learn_cost":6,"desc":"Kuehlendes Gelee fuer konzentrierte Kaempfer.","effect":"+3 HP/s · +5% Cooldown-Tempo · 6:00"},
+	{"name":"Nebelpflaumen-Tee","ingredients":{"Nebelbeeren":2,"Pflaume":2,"__herb__":1},"learn_cost":7,"desc":"Leichter Tee fuer schnelle Schritte.","effect":"+2 HP/s · +5% Bewegung · 6:00"},
+	{"name":"Daemmerhimmel-Torte","ingredients":{"Daemmerbeeren":2,"Himmelsfrucht":2,"__herb__":1},"learn_cost":9,"desc":"Almas seltenes Reisegericht.","effect":"+4 HP/s · +4% Schaden · 6:00"},
+	{"name":"Himmelsfrucht-Salat","ingredients":{"Himmelsfrucht":1,"Quellbeeren":2,"Aprikose":1,"__herb__":1},"learn_cost":10,"desc":"Frisch, leicht und ideal zum Sammeln.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
+	{"name":"Quellbeeren-Brei","ingredients":{"Quellbeeren":3,"Moosbeeren":1,"__herb__":1},"learn_cost":10,"desc":"Sanfte, reine Regeneration.","effect":"+3 HP/s · 6:00"},
+	{"name":"Bernstein-Marmelade","ingredients":{"Bernsteinfrucht":2,"Himbeeren":2,"__herb__":1},"learn_cost":11,"desc":"Zaeh und schuetzend wie Harz.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
+	{"name":"Heidelbeer-Pfannkuchen","ingredients":{"Heidelbeeren":3,"Aprikose":1,"__herb__":1},"learn_cost":12,"desc":"Ein ruhiges Sammlerfruehstueck.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
+	{"name":"Schimmerbeeren-Suppe","ingredients":{"Kristallbeeren":2,"Heidelbeeren":2,"__herb__":1},"learn_cost":14,"desc":"Blaue Suppe fuer reine Mana-Erholung.","effect":"+4 Mana/s · nur Mana · 6:00"},
+	{"name":"Blauer Mondkuchen","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"Himmelsfrucht":1,"__herb__":1},"learn_cost":18,"desc":"Almas staerkstes Mana-Gericht.","effect":"+6 Mana/s · nur Mana · 6:00"}
 ]
 
 var selected := 0
@@ -46,9 +46,14 @@ func recipe(index: int = -1) -> Dictionary:
 func inventory_count(g, item_name: String) -> int:
 	var total := 0
 	for item in g.inventory:
-		if str(item.get("name","")) == item_name:
+		if item_name=="__herb__":
+			if str(item.get("icon",""))=="herb": total += int(item.get("count",1))
+		elif str(item.get("name","")) == item_name:
 			total += int(item.get("count",1))
 	return total
+
+func ingredient_label(item_name:String)->String:
+	return "Kraut" if item_name=="__herb__" else item_name
 
 func ingredient_status(g, index: int = -1) -> Dictionary:
 	var result := {}
@@ -88,15 +93,18 @@ func remove_item_count(g, item_name: String, amount: int) -> bool:
 	var remaining := amount
 	for i in range(g.inventory.size()-1,-1,-1):
 		var item: Dictionary = g.inventory[i]
-		if str(item.get("name","")) != item_name: continue
+		var matches:bool=str(item.get("icon",""))=="herb" if item_name=="__herb__" else str(item.get("name",""))==item_name
+		if not matches: continue
 		var count := int(item.get("count",1))
 		var take := mini(count,remaining)
 		count -= take
 		remaining -= take
 		if count <= 0:g.inventory.remove_at(i)
 		else:
+			var old_count:int=maxi(1,int(item.get("count",1)))
+			var old_value:int=g.item_sale_value(item)
 			item["count"] = count
-			item["stack_value"] = maxi(0,g.item_sale_value(item)-int(item.get("value",0)))
+			item["stack_value"] = int(round(float(old_value)*count/old_count))
 		if remaining <= 0: break
 	return remaining == 0
 
@@ -177,11 +185,14 @@ func draw_recipe_detail(g, allow_cook:bool=false) -> void:
 	var y:=327.0
 	var status:=ingredient_status(g)
 	for item_name in detail["ingredients"]:
-		var food_id:=FoodSystem.index_for(str(item_name))
-		FoodSystem.icon(g,Vector2(746,y-19),food_id,0.48)
+		if str(item_name)=="__herb__":
+			g.draw_item_icon(Vector2(746,y-19),"herb",Color("8dbb78"),0.48)
+		else:
+			var food_id:=FoodSystem.index_for(str(item_name))
+			FoodSystem.icon(g,Vector2(746,y-19),food_id,0.48)
 		var owned:=int(status[item_name]["owned"])
 		var needed:=int(status[item_name]["needed"])
-		g.text_at(Vector2(774,y),"%s  %d/%d" % [item_name,owned,needed],10,Color("bde8bd") if owned>=needed else Color("e8aaa0"),HORIZONTAL_ALIGNMENT_LEFT,194)
+		g.text_at(Vector2(774,y),"%s  %d/%d" % [ingredient_label(str(item_name)),owned,needed],10,Color("bde8bd") if owned>=needed else Color("e8aaa0"),HORIZONTAL_ALIGNMENT_LEFT,194)
 		y+=24
 	g.text_at(Vector2(745,414),"WIRKUNG",12,Color("e9cc90"))
 	g.text_at(Vector2(745,437),str(detail["effect"]),10,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,220)
@@ -262,7 +273,7 @@ func draw_cook_page(g) -> void:
 
 func draw(g) -> void:
 	g.text_at(Vector2(165,138),"ALMA · KUECHE DER STEINROSE",29,Color("ffe1a0"))
-	g.text_at(Vector2(165,160),"Du bringst die Zutaten · Alma nimmt nur einen kleinen Aufwand",12,Color("b9cbc3"))
+	g.text_at(Vector2(165,160),"Besondere Beeren + 1 Kraut · Alma nimmt nur einen kleinen Aufwand",12,Color("b9cbc3"))
 	var labels:=["REZEPTE","BEEREN & VORRAT","WIRKUNGEN","KOCHEN"]
 	for i in labels.size():g.ui_button(Rect2(165,170+i*48,220,40),labels[i],true,tab==i)
 	g.ui_box(Rect2(165,380,220,150),Color("253b3d"))
