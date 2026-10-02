@@ -33,18 +33,18 @@ const FOODS = [
  {"name":"Himmelsfrucht","color":"dcbadb","heal":18,"regen":3.0,"duration":32,"price":35},
  {"name":"Steinbeeren","color":"b3aaa0","heal":8,"regen":1.5,"duration":16,"price":10},
  {"name":"Moosbeeren","color":"6b8f63","heal":6,"regen":1.0,"duration":14,"price":6},
- {"name":"Waldbeer-Kompott","color":"b94d6f","heal":25,"regen":0.0,"duration":0,"price":42,"meal":true,"meal_hp_regen":2.0,"meal_duration":360},
- {"name":"Moosbeeren-Eintopf","color":"80945e","heal":20,"regen":0.0,"duration":0,"price":48,"meal":true,"meal_hp_regen":3.0,"meal_duration":360},
- {"name":"Steinbeeren-Riegel","color":"9c8c7c","heal":0,"regen":0.0,"duration":0,"price":52,"meal":true,"meal_hp_regen":2.0,"meal_duration":360,"buff":"armor","buff_value":0.05},
- {"name":"Kristallgelee","color":"72d7e5","heal":0,"regen":0.0,"duration":0,"price":58,"meal":true,"meal_hp_regen":3.0,"meal_duration":360,"buff":"cooldown","buff_value":0.05},
- {"name":"Nebelpflaumen-Tee","color":"9070ad","heal":0,"regen":0.0,"duration":0,"price":60,"meal":true,"meal_hp_regen":2.0,"meal_duration":360,"buff":"move","buff_value":0.05},
- {"name":"Daemmerhimmel-Torte","color":"bd8bc7","heal":0,"regen":0.0,"duration":0,"price":85,"meal":true,"meal_hp_regen":4.0,"meal_duration":360,"buff":"damage","buff_value":0.04},
- {"name":"Himmelsfrucht-Salat","color":"c9d9a3","heal":0,"regen":0.0,"duration":0,"price":92,"meal":true,"meal_hp_regen":3.0,"meal_duration":360,"buff":"gather","buff_value":0.04},
- {"name":"Quellbeeren-Brei","color":"b9d7cf","heal":0,"regen":0.0,"duration":0,"price":88,"meal":true,"meal_hp_regen":3.0,"meal_duration":360},
- {"name":"Bernstein-Marmelade","color":"d6a43e","heal":0,"regen":0.0,"duration":0,"price":96,"meal":true,"meal_hp_regen":2.0,"meal_duration":360,"buff":"armor","buff_value":0.05},
- {"name":"Heidelbeer-Pfannkuchen","color":"6c78bc","heal":0,"regen":0.0,"duration":0,"price":104,"meal":true,"meal_hp_regen":3.0,"meal_duration":360,"buff":"gather","buff_value":0.04},
- {"name":"Schimmerbeeren-Suppe","color":"4ba6df","heal":0,"regen":0.0,"duration":0,"price":110,"meal":true,"meal_mana_regen":4.0,"meal_duration":360},
- {"name":"Blauer Mondkuchen","color":"547bd1","heal":0,"regen":0.0,"duration":0,"price":135,"meal":true,"meal_mana_regen":6.0,"meal_duration":360}
+ {"name":"Waldbeer-Kompott","color":"b94d6f","heal":25,"regen":0.0,"duration":0,"price":8,"meal":true,"meal_hp_regen":2.0,"meal_duration":360},
+ {"name":"Moosbeeren-Eintopf","color":"80945e","heal":20,"regen":0.0,"duration":0,"price":10,"meal":true,"meal_hp_regen":3.0,"meal_duration":360},
+ {"name":"Steinbeeren-Riegel","color":"9c8c7c","heal":0,"regen":0.0,"duration":0,"price":10,"meal":true,"meal_hp_regen":2.0,"meal_duration":360,"buff":"armor","buff_value":0.05},
+ {"name":"Kristallgelee","color":"72d7e5","heal":0,"regen":0.0,"duration":0,"price":12,"meal":true,"meal_hp_regen":3.0,"meal_duration":360,"buff":"cooldown","buff_value":0.05},
+ {"name":"Nebelpflaumen-Tee","color":"9070ad","heal":0,"regen":0.0,"duration":0,"price":12,"meal":true,"meal_hp_regen":2.0,"meal_duration":360,"buff":"move","buff_value":0.05},
+ {"name":"Daemmerhimmel-Torte","color":"bd8bc7","heal":0,"regen":0.0,"duration":0,"price":16,"meal":true,"meal_hp_regen":4.0,"meal_duration":360,"buff":"damage","buff_value":0.04},
+ {"name":"Himmelsfrucht-Salat","color":"c9d9a3","heal":0,"regen":0.0,"duration":0,"price":14,"meal":true,"meal_hp_regen":3.0,"meal_duration":360,"buff":"gather","buff_value":0.04},
+ {"name":"Quellbeeren-Brei","color":"b9d7cf","heal":0,"regen":0.0,"duration":0,"price":12,"meal":true,"meal_hp_regen":3.0,"meal_duration":360},
+ {"name":"Bernstein-Marmelade","color":"d6a43e","heal":0,"regen":0.0,"duration":0,"price":14,"meal":true,"meal_hp_regen":2.0,"meal_duration":360,"buff":"armor","buff_value":0.05},
+ {"name":"Heidelbeer-Pfannkuchen","color":"6c78bc","heal":0,"regen":0.0,"duration":0,"price":14,"meal":true,"meal_hp_regen":3.0,"meal_duration":360,"buff":"gather","buff_value":0.04},
+ {"name":"Schimmerbeeren-Suppe","color":"4ba6df","heal":0,"regen":0.0,"duration":0,"price":16,"meal":true,"meal_mana_regen":4.0,"meal_duration":360},
+ {"name":"Blauer Mondkuchen","color":"547bd1","heal":0,"regen":0.0,"duration":0,"price":20,"meal":true,"meal_mana_regen":6.0,"meal_duration":360}
 ]
 const BUSHES=[Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]
 const TREES=[Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680)]
