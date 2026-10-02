@@ -8645,7 +8645,7 @@ func draw_account_form(registering:bool)->void:
 		var cr:=Rect2(300,435,550,48);draw_rect(cr,Color("22363c"));draw_rect(cr,Color("ffe2aa") if account_focus==2 else (Color("b96f68") if account_password_confirm!="" and account_password_confirm!=account_password else Color("8ba49c")),false,2)
 		text_at(cr.position+Vector2(14,31),masked_password(account_password_confirm) if account_password_confirm!="" else "Passwort erneut eingeben …",19,Color("fff0cf") if account_password_confirm!="" else Color("9fb4ac"))
 		if account_password_confirm!="" and account_password_confirm==account_password:
-			text_at(Vector2(865,466),"✓",18,Color("9de6c2"))
+			text_at(Vector2(865,466),"OK",14,Color("9de6c2"))
 	ui_button(Rect2(300,545 if registering else 455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_form_valid(registering))
 	ui_button(Rect2(300,615 if registering else 525,180,42),"ZURÜCK")
 	if account_status!="":text_at(Vector2(500,642 if registering else 552),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,350)
