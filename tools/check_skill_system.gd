@@ -21,10 +21,18 @@ func run():
 	assert(float(g.enemies[0]["hp"])<hp_before,"Magier-Kampfskill verursacht keinen Schaden")
 	g.enemies.clear()
 	g.reset_class_skills();g.level=40;g.skill_points=30;g.gold=20000
-	assert(g.buy_skill(0));assert(g.buy_skill(16))
-	var f:Dictionary=g.FUSIONS[0];var sp:=g.fusion_skill_cost(f);var before:=g.skill_points;var cash:=g.gold
-	assert(sp==(g.skill_point_cost(0)+g.skill_point_cost(16))*2);assert(g.buy_fusion(0))
-	assert(g.learned[40] and g.learned[0] and g.learned[16]);assert(g.skill_points==before-sp and g.gold==cash-int(f["gold"]))
+	assert(g.buy_skill(16));assert(g.buy_skill(20));assert(g.buy_skill(18))
+	var offers:Array=g.available_fusions()
+	assert(not offers.is_empty(),"Gelernte Attacken müssen als Verschmelzungsangebote erscheinen")
+	var f:Dictionary=offers[0]
+	assert(g.learned[int(f["a"])] and g.learned[int(f["b"])],"Fusion darf nur gelernte Attacken anbieten")
+	var sp:=g.fusion_skill_cost(f);var before:=g.skill_points;var cash:=g.gold
+	assert(sp>0 and sp<=before);assert(g.buy_fusion(0))
+	assert(g.learned[int(f["id"])] and g.learned[int(f["a"])] and g.learned[int(f["b"])])
+	assert(g.skill_points==before-sp and g.gold==cash-int(f["gold"]))
+	# Das Belegungsmenü listet gelernte aktive Attacken separat von passiven Werten.
+	var loadout:Array=g.learned_loadout_skills()
+	assert(16 in loadout and 18 in loadout and 20 in loadout)
 	# Klassenboni kommen aus genau einem Relikt des passenden Bosses.
 	assert(g.region_at(g.CLASS_BOSS_SITES[0])==6 and g.region_at(g.CLASS_BOSS_SITES[1])==7 and g.region_at(g.CLASS_BOSS_SITES[2])==8)
 	for boss_index in 3:
@@ -66,4 +74,4 @@ func run():
 	g.player_pos=Vector2(6000,1035)
 	g.class_id=2;g.class_mastery_unlocked=true;g.ranger_hunt_meter=90;g.ranger_hunt_buff=0;g.normal_attack();assert(g.ranger_hunt_buff==60 and g.ranger_hunt_meter==0);g.dodge();assert(g.ranger_stealth_timer>g.dodge_duration)
 	g.class_id=0;g.class_mastery_unlocked=true;g.warrior_rage=0;g.normal_attack();assert(g.warrior_rage>0)
-	print("BORIN_SKILL_SYSTEM_OK universal trees; fusion cost; Map06/07/08 class relics; reservation; rage; arcane step; hunt rush; stealth roll");g.free();quit()
+	print("BORIN_SKILL_SYSTEM_OK universal trees; learned-skill fusion offers; attack loadout; Map06/07/08 class relics; reservation; rage; arcane step; hunt rush; stealth roll");g.free();quit()
