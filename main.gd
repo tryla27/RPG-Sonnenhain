@@ -416,7 +416,7 @@ var network_status := "Offline"
 var network_port := 27844
 var websocket_port := 27845
 const LIVE_MULTIPLAYER_URL := "wss://multiplayer.sonnenhainrpg.de/"
-const NETWORK_PROTOCOL_VERSION := 8
+const NETWORK_PROTOCOL_VERSION := 9
 const PARTY_MAX_MEMBERS := 10
 const PARTY_XP_RANGE := 850.0
 const PARTY_BOSS_RANGE := 1100.0
@@ -1007,9 +1007,11 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 				if KonfluxMap.blocked(target,accepted,room_id): break
 				accepted=target
 			incoming_pos=accepted
-		elif context=="world" and (region_at(old_pos)==0 or region_at(incoming_pos)==0):
+		elif context=="world":
 			var radius:float=[15.0,18.0,16.0][clampi(int(state.get("race",0)),0,2)]-(1.0 if int(state.get("gender",0))==1 else 0.0)
-			incoming_pos=WAYSTONES[0]+SpawnStoneBody.accepted_move(old_pos-WAYSTONES[0],incoming_pos-WAYSTONES[0],radius)
+			if region_at(old_pos)==0 or region_at(incoming_pos)==0:
+				incoming_pos=WAYSTONES[0]+SpawnStoneBody.accepted_move(old_pos-WAYSTONES[0],incoming_pos-WAYSTONES[0],radius)
+			incoming_pos=food_system.accepted_move(self,old_pos,incoming_pos,radius)
 	if in_konflux and incoming_pos.distance_to(Vector2(float(pos_data[0]),float(pos_data[1])))>20:
 		rpc_konflux_correct.rpc_id(sender,[incoming_pos.x,incoming_pos.y])
 	var clean_facing := Vector2(float(facing_data[0]), float(facing_data[1]))
@@ -1080,7 +1082,7 @@ func push_world_snapshot() -> void:
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
 		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0)})
-	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows}
+	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows,"food_plants":food_system.snapshot()["plants"]}
 	for peer_id in multiplayer.get_peers():
 		var state: Dictionary = remote_players.get(int(peer_id),{})
 		if str(state.get("context","world")) == "world":
@@ -1129,6 +1131,61 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 		shot["dir"] = Vector2(float(sdir[0]),float(sdir[1]))
 		rebuilt_shots.append(shot)
 	enemy_projectiles = rebuilt_shots
+	var food_plants:Variant=snapshot.get("food_plants",{})
+	if food_plants is Dictionary:
+		food_system.harvested=food_plants.duplicate()
+	queue_redraw()
+
+func request_server_food_harvest(plant_key:String)->void:
+	if network_mode!="client" or multiplayer.multiplayer_peer==null:return
+	rpc_request_food_harvest.rpc_id(1,plant_key.substr(0,31))
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_request_food_harvest(plant_key:String)->void:
+	if network_mode!="host":return
+	var sender:=multiplayer.get_remote_sender_id()
+	if sender<=0 or not remote_players.has(sender) or not server_action_allowed(sender,"food_harvest:"+plant_key,250):return
+	var state:Dictionary=remote_players[sender]
+	if str(state.get("context","world"))!="world":return
+	var plant:Dictionary=food_system.plant_by_key(self,plant_key)
+	if plant.is_empty():return
+	var coords:Array=state.get("pos",[])
+	if coords.size()!=2:return
+	var peer_pos:=Vector2(float(coords[0]),float(coords[1]))
+	var point:Vector2=plant["point"]
+	if peer_pos.distance_to(point+Vector2(0,20))>=95.0:return
+	var now:=Time.get_unix_time_from_system()
+	if not food_system.ready_at(point,now):
+		rpc_food_harvest_result.rpc_id(sender,plant_key,-1,0,float(food_system.harvested.get(plant_key,now)))
+		return
+	var until:=now+FoodSystem.REGROW_SECONDS
+	food_system.harvested[plant_key]=until
+	for peer_id in multiplayer.get_peers():rpc_food_plant_state.rpc_id(int(peer_id),plant_key,until)
+	rpc_food_harvest_result.rpc_id(sender,plant_key,int(plant["food"]),3,until)
+
+@rpc("authority","call_remote","reliable")
+func rpc_food_plant_state(plant_key:String,until:float)->void:
+	if network_mode!="client" or plant_key.length()>31 or not is_finite(until):return
+	food_system.harvested[plant_key]=clampf(until,0,Time.get_unix_time_from_system()+FoodSystem.REGROW_SECONDS)
+	queue_redraw()
+
+@rpc("authority","call_remote","reliable")
+func rpc_food_harvest_result(plant_key:String,food_id:int,count:int,until:float)->void:
+	if network_mode!="client":return
+	if food_id<0:
+		message("Diese Beeren wurden gerade gepflueckt und wachsen nach.")
+		return
+	if food_id>=FoodSystem.FOODS.size() or count!=3:return
+	var info:Dictionary=FoodSystem.FOODS[food_id]
+	var item:Dictionary=make_item(info["name"],"food",0,0,int(info["price"]),"",1)
+	item["count"]=count
+	if not can_add_item(item):
+		message("Dein Inventar ist voll. Die Ernte konnte nicht aufgenommen werden.")
+		return
+	add_item(item)
+	food_system.harvested[plant_key]=until
+	message("3x %s gepflueckt. Nachwachsen in 5 Minuten." % info["name"])
+	play_sound("pickup");save_game();queue_redraw()
 
 func add_chat_line(author: String, value: String) -> void:
 	var clean := value.strip_edges().substr(0,120)
@@ -1907,7 +1964,7 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 			continue
 		if Rect2(stone+Vector2(-58,-82),Vector2(116,142)).grow(12).has_point(pos): return true
 	if region_at(pos) != 0:
-		return terrain_blocked(pos)
+		return terrain_blocked(pos) or food_system.blocks(self,pos,hero_collision_radius())
 	for shop in VillageLayout.SHOPS:
 		if Rect2(shop["cart"]+Vector2(-45,-24),Vector2(110,49)).grow(10).has_point(pos): return true
 	for tree in REFERENCE_TREES:

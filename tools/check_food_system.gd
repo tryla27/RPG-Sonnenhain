@@ -24,6 +24,13 @@ func run():
   assert(int(plant["food"])==Food.REGION_FOOD[region])
   region_kinds[region]=int(plant["food"])
  assert(region_kinds.size()==12)
+ assert(g.food_system.regional_props(g).size()==36)
+ for plant in g.food_system.plants:
+  var body_center:Vector2=plant["point"]+Vector2(0,8)
+  assert(g.food_system.blocks(g,body_center,g.hero_collision_radius()))
+  assert(not g.food_system.blocks(g,body_center+Vector2(100,0),g.hero_collision_radius()))
+  var stopped:Vector2=g.food_system.accepted_move(g,body_center-Vector2(100,0),body_center+Vector2(100,0),g.hero_collision_radius())
+  assert(stopped.x<body_center.x-Food.BODY_RADIUS)
  assert(Food.FOODS.size()==31)
  # Every edible item stacks and retains its exact fruit design index.
  for info in Food.FOODS:
@@ -98,7 +105,8 @@ func run():
  var data:Dictionary=g.capture_save_data()
  var store=Store.new()
  assert(store.valid_data(data,g.player_uuid))
- var directory=OS.get_environment("TEMP").path_join("sonnenhain-food-"+str(Time.get_ticks_usec())) if OS.has_feature("windows") else "/tmp/sonnenhain-food-"+str(Time.get_ticks_usec())
+ var run_id:="%d-%d-%d" % [OS.get_process_id(),int(Time.get_unix_time_from_system()),Time.get_ticks_usec()]
+ var directory=OS.get_environment("TEMP").path_join("sonnenhain-food-"+run_id) if OS.has_feature("windows") else "/tmp/sonnenhain-food-"+run_id
  assert(store.configure(directory)==OK)
  var token="f".repeat(64)
  assert(store.open(91,token,g.player_uuid)["revision"]==0)
@@ -113,5 +121,5 @@ func run():
  data["food_state"]["regen_rate"]=999
  assert(not store.valid_data(data,g.player_uuid))
  assert(not store.valid_food_state({"plants":[]}))
- print("FOOD_SYSTEM_OK 31 foods, 12 regions / 36 plants harvested through normal interact(), cooldown, inventory limits, healing, regen caps, non-stacking and durable server saves")
+ print("FOOD_SYSTEM_OK 31 foods, 12 regions / 36 visible plants with bodies harvested through normal interact(), cooldown, inventory limits, healing, regen caps, non-stacking and durable server saves")
  quit()
