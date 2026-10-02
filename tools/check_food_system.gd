@@ -24,7 +24,7 @@ func run():
   assert(int(plant["food"])==Food.REGION_FOOD[region])
   region_kinds[region]=int(plant["food"])
  assert(region_kinds.size()==12)
- assert(Food.FOODS.size()==37)
+ assert(Food.FOODS.size()==43)
  # Every edible item stacks and retains its exact fruit design index.
  for info in Food.FOODS:
   var item:Dictionary=g.make_item(info["name"],"food",0,0,info["price"],"",1)
@@ -113,5 +113,5 @@ func run():
  data["food_state"]["regen_rate"]=999
  assert(not store.valid_data(data,g.player_uuid))
  assert(not store.valid_food_state({"plants":[]}))
- print("FOOD_SYSTEM_OK 37 foods incl. 6 Steinrose meals, 12 regions / 36 plants, cooldown, inventory limits, healing, buffs, non-stacking and durable server saves")
+ print("FOOD_SYSTEM_OK 43 foods incl. 12 Steinrose meals, 12 regions / 36 plants, snacks, six-minute meal buffs and durable server saves")
  quit()
