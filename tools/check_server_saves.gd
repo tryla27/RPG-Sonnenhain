@@ -62,10 +62,20 @@ func run():
 	invalid = data.duplicate(true)
 	invalid["learned"][40] = true
 	assert(not store.valid_data(invalid,g.player_uuid))
+	# Relikt-Meisterschaft ist questunabhängig, aber Arkaner Schritt bleibt Magier-exklusiv.
 	invalid = data.duplicate(true)
+	invalid["class_id"] = 0
 	invalid["class_mastery_unlocked"] = true
 	invalid["arcane_step_learned"] = true
 	assert(not store.valid_data(invalid,g.player_uuid))
+	invalid = data.duplicate(true)
+	invalid["class_mastery_unlocked"] = true
+	invalid["arcane_step_learned"] = false
+	assert(not store.valid_data(invalid,g.player_uuid))
+	var valid_mastery:Dictionary=data.duplicate(true)
+	valid_mastery["class_mastery_unlocked"] = true
+	valid_mastery["arcane_step_learned"] = true
+	assert(store.valid_data(valid_mastery,g.player_uuid))
 	invalid = data.duplicate(true)
 	invalid["oversize"] = "x".repeat(262145)
 	assert(not store.valid_data(invalid,g.player_uuid))
@@ -87,6 +97,6 @@ func run():
 	g.class_id = 0
 	g.validate_equipment_slots()
 	assert(g.equipped_ring2_uid == -1)
-	print("SERVER_SAVES_OK: rings, reload, deduplication, stale/foreign writes, invalid skill/mastery/oversize data, backup recovery, corruption and disk failure")
+	print("SERVER_SAVES_OK: rings, reload, deduplication, stale/foreign writes, invalid skill/class consistency/oversize data, backup recovery, corruption and disk failure")
 	g.queue_free()
 	quit()
