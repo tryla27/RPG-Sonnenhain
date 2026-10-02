@@ -48,7 +48,9 @@ func configure(g)->void:
   for offset in [Vector2(-160,-140),Vector2(160,-140),Vector2(0,180)]:
    var desired:Vector2=bounds.get_center()+offset
    var p:Vector2=g.safe_world_teleport_destination(desired,region)
-   plants.append({"point":p,"food":REGION_FOOD[region],"tree":false})
+   if g.region_at(p) != region:
+    p=bounds.get_center()
+   plants.append({"point":p,"food":REGION_FOOD[region],"tree":false,"region":region})
    plant_foods[key(p)]=REGION_FOOD[region]
 var regen_rate:=0.0
 var regen_until:=0.0
@@ -86,11 +88,14 @@ func nearest(g)->Dictionary:
  if g.konflux.active or g.arena_mode!="" or g.dungeon_id>=0 or g.interior_id>=0:return {}
  configure(g)
  var found:Dictionary={};var distance:=95.0
+ var player_region:int=g.region_at(g.player_pos)
  for plant in plants:
   var p:Vector2=plant["point"]
+  var plant_region:int=int(plant.get("region",g.region_at(p)))
+  if plant_region!=player_region:continue
   var d:float=g.player_pos.distance_to(p+Vector2(0,20))
   if d<distance:
-   found={"point":p,"food":plant["food"]}
+   found={"point":p,"food":plant["food"],"region":plant_region}
    distance=d
  return found
 func harvest(g)->bool:
