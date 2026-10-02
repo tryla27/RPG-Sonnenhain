@@ -9,6 +9,18 @@ func run():
 	for race in 3:
 		g.hero_race=race
 		assert(g.SKILL_TREES.size()==3 and g.is_slot_skill(0) and g.is_slot_skill(16) and g.is_slot_skill(34))
+	# Universeller Kampfbaum: auch der Magier muss Kampfskills kaufen und ausführen können.
+	g.class_id=1
+	g.reset_class_skills();g.level=20;g.skill_points=30;g.energy=1000
+	assert(g.buy_skill(0))
+	g.slots[0]=0
+	g.player_pos=Vector2(6000,1000);g.facing=Vector2.RIGHT
+	g.enemies=[g.make_enemy(4,g.player_pos+Vector2(80,0))]
+	var hp_before:float=g.enemies[0]["hp"]
+	g.use_ability(0)
+	assert(float(g.enemies[0]["hp"])<hp_before,"Magier-Kampfskill verursacht keinen Schaden")
+	g.enemies.clear()
+	g.reset_class_skills();g.level=40;g.skill_points=30;g.gold=20000
 	assert(g.buy_skill(0));assert(g.buy_skill(16))
 	var f:Dictionary=g.FUSIONS[0];var sp:=g.fusion_skill_cost(f);var before:=g.skill_points;var cash:=g.gold
 	assert(sp==(g.skill_point_cost(0)+g.skill_point_cost(16))*2);assert(g.buy_fusion(0))
