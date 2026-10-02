@@ -100,7 +100,7 @@ func run()->void:
 	assert(right.remote_players[a]["hp"]==left.max_hp() and right.remote_players[a]["death_progress"]<0)
 	assert(right.remote_player_render_positions[a]==left.player_pos)
 	print("PLAYER_VITALS_TELEPORT_NETWORK_OK HP/death/respawn reliable; same-world waystone travel snaps immediately; normal walking still interpolates")
-	var site:Vector2=server.LANDMARKS[2]["pos"]
+	var site:Vector2=server.CLASS_BOSS_SITES[0]
 	left.player_pos=site+Vector2(0,300);right.player_pos=left.player_pos
 	server.remote_players[a]["pos"]=[left.player_pos.x,left.player_pos.y];server.remote_players[b]["pos"]=[left.player_pos.x,left.player_pos.y]
 	server.enemies.clear();server.spawn_dedicated_bosses();server.spawn_dedicated_bosses();server.push_world_snapshot()
@@ -108,7 +108,7 @@ func run()->void:
 	assert(server.enemies.size()==3 and left.enemies.size()==3 and right.enemies.size()==3)
 	for i in 3:assert(left.enemies[i]["uid"]==right.enemies[i]["uid"])
 	assert(left.enemies[1]["guardian_of"]==left.enemies[0]["uid"] and right.enemies[2]["small_guardian"])
-	print("TOWER_ENCOUNTER_NETWORK_OK one shared boss + exactly two linked guards; no duplicate per client")
+	print("CLASS_BOSS_NETWORK_OK Map06 Kriegsherr shared once + exactly two linked guards; no duplicate per client")
 	
 	for room in [-1,0,1,2,3]:
 		var spot:Vector2=server.KonfluxMap.CENTER+Vector2(4000,1000) if room<0 else server.KonfluxMap.CENTER
