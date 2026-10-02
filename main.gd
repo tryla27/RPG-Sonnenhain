@@ -7583,9 +7583,8 @@ func draw_minimap(rect: Rect2, compact: bool) -> void:
 
 func region_required_boss(zone:int)->int:
 	match zone:
-		7: return 0 # Map 06 Kriegsherr öffnet Map 07
-		8: return 1 # Map 07 Arkanhüter öffnet Map 08
-		9: return 2 # Map 08 Jagdmeister öffnet den weiteren Osten
+		4: return 0
+		5,7: return 1
 	return -1
 
 func boss_gate_name(boss_index:int)->String:
