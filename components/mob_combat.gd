@@ -91,7 +91,7 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 		var distance=position.distance_to(candidate["pos"])
 		var limit=float(config["leash_range"]) if int(candidate["id"])==remembered else float(config["aggro_range"])
 		if distance>=limit or home.distance_to(candidate["pos"])>=float(config["leash_range"]):continue
-		var score:=distance
+		var score:float=distance
 		# Klassenbosse wechseln intelligent auf verwundbare Ziele statt stumpf
 		# immer nur den nächsten Spieler zu verfolgen.
 		if int(enemy["type"]) in [12,13,14]:
