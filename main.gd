@@ -8492,6 +8492,7 @@ func open_account_character(index:int)->void:
 	rpc_zz_save_open.rpc_id(1,server_save.token,player_uuid)
 
 func draw_start_panel() -> void:
+	preload("res://components/start_emblem.gd").background(self)
 	text_at(Vector2(300, 210), "SONNENHAIN", 42, Color("ffe2aa"))
 	text_at(Vector2(300, 248), "Deine Reise beginnt hier.", 18, Color("dce7d8"))
 	text_at(Vector2(300, 320), "Lade deinen Spielstand oder erschaffe einen neuen Charakter.", 16, Color("dce7d8"), HORIZONTAL_ALIGNMENT_LEFT, 550)
