@@ -11286,7 +11286,7 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	var item: Dictionary = raw.duplicate(true)
 	item.erase("uid")
 	var icon := str(item.get("icon","gem"))
-	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food"]:
+	if icon not in ["sword","staff","bow","armor","ring","head","potion","gem","herb","essence","food"]:
 		item["icon"] = "gem"
 	item["rarity"] = clampi(int(item.get("rarity",0)),0,4)
 	item["power"] = clampi(int(item.get("power",0)),0,10000)
