@@ -35,7 +35,11 @@ func _initialize() -> void:
 	assert(game.dash_timer>0.0 and not game.arcane_step_learned)
 	game.dash_timer=0.0;game.dash_cooldown=0.0
 	assert(not game.claim_class_mastery())
+	game.quests.clear()
+	for i in game.QUESTS.size(): game.quests.append({"state":0,"progress":0})
 	game.final_completed=true
+	assert(not game.claim_class_mastery()) # altes Arena-Finale reicht nicht mehr
+	game.quests[game.CLASS_MASTERY_QUEST_INDEX]["state"]=3
 	var points_before:int=game.skill_points
 	assert(game.claim_class_mastery() and game.arcane_step_learned)
 	assert(game.skill_points==points_before)
@@ -50,5 +54,5 @@ func _initialize() -> void:
 	game._unhandled_input(click)
 	assert(game.panel=="map")
 	game.free()
-	print("EQUIPMENT_DEATH_OK six visible armors; merchant pagination stock; delayed revival; mage mastery dodge")
+	print("EQUIPMENT_DEATH_OK six visible armors; merchant pagination stock; delayed revival; Map-8 mage mastery dodge")
 	quit()
