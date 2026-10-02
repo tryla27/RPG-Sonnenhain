@@ -188,39 +188,39 @@ const CLASS_RELIC_RESERVE_MS := 15000
 const QUESTS := [
 	{"title":"Schleime im Blütenwald", "npc":"Mira", "target":0, "count":8, "xp":60, "gold":75, "reward":"Waldklinge"},
 	{"title":"Die Käferplage", "npc":"Mira", "target":1, "count":8, "xp":85, "gold":110, "reward":"Blütenanhänger"},
-	{"title":"Pilze auf Beinen", "npc":"Liora", "target":2, "count":9, "xp":110, "gold":130, "reward":"Waldelixier"},
-	{"title":"Wölfe im Pilzwald", "npc":"Borin", "target":3, "count":9, "xp":140, "gold":160, "reward":"Wolfszahn"},
-	{"title":"Die alten Wächter", "npc":"Borin", "target":4, "count":9, "xp":190, "gold":220, "reward":"Wächterschild"},
+	{"title":"Pilze auf Beinen", "npc":"Mira", "target":2, "count":9, "xp":110, "gold":130, "reward":"Waldelixier"},
+	{"title":"Wölfe im Pilzwald", "npc":"Mira", "target":3, "count":9, "xp":140, "gold":160, "reward":"Wolfszahn"},
+	{"title":"Die alten Wächter", "npc":"Mira", "target":4, "count":9, "xp":190, "gold":220, "reward":"Wächterschild"},
 	{"title":"Spuk in den Ruinen", "npc":"Mira", "target":5, "count":9, "xp":230, "gold":250, "reward":"Geisterklinge"},
-	{"title":"Kristallfieber", "npc":"Liora", "target":6, "count":10, "xp":270, "gold":300, "reward":"Kristallherz"},
-	{"title":"Splitter im Mondlicht", "npc":"Liora", "target":7, "count":10, "xp":320, "gold":360, "reward":"Splitterkrone"},
-	{"title":"Asche vor den Toren", "npc":"Borin", "target":8, "count":11, "xp":380, "gold":420, "reward":"Aschenklinge"},
-	{"title":"Herz aus Glut", "npc":"Borin", "target":9, "count":11, "xp":550, "gold":600, "reward":"Glutbrecher"},
+	{"title":"Kristallfieber", "npc":"Mira", "target":6, "count":10, "xp":270, "gold":300, "reward":"Kristallherz"},
+	{"title":"Splitter im Mondlicht", "npc":"Mira", "target":7, "count":10, "xp":320, "gold":360, "reward":"Splitterkrone"},
+	{"title":"Asche vor den Toren", "npc":"Mira", "target":8, "count":11, "xp":380, "gold":420, "reward":"Aschenklinge"},
+	{"title":"Herz aus Glut", "npc":"Mira", "target":9, "count":11, "xp":550, "gold":600, "reward":"Glutbrecher"},
 	{"title":"Krabben am Strand", "npc":"Mira", "target":10, "count":8, "xp":110, "gold":140, "reward":"Muschelring"},
-	{"title":"Stimmen im Wasser", "npc":"Liora", "target":11, "count":8, "xp":180, "gold":220, "reward":"Gezeitenstein"},
-	{"title":"Der Kriegsherr", "npc":"Borin", "target":12, "count":1, "xp":600, "gold":750, "reward":"Kampfsiegel"},
-	{"title":"Der Arkanhüter", "npc":"Liora", "target":13, "count":1, "xp":800, "gold":950, "reward":"Arkankern"},
+	{"title":"Stimmen im Wasser", "npc":"Mira", "target":11, "count":8, "xp":180, "gold":220, "reward":"Gezeitenstein"},
+	{"title":"Der Kriegsherr", "npc":"Mira", "target":12, "count":1, "xp":600, "gold":750, "reward":"Kampfsiegel"},
+	{"title":"Der Arkanhüter", "npc":"Mira", "target":13, "count":1, "xp":800, "gold":950, "reward":"Arkankern"},
 	{"title":"Der Jagdmeister", "npc":"Mira", "target":14, "count":1, "xp":1100, "gold":1300, "reward":"Jagdzeichen"},
-	{"title":"Spuren im Nebel", "npc":"Liora", "target":17, "count":9, "xp":310, "gold":280, "reward":"Nebelamulett"},
+	{"title":"Spuren im Nebel", "npc":"Mira", "target":17, "count":9, "xp":310, "gold":280, "reward":"Nebelamulett"},
 	{"title":"Lichter ohne Namen", "npc":"Mira", "target":18, "count":9, "xp":360, "gold":325, "reward":"Lichtsplitter"},
-	{"title":"Das goldene Harz", "npc":"Borin", "target":19, "count":10, "xp":610, "gold":490, "reward":"Harzpanzer"},
-	{"title":"Wurzeln der Plage", "npc":"Liora", "target":20, "count":10, "xp":680, "gold":540, "reward":"Wurzelring"},
+	{"title":"Das goldene Harz", "npc":"Mira", "target":19, "count":10, "xp":610, "gold":490, "reward":"Harzpanzer"},
+	{"title":"Wurzeln der Plage", "npc":"Mira", "target":20, "count":10, "xp":680, "gold":540, "reward":"Wurzelring"},
 	{"title":"Die versunkene Quelle", "npc":"Mira", "target":21, "count":11, "xp":880, "gold":760, "reward":"Quellensiegel"},
-	{"title":"Perlen im Dunkel", "npc":"Liora", "target":22, "count":11, "xp":960, "gold":820, "reward":"Perlenring"},
-	{"title":"Ruf vom Dämmergrat", "npc":"Borin", "target":23, "count":12, "xp":1200, "gold":1080, "reward":"Greifenfeder"},
+	{"title":"Perlen im Dunkel", "npc":"Mira", "target":22, "count":11, "xp":960, "gold":820, "reward":"Perlenring"},
+	{"title":"Ruf vom Dämmergrat", "npc":"Mira", "target":23, "count":12, "xp":1200, "gold":1080, "reward":"Greifenfeder"},
 	{"title":"Ritter der letzten Nacht", "npc":"Mira", "target":24, "count":12, "xp":1380, "gold":1180, "reward":"Dämmerrüstung"},
-	{"title":"Flügel über dem Garten", "npc":"Liora", "target":25, "count":13, "xp":1750, "gold":1500, "reward":"Himmelslicht"},
-	{"title":"Die letzte Wache", "npc":"Borin", "target":26, "count":13, "xp":2100, "gold":1750, "reward":"Sternenring"}
+	{"title":"Flügel über dem Garten", "npc":"Mira", "target":25, "count":13, "xp":1750, "gold":1500, "reward":"Himmelslicht"},
+	{"title":"Die letzte Wache", "npc":"Mira", "target":26, "count":13, "xp":2100, "gold":1750, "reward":"Sternenring"}
 ]
 const NPCS := [
-	{"name":"Mira", "role":"Älteste · Quests & Dorf", "pos":Vector2(1476, 1560), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 490), "color":Color("6783bd"), "kind":"quest"},
-	{"name":"Liora", "role":"Forscherin · Quests & Wissen", "pos":Vector2(276, 430), "color":Color("6bbba4"), "kind":"quest"},
-	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(276, 2040), "color":Color("ab6e60"), "kind":"smith"},
-	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(276, 1010), "color":Color("c080aa"), "kind":"stylist"},
-	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1126, 490), "color":Color("9f8bcc"), "kind":"apprentice"},
-	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(546, 1410), "color":Color("e2bc91"), "kind":"healer_alchemy"},
-	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1316, 2050), "color":Color("a48cbd"), "kind":"arena"}
+	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1476, 1550), "color":Color("a77ccb"), "kind":"quest"},
+	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 470), "color":Color("6783bd"), "kind":"skills"},
+	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1476, 1550), "color":Color("6bbba4"), "kind":"quest"},
+	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(276, 2030), "color":Color("ab6e60"), "kind":"smith"},
+	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(276, 1000), "color":Color("c080aa"), "kind":"stylist"},
+	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1126, 480), "color":Color("9f8bcc"), "kind":"apprentice"},
+	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(546, 1400), "color":Color("e2bc91"), "kind":"healer_alchemy"},
+	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1412, 2120), "color":Color("a48cbd"), "kind":"arena"}
 ]
 const SHOPS := {
 	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
@@ -2194,8 +2194,16 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	for origin in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]:
 		if Rect2(origin+Vector2(-6,-4),Vector2(112,12)).grow(12).has_point(pos):return true
 	for house in house_positions():
-		if house==BORIN_HOUSE_POS:
+		var house_info:Dictionary={}
+		for candidate in VillageLayout.SHOPS:
+			if candidate["house"]==house and not candidate.has("shared_with"):
+				house_info=candidate
+				break
+		var house_kind:=str(house_info.get("kind","home"))
+		if house_kind=="borin":
 			if Rect2(house+Vector2(12,105),Vector2(232,110)).grow(hero_collision_radius()).has_point(pos):return true
+		elif house_kind=="arena":
+			if Rect2(house+Vector2(8,88),Vector2(368,136)).grow(hero_collision_radius()).has_point(pos):return true
 		elif Rect2(house + Vector2(8, 73), Vector2(176, 75)).grow(hero_collision_radius()).has_point(pos):
 			return true
 	for solid in (VILLAGE_REF_SOLIDS if USE_VILLAGE_REFERENCE_BACKGROUND else []):
@@ -2442,12 +2450,19 @@ func village_house(name:String)->Dictionary:
 
 func village_house_door(house:Dictionary)->Vector2:
 	var p:Vector2=house["house"]
-	return p + (Vector2(128,240) if str(house["kind"])=="borin" else Vector2(96,180))
+	match str(house["kind"]):
+		"borin": return p+Vector2(128,240)
+		"arena": return p+Vector2(192,260)
+		_: return p+Vector2(96,180)
+
+func village_resident_is_indoors(name:String)->bool:
+	return not village_house(name).is_empty()
 
 func nearby_village_house_door(max_distance:float=86.0)->Dictionary:
 	var best:Dictionary={}
 	var best_distance:=max_distance
 	for house in VillageLayout.SHOPS:
+		if house.has("shared_with"): continue
 		var d:=player_pos.distance_to(village_house_door(house))
 		if d<best_distance:
 			best=house
@@ -3626,7 +3641,8 @@ func tavern_blocked(pos: Vector2) -> bool:
 func enter_village_house(name:String) -> void:
 	var house:=village_house(name)
 	if house.is_empty():return
-	var next_id:=VillageInteriors32.id_for_name(name)
+	var room_name:=str(house.get("shared_with",name))
+	var next_id:=VillageInteriors32.id_for_name(room_name)
 	if next_id<0:return
 	interior_return_pos=village_house_door(house)+Vector2(0,48)
 	save_game()
@@ -3639,7 +3655,7 @@ func enter_village_house(name:String) -> void:
 	battle_zones.clear()
 	play_sound("door_open")
 	update_music(0.05)
-	message("%s · %s" % [name,VillageInteriors32.role_for_id(interior_id)])
+	message("%s · %s" % [room_name,VillageInteriors32.role_for_id(interior_id)])
 	announce_multiplayer_context()
 
 func enter_tavern() -> void:
@@ -3669,8 +3685,30 @@ func open_elara_alchemy() -> void:
 	pending_purchase=-1
 	pending_purchase_item={}
 
-func interact_interior_owner() -> void:
-	var name:=VillageInteriors32.name_for_id(interior_id)
+func interior_actors() -> Array:
+	var room_name:=VillageInteriors32.name_for_id(interior_id)
+	if room_name in ["Mira","Liora"]:
+		return [
+			{"name":"Mira","role":"Älteste · alle Sonnenhain-Quests","pos":INTERIOR_CENTER+Vector2(-135,-90),"color":Color("a77ccb"),"kind":"quest"},
+			{"name":"Liora","role":"Forscherin · Wissen & Quest-Hinweise","pos":INTERIOR_CENTER+Vector2(135,-90),"color":Color("6bbba4"),"kind":"quest"}
+		]
+	var pos:=INTERIOR_CENTER+Vector2(0,-95)
+	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-215,-42)
+	var npc_kind:="innkeeper" if room_name=="Alma" else ("smith" if room_name=="Torvald" else ("stylist" if room_name=="Fenna" else ("apprentice" if room_name=="Pip" else ("healer_alchemy" if room_name=="Elara" else ("arena" if room_name=="Arven" else ("skills" if room_name=="Borin" else "quest"))))))
+	return [{"name":room_name,"role":VillageInteriors32.role_for_id(interior_id),"pos":pos,"color":Color("c9b58a"),"kind":npc_kind}]
+
+func nearby_interior_actor(max_distance:float=145.0)->Dictionary:
+	var best:Dictionary={}
+	var best_distance:=max_distance
+	for actor in interior_actors():
+		var distance:=player_pos.distance_to(actor["pos"])
+		if distance<best_distance:
+			best=actor
+			best_distance=distance
+	return best
+
+func interact_interior_owner(name:String="") -> void:
+	if name=="": name=VillageInteriors32.name_for_id(interior_id)
 	match name:
 		"Alma": steinrose.open(self)
 		"Borin":
@@ -3682,7 +3720,8 @@ func interact_interior_owner() -> void:
 		"Torvald":
 			merchant_kind="smith";shop_page=0;panel="shop";selected_item=-1
 		"Arven": panel="arena_entry"
-		"Mira","Liora": quest_dialogue(name)
+		"Mira": quest_dialogue("Mira")
+		"Liora": message("Liora: Mira verwaltet die Aufgaben von Sonnenhain. Ich helfe dir mit Wissen und Hinweisen.")
 
 func enter_dungeon(index: int) -> void:
 	if dungeon_id >= 0 or arena_mode != "": return
@@ -4251,8 +4290,9 @@ func interact() -> void:
 	if interior_id >= 0:
 		if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 215)) < 100:
 			leave_village_house()
-		elif player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -95)) < 135:
-			interact_interior_owner()
+		else:
+			var actor:=nearby_interior_actor()
+			if not actor.is_empty(): interact_interior_owner(str(actor["name"]))
 		return
 	if dungeon_id >= 0:
 		if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110:
@@ -4321,6 +4361,7 @@ func interact() -> void:
 	var closest: Dictionary = {}
 	var distance := 115.0
 	for npc in NPCS:
+		if village_resident_is_indoors(str(npc["name"])): continue
 		var d: float = player_pos.distance_to(npc["pos"])
 		if d < distance:
 			closest = npc
@@ -6451,10 +6492,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 func draw_village_interior() -> void:
 	draw_rect(Rect2(camera_pos,VIEW),Color("141e23"))
 	VillageInteriors32.paint(self,INTERIOR_CENTER,interior_id,font,touch_enabled,binding_short("interact"))
-	var name:=VillageInteriors32.name_for_id(interior_id)
-	var kind:=VillageInteriors32.kind_for_id(interior_id)
-	var npc_kind:="innkeeper" if name=="Alma" else ("smith" if name=="Torvald" else ("stylist" if name=="Fenna" else ("apprentice" if name=="Pip" else ("healer_alchemy" if name=="Elara" else ("arena" if name=="Arven" else "quest")))))
-	draw_npc({"name":name,"role":VillageInteriors32.role_for_id(interior_id),"pos":INTERIOR_CENTER+Vector2(0,-95),"color":Color("c9b58a"),"kind":npc_kind})
+	for actor in interior_actors(): draw_npc(actor)
 
 func draw_tavern_world() -> void:
 	draw_rect(Rect2(camera_pos, VIEW), Color("141e23"))
@@ -7090,9 +7128,12 @@ func draw_house(p: Vector2) -> void:
 		return
 	var kind:="home"
 	for house in VillageLayout.SHOPS:
-		if house["house"]==p:
+		if house["house"]==p and not house.has("shared_with"):
 			kind=str(house["kind"])
 			break
+	if kind=="arena":
+		StartScenery32.arena_building(self,p)
+		return
 	StartScenery32.themed_house(self,p,kind)
 func draw_npc(npc: Dictionary) -> void:
 	var p: Vector2 = npc["pos"]
@@ -7928,16 +7969,22 @@ func draw_hud() -> void:
 			nearest = "E  ·  Schatztruhe öffnen"
 			break
 	if player_pos.distance_to(BORIN_CRYSTAL_POS)<95: nearest="E  ·  Kristall der Verschmelzung"
+	var nearby_house:=nearby_village_house_door(110.0) if interior_id<0 else {}
+	if not nearby_house.is_empty():
+		nearest="E  ·  %s betreten" % ("Rathaus · Mira & Liora" if str(nearby_house["name"])=="Mira" else str(nearby_house["sign"]))
 	for npc in NPCS:
+		if village_resident_is_indoors(str(npc["name"])): continue
 		if player_pos.distance_to(npc["pos"]) < 105:
-			nearest = "E  ·  Elara · Vollheilung für %d Gold" % healing_cost() if npc["kind"] == "healer" else "E  ·  %s (%s)" % [npc["name"], npc["role"]]
+			nearest = "E  ·  %s (%s)" % [npc["name"], npc["role"]]
 			break
 	if rescue_state >= 2 and player_pos.distance_to(RESCUE_POS + Vector2(0, 120)) < 120:
 		nearest = "E  ·  Nela (Bewohnerin)"
 	if dungeon_id >= 0:
 		nearest = "E  ·  Gewölbe verlassen" if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110 else ("E  ·  Versiegelte Truhe" if player_pos.distance_to(DUNGEON_CENTER + Vector2(555, 0)) < 105 and dungeon_chest_ready(dungeon_id) else "")
 	elif interior_id >= 0:
-		nearest = "E  ·  Taverne verlassen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95 else ("E  ·  Alma ansprechen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -105)) < 130 else "")
+		nearest = "E  ·  Gebäude verlassen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95 else ""
+		var interior_actor:=nearby_interior_actor(150.0)
+		if not interior_actor.is_empty(): nearest="E  ·  %s ansprechen" % interior_actor["name"]
 	else:
 		if player_pos.distance_to(TAVERN_HOUSE + Vector2(126, 157)) < 112: nearest = "E  ·  Zur Steinrose betreten"
 		for index in DUNGEON_ENTRANCES.size():
@@ -8747,8 +8794,20 @@ func draw_skills_panel() -> void:
 
 func draw_fusion_crystal() -> void:
 	var p:=BORIN_CRYSTAL_POS
-	draw_circle(p,34,Color("5e53a8",0.22));draw_colored_polygon(PackedVector2Array([p+Vector2(0,-48),p+Vector2(25,-8),p+Vector2(15,40),p+Vector2(-18,40),p+Vector2(-27,-8)]),Color("8f7de8"));draw_colored_polygon(PackedVector2Array([p+Vector2(0,-39),p+Vector2(13,-5),p+Vector2(6,25),p+Vector2(-9,24),p+Vector2(-14,-6)]),Color("d8ccff"))
-	text_at(p+Vector2(-62,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,124)
+	# 32px-Pixelaltar statt glatter Vektor-Raute.
+	draw_rect(Rect2(p+Vector2(-48,34),Vector2(96,16)),Color("3c4144"))
+	draw_rect(Rect2(p+Vector2(-40,26),Vector2(80,16)),Color("77706a"))
+	draw_rect(Rect2(p+Vector2(-32,18),Vector2(64,12)),Color("aaa080"))
+	for x in [-24,-8,8,24]: draw_rect(Rect2(p+Vector2(x,30),Vector2(8,4)),Color("c7b985"))
+	draw_rect(Rect2(p+Vector2(-32,-18),Vector2(64,48)),Color("6758b1",0.14))
+	var outer:=PackedVector2Array([p+Vector2(0,-64),p+Vector2(28,-24),p+Vector2(20,18),p+Vector2(0,34),p+Vector2(-22,18),p+Vector2(-30,-24)])
+	draw_colored_polygon(outer,Color("7967d7"))
+	draw_colored_polygon(PackedVector2Array([p+Vector2(0,-56),p+Vector2(12,-21),p+Vector2(8,16),p+Vector2(0,26)]),Color("ddd5ff"))
+	draw_colored_polygon(PackedVector2Array([p+Vector2(0,-56),p+Vector2(-15,-20),p+Vector2(-10,16),p+Vector2(0,26)]),Color("a993f2"))
+	draw_line(p+Vector2(0,-60),p+Vector2(0,26),Color("f1ebff",0.72),3)
+	for spark in [Vector2(-38,-18),Vector2(36,-34),Vector2(-28,-48),Vector2(42,2)]:
+		draw_rect(Rect2(p+spark,Vector2(4,4)),Color("bdeaff"))
+	text_at(p+Vector2(-72,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,144)
 
 func draw_fusion_panel() -> void:
 	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(720,124),"%d SP · %d GOLD" % [skill_points,gold],16,Color("f6dc9a"));text_at(Vector2(165,160),"Beide Ausgangsskills bleiben erhalten.",13,Color("cbd9da"))
@@ -9424,7 +9483,12 @@ func invalidate_static_cache() -> void:
 
 func village_props() -> Array:
 	var props: Array = []
-	for house in house_positions(): props.append({"kind":"house","point":house,"depth":house.y+(235 if house==BORIN_HOUSE_POS else 155)})
+	for house in house_positions():
+		var kind:="home"
+		for info in VillageLayout.SHOPS:
+			if info["house"]==house and not info.has("shared_with"):
+				kind=str(info["kind"]);break
+		props.append({"kind":"house","point":house,"depth":house.y+(250 if kind=="arena" else (235 if kind=="borin" else 155)),"house_kind":kind})
 	for tree in REFERENCE_TREES: props.append({"kind":"tree","point":tree,"depth":tree.y+9})
 	props.append({"kind":"magic_tree","point":BORIN_MAGIC_TREE_POS,"depth":BORIN_MAGIC_TREE_POS.y+18})
 	props.append({"kind":"well","point":REFERENCE_WELL,"depth":REFERENCE_WELL.y+32})
@@ -9440,7 +9504,10 @@ func village_props() -> Array:
 func prop_bounds(prop: Dictionary) -> Rect2:
 	var p: Vector2 = prop["point"]
 	match prop["kind"]:
-		"house": return Rect2(p+Vector2(-16,-64),Vector2(288,320)) if p==BORIN_HOUSE_POS else Rect2(p+Vector2(-16,-64),Vector2(224,256))
+		"house":
+			var house_kind:=str(prop.get("house_kind","home"))
+			if house_kind=="arena": return Rect2(p+Vector2(-16,-32),Vector2(416,304))
+			return Rect2(p+Vector2(-16,-64),Vector2(288,320)) if house_kind=="borin" else Rect2(p+Vector2(-16,-64),Vector2(224,256))
 		"tree": return Rect2(p+Vector2(-88,-176),Vector2(176,208))
 		"magic_tree": return Rect2(p+Vector2(-112,-224),Vector2(224,264))
 		"lamp": return Rect2(p+Vector2(-20,-88),Vector2(40,112))
@@ -9457,7 +9524,9 @@ func paint_village_prop(prop: Dictionary) -> void:
 		"house":
 			draw_house(p)
 			for shop in VillageLayout.SHOPS:
-				if shop["house"] == p: StartScenery32.sign(self,p,shop["sign"],font)
+				if shop["house"] == p and not shop.has("shared_with") and str(shop["kind"])!="arena":
+					StartScenery32.sign(self,p,shop["sign"],font)
+					break
 		"tree":
 			StartScenery32.tree(self,p,int(p.x+p.y))
 			food_system.fruit(self,p,true)
@@ -9531,6 +9600,7 @@ func draw_sorted_world_objects() -> void:
 			var food_point: Vector2 = food_prop["point"]
 			if visible_world(food_point,140): entries.append({"kind":"food_plant","depth":food_prop["depth"],"data":food_prop})
 		for npc in NPCS:
+			if village_resident_is_indoors(str(npc["name"])): continue
 			if visible_world(npc["pos"],130): entries.append({"kind":"npc","depth":npc["pos"].y+24,"data":npc})
 		for stone in WAYSTONES:
 			if visible_world(stone,220): entries.append({"kind":"stone","depth":stone.y+70,"point":stone})
