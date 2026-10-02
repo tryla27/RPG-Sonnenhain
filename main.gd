@@ -44,7 +44,7 @@ const Wagon32 = preload("res://components/wagon_32.gd")
 const StartTileMap32 = preload("res://components/start_tilemap_32.gd")
 var start_tilemap_32_attached := false
 var live_reconnect_timer := 0.0
-const REFERENCE_TREES := [Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680),Vector2(190,1590),Vector2(1170,1880),Vector2(120,1910),Vector2(650,1930),Vector2(180,2240),Vector2(1600,2510)]
+const REFERENCE_TREES := [Vector2(170,510),Vector2(970,440),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680),Vector2(190,1590),Vector2(1170,1880),Vector2(120,1910),Vector2(650,1930),Vector2(180,2240),Vector2(1600,2510)]
 const REFERENCE_WELL := Vector2(1184, 832)
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
@@ -158,7 +158,9 @@ const CLASS_ULTIMATES := [15, 24, 33]
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
 const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200},{"id":41,"a":1,"b":36,"gold":2200},{"id":42,"a":18,"b":37,"gold":4200}]
-const BORIN_CRYSTAL_POS := Vector2(1608,1970)
+const BORIN_HOUSE_POS := Vector2(1330,230)
+const BORIN_MAGIC_TREE_POS := Vector2(1620,520)
+const BORIN_CRYSTAL_POS := Vector2(1608,700)
 const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14300,1200)] # Map 06 / 07 / 08
 const CLASS_BOSS_ARENA_RADIUS := 410.0
 const CLASS_BOSS_ARENA_CLEAR_RADIUS := 475.0
@@ -197,7 +199,7 @@ const QUESTS := [
 ]
 const NPCS := [
 	{"name":"Mira", "role":"Älteste · Quests", "pos":Vector2(316, 830), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Quests", "pos":Vector2(1486, 1970), "color":Color("6783bd"), "kind":"quest"},
+	{"name":"Borin", "role":"Skillzauberer · Quests", "pos":Vector2(1458, 490), "color":Color("6783bd"), "kind":"quest"},
 	{"name":"Liora", "role":"Forscherin · Quests", "pos":Vector2(636, 640), "color":Color("6bbba4"), "kind":"quest"},
 	{"name":"Torvald", "role":"Schmied", "pos":Vector2(316, 1420), "color":Color("ab6e60"), "kind":"smith"},
 	{"name":"Fenna", "role":"Händlerin", "pos":Vector2(596, 1610), "color":Color("87a66b"), "kind":"merchant"},
@@ -2089,15 +2091,19 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
 	for shop in VillageLayout.SHOPS:
+		if shop["kind"]=="borin":continue
 		if Rect2(shop["cart"]+Vector2(-45,-24),Vector2(110,49)).grow(10).has_point(pos): return true
 	for tree in REFERENCE_TREES:
 		if pos.distance_to(tree) < 18.0: return true
+	if pos.distance_to(BORIN_MAGIC_TREE_POS) < 42.0:return true
 	if Rect2(REFERENCE_WELL + Vector2(-44, -22), Vector2(88, 54)).grow(12).has_point(pos): return true
 	if Rect2(Vector2(596,1248),Vector2(74,22)).grow(10).has_point(pos):return true
 	for origin in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]:
 		if Rect2(origin+Vector2(-6,-4),Vector2(112,12)).grow(12).has_point(pos):return true
 	for house in house_positions():
-		if Rect2(house + Vector2(8, 73), Vector2(176, 75)).grow(hero_collision_radius()).has_point(pos):
+		if house==BORIN_HOUSE_POS:
+			if Rect2(house+Vector2(12,105),Vector2(232,110)).grow(hero_collision_radius()).has_point(pos):return true
+		elif Rect2(house + Vector2(8, 73), Vector2(176, 75)).grow(hero_collision_radius()).has_point(pos):
 			return true
 	for solid in (VILLAGE_REF_SOLIDS if USE_VILLAGE_REFERENCE_BACKGROUND else []):
 		if solid.has_point(pos):
@@ -2331,7 +2337,7 @@ func can_cross_gate(from_region: int, to_region: int, start: Vector2, end: Vecto
 	return true
 
 func house_positions() -> Array:
-	var homes: Array = [Vector2(220,260),Vector2(700,200),Vector2(1440,280),TAVERN_HOUSE,Vector2(250,1760),Vector2(450,2020),Vector2(1100,2110),Vector2(340,2280),Vector2(1370,2300)]
+	var homes: Array = [Vector2(220,260),Vector2(700,200),Vector2(1500,950),TAVERN_HOUSE,Vector2(250,1760),Vector2(450,2020),Vector2(1100,2110),Vector2(340,2280),Vector2(1370,2300)]
 	for shop in VillageLayout.SHOPS: homes.append(shop["house"])
 	return homes
 
@@ -6819,6 +6825,9 @@ func draw_village() -> void:
 		if visible_world(prop["point"],250): paint_village_prop(prop)
 
 func draw_house(p: Vector2) -> void:
+	if p==BORIN_HOUSE_POS:
+		StartScenery32.borin_house(self,p)
+		return
 	var house_kind:int=2 if p==TAVERN_HOUSE else 0
 	for shop in VillageLayout.SHOPS:
 		if shop["house"]==p and shop["kind"]=="healer":house_kind=1
@@ -8991,22 +9000,25 @@ func invalidate_static_cache() -> void:
 
 func village_props() -> Array:
 	var props: Array = []
-	for house in house_positions(): props.append({"kind":"house","point":house,"depth":house.y+155})
+	for house in house_positions(): props.append({"kind":"house","point":house,"depth":house.y+(235 if house==BORIN_HOUSE_POS else 155)})
 	for tree in REFERENCE_TREES: props.append({"kind":"tree","point":tree,"depth":tree.y+9})
+	props.append({"kind":"magic_tree","point":BORIN_MAGIC_TREE_POS,"depth":BORIN_MAGIC_TREE_POS.y+18})
 	props.append({"kind":"well","point":REFERENCE_WELL,"depth":REFERENCE_WELL.y+32})
 	props.append({"kind":"board","point":Vector2(630,1250),"depth":1272.0})
 	for p in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]: props.append({"kind":"fence","point":p,"depth":p.y+12})
 	for p in [Vector2(544,1056),Vector2(1120,1056),Vector2(1305,1200),Vector2(1430,1200),Vector2(480,1530)]: props.append({"kind":"lamp","point":p,"depth":p.y+8})
 	for p in [Vector2(460,940),Vector2(1220,1290),Vector2(520,1660),Vector2(1470,1215)]: props.append({"kind":"barrel","point":p,"depth":p.y+17})
 	for p in [Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]: props.append({"kind":"bush","point":p,"depth":p.y+28})
-	for shop in VillageLayout.SHOPS: props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
+	for shop in VillageLayout.SHOPS:
+		if shop["kind"]!="borin":props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
 	return props
 
 func prop_bounds(prop: Dictionary) -> Rect2:
 	var p: Vector2 = prop["point"]
 	match prop["kind"]:
-		"house": return Rect2(p+Vector2(-16,-64),Vector2(224,256))
+		"house": return Rect2(p+Vector2(-16,-64),Vector2(288,320)) if p==BORIN_HOUSE_POS else Rect2(p+Vector2(-16,-64),Vector2(224,256))
 		"tree": return Rect2(p+Vector2(-88,-176),Vector2(176,208))
+		"magic_tree": return Rect2(p+Vector2(-112,-224),Vector2(224,264))
 		"lamp": return Rect2(p+Vector2(-20,-88),Vector2(40,112))
 		"barrel": return Rect2(p+Vector2(-24,-40),Vector2(48,80))
 		"cart": return Rect2(p+Vector2(-52,-68),Vector2(132,108))
@@ -9025,6 +9037,7 @@ func paint_village_prop(prop: Dictionary) -> void:
 		"tree":
 			StartScenery32.tree(self,p,int(p.x+p.y))
 			food_system.fruit(self,p,true)
+		"magic_tree": StartScenery32.magic_tree(self,p)
 		"well": StartScenery32.well(self,p)
 		"board": StartScenery32.board(self,p)
 		"lamp": StartScenery32.lamp(self,p)
