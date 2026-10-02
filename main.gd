@@ -86,9 +86,9 @@ const ENEMY_TYPES := [
 	{"name":"Lavagolem", "region":5, "hp":260, "damage":38, "speed":52, "xp":82, "color":Color("a75c52")},
 	{"name":"Strandkrabbe", "region":6, "hp":57, "damage":9, "speed":93, "xp":15, "color":Color("e9a67e")},
 	{"name":"Wassergeist", "region":6, "hp":90, "damage":16, "speed":117, "xp":26, "color":Color("76bfd2")},
-	{"name":"Kriegsherr", "region":6, "hp":680, "damage":31, "speed":78, "xp":310, "color":Color("c97b5e")},
-	{"name":"Arkanhüter", "region":7, "hp":850, "damage":38, "speed":87, "xp":410, "color":Color("8caee8")},
-	{"name":"Jagdmeister", "region":8, "hp":1150, "damage":47, "speed":105, "xp":540, "color":Color("8fbd72")},
+	{"name":"Kriegsherr", "region":6, "hp":1800, "damage":46, "speed":96, "xp":520, "color":Color("c97b5e")},
+	{"name":"Arkanhüter", "region":7, "hp":2100, "damage":54, "speed":102, "xp":650, "color":Color("8caee8")},
+	{"name":"Jagdmeister", "region":8, "hp":2350, "damage":58, "speed":118, "xp":760, "color":Color("8fbd72")},
 	{"name":"Sternenschatten", "region":7, "hp":320, "damage":48, "speed":128, "xp":230, "color":Color("b5a3d9")},
 	{"name":"Bruchwächter", "region":7, "hp":470, "damage":55, "speed":72, "xp":280, "color":Color("dfac91")},
 	{"name":"Nebelhirsch", "region":8, "hp":91, "damage":17, "speed":123, "xp":28, "color":Color("b9cfcc")},
@@ -1722,10 +1722,10 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 			if str(state.get("context","world"))!="world" or bool(state.get("konflux",false)) or bool(state.get("stealth",false)) or konflux.fighter_stats.has(peer) or float(state.get("hp",1.0))<=0:continue
 			var pos:=network_player_position(int(peer))
 			if region_at(pos)==0 or region_at(pos)!=region_at(enemy["pos"]) or waystone_safe_at(pos):continue
-			result.append({"id":int(peer),"pos":pos})
+			result.append({"id":int(peer),"pos":pos,"hp":float(state.get("hp",1.0)),"max_hp":float(state.get("max_hp",1.0))})
 	elif hp>0 and death_timer<=0 and ranger_stealth_timer<=0.0 and (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)!=0):
 		if (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)==region_at(enemy["pos"])) and not waystone_safe_at(player_pos):
-			result.append({"id":0,"pos":player_pos})
+			result.append({"id":0,"pos":player_pos,"hp":hp,"max_hp":max_hp()})
 	return result
 
 func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
@@ -1780,7 +1780,13 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 	else:enemy["walking"]=false
 	for event in action["events"]:
 		if event["kind"]=="projectile":
-			enemy_projectiles.append({"pos":enemy["pos"],"dir":event["dir"],"speed":profile["projectile_speed"],"life":2.0,"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"hit_radius":profile["hit_radius"],"source_region":region_at(enemy["pos"])})
+			enemy_projectiles.append({"pos":enemy["pos"],"dir":event["dir"],"speed":profile["projectile_speed"],"life":2.3,"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"hit_radius":profile["hit_radius"],"source_region":region_at(enemy["pos"])})
+		elif event["kind"]=="boss_move":
+			var move_dir:Vector2=Vector2(event.get("dir",Vector2.ZERO)).normalized()
+			var desired:Vector2=Vector2(enemy["pos"])+move_dir*float(event.get("distance",0.0))
+			if region_at(desired)==region_at(enemy["pos"]) and not terrain_blocked(desired,mob_hit_radius(enemy)) and not blocked_by_region_wall(desired) and not waystone_safe_at(desired):
+				enemy["pos"]=desired
+				enemy["walking"]=true
 		elif server:
 			rpc_server_damage.rpc_id(int(event["target"]),int(event["damage"]))
 		elif invulnerable<=0:
@@ -3617,6 +3623,16 @@ func class_relic_item(boss_index:int) -> Dictionary:
 	item["mastery_skill"]=CLASS_RELIC_SKILLS[boss_index]
 	return item
 
+func class_boss_hat_item(boss_index:int) -> Dictionary:
+	boss_index=clampi(boss_index,0,2)
+	var names:=["Helm des Kriegsherrn","Hut des Arkanhüters","Hut des Jagdmeisters"]
+	var item:=make_item(names[boss_index],"head",4,18+boss_index*4,1800+boss_index*500,"",maxi(1,region_level(6+boss_index)))
+	item["head_class"]=boss_index
+	item["design"]=boss_index
+	item[["str","int","agi"][boss_index]]=18+boss_index*2
+	item["boss_hat"]=true
+	return item
+
 func server_spawn_world_drop(item:Dictionary,pos:Vector2,reserved_class:int=-1,life:float=180.0) -> int:
 	var uid:=server_next_drop_uid
 	server_next_drop_uid+=1
@@ -3678,7 +3694,8 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 		bosses_defeated[type - 12] = true
 		var relic:=class_relic_item(type-12)
 		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)),"item":relic,"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
-		message("%s besiegt! Legendärer Klassenfund: %s." % [ENEMY_TYPES[type]["name"],CLASS_RELIC_NAMES[type-12]])
+		drops.append({"pos":safe_drop_position(pos,Vector2(-25,8)),"item":class_boss_hat_item(type-12),"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
+		message("%s besiegt! %s und sein Klassenhut liegen als Beute am Boden." % [ENEMY_TYPES[type]["name"],CLASS_RELIC_NAMES[type-12]])
 		if bosses_defeated.count(true) == bosses_defeated.size() and not final_completed and final_countdown < 0.0:
 			final_countdown = 8.0
 			message("Alle Siegel sind gefallen! In Kürze öffnet sich die Arena der letzten Wache.")
@@ -6687,6 +6704,29 @@ func quest_marker_state(npc_name: String) -> int:
 	if has_available: return 1
 	return 0
 
+func draw_class_boss_actor(enemy:Dictionary,p:Vector2,look:Vector2,scale_factor:float,attack_progress:float) -> void:
+	var boss_index:=clampi(int(enemy["type"])-12,0,2)
+	var walking:=bool(enemy.get("walking",false))
+	var hurt:=clampf(float(enemy.get("flash",0.0))/.18,0.0,1.0)
+	var stride:=world_time*(8.5 if boss_index==2 else (6.8 if boss_index==1 else 5.8)) if walking else 0.0
+	# Eigener humanoider Bosskörper: alle vier Richtungen, Schrittanimation,
+	# Trefferblitz und die jeweilige Klassen-Kopfbedeckung sind Teil des Körpers.
+	ReferenceScenery.Hero.paint(self,p,boss_index,0,0,look,stride,scale_factor,character_canvas_offset,-1.0,look,-1,-1.0,hurt,boss_index,0)
+	var weapon_design:=[3,7,11][boss_index]
+	if boss_index==0:
+		draw_weapon_world(p+Vector2(0,-5),0,weapon_design,look,scale_factor,attack_progress)
+	elif boss_index==1:
+		draw_weapon_world(p+Vector2(0,-5),1,weapon_design,look,scale_factor,attack_progress)
+	else:
+		draw_weapon_world(p+Vector2(0,-5),2,weapon_design,look,scale_factor,attack_progress)
+	# Phasen-Aura macht sofort sichtbar, dass der Boss unter 68/38 Prozent neue Skills erhält.
+	var ratio:=float(enemy.get("hp",1.0))/maxf(1.0,float(enemy.get("max_hp",1.0)))
+	if ratio<=.68:
+		var aura_color:=[Color("f2685f",.36),Color("a477ff",.38),Color("87dc73",.36)][boss_index]
+		PixelStyle32.arc(self,p+Vector2(0,4),34*scale_factor,0,TAU,24,aura_color,2.5*scale_factor)
+	if ratio<=.38:
+		PixelStyle32.arc(self,p+Vector2(0,4),42*scale_factor,0,TAU,24,[Color("ff5c4d",.48),Color("cf73ff",.5),Color("b7f16d",.48)][boss_index],3.5*scale_factor)
+
 func draw_enemy(enemy: Dictionary) -> void:
 	var p: Vector2 = enemy["pos"]
 	var type: int = int(enemy["type"])
@@ -6707,7 +6747,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 		animation=MobCombat.visual_progress(state,profile)
 		if float(state.get("age",0))<float(profile["windup"]):
 			var ability:Dictionary=state["ability"]
-			var warn:=Color("efd49a",.6)
+			var warn:=[Color("f36f5d",.72),Color("ba7cff",.72),Color("9cdd72",.72)][type-12] if boss else Color("efd49a",.6)
 			if ability["shape"]=="line":
 				PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.25),20)
 			elif ability["shape"]=="arc":
@@ -6724,7 +6764,10 @@ func draw_enemy(enemy: Dictionary) -> void:
 	if type==1:
 		model_pos.y-=9+sin(world_time*7+float(enemy.get("seed",0)))*3
 		stride=world_time*18
-	MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion)
+	if boss:
+		draw_class_boss_actor(enemy,model_pos,aim,scale_factor,animation)
+	else:
+		MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion)
 	draw_set_transform(character_canvas_offset)
 	if float(enemy.get("flash", 0.0)) > 0.0:
 		draw_arc(model_pos, 37.0 * scale_factor, 0.0, TAU, 18, Color("fff7df", 0.72), 3.0)
@@ -9999,6 +10042,10 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 		item["mastery_skill"]=CLASS_RELIC_SKILLS[int(item["mastery_class"])]
 	else:
 		item.erase("mastery_class");item.erase("mastery_skill")
+	if bool(item.get("boss_hat",false)):
+		item["boss_hat"]=true
+		item["head_class"]=clampi(int(item.get("head_class",-1)),0,2)
+		item["design"]=int(item["head_class"])
 	return item
 
 func apply_rescue_progress(amount: int, shared: bool = false) -> void:
@@ -10345,6 +10392,7 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	# auch normale Itemdrops können von jedem Spieler aufgehoben werden.
 	if is_boss:
 		server_spawn_world_drop(class_relic_item(type-12),Vector2(enemy["pos"])+Vector2(25,0),type-12,180.0)
+		server_spawn_world_drop(class_boss_hat_item(type-12),Vector2(enemy["pos"])+Vector2(-25,8),type-12,180.0)
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
 		server_spawn_world_drop(random_loot(type,reward_class),Vector2(enemy["pos"]),-1,90.0)
 	if randf() < 0.03:
