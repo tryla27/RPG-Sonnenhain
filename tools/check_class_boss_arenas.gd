@@ -27,7 +27,7 @@ func run()->void:
 		# 16 Richtungen x mehrere Radien: keine prozeduralen Bäume/Felsen im Kampfraum.
 		for ring in [0.0,90.0,180.0,280.0,360.0]:
 			for n in 16:
-				var p:=center+Vector2.RIGHT.rotated(float(n)*TAU/16.0)*ring
+				var p:Vector2=center+Vector2.RIGHT.rotated(float(n)*TAU/16.0)*float(ring)
 				check(g.class_boss_arena_walkable(p,28.0) if ring<=360.0 else true,"arena walkable "+str(i))
 				check(not g.terrain_blocked(p,28.0),"arena terrain clear "+str(i))
 				check(not g.waystone_safe_at(p),"arena outside safezone "+str(i))
