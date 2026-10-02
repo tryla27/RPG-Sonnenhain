@@ -1725,7 +1725,7 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 			result.append({"id":int(peer),"pos":pos,"hp":float(state.get("hp",1.0)),"max_hp":float(state.get("max_hp",1.0))})
 	elif hp>0 and death_timer<=0 and ranger_stealth_timer<=0.0 and (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)!=0):
 		if (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)==region_at(enemy["pos"])) and not waystone_safe_at(player_pos):
-			result.append({"id":0,"pos":player_pos,"hp":hp,"max_hp":max_hp()})
+			result.append({"id":0,"pos":player_pos,"hp":hp,"max_hp":maxf(1.0,hp)})
 	return result
 
 func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
