@@ -220,7 +220,8 @@ const NPCS := [
 	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1126, 490), "color":Color("9f8bcc"), "kind":"apprentice"},
 	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(546, 1410), "color":Color("e2bc91"), "kind":"healer_alchemy"},
 	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1316, 2050), "color":Color("a48cbd"), "kind":"arena"}
-]const SHOPS := {
+]
+const SHOPS := {
 	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
 	"alchemy": [{"name":"Heiltrank", "icon":"potion", "power":0, "price":35}, {"name":"Großer Heiltrank", "icon":"potion", "power":0, "price":85}, {"name":"Energietrank", "icon":"potion", "power":0, "price":45}],
 	"merchant": [{"name":"Reisenderumhang", "icon":"armor", "power":4, "price":125}, {"name":"Wächterrüstung", "icon":"armor", "power":9, "price":520}, {"name":"Glücksring", "icon":"ring", "power":15, "price":240}]
