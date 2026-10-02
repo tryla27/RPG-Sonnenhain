@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MANITU_SSH_KEY: ${{ secrets.MANITU_SSH_KEY }}
-      SONNENHAIN_ACCESS_PASSWORD: ${{ secrets.SONNENHAIN_ACCESS_PASSWORD }}
+      SONNENHAIN_ACCESS_HTPASSWD: ${{ secrets.SONNENHAIN_ACCESS_HTPASSWD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,17 +25,18 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$MANITU_SSH_KEY" || { echo "MANITU_SSH_KEY missing"; exit 1; }
-          test -n "$SONNENHAIN_ACCESS_PASSWORD" || { echo "SONNENHAIN_ACCESS_PASSWORD missing"; exit 2; }
+          test -n "$SONNENHAIN_ACCESS_HTPASSWD" || { echo "SONNENHAIN_ACCESS_HTPASSWD missing"; exit 2; }
 
-      - name: Create bcrypt access entry
+      - name: Validate configured access entry
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq apache2-utils
-          entry="$(htpasswd -nbBC 12 sonnenhain "$SONNENHAIN_ACCESS_PASSWORD")"
-          echo "::add-mask::$entry"
-          echo "SONNENHAIN_ACCESS_HTPASSWD=$entry" >> "$GITHUB_ENV"
+          entry="$SONNENHAIN_ACCESS_HTPASSWD"
+          if [[ "$entry" != *:* ]]; then
+            echo "ACCESS_ENTRY_FORMAT=missing-user-prefix"
+          else
+            echo "ACCESS_ENTRY_FORMAT=user-prefixed"
+          fi
 
       - name: Repair live password gate only
         shell: bash
