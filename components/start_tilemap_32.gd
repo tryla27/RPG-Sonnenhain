@@ -15,7 +15,7 @@ static var flower_cells: Dictionary = {}
 static var ground_cells: Dictionary = {}
 static var ground_sources: Dictionary = {}
 static var cell_sources: Dictionary = {}
-static var grass_tones := [Color.WHITE,Color(1.22,1.16,0.86),Color(0.94,0.98,0.94),Color(1.035,1.035,0.98),Color(1.08,1.06,0.94)]
+static var grass_tones := [Color(1.0,1.0,1.0),Color(1.08,1.06,0.92),Color(0.94,0.98,0.94),Color(1.02,1.02,0.98),Color(1.04,1.03,0.95)]
 var world_bounds := BOUNDS
 var road_distance: Callable
 var ground: TileMapLayer
