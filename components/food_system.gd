@@ -208,7 +208,35 @@ static func icon(c:CanvasItem,p:Vector2,id:int,s:float=1.0)->void:
  var info:Dictionary=FOODS[clampi(id,0,FOODS.size()-1)]
  var col:=Color(info["color"])
  var edge:=Color("263b37")
- if id in [6,7,8,9,10,23,24,26,27,29,30,2]:
+ if id>=31:
+  match id:
+   31,32:
+    food_rect(c,p,s,4,15,24,11,edge)
+    food_rect(c,p,s,6,13,20,11,Color("a66b48"))
+    food_rect(c,p,s,8,12,16,8,col)
+    for o in [Vector2(11,12),Vector2(18,14),Vector2(15,10)]:
+     food_rect(c,p+o*s,s,0,0,3,3,col.lightened(.3))
+   33:
+    food_rect(c,p,s,5,12,24,12,edge)
+    food_rect(c,p,s,7,10,20,12,col)
+    for mark in 3:food_rect(c,p,s,10+mark*5,12,2,7,col.lightened(.25))
+   34:
+    food_rect(c,p,s,7,9,18,18,edge)
+    food_rect(c,p,s,9,7,14,18,col)
+    food_rect(c,p,s,11,9,4,8,col.lightened(.4))
+    food_rect(c,p,s,6,25,20,3,Color("8ba49c"))
+   35:
+    food_rect(c,p,s,7,10,18,17,edge)
+    food_rect(c,p,s,9,11,14,13,col)
+    food_rect(c,p,s,23,14,7,9,edge)
+    food_rect(c,p,s,11,7,2,5,Color("d8d4c1"))
+    food_rect(c,p,s,16,5,2,6,Color("d8d4c1"))
+   36:
+    food_rect(c,p,s,6,18,22,9,edge)
+    food_rect(c,p,s,8,11,18,14,col)
+    food_rect(c,p,s,10,7,14,5,col.lightened(.25))
+    for o in [Vector2(11,8),Vector2(18,9)]:food_rect(c,p+o*s,s,0,0,3,3,Color("ffe3a5"))
+ elif id in [6,7,8,9,10,23,24,26,27,29,30,2]:
   for off in [Vector2(6,15),Vector2(14,9),Vector2(19,18)]:
    food_rect(c,p+off*s,s,0,0,9,10,edge)
    food_rect(c,p+off*s,s,1,1,7,7,col)
