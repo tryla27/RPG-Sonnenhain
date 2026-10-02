@@ -90,6 +90,35 @@ func run():
 	g.learned[16]=true
 	assert(not g.available_fusions().is_empty())
 
+	# Warrior crit scales gently with level and stays capped.
+	g.class_id=0
+	assert(is_equal_approx(g.warrior_crit_chance(1),0.08))
+	assert(g.warrior_crit_chance(40)>0.13 and g.warrior_crit_chance(40)<0.15)
+	assert(g.warrior_crit_chance(99)<=0.20)
+	assert(is_equal_approx(g.warrior_crit_multiplier(),1.75))
+
+	# Auto-sort preserves UIDs, equipped items and sell locks while grouping sensibly.
+	g.inventory.clear();g.equipped_uid=-1;g.equipped_armor_uid=-1
+	var herb:=g.make_item("Kraut","herb",0,0,3)
+	var armor:=g.make_item("Ruestung","armor",2,12,80)
+	var sword:=g.make_item("Klinge","sword",3,18,120)
+	var locked_ring:=g.make_item("Ring","ring",1,4,40);locked_ring["locked"]=true
+	g.inventory=[herb,armor,locked_ring,sword]
+	g.equipped_uid=int(sword["uid"])
+	var sword_uid:=g.equipped_uid
+	var locked_uid:=int(locked_ring["uid"])
+	g.auto_sort_inventory()
+	assert(g.equipped_uid==sword_uid)
+	assert(int(g.inventory[0]["uid"])==sword_uid)
+	assert(g.inventory.any(func(it):return int(it.get("uid",-1))==locked_uid and bool(it.get("locked",false))))
+
+	# Persistent test level lock blocks XP leveling outside creative mode.
+	g.creative_mode=false
+	g.level=17;g.xp=0;g.test_level_lock=17
+	g.gain_xp(999999)
+	assert(g.level==17 and g.xp==0)
+	g.test_level_lock=0
+
 	# Bosses have long pursuit ranges compared with ordinary mobs.
 	for boss_type in [12,13,14]:
 		var p:=MobCombat.profile(boss_type,g.ENEMY_TYPES[boss_type],40,int(g.ENEMY_TYPES[boss_type]["damage"]))
@@ -107,6 +136,6 @@ func run():
 	assert(kitchen.keyboard_input(fake,up))
 	assert(kitchen.selected==0)
 
-	print("GAMEPLAY_STABILITY_OK inventory lock/drop; boss loot; falcon rune; auto waystone; dungeon loop reset; fusion gate; boss leash; kitchen keys")
+	print("GAMEPLAY_STABILITY_OK inventory lock/drop/sort; warrior crit; persistent level lock; boss loot; falcon rune; auto waystone; dungeon loop reset; fusion gate; boss leash; kitchen keys")
 	g.free()
 	quit()
