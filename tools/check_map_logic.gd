@@ -26,9 +26,18 @@ func _initialize() -> void:
 	check(g.player_pos.x>1780,"Opened gate cannot be crossed")
 	g.level=1
 	g.opened_village_gates[g.VILLAGE_GATES[1]]=true
-	check(g.is_blocked(Vector2(875,2600),Vector2(875,2500)),"South level gate bypassed")
-	g.level=5
-	check(not g.is_blocked(Vector2(875,2600),Vector2(875,2500)),"Unlocked south gate obstructed")
+	check(not g.is_blocked(Vector2(875,2600),Vector2(875,2500)),"Ordinary gate still blocked by level")
+	check(g.region_available(2),"Low-level player cannot access ordinary region")
+	g.bosses_defeated=[false,false,false]
+	check(g.is_blocked(Vector2(5000,6200),Vector2(4900,6200)),"Turmwaechter boss gate not sealed")
+	check(g.boss_gate_name(0)=="Turmwächter","Boss gate 0 label names wrong boss")
+	check(g.boss_gate_name(1)=="Kristallhüter","Boss gate 1 label names wrong boss")
+	check(not g.region_available(4),"Boss-locked region opened before Turmwaechter")
+	g.bosses_defeated[0]=true
+	check(not g.is_blocked(Vector2(5000,6200),Vector2(4900,6200)),"Turmwaechter victory did not open gate")
+	check(g.region_available(4),"Turmwaechter victory did not unlock region")
+	g.level=1
+	check(g.region_available(12),"High recommended level still blocks an ungated region")
 	for i in g.WAYSTONES.size():
 		var stone: Vector2 = g.WAYSTONES[i]
 		var arrival: Vector2 = g.waystone_arrival(i)
@@ -44,5 +53,5 @@ func _initialize() -> void:
 		check(g.dash_dir.is_normalized(),"Dodge direction invalid")
 	for look in [Vector2.UP,Vector2.DOWN,Vector2.LEFT,Vector2.RIGHT]: check(absf(g.weapon_hand_offset(look).x)>=22,"Weapon hand overlaps face")
 	g.free()
-	print("MAP_LOGIC_RESULT failures=",failures)
+	print("MAP_LOGIC_RESULT failures=",failures," · levels advisory, boss seals named and authoritative")
 	quit(0 if failures==0 else 1)
