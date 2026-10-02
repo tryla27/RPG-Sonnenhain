@@ -107,7 +107,7 @@ func run() -> void:
 	# Instant cakes restore resources without replacing the current long meal.
 	g.food_system.clear_meal()
 	g.inventory.clear();add_food(g,"Nebelpflaumen-Tee",1);assert(g.food_system.eat(g,0))
-	var active_before:=g.food_system.active_food_name
+	var active_before:String=str(g.food_system.active_food_name)
 	g.inventory.clear();add_food(g,"Blauer Mondkuchen",1);g.energy=1;assert(g.food_system.eat(g,0))
 	assert(g.energy==g.max_energy() and g.food_system.active_food_name==active_before)
 	g.inventory.clear();add_food(g,"Roter Sonnenkuchen",1);g.hp=1;assert(g.food_system.eat(g,0))
