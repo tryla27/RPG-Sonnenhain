@@ -17,9 +17,9 @@ func _initialize()->void:
 		if g.desired_music_theme()!="konflux-pvp":failures+=1
 	g.konflux.active=false
 	for index in 3:
-		if g.enemy_level(index+12)!=[22,29,43][index]:failures+=1
+		if g.enemy_level(index+12)!=[12,43,19][index]:failures+=1
 		if not g.register_boss_defeat(index,true):failures+=1
 		if g.register_boss_defeat(index,true):failures+=1
-	print("BOSS_MUSIC_CHECK failures=",failures," · boss +5 / credit dedupe / full 132s song / safe-zone borders")
+	print("BOSS_MUSIC_CHECK failures=",failures," · class boss map levels / credit dedupe / full 132s song / safe-zone borders")
 	g.free()
 	quit(1 if failures else 0)
