@@ -24,6 +24,11 @@ func run()->void:
 		for stone in g.WAYSTONES:
 			nearest=minf(nearest,center.distance_to(stone))
 		check(nearest>g.CLASS_BOSS_ARENA_RADIUS+g.WAYSTONE_SAFE_RADIUS+30.0,"arena waystone separation "+str(i))
+		var house:Vector2=g.CLASS_BOSS_HOUSE_POS[i]
+		check(g.region_at(house)==6+i,"house region "+str(i))
+		check(house.distance_to(center)>g.CLASS_BOSS_ARENA_RADIUS+90.0,"house outside combat ring "+str(i))
+		check(not g.waystone_safe_at(house),"house outside waystone safezone "+str(i))
+		check(g.terrain_blocked(house-Vector2(0,50),16.0),"house body collision "+str(i))
 		# 16 Richtungen x mehrere Radien: keine prozeduralen Bäume/Felsen im Kampfraum.
 		for ring in [0.0,90.0,180.0,280.0,360.0]:
 			for n in 16:
@@ -54,6 +59,6 @@ func run()->void:
 		g.advance_mob(boss,1.0/30.0,false)
 		check(Vector2(boss["pos"]).distance_to(center)<g.CLASS_BOSS_ARENA_RADIUS,"boss contained "+str(i))
 
-	print("CLASS_BOSS_ARENA_CHECK failures=",failures," · clear terrain / safezone gap / recovery / containment")
+	print("CLASS_BOSS_ARENA_CHECK failures=",failures," · clear terrain / class houses / safezone gap / recovery / containment")
 	g.free()
 	quit(1 if failures else 0)
