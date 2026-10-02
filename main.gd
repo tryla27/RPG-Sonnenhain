@@ -212,7 +212,7 @@ const QUESTS := [
 	{"title":"Die letzte Wache", "npc":"Borin", "target":26, "count":13, "xp":2100, "gold":1750, "reward":"Sternenring"}
 ]
 const NPCS := [
-	{"name":"Mira", "role":"Älteste · Quests & Dorf", "pos":Vector2(1416, 1210), "color":Color("a77ccb"), "kind":"quest"},
+	{"name":"Mira", "role":"Älteste · Quests & Dorf", "pos":Vector2(1476, 1560), "color":Color("a77ccb"), "kind":"quest"},
 	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 490), "color":Color("6783bd"), "kind":"quest"},
 	{"name":"Liora", "role":"Forscherin · Quests & Wissen", "pos":Vector2(276, 430), "color":Color("6bbba4"), "kind":"quest"},
 	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(276, 2040), "color":Color("ab6e60"), "kind":"smith"},
@@ -235,7 +235,7 @@ const DUNGEON_CENTER := Vector2(8000, 4800)
 const DUNGEON_ENTRANCES := [2, 3, 8]
 const DUNGEON_NAMES := ["Turmgewölbe", "Kristallgruft", "Versunkene Krypta"]
 const DUNGEON_ENEMIES := [[4, 5], [6, 7], [21, 22]]
-const TAVERN_HOUSE := Vector2(720, 1320)
+const TAVERN_HOUSE := Vector2(560, 1420)
 const VILLAGE_REF_ORIGIN := Vector2(0, 550)
 const VILLAGE_REF_RECT := Rect2(0, 550, 1672, 840)
 const VILLAGE_REF_SOLIDS := [Rect2(-40, 548, 1752, 112), Rect2(15, 805, 310, 140), Rect2(305, 1025, 310, 145), Rect2(1295, 1015, 365, 145), Rect2(12, 1012, 95, 95), Rect2(325, 825, 345, 30), Rect2(995, 825, 350, 30), Rect2(890, 870, 105, 45), Rect2(1625, 950, 50, 250)]
