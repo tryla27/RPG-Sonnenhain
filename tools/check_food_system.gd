@@ -77,6 +77,7 @@ func run():
  assert(not restored.ready_at(test_plant,Time.get_unix_time_from_system()))
  assert(restored.regrow_remaining(test_plant)>=298)
  restored.harvested[Food.key(test_plant)]=Time.get_unix_time_from_system()-1
+ restored.configure(g)
  assert(restored.ready_at(test_plant,Time.get_unix_time_from_system()))
  assert(restored.fruit_visible_at(test_plant))
  # Immediate heal, ongoing regen, no resurrection, cap and non-stacking.
