@@ -54,6 +54,7 @@ static func weapon(c:CanvasItem,p:Vector2,t:int,level:int,side:int,back:bool,loo
 		diamond(c,hand+Vector2(0,8),metal.lightened(.3),4)
 	c.draw_set_transform(canvas_origin,0,canvas_scale)
 
+# Eigener Waldschleim-Test: nur Typ 0 nutzt den neuen 32px Body.
 static func paint_waldschleim(c:CanvasItem,p:Vector2,look:Vector2,base:Color,phase:float,attack:float,scale_factor:float,stretch:Vector2)->void:
 	var heading:=Hero.direction_index(look)
 	var back:=heading in [3,4,5]
