@@ -43,11 +43,19 @@ func run() -> void:
 	assert(Kitchen.BERRIES.size()==12)
 	assert(Kitchen.RECIPES.size()==12)
 	assert(Food.FOODS.size()==43)
+	assert(int(Kitchen.RECIPES[0]["learn_cost"])==0)
+	for recipe_info in Kitchen.RECIPES:
+		assert(int(recipe_info["learn_cost"])<=18, "Alma recipe fee should stay small")
 	for berry in Kitchen.BERRIES:
 		assert(Food.index_for(berry)>=0, "regional berry missing: "+berry)
 
 	g.steinrose.open(g)
 	assert(g.panel=="steinrose")
+	assert(g.steinrose.tab==0)
+	g.steinrose.set_tab(g,1);assert(g.steinrose.tab==1)
+	g.steinrose.set_tab(g,2);assert(g.steinrose.tab==2)
+	g.steinrose.set_tab(g,3);assert(g.steinrose.tab==3)
+	g.steinrose.set_tab(g,0)
 	g.panel=""
 
 	var allowed_buffs:=["","armor","cooldown","move","damage","gather"]
@@ -60,7 +68,9 @@ func run() -> void:
 			assert(g.steinrose.learn_recipe(g,recipe_index))
 		assert(g.steinrose.learned[recipe_index])
 		assert(g.steinrose.can_cook(g,recipe_index))
+		var gold_before_cook:int=g.gold
 		assert(g.steinrose.cook(g,recipe_index))
+		assert(g.gold==gold_before_cook, "cooking should not charge extra gold")
 		var output_index:=find_food(g,str(recipe["name"]))
 		assert(output_index>=0,"cooked meal missing: "+str(recipe["name"]))
 		var info:Dictionary=Food.by_name(str(recipe["name"]))
@@ -142,6 +152,6 @@ func run() -> void:
 	bad_food["meal_until"]=Time.get_unix_time_from_system()+500
 	assert(not store.valid_food_state(bad_food))
 
-	print("STEINROSE_KITCHEN_OK 12 regional fruits, 12 recipes, 360s single active meal, pure mana regeneration, replacement, HUD-ready timer data and durable save/reconnect state")
+	print("STEINROSE_KITCHEN_OK 4 distinct Alma pages, 12 regional fruits, 12 low-fee recipes, free cooking with ingredients, 360s single active meal, pure mana regeneration and durable save/reconnect state")
 	g.queue_free()
 	quit()
