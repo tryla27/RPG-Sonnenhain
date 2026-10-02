@@ -47,9 +47,14 @@ func digest(data: Dictionary) -> String:
 func queue(g, data: Dictionary) -> void:
 	if g.creative_mode or g.konflux_preview_mode or g.multiplayer_smoke_client_mode or not g.character_created: return
 	if uuid != g.player_uuid or token.is_empty(): restore(data)
-	latest = data.duplicate(true)
-	dirty = true
-	status = "Speichere auf Server …" if ready else "Lokal gesichert · Serverabgleich ausstehend"
+	var incoming:=data.duplicate(true)
+	var changed:=latest.is_empty() or digest(incoming)!=digest(latest)
+	latest=incoming
+	if changed:
+		dirty=true
+		status="Speichere auf Server …" if ready else "Lokal gesichert · Serverabgleich ausstehend"
+	elif not dirty:
+		status="Server gespeichert ✓"
 	flush(g)
 
 func connected(g) -> bool:

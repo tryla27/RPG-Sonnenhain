@@ -15,7 +15,7 @@ static func profile(type:int,info:Dictionary,level:int,raw_damage:int)->Dictiona
 	if type==12:
 		return {
 			"movement_speed":float(info["speed"])*1.02,"attack_cycle":1.85,"windup":.62,"active_time":.2,"recovery":.48,
-			"attack_range":92.0,"hit_radius":20.0,"projectile_speed":360.0,"aggro_range":820.0,"leash_range":1250.0,
+			"attack_range":92.0,"hit_radius":20.0,"projectile_speed":360.0,"aggro_range":1450.0,"leash_range":3200.0,
 			"damage":damage,"weapon_tier":rank,"heavy":true,"ranged":false,"preferred_min":0.0,"preferred_max":105.0,
 			"abilities":[
 				{"id":"kriegshieb","shape":"arc","range":98.0,"damage":roundi(damage*1.15),"half_angle":1.15,"phase":1.0},
@@ -27,7 +27,7 @@ static func profile(type:int,info:Dictionary,level:int,raw_damage:int)->Dictiona
 	if type==13:
 		return {
 			"movement_speed":float(info["speed"])*1.08,"attack_cycle":1.72,"windup":.55,"active_time":.14,"recovery":.42,
-			"attack_range":470.0,"hit_radius":18.0,"projectile_speed":440.0,"aggro_range":900.0,"leash_range":1300.0,
+			"attack_range":470.0,"hit_radius":18.0,"projectile_speed":440.0,"aggro_range":1550.0,"leash_range":3300.0,
 			"damage":damage,"weapon_tier":rank,"heavy":false,"ranged":true,"preferred_min":220.0,"preferred_max":390.0,
 			"abilities":[
 				{"id":"arkansalve","shape":"projectile","range":500.0,"damage":roundi(damage*1.05),"half_angle":0.0,"phase":1.0,"projectiles":3,"spread":.16},
@@ -39,7 +39,7 @@ static func profile(type:int,info:Dictionary,level:int,raw_damage:int)->Dictiona
 	if type==14:
 		return {
 			"movement_speed":float(info["speed"])*1.18,"attack_cycle":1.48,"windup":.46,"active_time":.12,"recovery":.36,
-			"attack_range":520.0,"hit_radius":16.0,"projectile_speed":520.0,"aggro_range":930.0,"leash_range":1350.0,
+			"attack_range":520.0,"hit_radius":16.0,"projectile_speed":520.0,"aggro_range":1650.0,"leash_range":3400.0,
 			"damage":damage,"weapon_tier":rank,"heavy":false,"ranged":true,"preferred_min":270.0,"preferred_max":455.0,
 			"abilities":[
 				{"id":"praezisionsschuss","shape":"projectile","range":610.0,"damage":roundi(damage*1.55),"half_angle":0.0,"phase":1.0},

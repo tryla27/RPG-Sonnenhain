@@ -323,6 +323,7 @@ var ranger_hunt_buff := 0.0
 var ranger_ultimate_speed_timer := 0.0
 var ranger_ultimate_speed_mult := 1.0
 var ranger_stealth_timer := 0.0
+var ranger_falcon_rune := false
 var robotics_overclock_timer := 0.0
 const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
@@ -332,6 +333,10 @@ var selected_item := -1
 var inventory_page := 0
 var last_inventory_click_uid := -1
 var last_inventory_click_msec := -10000
+var inventory_drag_index := -1
+var inventory_drag_origin := Vector2.ZERO
+var party_reward_notice := ""
+var party_reward_notice_timer := 0.0
 var shop_page := 0
 var quests: Array = []
 var borin_quests: Array = []
@@ -447,6 +452,7 @@ var intro_timer := 0.0
 var event_states: Array = []
 var event_progress: Array = []
 var creative_mode := false
+var test_level_lock := 0
 var pause_status := "Das Spiel ist angehalten."
 var touch_enabled := false
 var mobile_performance_mode := false
@@ -538,7 +544,8 @@ var recent_players: Array = []
 var save_notice_timer := 0.0
 var save_notice_text := ""
 var last_save_unix := 0
-var server_save_timer := 5.0
+const AUTOSAVE_INTERVAL := 3.0
+var server_save_timer := AUTOSAVE_INTERVAL
 var client_ping_timer := 0.0
 var server_last_reply_ms := 0
 var network_ping_ms := -1
@@ -830,7 +837,7 @@ func _on_peer_connected(id: int) -> void:
 	if network_mode == "host":
 		push_world_snapshot()
 		if not dedicated_server_mode:
-			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id,"ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
@@ -1147,6 +1154,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
+		"ranger_falcon_rune":bool(state.get("ranger_falcon_rune",false)),
 		"race":clampi(int(state.get("race",0)),0,2),
 		"gender":clampi(int(state.get("gender",0)),0,1),
 		"name":str(state.get("name","Held")).strip_edges().substr(0,16),
@@ -1284,6 +1292,18 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 	drops=rebuilt_drops
 
 @rpc("any_peer","call_remote","reliable")
+func rpc_request_player_world_drop(raw_item:Dictionary,raw_pos:Array)->void:
+	if not dedicated_server_mode or network_mode!="host":return
+	var peer:=multiplayer.get_remote_sender_id()
+	if peer<=0 or not remote_players.has(peer) or not server_action_allowed(peer,"world_drop",250):return
+	var item:=sanitize_network_reward_item(raw_item)
+	var p:=network_player_position(peer)
+	if raw_pos.size()==2:
+		var wanted:=Vector2(float(raw_pos[0]),float(raw_pos[1]))
+		if wanted.is_finite() and wanted.distance_to(p)<=110:p=wanted
+	server_spawn_world_drop(item,p,-1,180.0)
+
+@rpc("any_peer","call_remote","reliable")
 func rpc_request_world_drop_pickup(drop_uid:int) -> void:
 	if network_mode!="host" or not dedicated_server_mode:return
 	var sender:=multiplayer.get_remote_sender_id()
@@ -1338,6 +1358,7 @@ func start_coop_world() -> void:
 	active_save_slot = selected_save_slot
 	if FileAccess.file_exists(slot_save_path(active_save_slot)):
 		load_game()
+		test_level_lock=0
 		enemies.clear()
 		drops.clear()
 		battle_zones.clear()
@@ -1637,7 +1658,7 @@ func _process(delta: float) -> void:
 	if character_created and panel not in ["start","creation"]:
 		server_save_timer -= delta
 		if server_save_timer <= 0:
-			server_save_timer = 5.0
+			server_save_timer = AUTOSAVE_INTERVAL
 			save_game()
 	process_multiplayer_smoke(delta)
 	update_music(delta)
@@ -1684,6 +1705,8 @@ func _process(delta: float) -> void:
 	ranger_stealth_timer = maxf(0.0, ranger_stealth_timer - delta)
 	robotics_overclock_timer = maxf(0.0, robotics_overclock_timer - delta)
 	notice_timer = maxf(0.0, notice_timer - delta)
+	party_reward_notice_timer = maxf(0.0,party_reward_notice_timer-delta)
+	if party_reward_notice_timer<=0.0: party_reward_notice=""
 	rescue_intro_timer = maxf(0.0, rescue_intro_timer - delta)
 	rescue_banner_timer = maxf(0.0, rescue_banner_timer - delta)
 	reward_scene_timer = maxf(0.0, reward_scene_timer - delta)
@@ -1696,6 +1719,7 @@ func _process(delta: float) -> void:
 	if panel == "":
 		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * food_system.energy_regen_mult() * delta)
 		update_player(delta)
+		update_waystone_activation()
 		if arena_mode == "" and dungeon_id < 0 and interior_id < 0: update_rescue()
 		update_battle_zones(delta)
 		update_impact_zones(delta)
@@ -1904,7 +1928,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		MobCombat.cancel(enemy)
 		for index in range(enemy_projectiles.size()-1,-1,-1):
 			if int(enemy_projectiles[index].get("owner_uid",-2))==int(enemy.get("uid",-1)):enemy_projectiles.remove_at(index)
-	for key in ["flash","hit","stun","slow","marked","shot"]:
+	for key in ["flash","hit","stun","slow","marked","falcon_mark","shot"]:
 		enemy[key]=maxf(0.0,float(enemy.get(key,0.0))-delta)
 	if float(enemy.get("poison",0))>0:
 		enemy["poison"]=maxf(0,float(enemy["poison"])-delta)
@@ -1957,6 +1981,23 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 				enemy["walking"]=true
 				moved=true;break
 	else:enemy["walking"]=false
+	if movement.length_squared()>.001 and not moved:
+		enemy["stuck_time"]=float(enemy.get("stuck_time",0.0))+delta
+		if float(enemy["stuck_time"])>=0.35:
+			var origin_retry:Vector2=enemy["pos"]
+			var seed_angle:=float(enemy.get("seed",0.0))+float(Time.get_ticks_msec()%997)*0.001
+			for step in 12:
+				var dir:=Vector2.RIGHT.rotated(seed_angle+float(step)*TAU/12.0)
+				var candidate:=origin_retry+dir*float(profile["movement_speed"])*delta*1.35
+				var ok:=not terrain_blocked(candidate,mob_hit_radius(enemy)) and not blocked_by_region_wall(candidate) and region_at(candidate)==region_at(origin_retry)
+				if ok and (server or not waystone_safe_at(candidate)):
+					enemy["pos"]=candidate
+					enemy["walking"]=true
+					moved=true
+					break
+			enemy["stuck_time"]=0.0
+	else:
+		enemy["stuck_time"]=0.0
 	# Klassenbosse dürfen sich weder aus ihrer Kampflichtung ziehen lassen noch
 	# dauerhaft an prozeduralen Kanten festfahren.
 	if int(enemy["type"]) in [12,13,14]:
@@ -2823,6 +2864,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	# nicht doppelt auslösen; eine echte Maus funktioniert danach weiterhin.
 	if is_web_platform() and touch_enabled and event is InputEventMouseButton and Time.get_ticks_msec() - last_touch_msec < 900:
 		return
+	if panel=="inventory":
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_Q:
+			drop_inventory_item(selected_item)
+			return
+		if event is InputEventMouseButton:
+			if event.button_index==MOUSE_BUTTON_RIGHT and event.pressed:
+				var right_index:=inventory_index_at(event.position)
+				if right_index>=0:
+					selected_item=right_index
+					use_item(right_index)
+				return
+			if event.button_index==MOUSE_BUTTON_LEFT:
+				if event.pressed:
+					var drag_index:=inventory_index_at(event.position)
+					if drag_index>=0:
+						inventory_drag_index=drag_index
+						inventory_drag_origin=event.position
+				elif inventory_drag_index>=0 and event.position.distance_to(inventory_drag_origin)>8.0:
+					finish_inventory_drag(event.position)
+					return
+	if panel=="steinrose" and steinrose.keyboard_input(self,event):
+		return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			panel = "start"
@@ -3051,6 +3114,12 @@ func equipped_weapon_variant() -> String:
 	if class_id == 2 and design % 4 == 3: return "crossbow"
 	return class_weapon_icon()
 
+func warrior_crit_chance(for_level:int=level)->float:
+	return clampf(0.08+float(clampi(for_level,1,99)-1)*0.0015,0.08,0.20)
+
+func warrior_crit_multiplier()->float:
+	return 1.75
+
 func normal_attack_power() -> int:
 	# Grundtreffer bleiben schwächer als Fähigkeiten, brauchen aber keine zähen Serien.
 	var base := 7.0 + level * 1.6 + weapon_power() * 0.86 + int(skill_levels[9]) * 4.0
@@ -3171,6 +3240,19 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 		enemy["flash"] = 0.16
 		effect(enemy["pos"] + Vector2(0, -25), str(maxi(0, amount)), Color("fff1a1"), 0.55)
 		return
+	var attacker_class:=class_id if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("class",-1)),0,2)
+	var attacker_level:=level if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("level",1)),1,99)
+	var critical:=attacker_class==0 and randf()<warrior_crit_chance(attacker_level)
+	if critical:
+		amount=maxi(1,roundi(float(amount)*warrior_crit_multiplier()))
+		effect(enemy["pos"]+Vector2(0,-48),"KRIT!",Color("ffd36f"),0.7)
+	var falcon_active:=ranger_falcon_rune if source_peer<=0 else bool(remote_players.get(source_peer,{}).get("ranger_falcon_rune",false))
+	if falcon_active and (class_id==2 or source_peer>0):
+		if float(enemy.get("falcon_mark",0.0))>0.0:
+			amount=int(amount*1.22)
+			enemy["falcon_mark"]=0.0
+		else:
+			enemy["falcon_mark"]=4.0
 	if float(enemy.get("marked", 0.0)) > 0.0:
 		amount = int(amount * 1.22)
 	match element:
@@ -3837,6 +3919,7 @@ func enter_dungeon(index: int) -> void:
 	if dungeon_id >= 0 or arena_mode != "": return
 	dungeon_return_pos = player_pos
 	save_game()
+	reset_combat_transition_state()
 	dungeon_id = index
 	player_pos = DUNGEON_CENTER + Vector2(-555, 0)
 	enemies.clear()
@@ -3852,7 +3935,21 @@ func enter_dungeon(index: int) -> void:
 	play_sound("menu")
 	announce_multiplayer_context()
 
+func reset_combat_transition_state() -> void:
+	attack_timer=0.0
+	attack_anim=0.0
+	swing_timer=0.0
+	dash_timer=0.0
+	invulnerable=0.0
+	projectiles.clear()
+	enemy_projectiles.clear()
+	battle_zones.clear()
+	impact_zones.clear()
+	poison_clouds.clear()
+	remote_combat_visuals.clear()
+
 func leave_dungeon() -> void:
+	reset_combat_transition_state()
 	dungeon_id = -1
 	player_pos = dungeon_return_pos
 	enemies.clear()
@@ -4043,7 +4140,8 @@ func update_enemies(delta:float)->void:
 		var enemy:Dictionary=enemies[i]
 		if float(enemy.get("hp",0))<=0:
 			MobCombat.cancel(enemy);defeat_enemy(i);continue
-		if enemy["pos"].distance_to(player_pos)>1250 and arena_mode=="":
+		var despawn_range:=3600.0 if int(enemy.get("type",-1)) in [12,13,14] else 1250.0
+		if enemy["pos"].distance_to(player_pos)>despawn_range and arena_mode=="":
 			enemies.remove_at(i);continue
 		advance_mob(enemy,delta,false)
 		if panel=="arena_reward":return
@@ -4128,12 +4226,22 @@ func respawn() -> void:
 	message("Du wurdest im Dorf wiederbelebt. -20 Gold")
 	save_game()
 
+func ranger_falcon_rune_item()->Dictionary:
+	var item:=make_item("Rune des Falken","gem",4,0,2200,"",maxi(1,level))
+	item["rune_class"]=2
+	item["rune_id"]="falcon"
+	item["tooltip"]="Pfeile markieren Ziele 4s. Der nächste Treffer auf ein markiertes Ziel verursacht +22% Schaden."
+	return item
+
 func class_relic_item(boss_index:int) -> Dictionary:
 	boss_index=clampi(boss_index,0,2)
 	var item:=make_item(CLASS_RELIC_NAMES[boss_index],"gem",4,0,2500+boss_index*1250)
 	item["class_relic"]=true
 	item["mastery_class"]=boss_index
 	item["mastery_skill"]=CLASS_RELIC_SKILLS[boss_index]
+	item["boss_relic"]=true
+	item["tooltip"]="Schaltet %s dauerhaft frei." % CLASS_RELIC_SKILLS[boss_index]
+	if boss_index==0:item["tooltip"]="Kriegsherrenblut · schaltet WUT + BLUTRAUSCH dauerhaft frei."
 	return item
 
 func class_boss_hat_item(boss_index:int) -> Dictionary:
@@ -4208,6 +4316,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 		var relic:=class_relic_item(type-12)
 		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)),"item":relic,"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		drops.append({"pos":safe_drop_position(pos,Vector2(-25,8)),"item":class_boss_hat_item(type-12),"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
+		if type==14:drops.append({"pos":safe_drop_position(pos,Vector2(0,34)),"item":ranger_falcon_rune_item(),"life":180.0,"reserved_class":2,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		message("%s besiegt! %s und sein Klassenhut liegen als Beute am Boden." % [ENEMY_TYPES[type]["name"],CLASS_RELIC_NAMES[type-12]])
 		if bosses_defeated.count(true) == bosses_defeated.size() and not final_completed and final_countdown < 0.0:
 			final_countdown = 8.0
@@ -4250,6 +4359,7 @@ func register_boss_defeat(boss_index:int,shared:bool=false)->bool:
 	return true
 
 func gain_xp(amount: int) -> void:
+	if test_level_lock>0:test_level_lock=0
 	xp += amount
 	while xp >= xp_required():
 		xp -= xp_required()
@@ -4472,7 +4582,7 @@ func interact() -> void:
 			message("Nela: Hinter dem Turm in den Ruinen liegt die Quelle der Plage. Sei vorsichtig!")
 		return
 	for i in LANDMARKS.size():
-		if chest_ready(i) and player_pos.distance_to(chest_position(i)) < 85:
+		if player_pos.distance_to(chest_position(i)) < 125:
 			open_chest(i)
 			return
 	for i in WORLD_EVENTS.size():
@@ -4590,7 +4700,7 @@ func open_chest(index: int) -> void:
 	if rare_head_reward("chest",index,.04):item=make_class_head(region_level(region))
 	inventory.append(item)
 	gold += 35 + region * 25
-	message("Schatztruhe geöffnet: %s (%s)!" % [item["name"], RARITY_NAMES[rarity]])
+	message("Schatztruhe geöffnet: %s (%s)!" % [item["name"], RARITY_NAMES[int(item["rarity"])]])
 	save_game()
 
 func waystone_arrival(index: int) -> Vector2:
@@ -4610,6 +4720,18 @@ func waystone_arrival(index: int) -> Vector2:
 		if is_blocked(candidate, candidate): continue
 		return candidate
 	return safe_world_teleport_destination(base, region)
+
+func update_waystone_activation() -> void:
+	if arena_mode!="" or dungeon_id>=0 or interior_id>=0 or konflux.active:return
+	for i in range(1,WAYSTONES.size()):
+		if waystone_unlocked[i]:continue
+		if player_pos.distance_to(WAYSTONES[i])<=225.0:
+			waystone_unlocked[i]=true
+			last_waystone=i
+			message("Wegstein %s aktiviert. Reise vom Dorf aus dorthin." % region_name(region_at(WAYSTONES[i])))
+			play_sound("level")
+			save_game()
+			break
 
 func use_waystone() -> void:
 	if konflux.active:
@@ -4771,12 +4893,13 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
 	data["ranger_hunt_meter"] = ranger_hunt_meter
 	data["ranger_hunt_buff"] = ranger_hunt_buff
+	data["ranger_falcon_rune"] = ranger_falcon_rune
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
@@ -4863,6 +4986,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	sprint_heading = Vector2.ZERO
 	sprint_exhausted = false
 	character_created = bool(data.get("character_created", data.has("class_id")))
+	test_level_lock = clampi(int(data.get("test_level_lock",0)),0,40)
 	player_uuid = str(data.get("player_uuid",""))
 	ensure_player_uuid()
 	if not from_server and not creative_mode: server_save.restore(data)
@@ -4942,6 +5066,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	warrior_rage = clampf(float(data.get("warrior_rage",0.0)),0.0,100.0)
 	ranger_hunt_meter = clampf(float(data.get("ranger_hunt_meter",0.0)),0.0,100.0)
 	ranger_hunt_buff = clampf(float(data.get("ranger_hunt_buff",0.0)),0.0,60.0)
+	ranger_falcon_rune = bool(data.get("ranger_falcon_rune",false))
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
 	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1)) if class_id == 1 else -1
 	last_waystone = clampi(int(data.get("last_waystone", 1)), 1, WAYSTONES.size() - 1)
@@ -4976,17 +5101,17 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if stored_quests.size() > 0:
 		for i in mini(stored_quests.size(), QUESTS.size()):
 			quests[i] = stored_quests[i]
-	var stored_borin_quests:Variant=data.get("borin_quests",[])
-	if stored_borin_quests is Array:
-		for i in mini(stored_borin_quests.size(),BORIN_QUESTS.size()):
-			if stored_borin_quests[i] is Dictionary: borin_quests[i]=stored_borin_quests[i]
-	pip_loan_received=bool(data.get("pip_loan_received",false))
 		if stored_bosses.size() != bosses_defeated.size():
 			for i in 3: bosses_defeated[i] = int(quests[12 + i].get("state", 0)) >= 2
 	# Ältere Spielstände aus der ersten Version übernehmen.
 	elif data.has("quest_state"):
 		quests[0]["state"] = clampi(int(data["quest_state"]), 0, 3)
 		quests[0]["progress"] = clampi(int(data.get("quest_kills", 0)), 0, 5)
+	var stored_borin_quests:Variant=data.get("borin_quests",[])
+	if stored_borin_quests is Array:
+		for i in mini(stored_borin_quests.size(),BORIN_QUESTS.size()):
+			if stored_borin_quests[i] is Dictionary: borin_quests[i]=stored_borin_quests[i]
+	pip_loan_received=bool(data.get("pip_loan_received",false))
 	# Older multiplayer saves may contain completed boss quests but missing boss flags.
 	for q in mini(quests.size(),QUESTS.size()):
 		var target:int=int(QUESTS[q]["target"])
@@ -5312,6 +5437,7 @@ func start_new_game() -> void:
 	equipped_head_uid=-1
 	quest_guide.tracked_id = QuestGuide.AUTO
 	creative_mode = false
+	test_level_lock = 0
 	opened_village_gates.clear()
 	dash_timer = 0.0
 	invulnerable = 0.0
@@ -5416,6 +5542,13 @@ func finish_intro() -> void:
 			rpc_player_presence.rpc_id(1, local_player_state())
 	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
 
+func apply_test_progress_to_normal(target_level:int,target_xp:int)->void:
+	test_level_lock=0
+	level=clampi(target_level,1,40)
+	xp=maxi(0,target_xp)
+	hp=max_hp()
+	energy=max_energy()
+
 func toggle_creative_mode() -> void:
 	if not creative_mode:
 		save_game()
@@ -5428,12 +5561,15 @@ func toggle_creative_mode() -> void:
 		copy.close()
 		creative_mode = true
 		load_game()
+		test_level_lock = 0
 		gold = maxi(gold, 50000)
 		skill_points = maxi(skill_points, 60)
 		for i in waystone_unlocked.size(): waystone_unlocked[i] = true
 		pause_status = "Testmodus aktiv · eigener Spielstand, alle Wege offen."
 		save_game()
 	else:
+		var carried_test_level:=clampi(level,1,40)
+		var carried_test_xp:=maxi(0,xp)
 		creative_mode = false
 		reset_class_skills()
 		for i in WORLD_EVENTS.size():
@@ -5442,6 +5578,8 @@ func toggle_creative_mode() -> void:
 		quests.clear()
 		for i in QUESTS.size(): quests.append({"state":0, "progress":0})
 		load_game()
+		apply_test_progress_to_normal(carried_test_level,carried_test_xp)
+		save_game()
 		enemies.clear()
 		drops.clear()
 		effects.clear()
@@ -5458,7 +5596,7 @@ func toggle_creative_mode() -> void:
 		poison_blade_timer = 0.0
 		previous_region = region_at(player_pos)
 		camera_pos = (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW)
-		pause_status = "Normaler Spielstand wiederhergestellt."
+		pause_status = "Normaler Spielstand wiederhergestellt · Level %d und %d XP übernommen." % [level,xp]
 
 func set_creative_level(target: int) -> void:
 	if not creative_mode: return
@@ -5532,7 +5670,7 @@ func available_fusions()->Array:
 		var a:=int(sources[pair_index])
 		var b:=int(sources[(pair_index+1)%sources.size()])
 		if a==b:break
-		var offer:=template.duplicate(true)
+		var offer:Dictionary=template.duplicate(true)
 		offer["a"]=a;offer["b"]=b
 		offers.append(offer)
 		pair_index+=2
@@ -5608,7 +5746,90 @@ func click_skill_loadout(mouse:Vector2)->void:
 func upgrade_skill(index: int) -> void:
 	buy_skill(index)
 
+func inventory_sort_key(item:Dictionary)->Array:
+	var uid:=int(item.get("uid",-1))
+	var equipped_rank:=0 if uid in equipped_item_uids() else 1
+	var locked_rank:=0 if bool(item.get("locked",false)) else 1
+	var type_order:={"sword":0,"staff":0,"bow":0,"head":1,"armor":2,"ring":3,"potion":4,"food":5,"gem":6,"essence":7,"herb":8}
+	var icon:=str(item.get("icon",""))
+	return [equipped_rank,locked_rank,int(type_order.get(icon,9)),-int(item.get("rarity",0)),-int(item.get("level",1)),-int(item.get("power",0)),str(item.get("name","")).to_lower()]
+
+func auto_sort_inventory()->void:
+	if inventory.size()<2:
+		message("Inventar ist bereits sortiert.")
+		return
+	inventory.sort_custom(func(a:Dictionary,b:Dictionary)->bool:
+		var ka:=inventory_sort_key(a);var kb:=inventory_sort_key(b)
+		for i in ka.size():
+			if ka[i]==kb[i]:continue
+			return ka[i]<kb[i]
+		return int(a.get("uid",-1))<int(b.get("uid",-1))
+	)
+	selected_item=-1
+	inventory_page=0
+	message("Inventar sortiert: ausgerüstet · gesperrt · Typ · Seltenheit · Level.")
+	save_game();queue_redraw()
+
+func inventory_index_at(mouse:Vector2)->int:
+	for cell in 25:
+		var col:=cell%5
+		var row:=int(cell/5.0)
+		if Rect2(641+col*65,200+row*55,54,48).has_point(mouse):
+			var index:=inventory_page*25+cell
+			return index if index<inventory.size() else -1
+	return -1
+
+func toggle_item_lock(index:int)->void:
+	if index<0 or index>=inventory.size():return
+	var item:Dictionary=inventory[index]
+	item["locked"]=not bool(item.get("locked",false))
+	message(("%s ist jetzt unverkäuflich." if bool(item["locked"]) else "%s ist wieder verkäuflich.") % str(item.get("name","Item")))
+	save_game();queue_redraw()
+
+func drop_inventory_item(index:int)->bool:
+	if index<0 or index>=inventory.size():return false
+	var item:Dictionary=inventory[index]
+	var uid:=int(item.get("uid",-1))
+	if uid in equipped_item_uids():
+		if uid==equipped_uid:equipped_uid=-1
+		if uid==equipped_armor_uid:equipped_armor_uid=-1
+		if uid==equipped_head_uid:equipped_head_uid=-1
+		if uid==equipped_ring_uid:equipped_ring_uid=-1
+		if uid==equipped_ring2_uid:equipped_ring2_uid=-1
+	var dropped:=item.duplicate(true)
+	if int(item.get("count",1))>1:
+		item["count"]=int(item["count"])-1
+		dropped["count"]=1
+		dropped["uid"]=next_uid;next_uid+=1
+	else:
+		inventory.remove_at(index)
+		selected_item=-1
+	var drop_pos:=safe_drop_position(player_pos,facing.normalized()*42.0 if facing.length_squared()>.01 else Vector2(42,0))
+	if uses_server_world() and network_mode=="client":
+		rpc_request_player_world_drop.rpc_id(1,network_reward_payload(dropped),[drop_pos.x,drop_pos.y])
+	else:
+		drops.append({"pos":drop_pos,"item":dropped,"life":180.0})
+	message("Fallen gelassen: %s" % str(dropped.get("name","Item")))
+	save_game();queue_redraw();return true
+
+func finish_inventory_drag(mouse:Vector2)->void:
+	if inventory_drag_index<0 or inventory_drag_index>=inventory.size():inventory_drag_index=-1;return
+	var source:=inventory_drag_index
+	var target:=inventory_index_at(mouse)
+	if target>=0 and target!=source:
+		var moved=inventory[source]
+		inventory[source]=inventory[target]
+		inventory[target]=moved
+		selected_item=target
+	elif Rect2(180,205,98,60).has_point(mouse) or Rect2(180,275,98,77).has_point(mouse) or Rect2(501,235,98,77).has_point(mouse) or Rect2(300,440,203,77).has_point(mouse):
+		use_item(source)
+	inventory_drag_index=-1
+	save_game();queue_redraw()
+
 func click_inventory(mouse: Vector2) -> void:
+	if Rect2(641,157,145,30).has_point(mouse):
+		auto_sort_inventory()
+		return
 	if Rect2(180,205,98,60).has_point(mouse) and equipped_head_uid>=0:
 		unequip_slot("head")
 		return
@@ -5644,7 +5865,7 @@ func click_inventory(mouse: Vector2) -> void:
 				if uid == last_inventory_click_uid and now-last_inventory_click_msec <= 420:
 					last_inventory_click_uid = -1
 					last_inventory_click_msec = -10000
-					use_item(selected_item)
+					toggle_item_lock(selected_item)
 				else:
 					last_inventory_click_uid = uid
 					last_inventory_click_msec = now
@@ -5701,7 +5922,7 @@ func sell_all_unequipped() -> void:
 	var count := 0
 	for i in range(inventory.size() - 1, -1, -1):
 		var item: Dictionary = inventory[i]
-		if int(item["uid"]) in equipped_item_uids(): continue
+		if int(item["uid"]) in equipped_item_uids() or bool(item.get("locked",false)): continue
 		total += item_sale_value(item)
 		count += int(item.get("count", 1))
 		inventory.remove_at(i)
@@ -5716,6 +5937,17 @@ func use_item(index: int) -> void:
 	if food_system.eat(self,index): return
 	var item: Dictionary = inventory[index]
 	var name: String = item["name"]
+	if str(item.get("rune_id",""))=="falcon":
+		if class_id!=2:
+			message("Rune des Falken kann nur der Bogenschütze binden.")
+			return
+		if ranger_falcon_rune:
+			message("Rune des Falken ist bereits aktiv.")
+			return
+		ranger_falcon_rune=true
+		inventory.remove_at(index);selected_item=-1
+		message("Rune des Falken gebunden: Pfeile markieren Ziele.")
+		play_sound("level");save_game();return
 	if bool(item.get("class_relic",false)):
 		var required:=clampi(int(item.get("mastery_class",-1)),0,2)
 		if class_id!=required:
@@ -5823,6 +6055,9 @@ func buy_item(stock_item: Dictionary) -> void:
 
 func sell_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
+	if bool(inventory[index].get("locked",false)):
+		message("Dieses Item ist als unverkäuflich markiert.")
+		return
 	var item: Dictionary = inventory[index]
 	if is_equipped_uid(int(item.get("uid",-1))):
 		message("Ausgerüstete Gegenstände können nicht verkauft werden. Erst ausziehen.")
@@ -8160,6 +8395,9 @@ func draw_hud() -> void:
 	var stamina_color:=Color("e5bd62") if stamina/maxf(1.0,max_stamina())>=0.20 else (Color("f08a63") if int(world_time*6.0)%2==0 else Color("d75f52"))
 	bar(Rect2(23, 81, 324, 11), stamina, max_stamina(), stamina_color, "AUSDAUER  %d / %d%s" % [ceili(stamina),ceili(max_stamina())," · RENNEN" if is_sprinting else ""])
 	bar(Rect2(23, 95, 324, 10), float(xp), float(xp_required()), Color("d9932e"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
+	if party_reward_notice_timer>0.0 and party_reward_notice!="":
+		draw_ref_panel(Rect2(365,8,410,42))
+		text_at(Vector2(378,35),party_reward_notice,13,Color("bfe8ad"),HORIZONTAL_ALIGNMENT_CENTER,384)
 	if class_mastery_unlocked and class_id==0: text_at(Vector2(365,30),"WUT %.0f%%" % warrior_rage,12,Color("efaa75"))
 	elif class_mastery_unlocked and class_id==2: text_at(Vector2(365,30),"JAGD %.0f%%%s" % [ranger_hunt_meter," · %.0fs" % ranger_hunt_buff if ranger_hunt_buff>0 else ""],12,Color("f3d68e"))
 	elif class_mastery_unlocked and class_id==1: text_at(Vector2(365,30),"LEERTASTE · ARKANER SCHRITT",12,Color("cdbaff"))
@@ -8223,15 +8461,15 @@ func draw_hud() -> void:
 		nearest="E  ·  %s" % (nearby_food_info["name"]+" pflücken" if nearby_ripe else "Nachwachsen %02d:%02d" % [food_system.regrow_remaining(nearby_food["point"])/60,food_system.regrow_remaining(nearby_food["point"])%60])
 	for i in WAYSTONES.size():
 		if player_pos.distance_to(WAYSTONES[i]) < 185:
-			nearest = "F  ·  Wegstein: %s" % ("Reiseziele wählen" if i == 0 else ("zurück ins Dorf · aktiviert" if waystone_unlocked[i] else "aktivieren und zurück ins Dorf"))
+			nearest = "F  ·  Wegstein: %s" % ("Reiseziele wählen" if i == 0 else ("zurück ins Dorf · aktiviert" if waystone_unlocked[i] else "wird beim Betreten automatisch aktiviert"))
 			break
 	for portal in PORTALS:
 		if player_pos.distance_to(portal[0]) < 112 or player_pos.distance_to(portal[1]) < 112:
 			nearest = "E  ·  Torbogen nach %s (LV %d)" % [region_name(int(portal[2])), region_level(int(portal[2]))]
 			break
 	for i in LANDMARKS.size():
-		if chest_ready(i) and player_pos.distance_to(chest_position(i)) < 85:
-			nearest = "E  ·  Schatztruhe öffnen"
+		if player_pos.distance_to(chest_position(i)) < 125:
+			nearest = "E  ·  Schatztruhe öffnen" if chest_ready(i) else "E  ·  Schatztruhe · %ds" % chest_cooldown_seconds(i)
 			break
 	if player_pos.distance_to(BORIN_CRYSTAL_POS)<95: nearest="E  ·  Kristall der Verschmelzung"
 	var nearby_house:=nearby_village_house_door(110.0) if interior_id<0 else {}
@@ -8971,10 +9209,12 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
 		ui_button(Rect2(590, 480, 260, 38), "BACKUP IMPORT")
 	if creative_mode:
-		text_at(Vector2(302, 504), "LEVEL %d · %d Skillpunkte" % [level, skill_points], 14, Color("fff0bd"))
+		text_at(Vector2(302, 504), "LEVEL %d · %d XP · wird beim Verlassen übernommen" % [level, xp], 14, Color("fff0bd"))
 		for index in 4:
 			ui_button(Rect2(300 + index * 113, 510, 105, 38), ["-10", "-1", "+1", "+10"][index])
 		ui_button(Rect2(762, 510, 180, 38), "REISEN")
+	elif test_level_lock>0:
+		text_at(Vector2(302,504),"LEVEL %d FIXIERT · XP verändert das Level nicht." % test_level_lock,13,Color("ffd98a"))
 	text_at(Vector2(302, 538 if not creative_mode else 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
 	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUR STARTSEITE" if is_web_platform() else "SPEICHERN & ZUM HAUPTMENÜ")
 
@@ -9184,7 +9424,7 @@ func draw_inventory_panel() -> void:
 	if class_id == 1: draw_equipment_slot(Vector2(405,440),"RING 2",equipped_ring2_uid,"ring")
 	text_at(Vector2(186, 534), "HP %d  ·  ANGRIFF %d  ·  SCHUTZ %d" % [int(max_hp()), normal_attack_power(), equipment_power(equipped_armor_uid)], 15, Color("e6efdd"))
 	ui_box(Rect2(625, 153, 352, 426), Color("16344b"))
-	text_at(Vector2(644, 179), "INVENTAR · Doppelklick", 12, Color("ffeda9"))
+	ui_button(Rect2(641,157,145,30),"AUTO-SORT")
 	text_at(Vector2(807, 179), "%d/2" % (inventory_page + 1), 16)
 	ui_button(Rect2(850, 157, 32, 30), "<", inventory_page > 0)
 	ui_button(Rect2(931, 157, 32, 30), ">", inventory_page < 1)
@@ -9201,6 +9441,7 @@ func draw_inventory_panel() -> void:
 			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 4)), RARITY_COLORS[int(item["rarity"])])
 			draw_item_icon(pos + Vector2(11, 9), String(item["icon"]), RARITY_COLORS[int(item["rarity"])], 0.88, weapon_visual_stage(item), item_design(item))
 			draw_item_signature(pos + Vector2(11, 9), item)
+			if bool(item.get("locked",false)): text_at(pos+Vector2(38,14),"L",10,Color("ffd66e"))
 			if int(item.get("count", 1)) > 1:
 				draw_rect(Rect2(pos + Vector2(19, 32), Vector2(32, 14)), Color("1d2d35"))
 				text_at(pos + Vector2(20, 44), "×%d" % int(item["count"]), 12, Color("fff2ce"))
@@ -9261,8 +9502,12 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var attribute_diff := int(item.get(primary_key, 0)) - int(worn.get(primary_key, 0))
 		var arrow := "▲ +" if attribute_diff > 0 else ("▼ " if attribute_diff < 0 else "= ")
 		text_at(pos + Vector2(14, 145), "%s für %s: %s%d" % [primary_key.to_upper(), CLASS_NAMES[class_id], arrow, attribute_diff], 13, Color("83e4a0") if attribute_diff > 0 else (Color("ee8a86") if attribute_diff < 0 else Color("dfdcc3")))
+	if bool(item.get("boss_relic",false)) or str(item.get("rune_id",""))!="":
+		text_at(pos+Vector2(14,168),str(item.get("tooltip","Spezialgegenstand")),11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	elif bool(item.get("locked",false)):
+		text_at(pos+Vector2(14,168),"UNVERKÄUFLICH · Doppelklick zum Entsperren",10,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
 	var price_text := "Kaufpreis: %d Gold" % purchase_price if purchase_price >= 0 else "Verkauf: %d Gold" % item_sale_value(item)
-	text_at(pos + Vector2(14, 171), price_text, 13, Color("f0d69b"))
+	text_at(pos + Vector2(14, 190), price_text, 13, Color("f0d69b"))
 
 func draw_item_signature(p: Vector2, item: Dictionary) -> void:
 	if item.get("icon") == "food": return
@@ -9304,6 +9549,7 @@ func item_type(icon: String) -> String:
 		"gem": return "Kristall"
 		"ring": return "Schmuck"
 		"armor": return "Rüstung"
+		"head": return "Kopfausrüstung"
 		"herb": return "Kräuter"
 		_: return "Gegenstand"
 
@@ -10487,7 +10733,10 @@ func rpc_server_party_progress(payload: Dictionary) -> void:
 	if gold_reward > 0: gold += gold_reward
 	if xp_reward > 0 or gold_reward > 0:
 		var reward_text:="+%d XP%s · Gruppenbelohnung" % [xp_reward," · +%d Gold" % gold_reward if gold_reward>0 else ""]
-		message(reward_text);add_chat_line("GRUPPE",reward_text);save_game()
+		message(reward_text)
+		party_reward_notice=reward_text
+		party_reward_notice_timer=3.5
+		save_game()
 	ack_server_transaction(tx_id)
 
 @rpc("authority","call_remote","reliable")
@@ -11096,7 +11345,7 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	var item: Dictionary = raw.duplicate(true)
 	item.erase("uid")
 	var icon := str(item.get("icon","gem"))
-	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food"]:
+	if icon not in ["sword","staff","bow","armor","ring","head","potion","gem","herb","essence","food"]:
 		item["icon"] = "gem"
 	item["rarity"] = clampi(int(item.get("rarity",0)),0,4)
 	item["power"] = clampi(int(item.get("power",0)),0,10000)
@@ -11214,7 +11463,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
@@ -11496,6 +11745,7 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	if is_boss:
 		server_spawn_world_drop(class_relic_item(type-12),Vector2(enemy["pos"])+Vector2(25,0),type-12,180.0)
 		server_spawn_world_drop(class_boss_hat_item(type-12),Vector2(enemy["pos"])+Vector2(-25,8),type-12,180.0)
+		if type==14:server_spawn_world_drop(ranger_falcon_rune_item(),Vector2(enemy["pos"])+Vector2(0,34),2,180.0)
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
 		server_spawn_world_drop(random_loot(type,reward_class),Vector2(enemy["pos"]),-1,90.0)
 	if randf() < 0.03:
@@ -11636,7 +11886,11 @@ func rpc_zz_save_put(token: String, uuid: String, revision: int, request: String
 	if not server_action_allowed(peer,"save_put",200):
 		rpc_zz_save_reply.rpc_id(peer,{"ok":false,"uuid":uuid,"error":"retry"})
 		return
-	rpc_zz_save_reply.rpc_id(peer,server_save_store.put(peer,token,uuid,revision,request,data))
+	var response:=server_save_store.put(peer,token,uuid,revision,request,data)
+	if bool(response.get("ok",false)) and str(response.get("kind",""))=="saved":
+		if not account_store.sync_character_save(peer,uuid,token,data,int(response.get("revision",revision))):
+			print("ACCOUNT_SAVE_META_PENDING peer=",peer," uuid=",uuid)
+	rpc_zz_save_reply.rpc_id(peer,response)
 
 @rpc("authority","call_remote","reliable")
 func rpc_zz_save_reply(response: Dictionary) -> void:

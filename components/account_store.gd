@@ -155,5 +155,35 @@ func claim_character(peer:int,slot:int,uuid:String,token:String,meta:Dictionary)
 	if err!=OK:return {"ok":false,"error":"disk_error"}
 	return {"ok":true,"kind":"claimed","characters":public_characters(account)}
 
+func sync_character_save(peer:int,uuid:String,token:String,data:Dictionary,revision:int)->bool:
+	if not sessions.has(peer):return false
+	var key:=str(sessions[peer].get("key",""))
+	var account:=read_account(key)
+	if account.is_empty():return false
+	var chars:Variant=account.get("characters",[])
+	if not chars is Array:return false
+	var changed:=false
+	for i in chars.size():
+		if not chars[i] is Dictionary:continue
+		var c:Dictionary=chars[i]
+		if str(c.get("uuid",""))!=uuid or str(c.get("token",""))!=token:continue
+		var next_name:=str(data.get("hero_name",c.get("name","Held"))).substr(0,32)
+		var next_level:=clampi(int(data.get("level",c.get("level",1))),1,99)
+		var next_class:=clampi(int(data.get("class_id",c.get("class_id",0))),0,2)
+		var next_revision:=maxi(0,revision)
+		if str(c.get("name",""))!=next_name or int(c.get("level",1))!=next_level or int(c.get("class_id",0))!=next_class or int(c.get("revision",-1))!=next_revision:
+			c["name"]=next_name
+			c["level"]=next_level
+			c["class_id"]=next_class
+			c["revision"]=next_revision
+			c["updated_at"]=int(Time.get_unix_time_from_system())
+			chars[i]=c
+			changed=true
+		break
+	if not changed:return true
+	account["characters"]=chars
+	account["updated_at"]=int(Time.get_unix_time_from_system())
+	return write_account(key,account)==OK
+
 func release(peer:int)->void:
 	sessions.erase(peer)
