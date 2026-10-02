@@ -20,7 +20,7 @@ static func direction_index(look:Vector2)->int:
 	if look.length_squared()<0.0001:return 0
 	return posmod(roundi(atan2(look.x,look.y)/(PI/4.0)),8)
 
-static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0,hurt:float=0.0,head:int=-1,rings:int=0) -> void:
+static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0,hurt:float=0.0,head:int=-1,rings:int=0,running:bool=false) -> void:
 	hurt_flash=clampf(hurt,0,1)
 	var female := gender == 1
 	var heading:=direction_index(look)
@@ -37,12 +37,18 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 		cloth = ["95734e","536d86","674e8c","426b55","963f40","a7aeb0"][clampi(armor,0,5)]
 		trim = ["cfb47c","d5c5a0","8fdedd","d2be79","e7c46b","86d8ed"][clampi(armor,0,5)]
 	var hair: String = "ba7147" if female else "604737"
-	var stride := int(sin(phase)*4)
+	var run_stride:float=([5.5,5.0,7.0][clampi(role,0,2)]+([0.0,0.5,0.8][clampi(race,0,2)] if running else 0.0)) if running else 4.0
+	var stride := int(sin(phase)*run_stride)
 	var rotation := 0.0
 	var squash := Vector2.ONE
 	# Race/class anatomy is shared by walking, equipment, rolling and death.
 	squash.y = [1.0,0.94,1.08][clampi(race,0,2)]*(1.02 if female else 1.0)
 	squash.x = 1.06 if role == 0 else (0.96 if role == 1 else 1.0)
+	if running and roll<0.0 and death<0.0:
+		# Sprint bleibt klar dieselbe Figur: kräftiger Schritt, tieferer Schwerpunkt,
+		# rassenspezifisch unterschiedlich schwer bzw. mechanisch gestreckt.
+		squash.y *= [0.99,0.96,1.02][clampi(race,0,2)]
+		squash.x *= [1.0,1.035,0.985][clampi(race,0,2)]
 	if roll >= 0 and role != 1:
 		var direction := -1.0 if roll_dir.x < 0 else 1.0
 		rotation = direction*TAU*roll
@@ -59,7 +65,7 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	if profile:
 		squash.x *= (0.96 if diagonal else 0.90)*(1.0 if look.x > 0 else -1.0)
 	var scale := Vector2.ONE*s*squash
-	var pivot := p+offset+Vector2(0,-10)*s
+	var pivot := p+offset+Vector2(0,-10+(2 if running and role==0 else (1 if running else 0)))*s
 	if death >= 0: pivot.y += smoothstep(0.0,0.7,death)*19.0*s
 	var origin := pivot-(Vector2(28,44)*scale).rotated(rotation)
 	c.draw_set_transform(origin,rotation,scale)
