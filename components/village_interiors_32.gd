@@ -72,7 +72,7 @@ static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:boo
 			c.draw_rect(Rect2(center+Vector2(160,-110),Vector2(104,54)),Color("4b3b51"))
 		"healer":
 			for x in [-220,-160,-100,100,160,220]:
-				c.draw_rect(Rect2(center+Vector2(x,-128),Vector2(18,30)),[Color("83c79c"),Color("8ec8d3"),Color("d8959f")][absi(x/60)%3])
+				c.draw_rect(Rect2(center+Vector2(x,-128),Vector2(18,30)),[Color("83c79c"),Color("8ec8d3"),Color("d8959f")][absi(int(x/60))%3])
 			for x in [-208,-144,144,208]: c.draw_circle(center+Vector2(x,96),16,Color("6f9e62"))
 		"style":
 			for x in [-250,-170,170,250]:
