@@ -1120,6 +1120,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"rescue_state":clampi(int(state.get("rescue_state",0)),0,3),
 		"rescue_kills":clampi(int(state.get("rescue_kills",0)),0,RESCUE_GOAL),
 		"active_quests":sanitize_active_quest_rows(state.get("active_quests",[])),
+		"active_borin_quests":sanitize_active_borin_quest_rows(state.get("active_borin_quests",[])),
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
@@ -3203,6 +3204,9 @@ func use_ability(slot: int) -> void:
 	stop_sprint(0.22)
 	var id: int = class_ultimate() if slot == 3 else int(slots[slot])
 	if id < 0 or id >= ABILITIES.size() or not learned[id]: return
+	if id==19 and skill_levels[19]<=0:
+		message("Arkaner Sprung muss zuerst bei Borin gelernt werden.")
+		return
 	var ability: Dictionary = ABILITIES[id]
 	if float(ability["cd"]) <= 0.0: return
 	if float(cooldowns[id]) > 0 or energy < float(ability["cost"]): return
@@ -8899,7 +8903,7 @@ func draw_skills_panel() -> void:
 	text_at(Vector2(165,125),"BORIN · SKILLZAUBERER",25,Color("ffeda9"))
 	text_at(Vector2(650,124),"LV %d · %d SP · %d GOLD" % [level,skill_points,gold],16,Color("f6dc9a"))
 	for tab in 3: ui_button(Rect2(165+tab*180,145,168,38),SKILL_TREE_NAMES[tab],true,skill_tree_tab==tab)
-	ui_button(Rect2(718,145,118,38),"QUESTS")
+	ui_button(Rect2(718,145,118,38),"PRÜFUNGEN")
 	for slot in 3:
 		var sid:int=slots[slot];ui_button(Rect2(165+slot*204,190,193,40),"%d · %s" % [slot+1,"FREI" if sid<0 else ABILITIES[sid]["name"]],true,selected_slot==slot)
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -10998,7 +11002,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
@@ -11011,6 +11015,14 @@ func active_quest_sync_rows() -> Array:
 		var row: Dictionary = quests[i]
 		if int(row.get("state",0)) == 1:
 			rows.append([i,clampi(int(row.get("progress",0)),0,int(QUESTS[i]["count"]))])
+	return rows
+
+func active_borin_quest_sync_rows() -> Array:
+	var rows:Array=[]
+	for i in mini(BORIN_QUESTS.size(),borin_quests.size()):
+		var row:Dictionary=borin_quests[i]
+		if int(row.get("state",0))==1:
+			rows.append([i,clampi(int(row.get("progress",0)),0,int(BORIN_QUESTS[i]["count"]))])
 	return rows
 
 func active_event_sync_rows() -> Array:
@@ -11030,6 +11042,18 @@ func sanitize_active_quest_rows(raw: Variant) -> Array:
 		if quest_id < 0 or quest_id >= QUESTS.size() or seen.has(quest_id): continue
 		seen[quest_id] = true
 		out.append([quest_id,clampi(int(entry[1]),0,int(QUESTS[quest_id]["count"]))])
+	return out
+
+func sanitize_active_borin_quest_rows(raw:Variant)->Array:
+	var out:Array=[]
+	if not raw is Array:return out
+	var seen:Dictionary={}
+	for entry in raw:
+		if not entry is Array or entry.size()<2:continue
+		var quest_id:=int(entry[0])
+		if quest_id<0 or quest_id>=BORIN_QUESTS.size() or seen.has(quest_id):continue
+		seen[quest_id]=true
+		out.append([quest_id,clampi(int(entry[1]),0,int(BORIN_QUESTS[quest_id]["count"]))])
 	return out
 
 func sanitize_active_event_rows(raw: Variant) -> Array:
@@ -11082,6 +11106,16 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 	var changed := false
 	var shared := bool(payload.get("shared",false))
 	if payload.has("boss"): changed=register_boss_defeat(int(payload["boss"]),shared)
+	for raw_id in (payload.get("borin_quests",[]) as Array):
+		var borin_id:=int(raw_id)
+		if borin_id<0 or borin_id>=borin_quests.size():continue
+		var borin_state:Dictionary=borin_quests[borin_id]
+		if int(borin_state.get("state",0))!=1:continue
+		borin_state["progress"]=mini(int(BORIN_QUESTS[borin_id]["count"]),int(borin_state.get("progress",0))+1)
+		changed=true
+		if int(borin_state["progress"])>=int(BORIN_QUESTS[borin_id]["count"]):
+			borin_state["state"]=2
+			message("%sBorins Prüfung geschafft: %s. Kehre zu Borin zurück!" % ["Gruppe · " if shared else "",BORIN_QUESTS[borin_id]["title"]])
 	for raw_id in (payload.get("quests",[]) as Array):
 		var quest_id := int(raw_id)
 		if quest_id < 0 or quest_id >= quests.size(): continue
@@ -11164,6 +11198,12 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 			var quest_id := int(entry[0])
 			if quest_id >= 0 and quest_id < QUESTS.size() and int(QUESTS[quest_id]["target"]) == enemy_type:
 				matched_quests.append(quest_id)
+		var matched_borin_quests:Array=[]
+		for entry in (state.get("active_borin_quests",[]) as Array):
+			if not entry is Array or entry.size()<1:continue
+			var borin_id:=int(entry[0])
+			if borin_id>=0 and borin_id<BORIN_QUESTS.size() and int(BORIN_QUESTS[borin_id]["target"])==enemy_type:
+				matched_borin_quests.append(borin_id)
 		var matched_events: Array = []
 		for entry in (state.get("active_events",[]) as Array):
 			if not entry is Array or entry.size() < 1: continue
@@ -11172,11 +11212,11 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 				matched_events.append(event_id)
 		var rescue_match := bool(enemy.get("invasion",false)) and int(state.get("rescue_state",0)) == 1
 		var boss_index:int=enemy_type-12 if enemy_type in [12,13,14] else -1
-		if matched_quests.is_empty() and matched_events.is_empty() and not rescue_match and boss_index<0: continue
+		if matched_quests.is_empty() and matched_borin_quests.is_empty() and matched_events.is_empty() and not rescue_match and boss_index<0: continue
 		var uuid := str(state.get("uuid","peer%d" % peer_id))
 		var tx := "quest:%d:%s" % [mob_uid,uuid]
 		server_register_transaction(peer_id,tx)
-		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer,"boss":boss_index})
+		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"borin_quests":matched_borin_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer,"boss":boss_index})
 
 func server_party_member_xp(type: int, elite_kind: int, member: int) -> int:
 	if not remote_players.has(member): return 0
