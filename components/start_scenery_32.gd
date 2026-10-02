@@ -36,9 +36,8 @@ static func borin_house(c:CanvasItem,p:Vector2)->void:
 	if objects != null:
 		sprite(c,objects,Rect2(10,20,495,480),Rect2(p,Vector2(256,240)))
 	else:
-		c.draw_set_transform(p,0.0,Vector2(1.333,1.5))
-		ReferenceHouse.paint(c,Vector2.ZERO,Color("465e86"),Color("ffe0a1"),false)
-		c.draw_set_transform(Vector2.ZERO)
+		ReferenceHouse.paint(c,p,Color("465e86"),Color("ffe0a1"),false)
+		ReferenceHouse.paint(c,p+Vector2(64,28),Color("3f577c"),Color("ffe0a1"),false)
 	c.draw_rect(Rect2(p+Vector2(18,205),Vector2(220,12)),Color("51483b"))
 	c.draw_rect(Rect2(p+Vector2(24,207),Vector2(208,5)),Color("b8aa87"))
 	for i in 5:
