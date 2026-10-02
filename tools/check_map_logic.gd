@@ -29,9 +29,12 @@ func _initialize() -> void:
 	check(g.is_blocked(Vector2(875,2600),Vector2(875,2500)),"South level gate bypassed")
 	g.level=5
 	check(not g.is_blocked(Vector2(875,2600),Vector2(875,2500)),"Unlocked south gate obstructed")
-	for stone in g.WAYSTONES:
+	for i in g.WAYSTONES.size():
+		var stone: Vector2 = g.WAYSTONES[i]
+		var arrival: Vector2 = g.waystone_arrival(i)
 		check(g.is_blocked(stone,stone),"Waystone core has no collider")
-		check(not g.is_blocked(stone+Vector2(0,180),stone+Vector2(0,180)),"Waystone arrival obstructed")
+		check(g.region_at(arrival)==g.region_at(stone),"Waystone arrival left its region: %d" % i)
+		check(not g.is_blocked(arrival,arrival),"Waystone arrival obstructed: %d at %s" % [i,arrival])
 	for role in 3:
 		g.class_id=role
 		g.arcane_step_learned=true
