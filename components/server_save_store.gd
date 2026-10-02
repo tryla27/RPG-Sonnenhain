@@ -135,6 +135,38 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 			if int(item["uid"])==int(data["equipped_head_uid"]) and (item["icon"]!="head" or int(item.get("head_class",-1))!=int(data["class_id"])):return false
 	for field in ["learned","skill_levels","slots","quests","event_states","event_progress","opened_chests","chest_respawn_until","dungeon_chests_opened","dungeon_chest_respawn_until","bosses_defeated","waystone_unlocked","discovered_regions","processed_server_transactions","recent_players","village_gates","arena_leaderboard"]:
 		if not data.get(field,[]) is Array or data.get(field,[]).size() > (256 if field == "processed_server_transactions" else 100): return false
+	# Skilldaten sind dauerhaft und dürfen nicht durch manipulierte Clients beliebig
+	# zusammengesetzt werden. Drei Slots, keine Doppelbelegung, nur gelernte Skills.
+	var learned:Array=data.get("learned",[])
+	var slots:Array=data.get("slots",[])
+	if slots.size()!=3:return false
+	var used_slots:Dictionary={}
+	for raw_slot in slots:
+		if not (raw_slot is int or raw_slot is float):return false
+		var slot_id:=int(raw_slot)
+		if slot_id < -1 or slot_id >= learned.size():return false
+		if slot_id >= 0:
+			if not learned[slot_id] is bool or not bool(learned[slot_id]):return false
+			if used_slots.has(slot_id):return false
+			used_slots[slot_id]=true
+	# Die drei bisher definierten Fusionen setzen ihre beiden Ausgangsskills voraus.
+	for fusion in [[40,0,16],[41,1,36],[42,18,37]]:
+		var fusion_id:int=fusion[0]
+		if fusion_id < learned.size() and learned[fusion_id] is bool and bool(learned[fusion_id]):
+			if fusion[1] >= learned.size() or fusion[2] >= learned.size():return false
+			if not bool(learned[fusion[1]]) or not bool(learned[fusion[2]]):return false
+	# Klassenmeisterschaft ist erst nach der Map-8-Finalquest zulässig. Bereits
+	# abgeschlossene alte Endspielstände bleiben als Migrationspfad gültig.
+	var mastery:=data.get("class_mastery_unlocked",false)
+	var arcane:=data.get("arcane_step_learned",false)
+	if not mastery is bool or not arcane is bool:return false
+	if bool(mastery):
+		var mastery_ready:=false
+		var quest_rows:Array=data.get("quests",[])
+		if quest_rows.size()>16 and quest_rows[16] is Dictionary:
+			mastery_ready=int(quest_rows[16].get("state",0))>=3
+		if not mastery_ready and not bool(data.get("final_completed",false)):return false
+	if bool(arcane) and (int(data.get("class_id",-1))!=1 or not bool(mastery)):return false
 	for quest in data.get("quests",[]):
 		if not quest is Dictionary or not (quest.get("state") is int or quest.get("state") is float) or not (quest.get("progress") is int or quest.get("progress") is float): return false
 		if int(quest["state"]) < 0 or int(quest["state"]) > 3 or int(quest["progress"]) < 0 or int(quest["progress"]) > 1000: return false
