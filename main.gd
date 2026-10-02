@@ -212,6 +212,11 @@ const QUESTS := [
 	{"title":"Flügel über dem Garten", "npc":"Mira", "target":25, "count":13, "xp":1750, "gold":1500, "reward":"Himmelslicht"},
 	{"title":"Die letzte Wache", "npc":"Mira", "target":26, "count":13, "xp":2100, "gold":1750, "reward":"Sternenring"}
 ]
+const BORIN_QUESTS := [
+	{"title":"Borins erste Prüfung","req":3,"target":0,"count":6,"skill_points":1,"item_rarity":1,"item_power":9},
+	{"title":"Borins Meisterprobe","req":20,"target":19,"count":8,"skill_points":2,"item_rarity":2,"item_power":30},
+	{"title":"Borins letzte Lehre","req":39,"target":25,"count":10,"skill_points":3,"item_rarity":3,"item_power":58}
+]
 const NPCS := [
 	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1476, 1550), "color":Color("a77ccb"), "kind":"quest"},
 	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 470), "color":Color("6783bd"), "kind":"quest"},
@@ -328,6 +333,8 @@ var last_inventory_click_uid := -1
 var last_inventory_click_msec := -10000
 var shop_page := 0
 var quests: Array = []
+var borin_quests: Array = []
+var pip_loan_received := false
 var enemies: Array = []
 var drops: Array = []
 var effects: Array = []
@@ -735,6 +742,8 @@ func _ready() -> void:
 	reset_class_skills()
 	for i in QUESTS.size():
 		quests.append({"state":0, "progress":0})
+	for i in BORIN_QUESTS.size():
+		borin_quests.append({"state":0,"progress":0})
 	for i in WORLD_EVENTS.size():
 		event_states.append(0)
 		event_progress.append(0)
@@ -3722,6 +3731,11 @@ func interior_actors() -> Array:
 			{"name":"Mira","role":"Älteste · alle Sonnenhain-Quests","pos":INTERIOR_CENTER+Vector2(-135,-90),"color":Color("a77ccb"),"kind":"quest"},
 			{"name":"Liora","role":"Forscherin · Wissen & Quest-Hinweise","pos":INTERIOR_CENTER+Vector2(135,-90),"color":Color("6bbba4"),"kind":"quest"}
 		]
+	if room_name=="Borin":
+		return [
+			{"name":"Borin","role":"Skillzauberer · Fähigkeiten & Prüfungen","pos":INTERIOR_CENTER+Vector2(-120,-90),"color":Color("6783bd"),"kind":"quest"},
+			{"name":"Pip","role":"Borins Gehilfe · Leihwaffen","pos":INTERIOR_CENTER+Vector2(130,-65),"color":Color("9f8bcc"),"kind":"apprentice"}
+		]
 	var pos:=INTERIOR_CENTER+Vector2(0,-95)
 	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-215,-42)
 	var npc_kind:="innkeeper" if room_name=="Alma" else ("smith" if room_name=="Torvald" else ("stylist" if room_name=="Fenna" else ("apprentice" if room_name=="Pip" else ("healer_alchemy" if room_name=="Elara" else ("arena" if room_name=="Arven" else "quest")))))
@@ -3744,7 +3758,7 @@ func interact_interior_owner(name:String="") -> void:
 		"Borin":
 			panel="skills";skill_tree_tab=0;menu_scroll=0
 		"Pip":
-			message("Pip: Ich lerne bei Borin. Für Fähigkeiten und Fusionen bist du hier genau richtig.")
+			pip_dialogue()
 		"Elara": open_elara_alchemy()
 		"Fenna": panel="appearance"
 		"Torvald":
@@ -4138,6 +4152,14 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	gain_xp(enemy_xp_reward(type, elite_kind, level))
 	var coins: int = randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
 	drops.append({"pos":safe_drop_position(pos,Vector2(8,12)), "gold":coins, "life":80.0})
+	for bindex in BORIN_QUESTS.size():
+		var bstate:Dictionary=borin_quests[bindex]
+		var bq:Dictionary=BORIN_QUESTS[bindex]
+		if int(bstate["state"])==1 and int(bq["target"])==type:
+			bstate["progress"]=mini(int(bq["count"]),int(bstate["progress"])+1)
+			if int(bstate["progress"])>=int(bq["count"]):
+				bstate["state"]=2
+				message("Borins Prüfung geschafft: %s. Kehre zu Borin zurück!" % bq["title"])
 	for qindex in quests.size():
 		var quest: Dictionary = quests[qindex]
 		if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == type:
@@ -4576,6 +4598,55 @@ func quick_potion(restore_energy: bool) -> void:
 			return
 	message("Kein passender Trank im Inventar.")
 
+func borin_reward_item(quest_index:int)->Dictionary:
+	var q:Dictionary=BORIN_QUESTS[quest_index]
+	var icon:=class_weapon_icon()
+	var names:=["Prüfklinge","Prüfstab","Prüfbogen"]
+	var tier_names:=["des Lehrlings","des Meisters","der letzten Lehre"]
+	return make_item("%s %s" % [names[class_id],tier_names[quest_index]],icon,int(q["item_rarity"]),int(q["item_power"]),120+quest_index*550,"",int(q["req"]))
+
+func borin_quest_dialogue()->void:
+	for i in BORIN_QUESTS.size():
+		var q:Dictionary=BORIN_QUESTS[i]
+		var state:Dictionary=borin_quests[i]
+		if int(state["state"])==2:
+			var reward:=borin_reward_item(i)
+			if not can_add_item(reward):
+				message("Borin: Mach erst Platz im Inventar, dann bekommst du deine Belohnung.")
+				return
+			state["state"]=3
+			skill_points+=int(q["skill_points"])
+			add_item(reward)
+			message("Borin: Prüfung bestanden! +%d Skillpunkte · %s" % [int(q["skill_points"]),reward["name"]])
+			play_sound("level");save_game();return
+	for i in BORIN_QUESTS.size():
+		var q:Dictionary=BORIN_QUESTS[i]
+		if int(borin_quests[i]["state"])==0 and level>=int(q["req"]):
+			borin_quests[i]["state"]=1
+			message("Borin: %s — besiege %d %s." % [q["title"],int(q["count"]),ENEMY_TYPES[int(q["target"])]["name"]])
+			save_game();return
+	var next_req:=-1
+	for i in BORIN_QUESTS.size():
+		if int(borin_quests[i]["state"])==0:
+			next_req=int(BORIN_QUESTS[i]["req"]);break
+	message("Borin: Deine nächste Prüfung wartet ab Level %d." % next_req if next_req>0 else "Borin: Du hast alle drei Prüfungen gemeistert.")
+
+func pip_dialogue()->void:
+	if pip_loan_received:
+		message("Pip: Die Leihwaffe hast du schon. Bring sie gut durch deine ersten Kämpfe!")
+		return
+	var icon:=class_weapon_icon()
+	var weapon_names:=["Pips Leihschwert","Pips Leihstab","Pips Leihbogen"]
+	var loan:=make_item(weapon_names[class_id],icon,0,4,20,"",1)
+	loan["loaned"]=true
+	if not can_add_item(loan):
+		message("Pip: Mach einen Platz im Inventar frei, dann leihe ich dir deine Startwaffe.")
+		return
+	add_item(loan)
+	pip_loan_received=true
+	message("Pip: Für den Anfang leihe ich dir %s. Viel Glück!" % loan["name"])
+	play_sound("pickup");save_game()
+
 func quest_dialogue(npc_name: String) -> void:
 	for i in QUESTS.size():
 		if QUESTS[i]["npc"] != npc_name: continue
@@ -4635,7 +4706,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -4693,6 +4764,8 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	food_system.restore({})
 	quests.clear()
 	for i in QUESTS.size(): quests.append({"state":0, "progress":0})
+	borin_quests.clear()
+	for i in BORIN_QUESTS.size(): borin_quests.append({"state":0,"progress":0})
 	for i in WORLD_EVENTS.size():
 		event_states[i] = 0
 		event_progress[i] = 0
@@ -4837,6 +4910,11 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if stored_quests.size() > 0:
 		for i in mini(stored_quests.size(), QUESTS.size()):
 			quests[i] = stored_quests[i]
+	var stored_borin_quests:Variant=data.get("borin_quests",[])
+	if stored_borin_quests is Array:
+		for i in mini(stored_borin_quests.size(),BORIN_QUESTS.size()):
+			if stored_borin_quests[i] is Dictionary: borin_quests[i]=stored_borin_quests[i]
+	pip_loan_received=bool(data.get("pip_loan_received",false))
 		if stored_bosses.size() != bosses_defeated.size():
 			for i in 3: bosses_defeated[i] = int(quests[12 + i].get("state", 0)) >= 2
 	# Ältere Spielstände aus der ersten Version übernehmen.
@@ -4851,6 +4929,13 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		player_pos = Vector2(825, 1020)
 	mark_network_teleport()
 	if level < region_level(region_at(WAYSTONES[last_waystone])): last_waystone = 1
+	# Arkaner Sprung (Skill 19) ist ein normal zu lernender Skill ab Level 15.
+	# Alte Spielstände, die ihn fälschlich früh hatten, verlieren nur diesen Früh-Unlock.
+	if class_id==1 and level<int(ABILITIES[19]["req"]):
+		learned[19]=false
+		skill_levels[19]=0
+		for s in 3:
+			if slots[s]==19: slots[s]=-1
 	if level >= 20:
 		learned[class_ultimate()] = true
 		skill_levels[class_ultimate()] = mini(5, 1 + (level - 20) / 5)
@@ -5213,8 +5298,11 @@ func start_new_game() -> void:
 	equipped_ring2_uid = -1
 	next_uid = 1
 	selected_item = -1
+	pip_loan_received = false
 	quests.clear()
 	for i in QUESTS.size(): quests.append({"state":0, "progress":0})
+	borin_quests.clear()
+	for i in BORIN_QUESTS.size(): borin_quests.append({"state":0,"progress":0})
 	for i in opened_chests.size(): opened_chests[i] = false
 	for i in boss_cooldowns.size(): boss_cooldowns[i] = 0.0
 	last_waystone = 1
@@ -5362,7 +5450,7 @@ func buy_fusion(index:int) -> bool:
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
 		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("menu");return
-	if Rect2(718,145,118,38).has_point(mouse): quest_dialogue("Borin");return
+	if Rect2(718,145,118,38).has_point(mouse): borin_quest_dialogue();return
 	for slot in 3:
 		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
