@@ -112,16 +112,15 @@ func run():
 	assert(int(g.inventory[0]["uid"])==sword_uid)
 	assert(g.inventory.any(func(it):return int(it.get("uid",-1))==locked_uid and bool(it.get("locked",false))))
 
-	# Leaving test mode fixes the chosen test level for normal play.
+	# Leaving test mode carries level + XP into normal play and resumes leveling.
 	g.creative_mode=false
 	g.level=3;g.xp=77;g.test_level_lock=0
-	g.fix_level_after_test_mode(25)
-	assert(g.level==25 and g.test_level_lock==25 and g.xp==77)
-	g.gain_xp(123)
-	assert(g.level==25 and g.xp==200)
-	g.fix_level_after_test_mode(1)
-	assert(g.level==1 and g.test_level_lock==1 and g.xp==200)
-	g.test_level_lock=0
+	g.apply_test_progress_to_normal(25,200)
+	assert(g.level==25 and g.test_level_lock==0 and g.xp==200)
+	var before_level:=g.level
+	g.gain_xp(g.xp_required()+10)
+	assert(g.level>before_level)
+	assert(g.test_level_lock==0)
 
 	# Bosses have long pursuit ranges compared with ordinary mobs.
 	for boss_type in [12,13,14]:
@@ -140,6 +139,6 @@ func run():
 	assert(kitchen.keyboard_input(fake,up))
 	assert(kitchen.selected==0)
 
-	print("GAMEPLAY_STABILITY_OK inventory lock/drop/sort; warrior crit; persistent level lock; boss loot; falcon rune; auto waystone; dungeon loop reset; fusion gate; boss leash; kitchen keys")
+	print("GAMEPLAY_STABILITY_OK inventory lock/drop/sort; warrior crit; test level+xp carryover; boss loot; falcon rune; auto waystone; dungeon loop reset; fusion gate; boss leash; kitchen keys")
 	g.free()
 	quit()
