@@ -87,6 +87,55 @@ static func borin_house(c:CanvasItem,p:Vector2)->void:
 		var q:=p+Vector2(30+i*43,220)
 		c.draw_circle(q,6,Color("7165ba",0.42))
 		c.draw_circle(q,3,Color("cfc5ff"))
+	# 32px-Pixelakzente machen Borins Haus als eigenes Skillhaus lesbar.
+	for x in [32,96,160]:
+		c.draw_rect(Rect2(p+Vector2(x,40),Vector2(32,8)),Color("685ca8"))
+		c.draw_rect(Rect2(p+Vector2(x+8,48),Vector2(16,8)),Color("a9dfff"))
+	c.draw_rect(Rect2(p+Vector2(80,176),Vector2(96,16)),Color("34313b"))
+	for x in [92,124,156]: c.draw_rect(Rect2(p+Vector2(x,180),Vector2(12,8)),Color("b8a7f0"))
+
+
+# Arvens Arena ersetzt das normale Dorfhaus. 384x240 = exakt die dreifache
+# Grundfläche eines 192x160-Hauses und bleibt komplett auf dem 32px-Raster.
+static func arena_building(c:CanvasItem,p:Vector2)->void:
+	var stone_dark:=Color("4a4541")
+	var stone:=Color("776b5b")
+	var stone_light:=Color("a59372")
+	var roof:=Color("8f3f31")
+	var gold:=Color("d0a85f")
+	# Schatten und massiver Sockel.
+	c.draw_rect(Rect2(p+Vector2(16,208),Vector2(352,32)),Color("202b2a",0.28))
+	for tx in 12:
+		for ty in 5:
+			var q:=p+Vector2(tx*32,64+ty*32)
+			var col:=stone if (tx+ty)%2==0 else stone_dark
+			c.draw_rect(Rect2(q,Vector2(32,32)),col)
+			c.draw_rect(Rect2(q,Vector2(32,32)),Color("2b302f",0.28),false,2)
+	# Breites rotes Dach mit harten Pixelstufen.
+	for step in 6:
+		c.draw_rect(Rect2(p+Vector2(32+step*16,48-step*8),Vector2(320-step*32,16)),roof.lightened(step*0.025))
+	# Zwei Seitentürme.
+	for x in [0,320]:
+		c.draw_rect(Rect2(p+Vector2(x,72),Vector2(64,136)),stone_dark)
+		c.draw_rect(Rect2(p+Vector2(x+8,80),Vector2(48,120)),stone)
+		c.draw_rect(Rect2(p+Vector2(x-8,56),Vector2(80,24)),roof)
+		c.draw_rect(Rect2(p+Vector2(x,48),Vector2(64,8)),gold)
+	# Zentraler Torbogen und dunkler Eingang.
+	c.draw_rect(Rect2(p+Vector2(144,116),Vector2(96,92)),stone_dark)
+	c.draw_circle(p+Vector2(192,116),48,stone_light)
+	c.draw_circle(p+Vector2(192,122),34,Color("2a292a"))
+	c.draw_rect(Rect2(p+Vector2(158,122),Vector2(68,86)),Color("2a292a"))
+	c.draw_rect(Rect2(p+Vector2(184,128),Vector2(8,80)),Color("5d4634"))
+	c.draw_rect(Rect2(p+Vector2(200,128),Vector2(8,80)),Color("5d4634"))
+	# Banner, Waffen und ARENA-Schild.
+	for x in [82,286]:
+		c.draw_rect(Rect2(p+Vector2(x,94),Vector2(20,68)),Color("793d45"))
+		c.draw_colored_polygon(PackedVector2Array([p+Vector2(x,162),p+Vector2(x+10,178),p+Vector2(x+20,162)]),Color("793d45"))
+		c.draw_line(p+Vector2(x+2,100),p+Vector2(x+18,146),gold,3)
+	c.draw_rect(Rect2(p+Vector2(116,78),Vector2(152,26)),Color("302f2c"))
+	c.draw_rect(Rect2(p+Vector2(122,84),Vector2(140,14)),Color("70523d"))
+	for i in 5:
+		c.draw_rect(Rect2(p+Vector2(32+i*72,216),Vector2(40,8)),gold if i%2==0 else stone_light)
 
 static func tree(c:CanvasItem,p:Vector2,_key:int)->void:
 	init_art()
