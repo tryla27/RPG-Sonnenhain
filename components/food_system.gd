@@ -44,7 +44,8 @@ const FOODS = [
  {"name":"Bernstein-Marmelade","color":"d6a43e","heal":0,"regen":0.0,"duration":0,"price":14,"meal":true,"meal_hp_regen":2.0,"meal_duration":360,"buff":"armor","buff_value":0.05},
  {"name":"Heidelbeer-Pfannkuchen","color":"6c78bc","heal":0,"regen":0.0,"duration":0,"price":14,"meal":true,"meal_hp_regen":3.0,"meal_duration":360,"buff":"gather","buff_value":0.04},
  {"name":"Schimmerbeeren-Suppe","color":"4ba6df","heal":0,"regen":0.0,"duration":0,"price":16,"meal":true,"meal_mana_regen":4.0,"meal_duration":360},
- {"name":"Blauer Mondkuchen","color":"547bd1","heal":0,"regen":0.0,"duration":0,"price":20,"meal":true,"meal_mana_regen":6.0,"meal_duration":360}
+ {"name":"Blauer Mondkuchen","color":"547bd1","heal":0,"regen":0.0,"duration":0,"price":20,"instant_mana_full":true},
+ {"name":"Roter Sonnenkuchen","color":"c84f55","heal":0,"regen":0.0,"duration":0,"price":20,"instant_hp_full":true}
 ]
 const BUSHES=[Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]
 const TREES=[Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680)]
@@ -214,7 +215,14 @@ func eat(g,index:int)->bool:
  var info:=by_name(str(item.get("name","")))
  if item.get("icon")!="food" or info.is_empty() or g.hp<=0:return false
  var now:=Time.get_unix_time_from_system()
- g.hp=minf(g.max_hp(),g.hp+float(info.get("heal",0)))
+ var instant_mana:=bool(info.get("instant_mana_full",false))
+ var instant_hp:=bool(info.get("instant_hp_full",false))
+ if instant_mana:
+  g.energy=g.max_energy()
+ elif instant_hp:
+  g.hp=g.max_hp()
+ else:
+  g.hp=minf(g.max_hp(),g.hp+float(info.get("heal",0)))
  if bool(info.get("meal",false)):
   clear_meal()
   active_food_name=str(info["name"])
@@ -224,7 +232,7 @@ func eat(g,index:int)->bool:
   buff_kind=str(info.get("buff",""))
   buff_value=clampf(float(info.get("buff_value",0)),0,0.05)
   buff_until=meal_until if buff_kind!="" else 0
- else:
+ elif not instant_mana and not instant_hp:
   if regen_until<=now or float(info.get("regen",0))>=regen_rate:
    regen_rate=float(info.get("regen",0));regen_until=now+float(info.get("duration",0))
  if int(item.get("count",1))>1:
@@ -232,7 +240,11 @@ func eat(g,index:int)->bool:
   item["stack_value"]=maxi(0,g.item_sale_value(item)-int(item.get("value",0)))
  else:
   g.inventory.remove_at(index);g.selected_item=-1
- if bool(info.get("meal",false)):
+ if instant_mana:
+  g.message("%s: Mana sofort vollstaendig wiederhergestellt." % info["name"])
+ elif instant_hp:
+  g.message("%s: HP sofort vollstaendig wiederhergestellt." % info["name"])
+ elif bool(info.get("meal",false)):
   g.message("%s: %s fuer 6 Minuten. Ersetzt den vorherigen Essenseffekt." % [info["name"],meal_effect_text()])
  else:
   g.message("%s: +%d HP, %.1f HP/s fuer %ds." % [info["name"],int(info.get("heal",0)),float(info.get("regen",0)),int(info.get("duration",0))])
@@ -325,7 +337,7 @@ static func icon(c:CanvasItem,p:Vector2,id:int,s:float=1.0)->void:
     food_rect(c,p,s,7,12,20,13,Color("4a7cc8"))
     food_rect(c,p,s,10,10,14,7,col.lightened(.2))
     food_rect(c,p,s,13,7,2,4,Color("cdeaff"))
-   42:
+   42,43:
     food_rect(c,p,s,6,18,22,9,edge)
     food_rect(c,p,s,8,10,18,16,Color("4a69b7"))
     food_rect(c,p,s,10,7,14,6,col.lightened(.25))
