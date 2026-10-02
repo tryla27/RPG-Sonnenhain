@@ -7960,7 +7960,7 @@ func draw_skills_panel() -> void:
 		text_at(Vector2(x+12,y+88),"GELERNT · SLOT %d" % (selected_slot+1) if learned[id] else ("KAUFEN · %d SP" % price if level>=req else "GESPERRT · LV %d" % req),12,Color("9de6c2") if learned[id] or level>=req else Color("c98d84"))
 	text_at(Vector2(165,530),"Gelernte Skills anklicken → ausgewählten Slot belegen · Wechsel bei Borin kostenlos.",13,Color("d9e6d5"))
 	text_at(Vector2(165,554),"Verschmelzungen gibt es nur am Kristall neben Borin.",13,Color("b9d9cf"))
-	var mastery:=["Wut: %.0f/100" % warrior_rage,"Arkaner Schritt: %s" % ("bereit" if arcane_step_learned else "nach Finalquest"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id]
+	var mastery:String=str(["Wut: %.0f/100" % warrior_rage,"Arkaner Schritt: %s" % ("bereit" if arcane_step_learned else "nach Finalquest"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id])
 	text_at(Vector2(165,578),"Klassenmeisterschaft · "+mastery,13,Color("ffe2aa"))
 
 func draw_fusion_crystal() -> void:
