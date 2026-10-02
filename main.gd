@@ -1180,7 +1180,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 		if coords.size()<2:continue
 		var item_raw:Variant=raw.get("item",{})
 		if not item_raw is Dictionary:continue
-		var drop:=raw.duplicate(true)
+		var drop:Dictionary=raw.duplicate(true)
 		drop["pos"]=Vector2(float(coords[0]),float(coords[1]))
 		drop["item"]=sanitize_network_reward_item(item_raw)
 		drop["reserve_until_ms"]=Time.get_ticks_msec()+maxi(0,int(raw.get("reserve_ms",0)))
