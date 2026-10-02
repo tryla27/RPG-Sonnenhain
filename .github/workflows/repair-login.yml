@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/repair-login.yml"
+      - "tools/deploy_website_access.sh"
   workflow_dispatch:
 
 permissions:
