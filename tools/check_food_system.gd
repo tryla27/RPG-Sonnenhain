@@ -65,14 +65,20 @@ func run():
  var test_plant:Vector2=g.food_system.plants[0]["point"]
  assert(g.region_at(test_plant)==1)
  g.player_pos=test_plant+Vector2(0,20)
+ assert(g.food_system.fruit_visible_at(test_plant))
  assert(g.food_system.harvest(g))
  assert(g.inventory.size()==1 and g.inventory[0]["count"]==3)
  assert(g.inventory[0]["name"]=="Himbeeren")
+ assert(not g.food_system.fruit_visible_at(test_plant))
+ var remaining:int=g.food_system.regrow_remaining(test_plant)
+ assert(remaining>=299 and remaining<=300)
  assert(g.food_system.harvest(g) and g.inventory[0]["count"]==3)
  var restored=Food.new();restored.restore(g.food_system.snapshot())
  assert(not restored.ready_at(test_plant,Time.get_unix_time_from_system()))
+ assert(restored.regrow_remaining(test_plant)>=298)
  restored.harvested[Food.key(test_plant)]=Time.get_unix_time_from_system()-1
  assert(restored.ready_at(test_plant,Time.get_unix_time_from_system()))
+ assert(restored.fruit_visible_at(test_plant))
  # Immediate heal, ongoing regen, no resurrection, cap and non-stacking.
  g.hp=20
  assert(g.food_system.eat(g,0) and g.hp==24 and g.inventory[0]["count"]==2)
@@ -117,5 +123,5 @@ func run():
  data["food_state"]["regen_rate"]=999
  assert(not store.valid_data(data,g.player_uuid))
  assert(not store.valid_food_state({"plants":[]}))
- print("FOOD_SYSTEM_OK 44 foods incl. 13 Alma recipes, 12 regional herbs / 48 plants, snacks, six-minute buffs and instant cakes")
+ print("FOOD_SYSTEM_OK 44 foods incl. 13 Alma recipes, 48 plants, visible ripe fruit bodies, exact five-minute regrow, buffs and instant cakes")
  quit()
