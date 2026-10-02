@@ -20,7 +20,7 @@ func _initialize() -> void:
 func add_food(g, name:String, count:int) -> void:
 	var info:=Food.by_name(name)
 	assert(not info.is_empty(), "missing food registry entry: "+name)
-	var item:=g.make_item(name,"food",0,0,int(info.get("price",1)),"",1)
+	var item:Dictionary=g.make_item(name,"food",0,0,int(info.get("price",1)),"",1)
 	item["count"]=count
 	assert(g.add_item(item))
 
@@ -87,8 +87,8 @@ func run() -> void:
 	assert(g.food_system.move_mult()>1.0)
 
 	# Kitchen progression and food buffs survive the same server-save payload shape.
-	var kitchen_state:=g.steinrose.snapshot()
-	var food_state:=g.food_system.snapshot()
+	var kitchen_state:Dictionary=g.steinrose.snapshot()
+	var food_state:Dictionary=g.food_system.snapshot()
 	var restored:=Kitchen.new()
 	restored.restore(kitchen_state)
 	assert(restored.learned==g.steinrose.learned)
