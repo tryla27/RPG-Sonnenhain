@@ -90,7 +90,8 @@ func handle(g, event: InputEvent) -> bool:
 	if event is InputEventJoypadButton and event.pressed and (g.panel != "" or g.chat_open):
 		blocked_codes[event.button_index] = true
 		if g.panel in ["skills","journal"] and event.button_index in [JOY_BUTTON_LEFT_SHOULDER,JOY_BUTTON_RIGHT_SHOULDER]:
-			g.menu_scroll = clampi(g.menu_scroll+(1 if event.button_index == JOY_BUTTON_RIGHT_SHOULDER else -1),0,maxi(0,g.QUESTS.size()-6) if g.panel == "journal" else 2)
+			var skill_max:int=maxi(0,ceili(float(g.SKILL_TREES[g.skill_tree_tab].size()-6)/3.0)) if g.panel=="skills" else 0
+			g.menu_scroll = clampi(g.menu_scroll+(1 if event.button_index == JOY_BUTTON_RIGHT_SHOULDER else -1),0,maxi(0,g.QUESTS.size()-6) if g.panel == "journal" else skill_max)
 			return true
 		if g.panel == "controller" and not awaiting.is_empty(): return true
 		if event.button_index == JOY_BUTTON_B or event.button_index == JOY_BUTTON_START:

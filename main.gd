@@ -183,7 +183,7 @@ const QUESTS := [
 ]
 const NPCS := [
 	{"name":"Mira", "role":"Älteste · Quests", "pos":Vector2(316, 830), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Wächter · Quests", "pos":Vector2(1486, 1970), "color":Color("6783bd"), "kind":"quest"},
+	{"name":"Borin", "role":"Skillzauberer · Quests", "pos":Vector2(1486, 1970), "color":Color("6783bd"), "kind":"quest"},
 	{"name":"Liora", "role":"Forscherin · Quests", "pos":Vector2(636, 640), "color":Color("6bbba4"), "kind":"quest"},
 	{"name":"Torvald", "role":"Schmied", "pos":Vector2(316, 1420), "color":Color("ab6e60"), "kind":"smith"},
 	{"name":"Fenna", "role":"Händlerin", "pos":Vector2(596, 1610), "color":Color("87a66b"), "kind":"merchant"},
@@ -1070,7 +1070,8 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
-		"region":region_at(incoming_pos)
+		"region":region_at(incoming_pos),
+		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2
 	}
 	clean["teleport_serial"]=int(state.get("teleport_serial",0)) if teleported or context_changed or not remote_players.has(sender) else int(remote_players[sender].get("teleport_serial",0))
 	clean["state_tick"]=Time.get_ticks_msec()
@@ -1657,11 +1658,11 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 	if server:
 		for peer in remote_players:
 			var state:Dictionary=remote_players[peer]
-			if str(state.get("context","world"))!="world" or bool(state.get("konflux",false)) or konflux.fighter_stats.has(peer) or float(state.get("hp",1.0))<=0:continue
+			if str(state.get("context","world"))!="world" or bool(state.get("konflux",false)) or bool(state.get("stealth",false)) or konflux.fighter_stats.has(peer) or float(state.get("hp",1.0))<=0:continue
 			var pos:=network_player_position(int(peer))
 			if region_at(pos)==0 or region_at(pos)!=region_at(enemy["pos"]) or waystone_safe_at(pos):continue
 			result.append({"id":int(peer),"pos":pos})
-	elif hp>0 and death_timer<=0 and (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)!=0):
+	elif hp>0 and death_timer<=0 and ranger_stealth_timer<=0.0 and (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)!=0):
 		if (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)==region_at(enemy["pos"])) and not waystone_safe_at(player_pos):
 			result.append({"id":0,"pos":player_pos})
 	return result
@@ -2499,7 +2500,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and panel != "":
 		if event.button_index == MOUSE_BUTTON_LEFT: handle_panel_click(event.position)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "journal"]:
-			menu_scroll = mini(maxi(0, QUESTS.size() - 6) if panel == "journal" else 2, menu_scroll + 1)
+			var skill_scroll_max := maxi(0, ceili(float(SKILL_TREES[skill_tree_tab].size()-6)/3.0)) if panel=="skills" else 0
+			menu_scroll = mini(maxi(0, QUESTS.size() - 6) if panel == "journal" else skill_scroll_max, menu_scroll + 1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and panel in ["skills", "journal"]:
 			menu_scroll = maxi(0, menu_scroll - 1)
 		return
@@ -4426,6 +4428,9 @@ func handle_panel_click(mouse: Vector2) -> void:
 		var destinations:Array=["","inventory","skills","journal","map","party","settings"]
 		for i in destinations.size():
 			if Rect2(540,155+i*51,410,42).has_point(mouse):
+				if destinations[i]=="skills" and not near_borin():
+					message("Skillwechsel nur bei Borin.")
+					return
 				panel=destinations[i]
 				play_sound("menu")
 				return
@@ -5680,6 +5685,20 @@ func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scal
 				PixelStyle32.rect(self,Rect2(rune-Vector2(2,2)*scale_factor,Vector2(4,4)*scale_factor),Color('e2c477'))
 
 func draw_skill_sprite(id: int, p: Vector2, size: float = 32.0) -> void:
+	if id >= 34:
+		var s:float=size/32.0
+		var center:=p+Vector2(16,16)*s
+		var tint:=Color("78d8e6") if id<=39 else Color("c999ff")
+		draw_rect(Rect2(p+Vector2(5,5)*s,Vector2(22,22)*s),Color(tint,0.18))
+		draw_arc(center,10*s,0,TAU,16,tint,3*s)
+		if id in [34,37,39,42]:
+			PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(17,3)*s,p+Vector2(8,17)*s,p+Vector2(15,17)*s,p+Vector2(12,29)*s,p+Vector2(25,13)*s,p+Vector2(19,13)*s]),Color("fff0a0"))
+		elif id in [35,36,41]:
+			draw_rect(Rect2(center-Vector2(3,10)*s,Vector2(6,20)*s),tint)
+			draw_rect(Rect2(center-Vector2(10,3)*s,Vector2(20,6)*s),tint)
+		else:
+			for a in 4: draw_line(center,center+Vector2.RIGHT.rotated(float(a)*PI/2.0)*11*s,tint,3*s)
+		return
 	if id in [16,17,18]:
 		var s:float=size/32.0
 		if id==16:
@@ -6882,7 +6901,8 @@ func draw_shadow(p: Vector2) -> void:
 func draw_player() -> void:
 	draw_shadow(player_pos)
 	if invulnerable > 0: draw_arc(player_pos+Vector2(0,12),31,0,TAU,16,Color("b7e5ee",0.35),2)
-	if ranger_stealth_timer > 0 and class_id == 2: draw_arc(player_pos+Vector2(0,10),34,0,TAU,24,Color("d8f3ff",0.28),4)
+	if ranger_stealth_timer > 0 and class_id == 2:
+		draw_arc(player_pos+Vector2(0,10),34,0,TAU,24,Color("d8f3ff",0.28),4)
 	if dash_timer > 0 and class_id == 1 and arcane_step_learned:
 		var progress := 1.0-dash_timer/dodge_duration
 		draw_line(dodge_start+Vector2(0,10),player_pos+Vector2(0,10),Color("a491e4",0.3),18)
@@ -7671,20 +7691,15 @@ func draw_mechanics_panel() -> void:
 			text_at(Vector2(620,246+i*31), "%s · %d/%d · %s" % [states[clampi(st,0,3)],prog,int(q["count"]),str(q["npc"])], 13, Color('b9d9cf'))
 		text_at(Vector2(190,575), "%d Quests insgesamt · Questbuch: J" % QUESTS.size(), 13, Color('aebfb9'))
 	elif mechanics_page == 2:
-		text_at(Vector2(190,211), "Skills: Freischalten mit Level + Skillpunkten · 3 Slots + Klassenfähigkeit auf 4", 16, Color('e9cc90'))
-		var ids: Array = CLASS_SKILLS[class_id] + [CLASS_ULTIMATES[class_id]]
-		for i in ids.size():
-			var id: int = int(ids[i])
-			var a: Dictionary = ABILITIES[id]
-			var rank: int = int(skill_levels[id]) if id < skill_levels.size() else 0
-			var col: int = int(i / 5.0)
-			var row: int = i % 5
-			var x: float = 190.0 + col*405.0
-			var y: float = 250.0 + row*58.0
-			draw_skill_sprite(id,Vector2(x,y-20),28)
-			text_at(Vector2(x+38,y), "%s · Rang %d · ab LV %d" % [str(a["name"]),rank,int(a["req"])], 13, Color('e5ecd9'))
-			text_at(Vector2(x+38,y+17), "%s" % str(a["desc"]), 11, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 345)
-		text_at(Vector2(190,575), "Skillbuch: K · freie Skillpunkte: %d" % skill_points, 13, Color('ffe0a1'))
+		text_at(Vector2(190,211), "Borin: Kampf · Magie · Robotik sind für jede Rasse und Klasse offen.", 16, Color('e9cc90'))
+		text_at(Vector2(190,250), "Skillpunkte bleiben beim normalen Leveln unverändert. Skills werden gezielt bei Borin gekauft.", 13, Color('e5ecd9'))
+		text_at(Vector2(190,282), "Drei aktive Slots werden nur bei Borin kostenlos umbelegt. Taste 4 bleibt die Klassen-Ultimate.", 13, Color('e5ecd9'))
+		text_at(Vector2(190,328), "KRISTALL DER VERSCHMELZUNG", 17, Color('d9c8ff'))
+		text_at(Vector2(190,356), "Neben Borin: zwei gelernte Skills + viel Gold + doppelte Grund-SP-Kosten → Fusionsskill.", 13, Color('cbd9da'))
+		text_at(Vector2(190,405), "MEISTERGABE NACH DEM FINALE", 17, Color('ffe0a1'))
+		text_at(Vector2(190,434), "Krieger: Wut · Magier: Arkaner Schritt · Bogenschütze: Jagdrausch + Schattenrolle.", 13, Color('e5ecd9'))
+		text_at(Vector2(190,468), "Bogenschütze: volle Jagdleiste = 60 Sek. +25% Angriffstempo; Rolle tarnt bis 0,4 Sek. danach.", 12, Color('aebfb9'))
+		text_at(Vector2(190,575), "Freie Skillpunkte: %d · Lernen und Build ändern: bei Borin" % skill_points, 13, Color('ffe0a1'))
 	else:
 		text_at(Vector2(190,211), "Online: Gruppen mit bis zu 10 Spielern · Browser und Desktop verbinden sich mit dem gemeinsamen Live-Server.", 16, Color('e9cc90'))
 		text_at(Vector2(190,250), "Status: %s" % network_status, 14, Color('bfe7d4'), HORIZONTAL_ALIGNMENT_LEFT, 750)
@@ -8829,7 +8844,8 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
-		"region":region_at(incoming_pos)
+		"region":region_at(incoming_pos),
+		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2
 	}
 	clean["konflux"] = in_konflux
 	clean["room"] = room_id
@@ -9970,7 +9986,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "konflux":konflux.active, "room":konflux.room}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:

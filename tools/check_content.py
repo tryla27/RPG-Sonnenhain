@@ -49,7 +49,7 @@ assert len(re.findall(r'\"[^\"]+\"', block('DUNGEON_NAMES'))) == 3
 assert re.findall(r'\[(\d+), (\d+)\]', block('DUNGEON_ENEMIES')) == [('4', '5'), ('6', '7'), ('21', '22')]
 assert len(entries('PORTALS')) == 5
 assert len(re.findall(r'Vector2\(', block('WAYSTONES'))) == 12
-assert len(entries('ABILITIES')) == 34
+assert len(entries('ABILITIES')) == 43
 for connection in ['func enter_dungeon', 'func leave_dungeon', 'func dungeon_blocked', 'func draw_dungeon_world', 'func draw_dungeon_atmosphere', 'func draw_overworld_atmosphere', 'func draw_dungeon_minimap', 'func open_dungeon_chest', '"dungeon_chests_opened":dungeon_chests_opened']:
     assert connection in source, f'missing dungeon feature: {connection}'
 # The dense fog must be rendered before floating effects and the HUD.
