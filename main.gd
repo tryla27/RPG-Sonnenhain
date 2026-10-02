@@ -88,7 +88,7 @@ const PORTALS := [
 ]
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
-const CUSTOM_MUSIC_THEMES := ["dorf", "blumen", "kueste", "pilzwald", "ruinen", "kristall", "asche", "sternen"]
+const CUSTOM_MUSIC_THEMES := ["dorf", "blumen", "kueste", "pilzwald", "ruinen", "kristall", "asche", "sternen", "taverne"]
 const MUSIC_FADE_SECONDS := 1.35
 const ENEMY_TYPES := [
 	{"name":"Waldschleim", "region":1, "hp":42, "damage":8, "speed":78, "xp":12, "color":Color("73cb88")},
@@ -1372,7 +1372,8 @@ func play_sound(name: String) -> void:
 func desired_music_theme() -> String:
 	if konflux.active:return "dorf" if KonfluxMap.safe(player_pos,konflux.room) else "konflux-pvp"
 	var region:int=region_at(player_pos)
-	if panel=="start" or interior_id>=0:return "dorf"
+	if interior_id>=0:return "taverne"
+	if panel=="start":return "dorf"
 	if arena_mode!="":return "boss"
 	if dungeon_id>=0:return ["ruinen","kristall","quelle"][dungeon_id]
 	var boss_theme:=active_class_boss_music_theme()
