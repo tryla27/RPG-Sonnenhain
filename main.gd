@@ -6057,7 +6057,7 @@ func draw_class_boss_house(index:int)->void:
 			draw_rect(Rect2(tile,Vector2(32,32)),wall.darkened(.06*float((tx+ty)%2)))
 			draw_rect(Rect2(tile,Vector2(32,32)),Color("1d2527",.38),false,2)
 	for tx in 7:
-		var roof_y:=-160+abs(tx-3)*10
+		var roof_y:float=-160.0+absf(float(tx-3))*10.0
 		draw_rect(Rect2(base+Vector2(-112+tx*32,roof_y),Vector2(32,48)),roof)
 		draw_rect(Rect2(base+Vector2(-112+tx*32,roof_y),Vector2(32,48)),accent,false,3)
 	# Tür, Fenster und Klassenzeichen.
@@ -6066,7 +6066,7 @@ func draw_class_boss_house(index:int)->void:
 	for wx in [-64,48]:
 		draw_rect(Rect2(base+Vector2(wx,-88),Vector2(28,28)),Color("18252e"))
 		draw_rect(Rect2(base+Vector2(wx+4,-84),Vector2(20,20)),accent.lightened(.32))
-	var symbol:=["⚔","✦","➶"][index]
+	var symbol:String=str(["⚔","✦","➶"][index])
 	text_at(base+Vector2(-32,-145),symbol,24,accent.lightened(.4),HORIZONTAL_ALIGNMENT_CENTER,64)
 	text_at(base+Vector2(-96,20),["KRIEGSHERRS HALLE","ARKANHÜTERS TURM","JAGDMEISTERS HÜTTE"][index],12,accent.lightened(.35),HORIZONTAL_ALIGNMENT_CENTER,192)
 
