@@ -54,6 +54,21 @@ func run():
 	g.food_system.harvested[g.FoodSystem.key(food_plant)]=Time.get_unix_time_from_system()+300
 	g.food_system.regen_rate=2.0
 	g.food_system.regen_until=Time.get_unix_time_from_system()+30
+	# Current multiplayer save must also preserve regional herbs, learned Alma recipes and long meals.
+	var herb_info:Dictionary=g.FoodSystem.herb_for_region(1)
+	var has_regional_herb:=false
+	for owned in g.inventory:
+		if str(owned.get("name",""))==str(herb_info["name"]):has_regional_herb=true
+	if not has_regional_herb:
+		g.add_item(g.make_item(str(herb_info["name"]),"herb",0,0,3,"",1))
+	g.steinrose.learned[1]=true
+	g.food_system.active_food_name="Nebelpflaumen-Tee"
+	g.food_system.meal_hp_regen=2.0
+	g.food_system.meal_mana_regen=0.0
+	g.food_system.meal_until=Time.get_unix_time_from_system()+360
+	g.food_system.buff_kind="move"
+	g.food_system.buff_value=0.05
+	g.food_system.buff_until=g.food_system.meal_until
 	g.server_save.latest = g.capture_save_data()
 	g.server_save.dirty = true
 	while g.server_save.revision <= initial_revision or g.server_save.dirty:
@@ -88,7 +103,15 @@ func run():
 		if owned.get("name")=="Heidelbeeren" and owned.get("icon")=="food":found_food=true
 	assert(found_food and not g.food_system.ready_at(food_plant,Time.get_unix_time_from_system()))
 	assert(g.food_system.regen_rate==2.0)
-	print("SERVER_SAVE_NETWORK_OK: food, harvest timers, nutrition, real WebSocket upload/acknowledgment, reconnect, server download, two-ring restoration revision=",initial_revision)
+	var found_regional_herb:=false
+	for owned in g.inventory:
+		if str(owned.get("name",""))==str(herb_info["name"]) and str(owned.get("icon",""))=="herb":found_regional_herb=true
+	assert(found_regional_herb)
+	assert(g.steinrose.learned[1])
+	assert(g.food_system.active_food_name=="Nebelpflaumen-Tee")
+	assert(g.food_system.meal_hp_regen==2.0 and g.food_system.buff_kind=="move")
+	assert(g.food_system.meal_remaining()>300)
+	print("SERVER_SAVE_NETWORK_OK: regional herb, Alma recipe, six-minute meal, harvest timers, real WebSocket upload/acknowledgment, reconnect and server download revision=",initial_revision)
 	peer.close()
 	g.queue_free()
 	await process_frame
