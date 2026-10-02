@@ -32,7 +32,13 @@ const FOODS = [
  {"name":"Daemmerbeeren","color":"7d6b99","heal":14,"regen":2.5,"duration":26,"price":24},
  {"name":"Himmelsfrucht","color":"dcbadb","heal":18,"regen":3.0,"duration":32,"price":35},
  {"name":"Steinbeeren","color":"b3aaa0","heal":8,"regen":1.5,"duration":16,"price":10},
- {"name":"Moosbeeren","color":"6b8f63","heal":6,"regen":1.0,"duration":14,"price":6}
+ {"name":"Moosbeeren","color":"6b8f63","heal":6,"regen":1.0,"duration":14,"price":6},
+ {"name":"Waldbeer-Kompott","color":"b94d6f","heal":30,"regen":1.0,"duration":20,"price":42},
+ {"name":"Moosbeeren-Eintopf","color":"80945e","heal":12,"regen":1.5,"duration":20,"price":48,"energy_heal":10,"buff":"energy_regen","buff_value":0.20,"buff_duration":25},
+ {"name":"Steinbeeren-Riegel","color":"9c8c7c","heal":10,"regen":1.0,"duration":15,"price":52,"buff":"armor","buff_value":0.12,"buff_duration":30},
+ {"name":"Kristallgelee","color":"72d7e5","heal":12,"regen":1.0,"duration":18,"price":58,"energy_heal":15,"buff":"cooldown","buff_value":0.15,"buff_duration":20},
+ {"name":"Nebelpflaumen-Tee","color":"9070ad","heal":8,"regen":1.0,"duration":14,"price":60,"buff":"move","buff_value":0.12,"buff_duration":25},
+ {"name":"Daemmerhimmel-Torte","color":"bd8bc7","heal":18,"regen":2.0,"duration":20,"price":85,"buff":"power_speed","buff_value":0.08,"buff_duration":20}
 ]
 const BUSHES=[Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]
 const TREES=[Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680)]
@@ -54,6 +60,9 @@ func configure(g)->void:
    plant_foods[key(p)]=REGION_FOOD[region]
 var regen_rate:=0.0
 var regen_until:=0.0
+var buff_kind:=""
+var buff_value:=0.0
+var buff_until:=0.0
 static func by_name(food_name:String)->Dictionary:
  for entry in FOODS:
   if entry["name"]==food_name:return entry
@@ -71,9 +80,12 @@ func prune(now:float)->void:
   if float(harvested[plant])<=now:harvested.erase(plant)
 func snapshot()->Dictionary:
  prune(Time.get_unix_time_from_system())
- return {"plants":harvested.duplicate(),"regen_rate":regen_rate,"regen_until":regen_until}
+ var now:=Time.get_unix_time_from_system()
+ if buff_until<=now:
+  buff_kind="";buff_value=0;buff_until=0
+ return {"plants":harvested.duplicate(),"regen_rate":regen_rate,"regen_until":regen_until,"buff_kind":buff_kind,"buff_value":buff_value,"buff_until":buff_until}
 func restore(raw:Variant)->void:
- harvested={};regen_rate=0;regen_until=0
+ harvested={};regen_rate=0;regen_until=0;buff_kind="";buff_value=0;buff_until=0
  if not raw is Dictionary:return
  var plants:Variant=raw.get("plants",{})
  if plants is Dictionary:
@@ -83,6 +95,13 @@ func restore(raw:Variant)->void:
     harvested[plant_key]=clampf(float(value),0,Time.get_unix_time_from_system()+REGROW_SECONDS)
  regen_rate=clampf(float(raw.get("regen_rate",0)),0,3)
  regen_until=clampf(float(raw.get("regen_until",0)),0,Time.get_unix_time_from_system()+40)
+ var candidate_kind:=str(raw.get("buff_kind",""))
+ if candidate_kind in ["energy_regen","armor","cooldown","move","power_speed"]:
+  buff_kind=candidate_kind
+  buff_value=clampf(float(raw.get("buff_value",0)),0,0.25)
+  buff_until=clampf(float(raw.get("buff_until",0)),0,Time.get_unix_time_from_system()+120)
+ if buff_until<=Time.get_unix_time_from_system():
+  buff_kind="";buff_value=0;buff_until=0
  prune(Time.get_unix_time_from_system())
 func nearest(g)->Dictionary:
  if g.konflux.active or g.arena_mode!="" or g.dungeon_id>=0 or g.interior_id>=0:return {}
@@ -122,22 +141,60 @@ func eat(g,index:int)->bool:
  if item.get("icon")!="food" or info.is_empty() or g.hp<=0:return false
  var now:=Time.get_unix_time_from_system()
  g.hp=minf(g.max_hp(),g.hp+float(info["heal"]))
- # Refresh only the same or stronger food; weak snacks cannot prolong a strong meal.
+ if int(info.get("energy_heal",0))>0:
+  g.energy=minf(g.max_energy(),g.energy+float(info.get("energy_heal",0)))
+ # Refresh only the same or stronger healing food; weak snacks cannot prolong a strong meal.
  if regen_until<=now or float(info["regen"])>=regen_rate:
   regen_rate=float(info["regen"]);regen_until=now+float(info["duration"])
+ var new_buff:=str(info.get("buff",""))
+ if new_buff!="":
+  buff_kind=new_buff
+  buff_value=clampf(float(info.get("buff_value",0)),0,0.25)
+  buff_until=now+clampf(float(info.get("buff_duration",0)),1,120)
  if int(item.get("count",1))>1:
   item["count"]=int(item["count"])-1
   item["stack_value"]=maxi(0,g.item_sale_value(item)-int(item.get("value",0)))
  else:
   g.inventory.remove_at(index);g.selected_item=-1
- g.message("%s: +%d HP, %.1f HP/s fuer %ds." % [info["name"],info["heal"],info["regen"],info["duration"]])
+ var extra:=""
+ if int(info.get("energy_heal",0))>0: extra+=" · +%d Energie" % int(info["energy_heal"])
+ if new_buff!="": extra+=" · Spezialeffekt %ds" % int(info.get("buff_duration",0))
+ g.message("%s: +%d HP, %.1f HP/s fuer %ds%s." % [info["name"],info["heal"],info["regen"],info["duration"],extra])
  g.play_sound("pickup");g.save_game()
  return true
 func tick(g,delta:float)->void:
  configure(g)
- if regen_until<=Time.get_unix_time_from_system():regen_rate=0;return
- if g.hp>0 and g.character_created and not g.server_save.loading and g.death_timer<=0 and not g.konflux.active and g.arena_mode=="":
+ var now:=Time.get_unix_time_from_system()
+ if buff_until<=now:
+  buff_kind="";buff_value=0;buff_until=0
+ if regen_until<=now:
+  regen_rate=0
+ elif g.hp>0 and g.character_created and not g.server_save.loading and g.death_timer<=0 and not g.konflux.active and g.arena_mode=="":
   g.hp=minf(g.max_hp(),g.hp+regen_rate*maxf(0,delta))
+
+func buff_active(kind:String="")->bool:
+ if buff_until<=Time.get_unix_time_from_system():return false
+ return kind=="" or buff_kind==kind
+
+func energy_regen_mult()->float:
+ return 1.0+buff_value if buff_active("energy_regen") else 1.0
+
+func damage_taken_mult()->float:
+ return 1.0-buff_value if buff_active("armor") else 1.0
+
+func cooldown_recovery_mult()->float:
+ return 1.0+buff_value if buff_active("cooldown") else 1.0
+
+func move_mult()->float:
+ return 1.0+buff_value if buff_active("move") or buff_active("power_speed") else 1.0
+
+func damage_mult()->float:
+ return 1.0+buff_value if buff_active("power_speed") else 1.0
+
+func buff_label()->String:
+ if not buff_active():return ""
+ var names:={"energy_regen":"ENERGIE-REGEN","armor":"STEINHAUT","cooldown":"KRISTALLFOKUS","move":"NEBELSCHRITT","power_speed":"DAEMMERKRAFT"}
+ return "%s · %ds" % [str(names.get(buff_kind,buff_kind)),maxi(0,ceili(buff_until-Time.get_unix_time_from_system()))]
 func regional_props(g)->Array:
  configure(g)
  var result:Array=[]
