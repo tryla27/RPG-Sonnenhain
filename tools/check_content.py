@@ -117,14 +117,16 @@ assert 'return "res://music/%s.ogg" % theme' in source
 for boss_theme in ['boss_kriegsherr','boss_arkanhueter','boss_jagdmeister']:
     assert boss_theme in source, f'missing boss music routing: {boss_theme}'
 sfx = re.findall(r'"([^"]+)"', block('SFX_NAMES'))
-for name in sfx + ['nebel', 'bernstein', 'quelle', 'daemmer', 'himmel', 'boss']:
+procedural_sfx = {'door_open', 'door_close'}
+for name in [n for n in sfx if n not in procedural_sfx] + ['nebel', 'bernstein', 'quelle', 'daemmer', 'himmel', 'boss']:
     path = root / 'audio' / f'{name}.wav'
     assert path.exists(), f'missing audio: {path.name}'
     with wave.open(str(path)) as wav:
         assert wav.getnframes() > 100 and wav.getframerate() > 8000, f'invalid audio: {name}'
+assert 'DoorSfx.make(true)' in source and 'DoorSfx.make(false)' in source, 'procedural village door sounds not wired'
 atlas = (root / 'art' / 'sonnenhain_tiles.png').read_bytes()
 assert atlas[:8] == b'\x89PNG\r\n\x1a\n' and int.from_bytes(atlas[16:20], 'big') == 128 and int.from_bytes(atlas[20:24], 'big') == 64
-for connection in ['func draw_pixel_tile', 'func draw_tavern_world', 'func tavern_blocked', 'func enter_tavern', 'func leave_tavern', 'if interior_id >= 0: return tavern_blocked(pos)', 'interior_return_pos if interior_id >= 0 else player_pos', '"res://art/sonnenhain_tiles.png"']:
+for connection in ['func draw_pixel_tile', 'func draw_tavern_world', 'func tavern_blocked', 'func draw_village_interior', 'func enter_village_house', 'func leave_village_house', 'func enter_tavern', 'func leave_tavern', 'VillageInteriors32.blocked(pos,INTERIOR_CENTER)', 'interior_return_pos if interior_id >= 0 else player_pos', '"res://art/sonnenhain_tiles.png"']:
     assert connection in source, f'missing pixel-art scene connection: {connection}'
 assert source.count('draw_pixel_tile(') > 15
 for connection in ['func load_bindings', 'func save_bindings', 'func reset_bindings', 'func draw_controls_panel', 'func movement_vector', 'binding_pressed("attack")', 'binding_short("ability_%d" % (slot + 1))']:
@@ -169,6 +171,27 @@ assert 'const CHEST_RESPAWN_SECONDS := 360.0' in source and 'chest_respawn_until
 assert 'func decorative_tree_in_cell' in source and 'Nur Stamm/Wurzel blockieren' in source, 'regional tree trunk collisions missing'
 assert 'Dekobuesche tragen absichtlich keine Fruechte' in source, 'decorative bushes still imply fake harvest fruit'
 assert 'ENTER oder T' in source, 'chat prompt missing'
+# Map 0 village-role / interior regression wiring.
+for connection in [
+    'const VillageInteriors32 = preload("res://components/village_interiors_32.gd")',
+    'const DoorSfx = preload("res://components/door_sfx.gd")',
+    'func draw_appearance_panel()',
+    'func click_appearance(',
+    'FENNA · CHARACTER EDITOR',
+    'ELARA (HEILUNG & ALCHEMIE)',
+    'func orc_jump_knockback()',
+    'func rpc_orc_jump_knockback(',
+    'play_sound("door_open")',
+    'play_sound("door_close")',
+]:
+    assert connection in source, f'missing Map 0 village update: {connection}'
+village_layout = (root / 'components' / 'village_layout.gd').read_text(encoding='utf8')
+for resident in ['Mira','Liora','Arven','Torvald','Fenna','Pip','Elara','Alma','Borin']:
+    assert f'"name":"{resident}"' in village_layout, f'missing village house: {resident}'
+assert '"name":"Borin","house":Vector2(1330,230)' in village_layout, 'Borin house anchor moved'
+assert 'const BORIN_MAGIC_TREE_POS := Vector2(1620,520)' in source, 'Borin magic tree anchor moved'
+assert 'const BORIN_CRYSTAL_POS := Vector2(1608,700)' in source, 'Borin fusion crystal anchor moved'
+
 
 # v27.5 visuals, weapons, roads, daylight, performance, chat, co-op and web preset checks.
 world_draw = source.split('func draw_static_overworld(bounds: Rect2) -> void:', 1)[1].split('func ', 1)[0]
@@ -196,7 +219,7 @@ sprite_builder = (root / 'tools' / 'build_v27_pixel_art.py').read_text(encoding=
 assert 'if direction==0:' in sprite_builder and 'elif direction==1:' in sprite_builder and 'elif direction==2:' in sprite_builder and 'else:' in sprite_builder, 'directional face animation missing'
 assert 'hair_dark' in sprite_builder and 'geschichteten Helm' in sprite_builder, 'female hair or warrior helmet redesign missing'
 assert 'var house_tiles: Texture2D' in source and 'house_tiles = load("res://art/houses_192.png")' in source, 'detailed house atlas not loaded'
-assert 'func draw_house(p: Vector2) -> void:' in source and 'StartScenery32.house(self,p,house_kind)' in source, 'start village does not use the new pixel houses'
+assert 'func draw_house(p: Vector2) -> void:' in source and 'StartScenery32.themed_house(self,p,kind)' in source and 'StartScenery32.borin_house(self,p)' in source, 'start village does not use the themed pixel houses'
 assert 'var fade_alpha := 1.0 if chat_open else clampf(chat_fade / 1.25, 0.0, 1.0)' in source, 'chat inactivity fade missing'
 assert 'func start_coop_world() -> void:' in source and 'WELT STARTEN' in source and 'WELT BEITRETEN' in source, 'co-op world start/join flow missing'
 assert 'func is_web_platform() -> bool:' in source and 'OS.has_feature("web")' in source, 'browser networking guard missing'
