@@ -112,11 +112,15 @@ func run():
 	assert(int(g.inventory[0]["uid"])==sword_uid)
 	assert(g.inventory.any(func(it):return int(it.get("uid",-1))==locked_uid and bool(it.get("locked",false))))
 
-	# Persistent test level lock blocks XP leveling outside creative mode.
+	# Leaving test mode fixes the chosen test level for normal play.
 	g.creative_mode=false
-	g.level=17;g.xp=0;g.test_level_lock=17
+	g.level=3;g.xp=77;g.test_level_lock=0
+	g.fix_level_after_test_mode(25)
+	assert(g.level==25 and g.test_level_lock==25 and g.xp==0)
 	g.gain_xp(999999)
-	assert(g.level==17 and g.xp==0)
+	assert(g.level==25 and g.xp==0)
+	g.fix_level_after_test_mode(1)
+	assert(g.level==1 and g.test_level_lock==1)
 	g.test_level_lock=0
 
 	# Bosses have long pursuit ranges compared with ordinary mobs.
