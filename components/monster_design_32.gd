@@ -53,7 +53,86 @@ static func weapon(c:CanvasItem,p:Vector2,t:int,level:int,side:int,back:bool,loo
 	if rank>=4:
 		diamond(c,hand+Vector2(0,8),metal.lightened(.3),4)
 	c.draw_set_transform(canvas_origin,0,canvas_scale)
+
+static func paint_waldschleim(c:CanvasItem,p:Vector2,look:Vector2,base:Color,phase:float,attack:float,scale_factor:float,stretch:Vector2)->void:
+	var heading:=Hero.direction_index(look)
+	var back:=heading in [3,4,5]
+	var profile:=heading in [2,6]
+	var side:=-1 if heading in [5,6,7] else 1
+	var diag:=heading in [1,3,5,7]
+	var bounce:=absf(sin(phase))
+	var squash:=0.0
+	var lift:=0.0
+	if attack>=0.0:
+		# Treffer-/Angriffsbewegung: kurz zusammenpressen, dann nach vorn federn.
+		squash=sin(clampf(attack,0.0,1.0)*PI)*0.22
+		lift=sin(clampf(attack,0.0,1.0)*PI)*2.0
+	else:
+		# Laufbewegung: kompakter Squash-and-Stretch-Hop statt humanoidem Laufen.
+		squash=bounce*0.12
+		lift=bounce*2.0
+	var canvas_scale:=stretch*scale_factor*Vector2(1.0+squash,1.0-squash*0.72)
+	c.draw_set_transform(p+Vector2(0,-lift),0,canvas_scale)
+	var q:=Vector2.ZERO
+	var dark:=base.darkened(.42)
+	var shade:=base.darkened(.20)
+	var mid:=base
+	var light:=base.lightened(.22)
+	var hi:=base.lightened(.42)
+	# Fester Bodenschatten und dunkle Kontaktkante geben dem Schleim Gewicht.
+	box(c,q,-18,12,36,4,Color("172526"))
+	box(c,q,-14,11,28,2,Color("23332d"))
+	# 32px-Pixelkörper: wenige harte Stufen statt weicher Render-Verläufe.
+	box(c,q,-16,-13,32,23,dark)
+	box(c,q,-14,-18,28,25,shade)
+	box(c,q,-11,-22,22,27,mid)
+	box(c,q,-7,-24,14,27,light)
+	# Richtung beeinflusst Volumen und sichtbare Vorder-/Rückseite.
+	if profile:
+		box(c,q,side*7-5,-20,10,24,shade)
+		box(c,q,-side*6-5,-20,10,23,mid)
+	elif diag:
+		box(c,q,side*6-5,-20,10,24,shade)
+	# Kleine, harte Lichtcluster statt Hochglanz.
+	if heading not in [3,4,5]:
+		box(c,q,-9,-21,6,3,hi)
+		box(c,q,-11,-17,3,4,light)
+	else:
+		box(c,q,-7,-21,5,2,light)
+	# Moosige Randdetails, bewusst sparsam.
+	for x in [-13,11]:
+		box(c,q,x,-4,4,7,dark)
+		box(c,q,x+1,-7,3,4,light.darkened(.1))
+	box(c,q,-15,3,6,4,shade)
+	box(c,q,9,4,6,3,shade)
+	# Blatt-Spross als asymmetrischer Richtungsanker.
+	var leaf_x:=(-3 if back else 2) + (side*2 if diag or profile else 0)
+	box(c,q,leaf_x,-30,2,8,Color("557a35"))
+	box(c,q,leaf_x+2,-33,5,4,Color("87ad47"))
+	box(c,q,leaf_x+4,-35,3,3,Color("a8c956"))
+	box(c,q,leaf_x-4,-28,5,3,Color("6f963e"))
+	# Gesicht nur auf Vorder-/Seitenansichten. Rücken bleibt wirklich gesichtslos.
+	if not back:
+		var face_x:=side*5 if profile else (side*3 if diag else 0)
+		if profile:
+			box(c,q,face_x,-11,3,4,Color("17242a"))
+			box(c,q,face_x,-11,1,1,Color("eaf3c8"))
+		else:
+			box(c,q,face_x-5,-11,3,4,Color("17242a"))
+			box(c,q,face_x+3,-11,3,4,Color("17242a"))
+			box(c,q,face_x-5,-11,1,1,Color("eaf3c8"))
+			box(c,q,face_x+3,-11,1,1,Color("eaf3c8"))
+		# Sehr kleines neutrales Monstergesicht, kein Maskottchen-Grinsen.
+		box(c,q,face_x-2,-5,4,1,Color("26372f"))
+	# Innerer Waldkern, nur subtil sichtbar.
+	if not back:
+		box(c,q,side*2-3,-1,6,3,base.darkened(.28))
+	c.draw_set_transform(Vector2.ZERO)
+
 static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color,phase:float=0.0,attack:float=-1.0,scale_factor:float=1.0,stretch:Vector2=Vector2.ONE)->void:
+	if t==0:
+		paint_waldschleim(c,p,look,base,phase,attack,scale_factor,stretch)
+		return
 	var canvas_origin:=p
 	var canvas_scale:=stretch*scale_factor
 	c.draw_set_transform(canvas_origin,0,canvas_scale)
