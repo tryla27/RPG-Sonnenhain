@@ -5551,6 +5551,13 @@ func finish_intro() -> void:
 			rpc_player_presence.rpc_id(1, local_player_state())
 	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
 
+func fix_level_after_test_mode(target_level:int)->void:
+	test_level_lock=clampi(target_level,1,40)
+	level=test_level_lock
+	xp=0
+	hp=max_hp()
+	energy=max_energy()
+
 func toggle_creative_mode() -> void:
 	if not creative_mode:
 		save_game()
@@ -5579,11 +5586,7 @@ func toggle_creative_mode() -> void:
 		quests.clear()
 		for i in QUESTS.size(): quests.append({"state":0, "progress":0})
 		load_game()
-		test_level_lock=fixed_test_level
-		level=fixed_test_level
-		xp=0
-		hp=max_hp()
-		energy=max_energy()
+		fix_level_after_test_mode(fixed_test_level)
 		save_game()
 		enemies.clear()
 		drops.clear()
