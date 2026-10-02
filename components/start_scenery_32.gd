@@ -28,6 +28,24 @@ static func house(c:CanvasItem,p:Vector2,kind:int=0)->void:
 	else:
 		var roof: Color = [Color("a7422d"),Color("87563d"),Color("6f5540")][clampi(kind,0,2)]
 		ReferenceHouse.paint(c,p,roof,Color("ffd482"),false)
+
+# Borins Haus ist bewusst groesser als die normalen 192x160-Dorfhaeuser.
+# Der Anker bleibt links oben, damit Wege, NPC und Interaktion stabil positionierbar sind.
+static func borin_house(c:CanvasItem,p:Vector2)->void:
+	init_art()
+	if objects != null:
+		sprite(c,objects,Rect2(10,20,495,480),Rect2(p,Vector2(256,240)))
+	else:
+		c.draw_set_transform(p,0.0,Vector2(1.333,1.5))
+		ReferenceHouse.paint(c,Vector2.ZERO,Color("465e86"),Color("ffe0a1"),false)
+		c.draw_set_transform(Vector2.ZERO)
+	c.draw_rect(Rect2(p+Vector2(18,205),Vector2(220,12)),Color("51483b"))
+	c.draw_rect(Rect2(p+Vector2(24,207),Vector2(208,5)),Color("b8aa87"))
+	for i in 5:
+		var q:=p+Vector2(30+i*43,220)
+		c.draw_circle(q,6,Color("7165ba",0.42))
+		c.draw_circle(q,3,Color("cfc5ff"))
+
 static func tree(c:CanvasItem,p:Vector2,_key:int)->void:
 	init_art()
 	if objects != null:
@@ -37,6 +55,29 @@ static func tree(c:CanvasItem,p:Vector2,_key:int)->void:
 	c.draw_circle(p+Vector2(0,-83),44,Color("406b49"))
 	c.draw_circle(p+Vector2(-28,-62),30,Color("4d7b52"))
 	c.draw_circle(p+Vector2(28,-60),29,Color("4a7550"))
+
+# Eigener Zauberbaum fuer Borins Skillbereich: groesser, blau-violett und mit Runen.
+static func magic_tree(c:CanvasItem,p:Vector2)->void:
+	init_art()
+	if objects != null:
+		sprite(c,objects,Rect2(5,510,550,495),Rect2(p+Vector2(-104,-216),Vector2(208,248)))
+	else:
+		c.draw_rect(Rect2(p+Vector2(-10,-76),Vector2(20,92)),Color("574035"))
+		c.draw_circle(p+Vector2(0,-120),56,Color("76599b"))
+		c.draw_circle(p+Vector2(-38,-91),38,Color("8b66ad"))
+		c.draw_circle(p+Vector2(39,-90),37,Color("6654a1"))
+	for i in 4:
+		var rune:=p+Vector2(0,-58-i*24)
+		c.draw_circle(rune,8,Color("5ed7ff",0.22),false,3.0)
+		c.draw_line(rune+Vector2(-5,0),rune+Vector2(5,0),Color("9be9ff"),2)
+	for side in [-1,1]:
+		for i in 3:
+			var lamp:=p+Vector2(side*(38+i*13),-116+i*28)
+			c.draw_line(lamp-Vector2(0,14),lamp,Color("69548e"),2)
+			c.draw_colored_polygon(PackedVector2Array([lamp+Vector2(0,-6),lamp+Vector2(5,0),lamp+Vector2(0,9),lamp+Vector2(-5,0)]),Color("8be6ff"))
+	c.draw_circle(p+Vector2(0,8),38,Color("6d64be",0.16))
+	c.draw_arc(p+Vector2(0,8),31,0,TAU,24,Color("91e7ff"),3)
+
 static func well(c:CanvasItem,p:Vector2)->void:
 	init_art()
 	if objects != null:
