@@ -2915,10 +2915,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and panel != "":
 		if event.button_index == MOUSE_BUTTON_LEFT: handle_panel_click(event.position)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "journal"]:
-			var skill_scroll_max := maxi(0, ceili(float(SKILL_TREES[skill_tree_tab].size()-6)/3.0)) if panel=="skills" else 0
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "skill_loadout", "journal"]:
+			var skill_scroll_max := maxi(0, ceili(float(SKILL_TREES[skill_tree_tab].size()-6)/3.0)) if panel=="skills" else (maxi(0, learned_loadout_skills().size()-7) if panel=="skill_loadout" else 0)
 			menu_scroll = mini(maxi(0, QUESTS.size() - 6) if panel == "journal" else skill_scroll_max, menu_scroll + 1)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and panel in ["skills", "journal"]:
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and panel in ["skills", "skill_loadout", "journal"]:
 			menu_scroll = maxi(0, menu_scroll - 1)
 		return
 	if event is InputEventKey and event.keycode == KEY_ESCAPE or event_matches_binding(event, "pause"):
@@ -5251,6 +5251,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		return
 	match panel:
 		"skills": click_skills(mouse)
+		"skill_loadout": click_skill_loadout(mouse)
 		"fusion": click_fusion(mouse)
 		"appearance": click_appearance(mouse)
 		"inventory": click_inventory(mouse)
@@ -5481,25 +5482,62 @@ func buy_skill(index:int) -> bool:
 	skill_points -= price;learned[index]=true;skill_levels[index]=1
 	message("%s gelernt · %d Skillpunkte" % [ABILITIES[index]["name"],price]);save_game();return true
 
+func fusion_source_skills()->Array:
+	var out:Array=[]
+	for id in range(0,40):
+		if id>=learned.size() or not learned[id]:continue
+		if id in CLASS_ULTIMATES or id in [9,10,11]:continue
+		# Nur aktiv nutzbare Fähigkeiten anbieten; passive Werte gehören nicht in den Kristall.
+		if float(ABILITIES[id].get("cd",0.0))<=0.0:continue
+		out.append(id)
+	return out
+
+func available_fusions()->Array:
+	var sources:=fusion_source_skills()
+	var free_outputs:Array=[]
+	for fusion in FUSIONS:
+		var output:=int(fusion["id"])
+		if output<learned.size() and not learned[output]:free_outputs.append(fusion)
+	var offers:Array=[]
+	if sources.size()<2:return offers
+	var pair_index:=0
+	for template in free_outputs:
+		if pair_index+1>=sources.size():pair_index=0
+		var a:=int(sources[pair_index])
+		var b:=int(sources[(pair_index+1)%sources.size()])
+		if a==b:break
+		var offer:=template.duplicate(true)
+		offer["a"]=a;offer["b"]=b
+		offers.append(offer)
+		pair_index+=2
+		if offers.size()>=3:break
+	return offers
+
 func fusion_skill_cost(fusion:Dictionary) -> int:
-	return (skill_point_cost(int(fusion["a"])) + skill_point_cost(int(fusion["b"]))) * 2
+	var a:=int(fusion["a"]);var b:=int(fusion["b"])
+	return maxi(1,ceili(float(skill_point_cost(a)+skill_point_cost(b))*0.75))
 
 func can_fuse(fusion:Dictionary) -> bool:
 	var a:=int(fusion["a"]);var b:=int(fusion["b"]);var id:=int(fusion["id"])
-	return not learned[id] and learned[a] and learned[b] and level >= int(ABILITIES[id]["req"]) and skill_points >= fusion_skill_cost(fusion) and gold >= int(fusion["gold"])
+	return a!=b and not learned[id] and learned[a] and learned[b] and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and skill_points >= fusion_skill_cost(fusion) and gold >= int(fusion["gold"])
 
 func buy_fusion(index:int) -> bool:
-	if index < 0 or index >= FUSIONS.size(): return false
-	var fusion:Dictionary=FUSIONS[index]
-	if not can_fuse(fusion): return false
+	var offers:=available_fusions()
+	if index < 0 or index >= offers.size(): return false
+	var fusion:Dictionary=offers[index]
+	if not can_fuse(fusion):
+		message("Diese Verschmelzung ist gerade nicht verfügbar.")
+		return false
 	var id:=int(fusion["id"]);var sp:=fusion_skill_cost(fusion)
 	skill_points-=sp;gold-=int(fusion["gold"]);learned[id]=true;skill_levels[id]=1
-	message("%s verschmolzen · -%d SP · -%d Gold" % [ABILITIES[id]["name"],sp,int(fusion["gold"])]);save_game();return true
+	message("%s + %s → %s · -%d SP · -%d Gold" % [ABILITIES[int(fusion["a"])]["name"],ABILITIES[int(fusion["b"])]["name"],ABILITIES[id]["name"],sp,int(fusion["gold"])])
+	save_game();return true
 
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
 		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("menu");return
 	if Rect2(718,145,118,38).has_point(mouse): borin_quest_dialogue();return
+	if Rect2(848,145,118,38).has_point(mouse): panel="skill_loadout";menu_scroll=0;play_sound("menu");return
 	for slot in 3:
 		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -5511,6 +5549,34 @@ func click_skills(mouse: Vector2) -> void:
 					if slots[s]==id:slots[s]=-1
 				slots[selected_slot]=id;save_game()
 			else: buy_skill(id)
+			return
+
+func learned_loadout_skills()->Array:
+	var out:Array=[]
+	for id in range(ABILITIES.size()):
+		if id>=learned.size() or not learned[id]:continue
+		if id in CLASS_ULTIMATES:continue
+		if id in [9,10,11]:continue
+		out.append(id)
+	return out
+
+func click_skill_loadout(mouse:Vector2)->void:
+	if Rect2(165,145,140,38).has_point(mouse):panel="skills";menu_scroll=0;return
+	for slot in 3:
+		if Rect2(165+slot*204,200,193,44).has_point(mouse):
+			selected_slot=slot
+			return
+	var known:=learned_loadout_skills()
+	for row in 7:
+		var i:=row+menu_scroll
+		if i>=known.size():break
+		if Rect2(165,270+row*40,815,35).has_point(mouse):
+			var id:=int(known[i])
+			for s in 3:
+				if slots[s]==id:slots[s]=-1
+			slots[selected_slot]=id
+			save_game()
+			play_sound("menu")
 			return
 
 func upgrade_skill(index: int) -> void:
@@ -8489,6 +8555,7 @@ func draw_panel() -> void:
 		"controls": draw_controls_panel()
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
+		"skill_loadout": draw_skill_loadout_panel()
 		"fusion": draw_fusion_panel()
 		"appearance": draw_appearance_panel()
 		"inventory": draw_inventory_panel()
@@ -8974,7 +9041,7 @@ func draw_skills_panel() -> void:
 	text_at(Vector2(165,125),"BORIN · SKILLZAUBERER",25,Color("ffeda9"))
 	text_at(Vector2(650,124),"LV %d · %d SP · %d GOLD" % [level,skill_points,gold],16,Color("f6dc9a"))
 	for tab in 3: ui_button(Rect2(165+tab*180,145,168,38),SKILL_TREE_NAMES[tab],true,skill_tree_tab==tab)
-	ui_button(Rect2(718,145,118,38),"PRÜFUNGEN")
+	ui_button(Rect2(718,145,118,38),"PRÜFUNGEN");ui_button(Rect2(848,145,118,38),"BELEGUNG")
 	for slot in 3:
 		var sid:int=slots[slot];ui_button(Rect2(165+slot*204,190,193,40),"%d · %s" % [slot+1,"FREI" if sid<0 else ABILITIES[sid]["name"]],true,selected_slot==slot)
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -8990,6 +9057,25 @@ func draw_skills_panel() -> void:
 	if not class_mastery_unlocked:
 		mastery = "Relikt von Map %02d · %s" % [6+class_id,ENEMY_TYPES[12+class_id]["name"]]
 	text_at(Vector2(165,578),"Klassenbonus · "+mastery,13,Color("ffe2aa"))
+
+func draw_skill_loadout_panel() -> void:
+	text_at(Vector2(165,125),"ATTACKEN · REIHENFOLGE",25,Color("ffeda9"))
+	ui_button(Rect2(165,145,140,38),"ZURÜCK")
+	text_at(Vector2(330,169),"Wähle Slot 1–3 und danach eine gelernte Attacke.",14,Color("d8e6dc"))
+	for slot in 3:
+		var sid:=int(slots[slot])
+		var label:="%d · %s" % [slot+1,"FREI" if sid<0 else ABILITIES[sid]["name"]]
+		ui_button(Rect2(165+slot*204,200,193,44),label,true,selected_slot==slot)
+	text_at(Vector2(165,258),"GELERNTE ATTACKEN",15,Color("f3d393"))
+	var known:=learned_loadout_skills()
+	for row in 7:
+		var i:=row+menu_scroll
+		if i>=known.size():break
+		var id:=int(known[i])
+		var active_slot:=slots.find(id)
+		ui_button(Rect2(165,270+row*40,815,35),"%s%s" % [ABILITIES[id]["name"]," · SLOT %d" % (active_slot+1) if active_slot>=0 else ""],true,active_slot>=0)
+	if known.is_empty():text_at(Vector2(165,310),"Noch keine Attacken gelernt.",15,Color("c8d8d2"))
+	text_at(Vector2(165,566),"Die Reihenfolge hier entspricht den Tasten 1, 2 und 3.",13,Color("b9d9cf"))
 
 func draw_fusion_crystal() -> void:
 	var p:=BORIN_CRYSTAL_POS
@@ -9009,13 +9095,17 @@ func draw_fusion_crystal() -> void:
 	text_at(p+Vector2(-72,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,144)
 
 func draw_fusion_panel() -> void:
-	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(720,124),"%d SP · %d GOLD" % [skill_points,gold],16,Color("f6dc9a"));text_at(Vector2(165,160),"Beide Ausgangsskills bleiben erhalten.",13,Color("cbd9da"))
-	for i in FUSIONS.size():
-		var f:Dictionary=FUSIONS[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
-		ui_box(Rect2(165,y,800,104),Color("342f51") if learned[id] else Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s %s  +  %s %s" % [ABILITIES[a]["name"],"✓" if learned[a] else "✗",ABILITIES[b]["name"],"✓" if learned[b] else "✗"],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Skillpunkte · %d Gold" % [fusion_skill_cost(f),int(f["gold"])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),"GELERNT" if learned[id] else ("VERSCHMELZEN" if can_fuse(f) else "GESPERRT"),can_fuse(f),learned[id])
+	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(720,124),"%d SP · %d GOLD" % [skill_points,gold],16,Color("f6dc9a"));text_at(Vector2(165,160),"Der Kristall bietet immer Kombinationen aus deinen bereits gelernten Attacken an.",13,Color("cbd9da"))
+	var offers:=available_fusions()
+	if offers.is_empty():
+		text_at(Vector2(185,225),"Lerne mindestens zwei aktive Attacken. Bereits erschaffene Fusionen bleiben erhalten.",15,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,760)
+	for i in offers.size():
+		var f:Dictionary=offers[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
+		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Skillpunkte · %d Gold" % [fusion_skill_cost(f),int(f["gold"])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),"VERSCHMELZEN" if can_fuse(f) else "GESPERRT",can_fuse(f))
 
 func click_fusion(mouse:Vector2) -> void:
-	for i in FUSIONS.size():
+	var offers:=available_fusions()
+	for i in offers.size():
 		if Rect2(745,223+i*118,190,45).has_point(mouse): buy_fusion(i);return
 
 func draw_skill_star(center: Vector2, tint: Color, lit: bool) -> void:
