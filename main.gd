@@ -1,4 +1,4 @@
-# Release marker: stabilized two-client multiplayer, regional herbs and Alma food persistence production rollout.
+# Release marker: production rollout for Borin skill trees, Map-8 masteries, validated saves and current multiplayer fixes.
 extends Node2D
 const PatchNotice = preload("res://components/patch_notice.gd")
 var patch_notice = PatchNotice.new()
