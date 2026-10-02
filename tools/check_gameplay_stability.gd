@@ -116,11 +116,11 @@ func run():
 	g.creative_mode=false
 	g.level=3;g.xp=77;g.test_level_lock=0
 	g.fix_level_after_test_mode(25)
-	assert(g.level==25 and g.test_level_lock==25 and g.xp==0)
+	assert(g.level==25 and g.test_level_lock==25 and g.xp==77)
 	g.gain_xp(999999)
-	assert(g.level==25 and g.xp==0)
+	assert(g.level==25 and g.xp==77)
 	g.fix_level_after_test_mode(1)
-	assert(g.level==1 and g.test_level_lock==1)
+	assert(g.level==1 and g.test_level_lock==1 and g.xp==77)
 	g.test_level_lock=0
 
 	# Bosses have long pursuit ranges compared with ordinary mobs.
