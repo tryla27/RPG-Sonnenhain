@@ -3706,6 +3706,11 @@ func interact() -> void:
 		elif player_pos.distance_to(DUNGEON_CENTER + Vector2(555, 0)) < 105:
 			open_dungeon_chest()
 		return
+	# Wenn das HUD eine Fruchtpflanze anbietet, muss dieselbe E-Interaktion
+	# auch wirklich diese Pflanze ernten. So werden Portale, Truhen oder NPCs
+	# in der Naehe nicht versehentlich vor die sichtbare Pflanzenaktion gesetzt.
+	if food_system.harvest(self):
+		return
 	if player_pos.distance_to(TAVERN_HOUSE + Vector2(126, 157)) < 112:
 		enter_tavern()
 		return
