@@ -13,8 +13,16 @@ func run():
 	var f:Dictionary=g.FUSIONS[0];var sp:=g.fusion_skill_cost(f);var before:=g.skill_points;var cash:=g.gold
 	assert(sp==(g.skill_point_cost(0)+g.skill_point_cost(16))*2);assert(g.buy_fusion(0))
 	assert(g.learned[40] and g.learned[0] and g.learned[16]);assert(g.skill_points==before-sp and g.gold==cash-int(f["gold"]))
-	g.class_id=1;g.class_mastery_unlocked=false;g.arcane_step_learned=false;assert(not g.claim_class_mastery());g.final_completed=true;assert(g.claim_class_mastery() and g.arcane_step_learned)
+	g.class_id=1;g.class_mastery_unlocked=false;g.arcane_step_learned=false
+	g.quests.clear()
+	for i in g.QUESTS.size(): g.quests.append({"state":0,"progress":0})
+	assert(not g.class_mastery_quest_completed());assert(not g.claim_class_mastery())
+	# Das gesamte alte Arena-Finale darf die Meistergabe nicht mehr freischalten.
+	g.final_completed=true;assert(not g.claim_class_mastery())
+	g.quests[g.CLASS_MASTERY_QUEST_INDEX]["state"]=2;assert(not g.claim_class_mastery())
+	g.quests[g.CLASS_MASTERY_QUEST_INDEX]["state"]=3
+	assert(g.class_mastery_quest_completed());assert(g.claim_class_mastery() and g.arcane_step_learned)
 	g.player_pos=Vector2(6000,1035)
 	g.class_id=2;g.class_mastery_unlocked=true;g.ranger_hunt_meter=90;g.ranger_hunt_buff=0;g.normal_attack();assert(g.ranger_hunt_buff==60 and g.ranger_hunt_meter==0);g.dodge();assert(g.ranger_stealth_timer>g.dodge_duration)
 	g.class_id=0;g.class_mastery_unlocked=true;g.warrior_rage=0;g.normal_attack();assert(g.warrior_rage>0)
-	print("BORIN_SKILL_SYSTEM_OK universal trees; fusion cost; mastery; rage; arcane step; hunt rush; stealth roll");g.free();quit()
+	print("BORIN_SKILL_SYSTEM_OK universal trees; fusion cost; Map-8 mastery quest; rage; arcane step; hunt rush; stealth roll");g.free();quit()
