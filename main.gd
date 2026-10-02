@@ -1956,7 +1956,7 @@ func blocked_by_region_wall(pos: Vector2) -> bool:
 		var across: float = pos.x if wall["vertical"] else pos.y
 		if along < float(wall["from"]) - 20.0 or along > float(wall["to"]) + 20.0: continue
 		if absf(across - float(wall["axis"])) > 51.0: continue
-		var gate_open: bool = creative_mode or (level >= int(wall["level"]) and (int(wall["boss"]) < 0 or bosses_defeated[int(wall["boss"])]))
+		var gate_open: bool = creative_mode or int(wall["boss"]) < 0 or bosses_defeated[int(wall["boss"])]
 		if wall["vertical"] and float(wall["axis"]) == 1780.0 and float(wall["gate"]) == 1120.0: gate_open = gate_open and opened_village_gates.has(Vector2(1780,1120))
 		if not wall["vertical"] and float(wall["axis"]) == 2600.0: gate_open = gate_open and opened_village_gates.has(Vector2(875,2600))
 		if gate_open and absf(along - float(wall["gate"])) < GATE_HALF_WIDTH - 24.0: continue
@@ -2081,9 +2081,6 @@ func can_cross_gate(from_region: int, to_region: int, start: Vector2, end: Vecto
 		var t := (center.y - start.y) / span_y
 		crossing = start.lerp(end, clampf(t, 0.0, 1.0))
 		if absf(crossing.x - center.x) >= GATE_HALF_WIDTH: return false
-	if not creative_mode and level < region_level(to_region):
-		message("%s ist ab Level %d zugänglich." % [region_name(to_region), region_level(to_region)])
-		return false
 	if not creative_mode and needed_boss >= 0 and not bosses_defeated[needed_boss]:
 		message("Weg versiegelt! Besiege zuerst %s." % ENEMY_TYPES[12 + needed_boss]["name"])
 		return false
@@ -3691,13 +3688,9 @@ func interact() -> void:
 	if interior_id < 0 and dungeon_id < 0 and arena_mode == "":
 		for gate in VILLAGE_GATES:
 			if player_pos.distance_to(gate) < 245:
-				var required: int = 1 if gate.x == 1780 else 5
-				if not creative_mode and level < required:
-					message("Dieses Tor öffnet sich ab Level %d." % required)
-				else:
-					opened_village_gates[gate] = true
-					message("Tor geöffnet.")
-					save_game()
+				opened_village_gates[gate] = true
+				message("Tor geöffnet. Gebietslevel sind nur noch Empfehlungen.")
+				save_game()
 				return
 	if arena_mode != "": return
 	if interior_id >= 0:
@@ -3730,7 +3723,8 @@ func interact() -> void:
 		var near_new: bool = player_pos.distance_to(portal[1]) < 112
 		if near_old or near_new:
 			if near_old and not region_available(int(portal[2])):
-				message("%s öffnet sich ab Level %d." % [region_name(int(portal[2])), region_level(int(portal[2]))])
+				var needed_boss:=region_required_boss(int(portal[2]))
+				message("Weg versiegelt! Besiege zuerst %s." % boss_gate_name(needed_boss))
 				return
 			var desired: Vector2 = portal[1]+Vector2(0,110) if near_old else portal[0]+Vector2(0,110)
 			var expected_region := int(portal[2]) if near_old else region_at(portal[0])
@@ -6197,17 +6191,17 @@ func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_lev
 		else:
 			text_at(gate+Vector2(-85,-82),"TOR OFFEN",14,Color("fff0bc"))
 
-	var level_locked := level < required_level
 	var boss_locked: bool = boss_index >= 0 and not bosses_defeated[boss_index]
-	if level_locked or boss_locked:
+	if boss_locked:
 		var seal := Rect2(gate+(Vector2(-28,-GATE_HALF_WIDTH+39) if vertical else Vector2(-GATE_HALF_WIDTH+39,-28)),Vector2(56,GATE_HALF_WIDTH*2-78) if vertical else Vector2(GATE_HALF_WIDTH*2-78,56))
 		draw_rect(seal,Color("6e405b",0.94))
 		draw_rect(seal.grow(-8),Color("c37598",0.9),false,4)
 		draw_line(seal.position,seal.end,Color("e3a1bf",0.7),3)
 		draw_line(Vector2(seal.end.x,seal.position.y),Vector2(seal.position.x,seal.end.y),Color("e3a1bf",0.7),3)
-		text_at(gate+Vector2(-105,-52),"AB LEVEL %d" % required_level if level_locked else "BOSS-SIEG NÖTIG",16,Color("fff0bc"))
+		text_at(gate+Vector2(-145,-62),"BOSS-SIEG NÖTIG",14,Color("fff0bc"),HORIZONTAL_ALIGNMENT_CENTER,290)
+		text_at(gate+Vector2(-145,-42),boss_gate_name(boss_index).to_upper(),13,Color("ffd0d0"),HORIZONTAL_ALIGNMENT_CENTER,290)
 	elif not village_gate or gate_open:
-		text_at(gate+Vector2(-85,-52),"DURCHGANG",14,Color("fff0bc"))
+		text_at(gate+Vector2(-120,-52),"DURCHGANG · EMPF. LV %d" % required_level,12,Color("fff0bc"),HORIZONTAL_ALIGNMENT_CENTER,240)
 
 func draw_grass(p: Vector2) -> void:
 	if region_at(p) == 0:
@@ -7354,13 +7348,20 @@ func draw_minimap(rect: Rect2, compact: bool) -> void:
 	if not compact:
 		draw_rect(Rect2(inset.position + camera_pos * Vector2(sx, sy), VIEW * Vector2(sx, sy)), Color.WHITE, false, 2)
 
+func region_required_boss(zone:int)->int:
+	match zone:
+		4: return 0
+		5,7: return 1
+	return -1
+
+func boss_gate_name(boss_index:int)->String:
+	if boss_index<0 or 12+boss_index>=ENEMY_TYPES.size(): return ""
+	return str(ENEMY_TYPES[12+boss_index]["name"])
+
 func region_available(zone: int) -> bool:
 	if creative_mode: return true
-	if level < region_level(zone): return false
-	if zone == 4 and not bosses_defeated[0]: return false
-	if zone == 5 and not bosses_defeated[1]: return false
-	if zone == 7 and not bosses_defeated[1]: return false
-	return true
+	var needed_boss:=region_required_boss(zone)
+	return needed_boss<0 or bosses_defeated[needed_boss]
 
 func draw_local_minimap(rect: Rect2) -> void:
 	if interior_id >= 0:
@@ -7469,7 +7470,7 @@ func draw_portal(p: Vector2, region: int) -> void:
 	draw_arc(p, 39, PI, TAU, 20, glow.darkened(0.45), 12)
 	draw_arc(p, 34, PI, TAU, 20, glow, 5)
 	draw_circle(p + Vector2(0, -14), 13 + sin(world_time * 2.0) * 2.0, Color(glow, 0.48))
-	text_at(p + Vector2(-93, -59), "%s · %s · LV %d" % ["AKTION" if touch_enabled else binding_short("interact"), region_name(region), region_level(region)], 13, Color("fff0c7"), HORIZONTAL_ALIGNMENT_CENTER, 186)
+	text_at(p + Vector2(-105, -59), "%s · %s · EMPF. LV %d" % ["AKTION" if touch_enabled else binding_short("interact"), region_name(region), region_level(region)], 12, Color("fff0c7"), HORIZONTAL_ALIGNMENT_CENTER, 210)
 
 func draw_map_natural_edges(inset: Rect2, palette: Array) -> void:
 	var scale_map := inset.size / WORLD
@@ -7536,7 +7537,7 @@ func draw_mechanics_panel() -> void:
 	for tab in 4:
 		ui_button(Rect2(190 + tab*195,142,180,38), labels[tab], true, mechanics_page == tab)
 	if mechanics_page == 0:
-		text_at(Vector2(190,211), "Regionen: Mindestlevel · typische Gegner · Freischaltung", 16, Color('e9cc90'))
+		text_at(Vector2(190,211), "Regionen: empfohlenes Level · typische Gegner · Bossfreischaltung", 16, Color('e9cc90'))
 		for i in 13:
 			var col: int = int(i / 7.0)
 			var row: int = i % 7
@@ -7548,7 +7549,7 @@ func draw_mechanics_panel() -> void:
 					if mob_text != "": mob_text += ", "
 					mob_text += str(ENEMY_TYPES[e]["name"])
 			var status: String = "OFFEN" if region_available(i) else "GESPERRT"
-			text_at(Vector2(x,y), "%02d  %s · LV %d · %s" % [i+1,region_name(i),region_level(i),status], 14, Color('dff0d9') if status == "OFFEN" else Color('d6a5a5'))
+			text_at(Vector2(x,y), "%02d  %s · EMPF. LV %d · %s" % [i+1,region_name(i),region_level(i),status], 14, Color('dff0d9') if status == "OFFEN" else Color('d6a5a5'))
 			text_at(Vector2(x+18,y+17), mob_text.substr(0,42), 11, Color('aebfb9'), HORIZONTAL_ALIGNMENT_LEFT, 370)
 	elif mechanics_page == 1:
 		text_at(Vector2(190,211), "Questablauf: NPC ansprechen → Ziel erfüllen → zurück zum NPC → Belohnung", 16, Color('e9cc90'))
@@ -8093,7 +8094,7 @@ func draw_travel_panel() -> void:
 		ui_box(Rect2(pos, Vector2(255, 79)), Color("59766b") if available else Color("405657"))
 		draw_circle(pos + Vector2(25, 35), 12, Color("9cece7") if available else Color("8d9b9a"))
 		text_at(pos + Vector2(48, 32), region_name(zone), 16, Color("fff1c4") if available else Color("b9c7c1"))
-		text_at(pos + Vector2(48, 57), "LV %d · %s" % [region_level(zone), "REISEN" if available else "NICHT AKTIVIERT"], 13, Color("bfeee0") if available else Color("d2c0b6"))
+		text_at(pos + Vector2(48, 57), "EMPF. LV %d · %s" % [region_level(zone), "REISEN" if available else "NICHT AKTIVIERT"], 13, Color("bfeee0") if available else Color("d2c0b6"))
 
 func draw_journal_panel() -> void:
 	text_at(Vector2(165, 125), "QUESTBUCH", 26, Color("ffeda9"))
@@ -8191,7 +8192,7 @@ func draw_world_atlas(rect: Rect2) -> void:
 		draw_rect(plaque, Color("c8a96d") if region_available(region) else Color("ad7676"), false, 2)
 		var available := region_available(region)
 		text_at(plaque.position + Vector2(3, 18), region_name(region), 12 if region in [0, 6] else 13, Color("fff0cf"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
-		text_at(plaque.position + Vector2(3, 36), "LV %d · %s" % [region_level(region), "OFFEN" if available else "GESPERRT"], 10, Color("f6d48f") if available else Color("ffaca7"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
+		text_at(plaque.position + Vector2(3, 36), "EMPF. LV %d · %s" % [region_level(region), "OFFEN" if available else "BOSS-GESPERRT"], 10, Color("f6d48f") if available else Color("ffaca7"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
 	for i in WAYSTONES.size():
 		var point: Vector2 = inset.position + WAYSTONES[i] * map_scale
 		draw_rect(Rect2(point - Vector2(4, 4), Vector2(8, 8)), Color("1d3540"))
