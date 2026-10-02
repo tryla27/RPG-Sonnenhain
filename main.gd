@@ -1,4 +1,4 @@
-# Release marker: six-minute Steinrose food system production rollout.
+# Release marker: regional herbs, Alma recipes and multiplayer food persistence production rollout.
 extends Node2D
 const PatchNotice = preload("res://components/patch_notice.gd")
 var patch_notice = PatchNotice.new()
