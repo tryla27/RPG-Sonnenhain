@@ -41,7 +41,11 @@ ssh -4 -i "$HOME/.ssh/manitu_deploy" -p 22 \
 
 access_file=/home/sites/site100047525/web/sonnenhain-access.htpasswd
 if [ -n "${SONNENHAIN_ACCESS_HTPASSWD:-}" ]; then
-  printf '%s\n' "$SONNENHAIN_ACCESS_HTPASSWD" > /tmp/sonnenhain-access.htpasswd
+  entry="$SONNENHAIN_ACCESS_HTPASSWD"
+  if [[ "$entry" != *:* ]]; then
+    entry="sonnenhain:$entry"
+  fi
+  printf '%s\n' "$entry" > /tmp/sonnenhain-access.htpasswd
   chmod 600 /tmp/sonnenhain-access.htpasswd
   scp -4 -i "$HOME/.ssh/manitu_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new /tmp/sonnenhain-access.htpasswd ssh300011111@ngcobalt378.manitu.net:"$access_file"
   rm -f /tmp/sonnenhain-access.htpasswd
