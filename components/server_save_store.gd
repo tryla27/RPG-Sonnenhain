@@ -68,13 +68,24 @@ func valid_food_state(raw:Variant)->bool:
 	if float(raw.get("buff_value",0))>0.05:return false
 	var food_name:Variant=raw.get("active_food_name","")
 	if not food_name is String or String(food_name).length()>80:return false
-	if String(food_name)!="":
-		var food:Dictionary=preload("res://components/food_system.gd").by_name(String(food_name))
-		if food.is_empty() or not bool(food.get("meal",false)):return false
 	var buff_kind:Variant=raw.get("buff_kind","")
 	if not buff_kind is String or String(buff_kind) not in ["","armor","cooldown","move","damage","gather"]:return false
+	var meal_until:=float(raw.get("meal_until",0))
+	var buff_until:=float(raw.get("buff_until",0))
 	var now:=Time.get_unix_time_from_system()
-	if float(raw.get("meal_until",0))>now+365 or float(raw.get("buff_until",0))>now+365:return false
+	if meal_until>now+365 or buff_until>now+365:return false
+	if String(food_name)=="":
+		return meal_until==0 and float(raw.get("meal_hp_regen",0))==0 and float(raw.get("meal_mana_regen",0))==0 and String(buff_kind)=="" and float(raw.get("buff_value",0))==0 and buff_until==0
+	var food:Dictionary=preload("res://components/food_system.gd").by_name(String(food_name))
+	if food.is_empty() or not bool(food.get("meal",false)) or meal_until<=0:return false
+	if not is_equal_approx(float(raw.get("meal_hp_regen",0)),float(food.get("meal_hp_regen",0))):return false
+	if not is_equal_approx(float(raw.get("meal_mana_regen",0)),float(food.get("meal_mana_regen",0))):return false
+	if String(buff_kind)!=str(food.get("buff","")):return false
+	if not is_equal_approx(float(raw.get("buff_value",0)),float(food.get("buff_value",0))):return false
+	if String(buff_kind)=="":
+		if buff_until!=0:return false
+	elif not is_equal_approx(buff_until,meal_until):
+		return false
 	return true
 
 func valid_steinrose_state(raw:Variant)->bool:
