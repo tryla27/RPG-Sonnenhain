@@ -50,6 +50,20 @@ const BUSHES=[Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,
 const TREES=[Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680)]
 const REGROW_SECONDS=300
 const REGION_FOOD=[-1,6,30,29,23,5,7,3,24,25,26,27,28]
+const REGIONAL_HERBS=[
+ {"name":"Sonnenkraut","color":"8dbb78"},
+ {"name":"Moosminze","color":"6ea96c"},
+ {"name":"Steinwurz","color":"9b8f79"},
+ {"name":"Kristallthymian","color":"6fd4d8"},
+ {"name":"Glutblatt","color":"c46d4c"},
+ {"name":"Blausalbei","color":"668fc9"},
+ {"name":"Nebelklee","color":"a8c6bd"},
+ {"name":"Sternenfarn","color":"7e78b7"},
+ {"name":"Bernsteinblatt","color":"c69b45"},
+ {"name":"Quellminze","color":"78b9b4"},
+ {"name":"Daemmerkraut","color":"83709e"},
+ {"name":"Himmelslavendel","color":"b99bc8"}
+]
 var harvested:Dictionary={}
 var plants:Array=[]
 var plant_foods:Dictionary={}
@@ -62,8 +76,14 @@ func configure(g)->void:
    var p:Vector2=g.safe_world_teleport_destination(desired,region)
    if g.region_at(p) != region:
     p=bounds.get_center()
-   plants.append({"point":p,"food":REGION_FOOD[region],"tree":false,"region":region})
+   plants.append({"point":p,"food":REGION_FOOD[region],"tree":false,"region":region,"kind":"fruit"})
    plant_foods[key(p)]=REGION_FOOD[region]
+  var herb_desired:Vector2=bounds.get_center()+Vector2(265,175)
+  var herb_point:Vector2=g.safe_world_teleport_destination(herb_desired,region)
+  if g.region_at(herb_point)!=region:
+   herb_point=g.safe_world_teleport_destination(bounds.get_center()+Vector2(-260,175),region)
+  var herb_info:Dictionary=herb_for_region(region)
+  plants.append({"point":herb_point,"region":region,"kind":"herb","name":herb_info["name"],"color":herb_info["color"]})
 var regen_rate:=0.0
 var regen_until:=0.0
 var active_food_name:=""
@@ -80,6 +100,13 @@ static func by_name(food_name:String)->Dictionary:
 static func index_for(food_name:String)->int:
  for i in FOODS.size():
   if FOODS[i]["name"]==food_name:return i
+ return -1
+static func herb_for_region(region:int)->Dictionary:
+ if region<1 or region>REGIONAL_HERBS.size():return {}
+ return REGIONAL_HERBS[region-1]
+static func herb_region(herb_name:String)->int:
+ for i in REGIONAL_HERBS.size():
+  if str(REGIONAL_HERBS[i]["name"])==herb_name:return i+1
  return -1
 static func at_plant(p:Vector2,tree:bool)->int:
  return REGION_FOOD[0] if (p in TREES if tree else p in BUSHES) else -1
@@ -146,7 +173,12 @@ func nearest(g)->Dictionary:
   if plant_region!=player_region:continue
   var d:float=g.player_pos.distance_to(p+Vector2(0,20))
   if d<distance:
-   found={"point":p,"food":plant["food"],"region":plant_region}
+   found={"point":p,"region":plant_region,"kind":str(plant.get("kind","fruit"))}
+   if str(plant.get("kind","fruit"))=="herb":
+    found["name"]=str(plant.get("name","Kraut"))
+    found["color"]=str(plant.get("color","8dbb78"))
+   else:
+    found["food"]=int(plant["food"])
    distance=d
  return found
 func harvest(g)->bool:
@@ -156,15 +188,24 @@ func harvest(g)->bool:
  var now:=Time.get_unix_time_from_system()
  if not ready_at(p,now):
   g.message("Hier wachsen neue Fruechte nach (%ds)." % ceili(float(harvested[key(p)])-now));return true
- var info:Dictionary=FOODS[int(plant["food"])]
- var item:Dictionary=g.make_item(info["name"],"food",0,0,int(info["price"]), "",1)
- item["count"]=3
- if buff_active("gather") and randf()<buff_value:item["count"]=4
+ var plant_kind:=str(plant.get("kind","fruit"))
+ var item:Dictionary
+ var display_name:String
+ if plant_kind=="herb":
+  display_name=str(plant.get("name","Kraut"))
+  item=g.make_item(display_name,"herb",0,0,3,"",maxi(1,g.region_level(int(plant["region"]))))
+  item["count"]=1
+ else:
+  var info:Dictionary=FOODS[int(plant["food"])]
+  display_name=str(info["name"])
+  item=g.make_item(display_name,"food",0,0,int(info["price"]), "",1)
+  item["count"]=3
+  if buff_active("gather") and randf()<buff_value:item["count"]=4
  if not g.can_add_item(item):
-  g.message("Dein Inventar ist voll. Die Fruechte bleiben an der Pflanze.");return true
+  g.message("Dein Inventar ist voll. Die Pflanze bleibt unberuehrt.");return true
  if not g.add_item(item):return true
  harvested[key(p)]=now+REGROW_SECONDS
- g.message("%dx %s gepflueckt. Nachwachsen in 5 Minuten." % [int(item["count"]),info["name"]])
+ g.message("%dx %s geerntet. Nachwachsen in 5 Minuten." % [int(item["count"]),display_name])
  g.play_sound("pickup");g.save_game();g.queue_redraw()
  return true
 func eat(g,index:int)->bool:
@@ -239,7 +280,7 @@ func regional_props(g)->Array:
  var result:Array=[]
  for plant in plants:
   if plant["point"] not in BUSHES+TREES:
-   result.append({"kind":"bush","point":plant["point"],"depth":plant["point"].y+20})
+   result.append({"kind":str(plant.get("kind","fruit")),"point":plant["point"],"depth":plant["point"].y+20,"region":plant.get("region",0),"name":plant.get("name",""),"color":plant.get("color","")})
  return result
 static func food_rect(c:CanvasItem,p:Vector2,s:float,x:float,y:float,w:float,h:float,col:Color)->void:
  PixelStyle32.rect(c,Rect2(p+Vector2(x,y)*s,Vector2(w,h)*s),col)
@@ -349,6 +390,22 @@ func fruit(c:CanvasItem,p:Vector2,tree:bool)->void:
  if id<0 or not ready_at(p,Time.get_unix_time_from_system()):return
  var offsets=[Vector2(-42,-116),Vector2(12,-142),Vector2(38,-99),Vector2(-15,-83),Vector2(49,-133)] if tree else [Vector2(-29,-19),Vector2(-11,-35),Vector2(12,-29),Vector2(29,-12),Vector2(0,-10)]
  for offset in offsets:icon(c,p+offset,id,0.38 if tree else 0.3)
+func herb_bush(c:CanvasItem,p:Vector2,herb_name:String,herb_color:String)->void:
+ var dark:=Color("274735")
+ var leaf:=Color("47704a")
+ c.draw_rect(Rect2(p+Vector2(-34,-18),Vector2(68,30)),dark)
+ c.draw_rect(Rect2(p+Vector2(-27,-31),Vector2(54,35)),leaf)
+ for o in [Vector2(-26,-21),Vector2(-12,-35),Vector2(4,-30),Vector2(19,-20)]:
+  c.draw_rect(Rect2(p+o,Vector2(11,8)),Color("6e935e"))
+ if ready_at(p,Time.get_unix_time_from_system()):
+  var flower:=Color(herb_color)
+  for o in [Vector2(-19,-28),Vector2(-2,-37),Vector2(17,-25)]:
+   c.draw_circle(p+o,4,flower)
+   c.draw_circle(p+o+Vector2(2,-1),2,flower.lightened(.28))
+ else:
+  var seconds:=maxi(0,ceili(float(harvested.get(key(p),0))-Time.get_unix_time_from_system()))
+  c.draw_string(ThemeDB.fallback_font,p+Vector2(-22,28),"%02d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("e4cf8b"))
+
 func bush(c:CanvasItem,p:Vector2)->void:
  if p in BUSHES:
   preload("res://components/start_scenery_32.gd").bush(c,p,int(p.x+p.y))
