@@ -429,6 +429,7 @@ var is_walking := false
 var is_sprinting := false
 var stamina := 100.0
 var sprint_blend := 0.0
+var sprint_heading := Vector2.ZERO
 var sprint_regen_delay := 0.0
 var sprint_block_timer := 0.0
 var sprint_exhausted := false
@@ -1461,20 +1462,38 @@ func max_stamina() -> float:
 	return [100.0,120.0,105.0][clampi(hero_race,0,2)] + [15.0,-10.0,5.0][clampi(class_id,0,2)]
 
 func sprint_speed_mult() -> float:
-	var race_mult:float=[1.45,1.40,1.50][clampi(hero_race,0,2)]
-	var class_mult:float=[1.0,1.0,1.05][clampi(class_id,0,2)]
+	var race_mult:float=[1.46,1.42,1.50][clampi(hero_race,0,2)]
+	# Schütze erreicht das höchste Tempo, Krieger hält den Sprint dafür länger.
+	var class_mult:float=[1.00,1.02,1.08][clampi(class_id,0,2)]
 	return race_mult*class_mult
 
 func sprint_drain_rate() -> float:
 	var race_rate:float=[18.0,17.0,20.0][clampi(hero_race,0,2)]
-	return race_rate*(0.95 if class_id==0 else 1.0)
+	return race_rate*[0.86,1.0,1.05][clampi(class_id,0,2)]
 
 func stamina_regen_rate() -> float:
 	var race_rate:float=[24.0,22.0,27.0][clampi(hero_race,0,2)]
 	return race_rate*(1.10 if class_id in [1,2] else 1.0)
 
 func sprint_acceleration() -> float:
-	return [3.8,2.9,5.0][clampi(hero_race,0,2)]
+	# Rund 0.8-1.2 Sekunden bis zum vollen Sprint; Schütze zieht am schnellsten an.
+	return [1.02,0.92,1.34][clampi(class_id,0,2)] * [1.0,0.92,1.08][clampi(hero_race,0,2)]
+
+func sprint_speed_curve(blend:float)->float:
+	var t:=clampf(blend,0.0,1.0)
+	# Smoothstep hält die ersten ~0.4 s als fühlbaren Anlauf und zieht danach deutlich an.
+	return t*t*(3.0-2.0*t)
+
+func sprint_stamina_mult(blend:float)->float:
+	return lerpf(0.62,1.18,sprint_speed_curve(blend))
+
+func sprint_turn_retention(previous:Vector2,current:Vector2)->float:
+	if previous.length_squared()<0.01 or current.length_squared()<0.01:return 1.0
+	var alignment:=previous.normalized().dot(current.normalized())
+	if alignment < -0.15:return 0.34
+	if alignment < 0.35:return 0.58
+	if alignment < 0.72:return 0.82
+	return 1.0
 
 func stamina_in_combat() -> bool:
 	if attack_timer>0.0 or swing_timer>0.0 or hurt_until>combat_feedback.clock:return true
@@ -1490,6 +1509,8 @@ func sprint_requested(move:Vector2) -> bool:
 
 func stop_sprint(block_for:float=0.0)->void:
 	is_sprinting=false
+	sprint_heading=Vector2.ZERO
+	if block_for>0.0:sprint_blend=minf(sprint_blend,0.24)
 	sprint_block_timer=maxf(sprint_block_timer,block_for)
 
 func equipment_power(uid: int) -> int:
@@ -2093,25 +2114,32 @@ func update_player(delta: float) -> void:
 	if sprint_exhausted and stamina>=15.0:sprint_exhausted=false
 	var wants_sprint:=sprint_requested(move) and not sprint_exhausted
 	if wants_sprint:
-		sprint_regen_delay=0.75
-		stamina=maxf(0.0,stamina-sprint_drain_rate()*delta)
+		var retention:=sprint_turn_retention(sprint_heading,move)
+		if retention < 1.0:
+			sprint_blend*=retention
+			if retention <= 0.34:sprint_block_timer=maxf(sprint_block_timer,0.10)
+		sprint_heading=move.normalized()
+		sprint_regen_delay=0.85
+		stamina=maxf(0.0,stamina-sprint_drain_rate()*sprint_stamina_mult(sprint_blend)*delta)
 		if stamina<=0.01:
 			stamina=0.0
 			sprint_exhausted=true
 			wants_sprint=false
 	else:
+		sprint_heading=Vector2.ZERO
 		sprint_regen_delay=maxf(0.0,sprint_regen_delay-delta)
 		if sprint_regen_delay<=0.0:
 			var regen:=stamina_regen_rate()*(1.33 if not stamina_in_combat() else 1.0)
 			stamina=minf(max_stamina(),stamina+regen*delta)
 	var target_sprint:=1.0 if wants_sprint else 0.0
-	sprint_blend=move_toward(sprint_blend,target_sprint,delta*sprint_acceleration())
+	var accel:=sprint_acceleration() if wants_sprint else 2.6
+	sprint_blend=move_toward(sprint_blend,target_sprint,delta*accel)
 	is_sprinting=sprint_blend>0.18 and wants_sprint
 	is_walking = move.length_squared() > 0.01 or dash_timer > 0
 	if is_walking:
-		var anim_rate:=19.0 if dash_timer>0 else 11.0*lerpf(1.0,1.68,sprint_blend)
+		var anim_rate:=19.0 if dash_timer>0 else 11.0*lerpf(1.0,1.72,sprint_speed_curve(sprint_blend))
 		walk_phase += delta*anim_rate
-	var run_mult:=lerpf(1.0,sprint_speed_mult(),sprint_blend)
+	var run_mult:=lerpf(1.0,sprint_speed_mult(),sprint_speed_curve(sprint_blend))
 	var ultimate_move_mult := ranger_ultimate_speed_mult if class_id == 2 and ranger_ultimate_speed_timer > 0.0 else 1.0
 	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult() * ultimate_move_mult)*delta
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
@@ -2931,6 +2959,7 @@ func learn_arcane_step() -> bool:
 	return true
 
 func dodge() -> void:
+	stop_sprint(0.16)
 	var arcane := class_id == 1 and arcane_step_learned
 	var dir := movement_vector()
 	dash_dir = dir.normalized() if dir.length() > 0 else facing.normalized()
@@ -4799,6 +4828,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	cosmetic_accent=clampi(int(data.get("cosmetic_accent",0)),0,5)
 	stamina = max_stamina()
 	sprint_blend = 0.0
+	sprint_heading = Vector2.ZERO
 	sprint_exhausted = false
 	character_created = bool(data.get("character_created", data.has("class_id")))
 	player_uuid = str(data.get("player_uuid",""))
@@ -5271,6 +5301,7 @@ func start_new_game() -> void:
 	class_id = pending_class
 	stamina = max_stamina()
 	sprint_blend = 0.0
+	sprint_heading = Vector2.ZERO
 	sprint_exhausted = false
 	rescue_state = 0
 	rescue_kills = 0
