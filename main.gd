@@ -1359,11 +1359,7 @@ func start_coop_world() -> void:
 	if FileAccess.file_exists(slot_save_path(active_save_slot)):
 		load_game()
 		if keep_level_lock>0:
-			test_level_lock=clampi(keep_level_lock,1,40)
-			level=test_level_lock
-			xp=maxi(0,xp)
-			hp=max_hp()
-			energy=max_energy()
+			test_level_lock=0
 			save_game()
 		enemies.clear()
 		drops.clear()
@@ -4365,10 +4361,7 @@ func register_boss_defeat(boss_index:int,shared:bool=false)->bool:
 	return true
 
 func gain_xp(amount: int) -> void:
-	if test_level_lock>0:
-		level=clampi(test_level_lock,1,40)
-		xp=maxi(0,xp+maxi(0,amount))
-		return
+	if test_level_lock>0:test_level_lock=0
 	xp += amount
 	while xp >= xp_required():
 		xp -= xp_required()
@@ -5551,11 +5544,10 @@ func finish_intro() -> void:
 			rpc_player_presence.rpc_id(1, local_player_state())
 	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
 
-func fix_level_after_test_mode(target_level:int)->void:
-	var preserved_xp:=maxi(0,xp)
-	test_level_lock=clampi(target_level,1,40)
-	level=test_level_lock
-	xp=preserved_xp
+func apply_test_progress_to_normal(target_level:int,target_xp:int)->void:
+	test_level_lock=0
+	level=clampi(target_level,1,40)
+	xp=maxi(0,target_xp)
 	hp=max_hp()
 	energy=max_energy()
 
@@ -5578,7 +5570,7 @@ func toggle_creative_mode() -> void:
 		pause_status = "Testmodus aktiv · eigener Spielstand, alle Wege offen."
 		save_game()
 	else:
-		var fixed_test_level:=clampi(level,1,40)
+		var carried_test_level:=clampi(level,1,40)
 		var carried_test_xp:=maxi(0,xp)
 		creative_mode = false
 		reset_class_skills()
@@ -5588,8 +5580,7 @@ func toggle_creative_mode() -> void:
 		quests.clear()
 		for i in QUESTS.size(): quests.append({"state":0, "progress":0})
 		load_game()
-		xp=carried_test_xp
-		fix_level_after_test_mode(fixed_test_level)
+		apply_test_progress_to_normal(carried_test_level,carried_test_xp)
 		save_game()
 		enemies.clear()
 		drops.clear()
@@ -5607,7 +5598,7 @@ func toggle_creative_mode() -> void:
 		poison_blade_timer = 0.0
 		previous_region = region_at(player_pos)
 		camera_pos = (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW)
-		pause_status = "Normaler Spielstand wiederhergestellt · Level %d fixiert." % test_level_lock
+		pause_status = "Normaler Spielstand wiederhergestellt · Level %d und %d XP übernommen." % [level,xp]
 
 func set_creative_level(target: int) -> void:
 	if not creative_mode: return
@@ -9220,7 +9211,7 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
 		ui_button(Rect2(590, 480, 260, 38), "BACKUP IMPORT")
 	if creative_mode:
-		text_at(Vector2(302, 504), "LEVEL %d · %d Skillpunkte · wird beim Verlassen fixiert" % [level, skill_points], 14, Color("fff0bd"))
+		text_at(Vector2(302, 504), "LEVEL %d · %d XP · wird beim Verlassen übernommen" % [level, xp], 14, Color("fff0bd"))
 		for index in 4:
 			ui_button(Rect2(300 + index * 113, 510, 105, 38), ["-10", "-1", "+1", "+10"][index])
 		ui_button(Rect2(762, 510, 180, 38), "REISEN")
