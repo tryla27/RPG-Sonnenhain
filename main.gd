@@ -1007,6 +1007,26 @@ func disconnect_multiplayer(show_message: bool = true) -> void:
 	invite_code = ""
 	if show_message: network_status = "Offline"
 
+func save_and_return_to_start() -> bool:
+	# Ein P2P-Host darf die Sitzung nicht schließen, solange andere Spieler
+	# verbunden sind. close() auf dem Host würde sonst alle Peers herauswerfen.
+	if network_mode == "host" and multiplayer.multiplayer_peer != null and not multiplayer.get_peers().is_empty():
+		save_game()
+		pause_status = "Andere Spieler sind noch verbunden. Als Host kannst du erst ins Hauptmenü, wenn sie die Sitzung verlassen haben."
+		message(pause_status)
+		play_sound("menu")
+		return false
+	save_game()
+	refresh_save_slot_labels()
+	# Client-Abmeldung trennt nur diesen Spieler vom Dedicated Server.
+	# Offline bleibt offline; ein Host ohne Peers kann gefahrlos schließen.
+	if network_mode != "offline":
+		disconnect_multiplayer(false)
+	panel = "start"
+	selected_save_slot = active_save_slot
+	play_sound("menu")
+	return true
+
 func server_action_allowed(peer_id: int, action_key: String, cooldown_ms: int) -> bool:
 	if peer_id <= 0: return false
 	var now := Time.get_ticks_msec()
@@ -5149,10 +5169,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 				play_sound("menu")
 				return
 		if Rect2(190,540,300,44).has_point(mouse):
-			save_game()
-			refresh_save_slot_labels()
-			disconnect_multiplayer(false)
-			panel="start"
+			save_and_return_to_start()
 		return
 	if panel == "settings":
 		if set_volume_from_mouse(mouse):
@@ -5180,10 +5197,6 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif not creative_mode and Rect2(590,480,260,38).has_point(mouse):
 			import_save_backup()
 		elif Rect2(300, 563, 550, 35).has_point(mouse):
-			if is_web_platform():
-				save_game()
-				JavaScriptBridge.get_interface("window").location.assign("/")
-				return
 			if arena_mode != "":
 				arena_mode = ""
 				player_pos = arena_return_pos
@@ -5195,11 +5208,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if interior_id >= 0:
 				interior_id = -1
 				player_pos = interior_return_pos
-			save_game()
-			refresh_save_slot_labels()
-			panel = "start"
-			selected_save_slot = active_save_slot
-			play_sound("menu")
+			var returned_to_start := save_and_return_to_start()
+			if returned_to_start and is_web_platform():
+				JavaScriptBridge.get_interface("window").location.assign("/")
+				return
 		elif creative_mode:
 			for index in 4:
 				if Rect2(300 + index * 113, 510, 105, 38).has_point(mouse):
