@@ -4684,7 +4684,7 @@ func open_chest(index: int) -> void:
 	if rare_head_reward("chest",index,.04):item=make_class_head(region_level(region))
 	inventory.append(item)
 	gold += 35 + region * 25
-	message("Schatztruhe geöffnet: %s (%s)!" % [item["name"], RARITY_NAMES[rarity]])
+	message("Schatztruhe geöffnet: %s (%s)!" % [item["name"], RARITY_NAMES[int(item["rarity"])]])
 	save_game()
 
 func waystone_arrival(index: int) -> Vector2:
@@ -5049,6 +5049,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	warrior_rage = clampf(float(data.get("warrior_rage",0.0)),0.0,100.0)
 	ranger_hunt_meter = clampf(float(data.get("ranger_hunt_meter",0.0)),0.0,100.0)
 	ranger_hunt_buff = clampf(float(data.get("ranger_hunt_buff",0.0)),0.0,60.0)
+	ranger_falcon_rune = bool(data.get("ranger_falcon_rune",false))
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
 	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1)) if class_id == 1 else -1
 	last_waystone = clampi(int(data.get("last_waystone", 1)), 1, WAYSTONES.size() - 1)
@@ -8403,15 +8404,15 @@ func draw_hud() -> void:
 		nearest="E  ·  %s" % (nearby_food_info["name"]+" pflücken" if nearby_ripe else "Nachwachsen %02d:%02d" % [food_system.regrow_remaining(nearby_food["point"])/60,food_system.regrow_remaining(nearby_food["point"])%60])
 	for i in WAYSTONES.size():
 		if player_pos.distance_to(WAYSTONES[i]) < 185:
-			nearest = "F  ·  Wegstein: %s" % ("Reiseziele wählen" if i == 0 else ("zurück ins Dorf · aktiviert" if waystone_unlocked[i] else "aktivieren und zurück ins Dorf"))
+			nearest = "F  ·  Wegstein: %s" % ("Reiseziele wählen" if i == 0 else ("zurück ins Dorf · aktiviert" if waystone_unlocked[i] else "wird beim Betreten automatisch aktiviert"))
 			break
 	for portal in PORTALS:
 		if player_pos.distance_to(portal[0]) < 112 or player_pos.distance_to(portal[1]) < 112:
 			nearest = "E  ·  Torbogen nach %s (LV %d)" % [region_name(int(portal[2])), region_level(int(portal[2]))]
 			break
 	for i in LANDMARKS.size():
-		if chest_ready(i) and player_pos.distance_to(chest_position(i)) < 85:
-			nearest = "E  ·  Schatztruhe öffnen"
+		if player_pos.distance_to(chest_position(i)) < 125:
+			nearest = "E  ·  Schatztruhe öffnen" if chest_ready(i) else "E  ·  Schatztruhe · %ds" % chest_cooldown_seconds(i)
 			break
 	if player_pos.distance_to(BORIN_CRYSTAL_POS)<95: nearest="E  ·  Kristall der Verschmelzung"
 	var nearby_house:=nearby_village_house_door(110.0) if interior_id<0 else {}
@@ -9489,6 +9490,7 @@ func item_type(icon: String) -> String:
 		"gem": return "Kristall"
 		"ring": return "Schmuck"
 		"armor": return "Rüstung"
+		"head": return "Kopfausrüstung"
 		"herb": return "Kräuter"
 		_: return "Gegenstand"
 
