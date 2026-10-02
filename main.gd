@@ -6712,7 +6712,7 @@ func draw_class_boss_actor(enemy:Dictionary,p:Vector2,look:Vector2,scale_factor:
 	# Eigener humanoider Bosskörper: alle vier Richtungen, Schrittanimation,
 	# Trefferblitz und die jeweilige Klassen-Kopfbedeckung sind Teil des Körpers.
 	ReferenceScenery.Hero.paint(self,p,boss_index,0,0,look,stride,scale_factor,character_canvas_offset,-1.0,look,-1,-1.0,hurt,boss_index,0)
-	var weapon_design:=[3,7,11][boss_index]
+	var weapon_design:int=int([3,7,11][boss_index])
 	if boss_index==0:
 		draw_weapon_world(p+Vector2(0,-5),0,weapon_design,look,scale_factor,attack_progress)
 	elif boss_index==1:
@@ -6722,7 +6722,7 @@ func draw_class_boss_actor(enemy:Dictionary,p:Vector2,look:Vector2,scale_factor:
 	# Phasen-Aura macht sofort sichtbar, dass der Boss unter 68/38 Prozent neue Skills erhält.
 	var ratio:=float(enemy.get("hp",1.0))/maxf(1.0,float(enemy.get("max_hp",1.0)))
 	if ratio<=.68:
-		var aura_color:=[Color("f2685f",.36),Color("a477ff",.38),Color("87dc73",.36)][boss_index]
+		var aura_color:Color=[Color("f2685f",.36),Color("a477ff",.38),Color("87dc73",.36)][boss_index]
 		PixelStyle32.arc(self,p+Vector2(0,4),34*scale_factor,0,TAU,24,aura_color,2.5*scale_factor)
 	if ratio<=.38:
 		PixelStyle32.arc(self,p+Vector2(0,4),42*scale_factor,0,TAU,24,[Color("ff5c4d",.48),Color("cf73ff",.5),Color("b7f16d",.48)][boss_index],3.5*scale_factor)
@@ -6747,7 +6747,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 		animation=MobCombat.visual_progress(state,profile)
 		if float(state.get("age",0))<float(profile["windup"]):
 			var ability:Dictionary=state["ability"]
-			var warn:=[Color("f36f5d",.72),Color("ba7cff",.72),Color("9cdd72",.72)][type-12] if boss else Color("efd49a",.6)
+			var warn:Color=[Color("f36f5d",.72),Color("ba7cff",.72),Color("9cdd72",.72)][type-12] if boss else Color("efd49a",.6)
 			if ability["shape"]=="line":
 				PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.25),20)
 			elif ability["shape"]=="arc":
