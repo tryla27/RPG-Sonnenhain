@@ -60,12 +60,12 @@ func run()->void:
 		g.combat_feedback.breaks.clear();g.update_projectiles(.08)
 		check(not g.combat_feedback.breaks.is_empty() and g.combat_feedback.breaks.back()["element"]==element,"Element impact lost: "+element)
 	g.projectiles.clear()
-	var site:Vector2=g.LANDMARKS[2]["pos"]
+	var site:Vector2=g.CLASS_BOSS_SITES[0]
 	g.player_pos=site+Vector2(0,300);g.enemies.clear();g.boss_cooldowns=[0.0,0.0,0.0]
 	g.spawn_nearby_boss();g.spawn_nearby_boss()
-	check(g.enemies.size()==3,"Tower encounter must spawn one boss and exactly two guards")
+	check(g.enemies.size()==3,"Map06 class boss must spawn one boss and exactly two guards")
 	var boss:Dictionary=g.enemies[0]
-	check(is_equal_approx(g.mob_visual_scale(boss),1.3),"Tower boss is not 30 percent larger")
+	check(is_equal_approx(g.mob_visual_scale(boss),1.3),"Map06 class boss is not 30 percent larger")
 	for guard in g.enemies.slice(1):
 		check(int(guard.get("guardian_of",-1))==int(boss["uid"]),"Guard parent mismatch")
 		check(g.mob_visual_scale(guard)<.6,"Stone guard too large")
