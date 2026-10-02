@@ -611,7 +611,10 @@ func process_multiplayer_smoke(delta: float) -> void:
 		var position: Vector2 = enemy["pos"]
 		if not multiplayer_smoke_mob_origins.has(uid): multiplayer_smoke_mob_origins[uid] = position
 		elif position.distance_to(multiplayer_smoke_mob_origins[uid]) > 4.0: multiplayer_smoke_mobs_moved = true
-	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and multiplayer_smoke_mobs_moved and saw_other_chat and saw_remote_attack and party_ok and ping_ok and multiplayer_smoke_success_since == 0:
+	# World-snapshot presence is deterministic here; actual mob movement/combat is covered by
+	# check_spawn_network.gd and check_mob_combat_network.gd. Do not make this release smoke
+	# depend on a random mob walking >4 px inside its short observation window.
+	if remote_players.size() >= 1 and visible_remote_count >= 1 and complete_remote_count >= 1 and enemies.size() >= 1 and saw_other_chat and saw_remote_attack and party_ok and ping_ok and multiplayer_smoke_success_since == 0:
 		multiplayer_smoke_success_since = Time.get_ticks_msec()
 		multiplayer_smoke_deadline=maxi(multiplayer_smoke_deadline,multiplayer_smoke_success_since+4000)
 		print("MULTIPLAYER_SMOKE_READY name=", multiplayer_smoke_name, " peers=", remote_players.size(), " visible=", visible_remote_count, " complete=", complete_remote_count, " enemies=", enemies.size(), " combat=", saw_remote_attack, " party=", party_ok, " ping=", network_ping_ms)
