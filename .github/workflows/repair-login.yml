@@ -1,0 +1,36 @@
+name: Repair Sonnenhain login
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/repair-login.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repair-login:
+    runs-on: ubuntu-latest
+    env:
+      MANITU_SSH_KEY: ${{ secrets.MANITU_SSH_KEY }}
+      SONNENHAIN_ACCESS_HTPASSWD: ${{ secrets.SONNENHAIN_ACCESS_HTPASSWD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$MANITU_SSH_KEY" || { echo "MANITU_SSH_KEY missing"; exit 1; }
+          test -n "$SONNENHAIN_ACCESS_HTPASSWD" || { echo "SONNENHAIN_ACCESS_HTPASSWD missing"; exit 2; }
+          case "$SONNENHAIN_ACCESS_HTPASSWD" in
+            *:\$2y\$*|*:\$2b\$*|*:\$2a\$*) ;;
+            *) echo "SONNENHAIN_ACCESS_HTPASSWD does not look like a bcrypt htpasswd entry"; exit 3 ;;
+          esac
+
+      - name: Repair live password gate only
+        shell: bash
+        run: bash tools/deploy_website_access.sh
