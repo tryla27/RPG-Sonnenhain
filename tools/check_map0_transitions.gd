@@ -24,7 +24,9 @@ func _initialize():
 		assert(int(map.terrain[cell])==1,"Gate path must be grass")
 		assert(reached.has(cell),"Exit has no continuous path from spawn")
 	for home in game.house_positions():
-		var door:Vector2=home+(Vector2(128,240) if home==game.BORIN_HOUSE_POS else Vector2(96,180))
+		var door:Vector2=home+Vector2(96,180)
+		if home==game.BORIN_HOUSE_POS: door=home+Vector2(128,240)
+		elif home==Vector2(1220,1860): door=home+Vector2(192,260)
 		var cell:=Vector2i(floori(door.x/32),floori(door.y/32))
 		assert(reached.has(cell),"Disconnected live house path: "+str(home))
 	assert(map.terrain.size()==56*82)
