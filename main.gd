@@ -9663,14 +9663,22 @@ func draw_sorted_world_objects() -> void:
 					var herb_color:=str(entry["data"].get("color","8dbb78"))
 					food_system.herb_bush(self,food_point,herb_name,herb_color)
 					if player_pos.distance_to(food_point+Vector2(0,20)) < 120.0:
-						text_at(food_point+Vector2(-105,42),"E · %s ernten" % herb_name,13,Color("d9f0b7"),HORIZONTAL_ALIGNMENT_CENTER,210)
+						if food_system.ready_at(food_point,Time.get_unix_time_from_system()):
+							text_at(food_point+Vector2(-105,42),"E · %s ernten" % herb_name,13,Color("d9f0b7"),HORIZONTAL_ALIGNMENT_CENTER,210)
+						else:
+							var seconds:=food_system.regrow_remaining(food_point)
+							text_at(food_point+Vector2(-105,42),"Nachwachsen %02d:%02d" % [seconds/60,seconds%60],13,Color("e4cf8b"),HORIZONTAL_ALIGNMENT_CENTER,210)
 				else:
 					food_system.bush(self,food_point)
 					if player_pos.distance_to(food_point+Vector2(0,20)) < 120.0:
 						var food_id := int(food_system.plant_foods.get(FoodSystem.key(food_point),-1))
 						if food_id >= 0:
 							var food_name := str(FoodSystem.FOODS[food_id]["name"])
-							text_at(food_point+Vector2(-95,42),"E · %s pfluecken" % food_name,13,Color("fff0b8"),HORIZONTAL_ALIGNMENT_CENTER,190)
+							if food_system.ready_at(food_point,Time.get_unix_time_from_system()):
+								text_at(food_point+Vector2(-95,42),"E · %s pflücken" % food_name,13,Color("fff0b8"),HORIZONTAL_ALIGNMENT_CENTER,190)
+							else:
+								var seconds:=food_system.regrow_remaining(food_point)
+								text_at(food_point+Vector2(-95,42),"Nachwachsen %02d:%02d" % [seconds/60,seconds%60],13,Color("e4cf8b"),HORIZONTAL_ALIGNMENT_CENTER,190)
 			"npc": draw_npc(entry["data"])
 			"stone": draw_waystone(entry["point"])
 			"enemy": draw_enemy(entry["data"])
