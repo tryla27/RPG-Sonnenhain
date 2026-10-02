@@ -29,6 +29,49 @@ static func house(c:CanvasItem,p:Vector2,kind:int=0)->void:
 		var roof: Color = [Color("a7422d"),Color("87563d"),Color("6f5540")][clampi(kind,0,2)]
 		ReferenceHouse.paint(c,p,roof,Color("ffd482"),false)
 
+# Themed village houses: same 32px-compatible base sprite, with profession-specific
+# roof/accent props so every resident has a readable home silhouette.
+static func themed_house(c:CanvasItem,p:Vector2,kind:String)->void:
+	var base_kind:=2 if kind=="innkeeper" else (1 if kind=="healer" else 0)
+	house(c,p,base_kind)
+	var accent:Color={
+		"research":Color("6f91ad"),"style":Color("b77aa6"),"healer":Color("6da987"),
+		"innkeeper":Color("b47755"),"elder":Color("8a78a4"),"apprentice":Color("897bb7"),
+		"smith":Color("a65e47"),"arena":Color("a15d4e")
+	}.get(kind,Color("8f765b"))
+	# Tile-sized trim and sign-like roof marks.
+	for i in 5:
+		c.draw_rect(Rect2(p+Vector2(16+i*32,20),Vector2(24,7)),accent if i%2==0 else accent.lightened(.18))
+	match kind:
+		"research":
+			c.draw_circle(p+Vector2(154,42),18,Color("415c67"))
+			c.draw_arc(p+Vector2(154,42),14,0,TAU,18,Color("b9e8ec"),3)
+			c.draw_line(p+Vector2(154,24),p+Vector2(170,5),Color("c7c0a1"),3)
+		"style":
+			c.draw_rect(Rect2(p+Vector2(19,113),Vector2(35,48)),Color("71566c"))
+			c.draw_rect(Rect2(p+Vector2(137,113),Vector2(35,48)),Color("71566c"))
+			for x in [33,151]: c.draw_circle(p+Vector2(x,104),6,Color("f0c8df"))
+		"healer":
+			c.draw_rect(Rect2(p+Vector2(146,105),Vector2(8,30)),Color("e7ead5"))
+			c.draw_rect(Rect2(p+Vector2(135,116),Vector2(30,8)),Color("e7ead5"))
+			for x in [25,52,79]: c.draw_circle(p+Vector2(x,153),6,Color("75a96c"))
+		"innkeeper":
+			c.draw_rect(Rect2(p+Vector2(18,140),Vector2(156,12)),Color("6f4d37"))
+			for x in [35,67,99,131]: c.draw_circle(p+Vector2(x,151),5,Color("d49a58"))
+		"elder":
+			c.draw_colored_polygon(PackedVector2Array([p+Vector2(96,18),p+Vector2(111,40),p+Vector2(96,34),p+Vector2(81,40)]),accent.lightened(.35))
+		"apprentice":
+			for x in [28,58,128,158]:
+				c.draw_colored_polygon(PackedVector2Array([p+Vector2(x,115),p+Vector2(x+6,103),p+Vector2(x+12,115),p+Vector2(x+6,128)]),Color("8bdfff"))
+		"smith":
+			c.draw_rect(Rect2(p+Vector2(143,34),Vector2(24,48)),Color("5b4b49"))
+			c.draw_circle(p+Vector2(155,27),11,Color("6d6b69",.55))
+			c.draw_line(p+Vector2(22,143),p+Vector2(54,115),Color("d2b06e"),5)
+		"arena":
+			for x in [34,152]:
+				c.draw_line(p+Vector2(x,145),p+Vector2(x+18,112),Color("d6d9cf"),4)
+				c.draw_line(p+Vector2(x-4,132),p+Vector2(x+17,138),Color("d4a85e"),3)
+
 # Borins Haus ist bewusst groesser als die normalen 192x160-Dorfhaeuser.
 # Der Anker bleibt links oben, damit Wege, NPC und Interaktion stabil positionierbar sind.
 static func borin_house(c:CanvasItem,p:Vector2)->void:
