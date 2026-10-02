@@ -69,9 +69,9 @@ var opened_village_gates: Dictionary = {}
 const SAVE_PATH := "user://sonnenhain_save.json"
 const CREATIVE_SAVE_PATH := "user://sonnenhain_testmodus.json"
 const CONTROLS_PATH := "user://sonnenhain_tasten.json"
-const BIND_ACTIONS := ["move_up", "move_down", "move_left", "move_right", "attack", "dodge", "interact", "waystone", "heal", "resource", "ability_1", "ability_2", "ability_3", "ability_4", "skills", "inventory", "journal", "map", "pause", "chat", "mechanics", "online", "party"]
-const BIND_NAMES := ["Nach oben", "Nach unten", "Nach links", "Nach rechts", "Angriff", "Ausweichen", "Öffnen / Interagieren", "Wegstein", "Heiltrank", "Energie / Mana", "Fähigkeit 1", "Fähigkeit 2", "Fähigkeit 3", "Fähigkeit 4", "Skillbuch", "Inventar", "Questbuch", "Weltkarte", "Pause", "Chat", "Spielhilfe", "Spielerliste", "Gruppe"]
-const DEFAULT_BINDINGS := {"move_up":KEY_W, "move_down":KEY_S, "move_left":KEY_A, "move_right":KEY_D, "attack":-MOUSE_BUTTON_LEFT, "dodge":KEY_SPACE, "interact":KEY_E, "waystone":KEY_F, "heal":KEY_Q, "resource":KEY_R, "ability_1":KEY_1, "ability_2":KEY_2, "ability_3":KEY_3, "ability_4":KEY_4, "skills":KEY_K, "inventory":KEY_I, "journal":KEY_J, "map":KEY_M, "pause":KEY_ESCAPE, "chat":KEY_ENTER, "mechanics":KEY_H, "online":KEY_TAB, "party":KEY_P}
+const BIND_ACTIONS := ["move_up", "move_down", "move_left", "move_right", "sprint", "attack", "dodge", "interact", "waystone", "heal", "resource", "ability_1", "ability_2", "ability_3", "ability_4", "skills", "inventory", "journal", "map", "pause", "chat", "mechanics", "online", "party"]
+const BIND_NAMES := ["Nach oben", "Nach unten", "Nach links", "Nach rechts", "Rennen", "Angriff", "Ausweichen", "Öffnen / Interagieren", "Wegstein", "Heiltrank", "Energie / Mana", "Fähigkeit 1", "Fähigkeit 2", "Fähigkeit 3", "Fähigkeit 4", "Skillbuch", "Inventar", "Questbuch", "Weltkarte", "Pause", "Chat", "Spielhilfe", "Spielerliste", "Gruppe"]
+const DEFAULT_BINDINGS := {"move_up":KEY_W, "move_down":KEY_S, "move_left":KEY_A, "move_right":KEY_D, "sprint":KEY_SHIFT, "attack":-MOUSE_BUTTON_LEFT, "dodge":KEY_SPACE, "interact":KEY_E, "waystone":KEY_F, "heal":KEY_Q, "resource":KEY_R, "ability_1":KEY_1, "ability_2":KEY_2, "ability_3":KEY_3, "ability_4":KEY_4, "skills":KEY_K, "inventory":KEY_I, "journal":KEY_J, "map":KEY_M, "pause":KEY_ESCAPE, "chat":KEY_ENTER, "mechanics":KEY_H, "online":KEY_TAB, "party":KEY_P}
 const FONT_COLOR := Color("f7f0d0")
 const INK := Color("26383c")
 const RARITY_NAMES := ["Gewöhnlich", "Ungewöhnlich", "Selten", "Episch", "Legendär"]
@@ -414,6 +414,12 @@ var swing_duration := 0.24
 var world_time := 0.0
 var walk_phase := 0.0
 var is_walking := false
+var is_sprinting := false
+var stamina := 100.0
+var sprint_blend := 0.0
+var sprint_regen_delay := 0.0
+var sprint_block_timer := 0.0
+var sprint_exhausted := false
 var step_timer := 0.0
 var music_player: AudioStreamPlayer
 var music_incoming: AudioStreamPlayer
@@ -800,7 +806,7 @@ func _on_peer_connected(id: int) -> void:
 	if network_mode == "host":
 		push_world_snapshot()
 		if not dedicated_server_mode:
-			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
@@ -1103,6 +1109,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"hp":clampf(float(state.get("hp",1.0)),0.0,100000.0),
 		"max_hp":clampf(float(state.get("max_hp",1.0)),1.0,100000.0),
 		"walking":bool(state.get("walking",false)),
+		"running":bool(state.get("running",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
@@ -1423,6 +1430,42 @@ func max_hp() -> float:
 
 func max_energy() -> float:
 	return 100.0 + float(skill_levels[11]) * 25.0
+
+func max_stamina() -> float:
+	# Rasse prägt die Grundkondition, Klasse verschiebt sie nur moderat.
+	return [100.0,120.0,105.0][clampi(hero_race,0,2)] + [15.0,-10.0,5.0][clampi(class_id,0,2)]
+
+func sprint_speed_mult() -> float:
+	var race_mult:float=[1.45,1.40,1.50][clampi(hero_race,0,2)]
+	var class_mult:float=[1.0,1.0,1.05][clampi(class_id,0,2)]
+	return race_mult*class_mult
+
+func sprint_drain_rate() -> float:
+	var race_rate:float=[18.0,17.0,20.0][clampi(hero_race,0,2)]
+	return race_rate*(0.95 if class_id==0 else 1.0)
+
+func stamina_regen_rate() -> float:
+	var race_rate:float=[24.0,22.0,27.0][clampi(hero_race,0,2)]
+	return race_rate*(1.10 if class_id in [1,2] else 1.0)
+
+func sprint_acceleration() -> float:
+	return [3.8,2.9,5.0][clampi(hero_race,0,2)]
+
+func stamina_in_combat() -> bool:
+	if attack_timer>0.0 or swing_timer>0.0 or hurt_until>combat_feedback.clock:return true
+	for enemy in enemies:
+		if float(enemy.get("hp",0))>0.0 and enemy["pos"].distance_to(player_pos)<560.0:return true
+	return false
+
+func sprint_requested(move:Vector2) -> bool:
+	if move.length_squared()<0.01 or dash_timer>0.0 or sprint_block_timer>0.0 or attack_timer>0.0 or swing_timer>0.0:return false
+	if touch_enabled:return touch_move_vector.length()>0.88
+	if controller.used and controller.stick().length()>0.88:return true
+	return binding_pressed("sprint")
+
+func stop_sprint(block_for:float=0.0)->void:
+	is_sprinting=false
+	sprint_block_timer=maxf(sprint_block_timer,block_for)
 
 func equipment_power(uid: int) -> int:
 	for item in inventory:
@@ -2019,14 +2062,35 @@ func update_player(delta: float) -> void:
 		var accel := 10.5 if touch_move_vector.length_squared() > 0.001 else 14.0
 		touch_move_smoothed = touch_move_smoothed.move_toward(touch_move_vector, delta * accel)
 	var move := movement_vector()
+	sprint_block_timer=maxf(0.0,sprint_block_timer-delta)
+	if sprint_exhausted and stamina>=15.0:sprint_exhausted=false
+	var wants_sprint:=sprint_requested(move) and not sprint_exhausted
+	if wants_sprint:
+		sprint_regen_delay=0.75
+		stamina=maxf(0.0,stamina-sprint_drain_rate()*delta)
+		if stamina<=0.01:
+			stamina=0.0
+			sprint_exhausted=true
+			wants_sprint=false
+	else:
+		sprint_regen_delay=maxf(0.0,sprint_regen_delay-delta)
+		if sprint_regen_delay<=0.0:
+			var regen:=stamina_regen_rate()*(1.33 if not stamina_in_combat() else 1.0)
+			stamina=minf(max_stamina(),stamina+regen*delta)
+	var target_sprint:=1.0 if wants_sprint else 0.0
+	sprint_blend=move_toward(sprint_blend,target_sprint,delta*sprint_acceleration())
+	is_sprinting=sprint_blend>0.18 and wants_sprint
 	is_walking = move.length_squared() > 0.01 or dash_timer > 0
-	if is_walking: walk_phase += delta * (19.0 if dash_timer > 0 else 11.0)
-	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * food_system.move_mult())*delta
+	if is_walking:
+		var anim_rate:=19.0 if dash_timer>0 else 11.0*lerpf(1.0,1.68,sprint_blend)
+		walk_phase += delta*anim_rate
+	var run_mult:=lerpf(1.0,sprint_speed_mult(),sprint_blend)
+	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult())*delta
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
 		play_sound("step")
-		step_timer = 0.43 if dash_timer <= 0 else 0.25
+		step_timer = (lerpf(0.43,0.29,sprint_blend) if dash_timer<=0 else 0.25)
 	if controller.used:
 		var stick_aim: Vector2 = controller.stick(true)
 		if stick_aim.length_squared() > 0.0: facing = stick_aim.normalized()
@@ -2844,6 +2908,7 @@ func weapon_element() -> String:
 	return ""
 
 func normal_attack() -> void:
+	stop_sprint(0.22)
 	if konflux.active:
 		konflux.attack(self)
 		return
@@ -3027,6 +3092,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 
 func use_ability(slot: int) -> void:
 	if slot < 0 or slot > 3: return
+	stop_sprint(0.22)
 	var id: int = class_ultimate() if slot == 3 else int(slots[slot])
 	if id < 0 or id >= ABILITIES.size() or not learned[id]: return
 	var ability: Dictionary = ABILITIES[id]
@@ -3740,6 +3806,8 @@ func apply_player_damage(raw: int) -> void:
 				enemy["slow"] = 3.5
 				enemy["stun"] = 0.4
 	hp -= dealt
+	stop_sprint(0.25)
+	sprint_blend*=0.35
 	hurt_until=combat_feedback.clock+.18
 	invulnerable = 0.5
 	effect(player_pos + Vector2(0, -30), "-%d" % dealt, Color("ff888d"), 0.75)
@@ -3752,6 +3820,8 @@ func apply_player_damage(raw: int) -> void:
 		attack_anim = 0.0
 		swing_timer = 0.0
 		is_walking = false
+		stop_sprint()
+		sprint_blend=0.0
 
 func update_enemy_projectiles(delta:float)->void:
 	if not uses_server_world():advance_mob_shots(delta,false)
@@ -3763,6 +3833,7 @@ func respawn() -> void:
 		dash_timer=0.0
 		hp=max_hp()
 		energy=max_energy()
+		stamina=max_stamina()
 		konflux.room=-1
 		player_pos=KonfluxMap.CENTER
 		panel=""
@@ -3784,6 +3855,7 @@ func respawn() -> void:
 		message("Die letzte Wache hält noch stand. Sprich mit Arven, um es erneut zu versuchen.")
 		hp = max_hp()
 		energy = max_energy()
+		stamina = max_stamina()
 		save_game()
 		return
 	if dungeon_id >= 0:
@@ -3795,6 +3867,7 @@ func respawn() -> void:
 	mark_network_teleport()
 	hp = max_hp()
 	energy = max_energy()
+	stamina = max_stamina()
 	gold = maxi(0, gold - 20)
 	panel = ""
 	message("Du wurdest im Dorf wiederbelebt. -20 Gold")
@@ -4460,6 +4533,9 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	hero_name = str(data.get("hero_name", "Held"))
 	hero_gender = clampi(int(data.get("hero_gender", 0)), 0, 1)
 	hero_race = clampi(int(data.get("hero_race", 0)), 0, 2)
+	stamina = max_stamina()
+	sprint_blend = 0.0
+	sprint_exhausted = false
 	character_created = bool(data.get("character_created", data.has("class_id")))
 	player_uuid = str(data.get("player_uuid",""))
 	ensure_player_uuid()
@@ -4916,6 +4992,9 @@ func start_new_game() -> void:
 	player_pos = Vector2(825, 1020)
 	mark_network_teleport()
 	class_id = pending_class
+	stamina = max_stamina()
+	sprint_blend = 0.0
+	sprint_exhausted = false
 	rescue_state = 0
 	rescue_kills = 0
 	rescue_intro_timer = 0.0
@@ -5820,7 +5899,7 @@ func armor_visual() -> int:
 			return clampi(int(item.get("design",0)),0,5)
 	return -1
 
-func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2,rings_override:int=-2) -> void:
+func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2,rings_override:int=-2,running_override:bool=false) -> void:
 	var local := race_override < 0 or (p == player_pos and scale_factor == 1.0)
 	var roll := 1.0-dash_timer/dodge_duration if local and dash_timer > 0 else -1.0
 	var death := 1.0-death_timer/DEATH_DURATION if local and death_timer > 0 else death_override
@@ -5830,7 +5909,7 @@ func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: V
 	if panel in ["creation","creation_review"]:head=-1
 	var rings:int=ring_visual() if rings_override==-2 else rings_override
 	if panel in ["creation","creation_review"]:rings=0
-	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings)
+	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override))
 
 func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2, scale_factor: float, race: int, gender: int) -> void:
 	var accent: Color = [Color('e5bd77'),Color('8fcde6'),Color('91c787')][clampi(visual_class,0,2)]
@@ -7339,7 +7418,7 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	var use_race := pending_race if panel == "creation" and preview_class >= 0 else hero_race
 	var use_gender := pending_gender if panel == "creation" and preview_class >= 0 else hero_gender
 	var attack_now := swing_timer > 0.0 and preview_class < 0
-	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender)
+	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender,-2,-1.0,0.0,-2,-2,is_sprinting if preview_class<0 else false)
 	if in_world and (death_timer > 0 or (dash_timer > 0 and class_id != 1)): return
 	# Arm, Hand und Waffe folgen während des Angriffs derselben Bewegung.
 	var design := equipped_weapon_design() if preview_class < 0 else visual_class * 4
@@ -7375,7 +7454,7 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 		draw_circle(grip,2.8*scale_factor,hand_color)
 	# Facing north: the body masks the rear arm and weapon across the head.
 	if base_look == Vector2.UP:
-		draw_character_sprite(p,visual_class,walking,look,scale_factor,attack_now,use_race,use_gender)
+		draw_character_sprite(p,visual_class,walking,look,scale_factor,attack_now,use_race,use_gender,-2,-1.0,0.0,-2,-2,is_sprinting if preview_class<0 else false)
 
 
 func weapon_attack_look(look: Vector2, family: int, design: int, progress: float) -> Vector2:
@@ -7643,9 +7722,11 @@ func draw_hud() -> void:
 	if creative_mode:
 		draw_rect(Rect2(301, 17, 46, 17), Color("806a4e"))
 		text_at(Vector2(304, 30), "TEST", 12, Color("fff1cb"))
-	bar(Rect2(23, 40, 324, 21), hp, max_hp(), Color("d94f4f"), "HP  %d / %d" % [ceili(hp), ceili(max_hp())])
-	bar(Rect2(23, 65, 324, 17), energy, max_energy(), Color("3f7fd9") if class_id == 1 else Color("35b381"), "%s  %d / %d" % ["MANA" if class_id == 1 else "ENERGIE", ceili(energy), ceili(max_energy())])
-	bar(Rect2(23, 86, 324, 14), float(xp), float(xp_required()), Color("d9932e"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
+	bar(Rect2(23, 40, 324, 20), hp, max_hp(), Color("d94f4f"), "HP  %d / %d" % [ceili(hp), ceili(max_hp())])
+	bar(Rect2(23, 63, 324, 15), energy, max_energy(), Color("3f7fd9") if class_id == 1 else Color("35b381"), "%s  %d / %d" % ["MANA" if class_id == 1 else "ENERGIE", ceili(energy), ceili(max_energy())])
+	var stamina_color:=Color("e5bd62") if stamina/maxf(1.0,max_stamina())>=0.20 else (Color("f08a63") if int(world_time*6.0)%2==0 else Color("d75f52"))
+	bar(Rect2(23, 81, 324, 11), stamina, max_stamina(), stamina_color, "AUSDAUER  %d / %d%s" % [ceili(stamina),ceili(max_stamina())," · RENNEN" if is_sprinting else ""])
+	bar(Rect2(23, 95, 324, 10), float(xp), float(xp_required()), Color("d9932e"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
 	if class_mastery_unlocked and class_id==0: text_at(Vector2(365,30),"WUT %.0f%%" % warrior_rage,12,Color("efaa75"))
 	elif class_mastery_unlocked and class_id==2: text_at(Vector2(365,30),"JAGD %.0f%%%s" % [ranger_hunt_meter," · %.0fs" % ranger_hunt_buff if ranger_hunt_buff>0 else ""],12,Color("f3d68e"))
 	elif class_mastery_unlocked and class_id==1: text_at(Vector2(365,30),"LEERTASTE · ARKANER SCHRITT",12,Color("cdbaff"))
@@ -8362,7 +8443,7 @@ func draw_controls_panel() -> void:
 		text_at(Vector2(185, 153), "MOBILE STEUERUNG", 29, Color("ffdf9f"))
 		text_at(Vector2(187, 184), "Touch-Version · keine Tastaturbelegung nötig", 14, Color("b9cbc3"))
 		var rows := [
-			["BEWEGEN", "Linke Bildschirmseite antippen und ziehen · Floating-Joystick"],
+			["BEWEGEN / RENNEN", "Links ziehen · am Außenring automatisch rennen · verbraucht Ausdauer"],
 			["ZIELEN & ANGRIFF", "Rechten Angriffsstick halten und intuitiv in Angriffsrichtung ziehen"],
 			["ROLLE", "ROLLE antippen · Richtung kommt vom linken Bewegungsstick"],
 			["AKTION", "AKTION für NPCs, Türen, Wegsteine und Interaktionen"],
@@ -10034,7 +10115,7 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		draw_circle(rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
 		draw_arc(rp + Vector2(0, 10), 30.0, 0.0, TAU, 24, Color("8ee7ff", 0.82), 2.0)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
-		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)))
+		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)))
 		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
 		combat_feedback.health(self,"peer:%d"%int(peer_id),rp+Vector2(0,-43),float(state.get("hp",1)),float(state.get("max_hp",1)),60,Color("79caa3"))
 		var party_peer_ids := local_party_peer_ids()
@@ -10526,7 +10607,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
