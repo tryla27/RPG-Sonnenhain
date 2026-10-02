@@ -154,6 +154,7 @@ const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
 const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200},{"id":41,"a":1,"b":36,"gold":2200},{"id":42,"a":18,"b":37,"gold":4200}]
 const BORIN_CRYSTAL_POS := Vector2(1608,1970)
+const CLASS_MASTERY_QUEST_INDEX := 16 # "Lichter ohne Namen" · Abschluss von Map 8
 const QUESTS := [
 	{"title":"Schleime im Blütenwald", "npc":"Mira", "target":0, "count":8, "xp":60, "gold":75, "reward":"Waldklinge"},
 	{"title":"Die Käferplage", "npc":"Mira", "target":1, "count":8, "xp":85, "gold":110, "reward":"Blütenanhänger"},
@@ -4039,7 +4040,10 @@ func quest_dialogue(npc_name: String) -> void:
 			gold += int(QUESTS[i]["gold"])
 			gain_xp(int(QUESTS[i]["xp"]))
 			add_item(reward_item)
-			message("Quest abgeschlossen: %s! +%d XP, +%d Gold" % [QUESTS[i]["title"], QUESTS[i]["xp"], QUESTS[i]["gold"]])
+			if i == CLASS_MASTERY_QUEST_INDEX:
+				message("Quest abgeschlossen: %s! +%d XP, +%d Gold · Kehre zu Borin zurück: Deine Klassenmeisterschaft wartet." % [QUESTS[i]["title"], QUESTS[i]["xp"], QUESTS[i]["gold"]])
+			else:
+				message("Quest abgeschlossen: %s! +%d XP, +%d Gold" % [QUESTS[i]["title"], QUESTS[i]["xp"], QUESTS[i]["gold"]])
 			save_game()
 			announce_quest_state()
 			return
@@ -4774,8 +4778,11 @@ func buy_fusion(index:int) -> bool:
 	skill_points-=sp;gold-=int(fusion["gold"]);learned[id]=true;skill_levels[id]=1
 	message("%s verschmolzen · -%d SP · -%d Gold" % [ABILITIES[id]["name"],sp,int(fusion["gold"])]);save_game();return true
 
+func class_mastery_quest_completed() -> bool:
+	return quests.size() > CLASS_MASTERY_QUEST_INDEX and int(quests[CLASS_MASTERY_QUEST_INDEX].get("state",0)) >= 3
+
 func claim_class_mastery() -> bool:
-	if not final_completed or class_mastery_unlocked: return false
+	if not class_mastery_quest_completed() or class_mastery_unlocked: return false
 	class_mastery_unlocked=true
 	if class_id==1: arcane_step_learned=true
 	message(["BLUTRAUSCH gemeistert!","ARKANER SCHRITT gemeistert!","JAGDRAUSCH + SCHATTENROLLE gemeistert!"][class_id]);play_sound("level");save_game();return true
@@ -4784,7 +4791,7 @@ func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
 		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("menu");return
 	if Rect2(718,145,118,38).has_point(mouse): quest_dialogue("Borin");return
-	if Rect2(848,145,118,38).has_point(mouse) and final_completed and not class_mastery_unlocked: claim_class_mastery();return
+	if Rect2(848,145,118,38).has_point(mouse) and class_mastery_quest_completed() and not class_mastery_unlocked: claim_class_mastery();return
 	for slot in 3:
 		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -7948,7 +7955,7 @@ func draw_skills_panel() -> void:
 	text_at(Vector2(165,125),"BORIN · SKILLZAUBERER",25,Color("ffeda9"))
 	text_at(Vector2(650,124),"LV %d · %d SP · %d GOLD" % [level,skill_points,gold],16,Color("f6dc9a"))
 	for tab in 3: ui_button(Rect2(165+tab*180,145,168,38),SKILL_TREE_NAMES[tab],true,skill_tree_tab==tab)
-	ui_button(Rect2(718,145,118,38),"QUESTS");ui_button(Rect2(848,145,118,38),"MEISTER",final_completed and not class_mastery_unlocked,class_mastery_unlocked)
+	ui_button(Rect2(718,145,118,38),"QUESTS");ui_button(Rect2(848,145,118,38),"MEISTER",class_mastery_quest_completed() and not class_mastery_unlocked,class_mastery_unlocked)
 	for slot in 3:
 		var sid:int=slots[slot];ui_button(Rect2(165+slot*204,190,193,40),"%d · %s" % [slot+1,"FREI" if sid<0 else ABILITIES[sid]["name"]],true,selected_slot==slot)
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -7960,7 +7967,9 @@ func draw_skills_panel() -> void:
 		text_at(Vector2(x+12,y+88),"GELERNT · SLOT %d" % (selected_slot+1) if learned[id] else ("KAUFEN · %d SP" % price if level>=req else "GESPERRT · LV %d" % req),12,Color("9de6c2") if learned[id] or level>=req else Color("c98d84"))
 	text_at(Vector2(165,530),"Gelernte Skills anklicken → ausgewählten Slot belegen · Wechsel bei Borin kostenlos.",13,Color("d9e6d5"))
 	text_at(Vector2(165,554),"Verschmelzungen gibt es nur am Kristall neben Borin.",13,Color("b9d9cf"))
-	var mastery:String=str(["Wut: %.0f/100" % warrior_rage,"Arkaner Schritt: %s" % ("bereit" if arcane_step_learned else "nach Finalquest"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id])
+	var mastery:String=str(["Wut: %.0f/100" % warrior_rage,"Arkaner Schritt: %s" % ("bereit" if arcane_step_learned else "gesperrt"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id])
+	if not class_mastery_unlocked:
+		mastery = "bei Borin nach Map-8-Finalquest \"Lichter ohne Namen\"" if not class_mastery_quest_completed() else "BEREIT · MEISTER anklicken"
 	text_at(Vector2(165,578),"Klassenmeisterschaft · "+mastery,13,Color("ffe2aa"))
 
 func draw_fusion_crystal() -> void:
