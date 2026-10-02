@@ -1,4 +1,4 @@
-# Release marker: Borin skill trees, class-boss relic masteries, shared world loot and current multiplayer fixes.
+# Release marker: class bosses, shared loot, boss arenas/houses, harvest visuals/timers and audiovisual combat.
 extends Node2D
 const PatchNotice = preload("res://components/patch_notice.gd")
 var patch_notice = PatchNotice.new()
@@ -29,7 +29,10 @@ var hurt_until:=0.0
 var mob_deaths:Array=[]
 var dead_mob_uids:Dictionary={}
 var boss_spawn_sound_seen:Dictionary={}
+var boss_attack_sound_seen:Dictionary={}
 var boss_death_end_queue:Array=[]
+var boss_music_hold_timer:=0.0
+var boss_music_hold_theme:=""
 const INVENTORY_HUD_RECT:=Rect2(584,590,98,42)
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
@@ -159,6 +162,9 @@ const BORIN_CRYSTAL_POS := Vector2(1608,1970)
 const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14300,1200)] # Map 06 / 07 / 08
 const CLASS_BOSS_ARENA_RADIUS := 410.0
 const CLASS_BOSS_ARENA_CLEAR_RADIUS := 475.0
+const CLASS_BOSS_HOUSE_POS := [Vector2(430,5940),Vector2(9700,5940),Vector2(14300,640)]
+const CLASS_BOSS_HOUSE_SIZE := Vector2(192,160)
+const CLASS_BOSS_MUSIC_THEMES := ["boss_kriegsherr","boss_arkanhueter","boss_jagdmeister"]
 const CLASS_RELIC_NAMES := ["Herz des Kriegsherrn","Arkansplitter","Herz der Jagd"]
 const CLASS_RELIC_SKILLS := ["WUT + BLUTRAUSCH","ARKANER SCHRITT","JAGDRAUSCH + SCHATTENROLLE"]
 const CLASS_RELIC_RESERVE_MS := 15000
@@ -1163,6 +1169,15 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 			copy["pos"] = old.get("pos",target)
 			copy["flash"]=maxf(float(copy.get("flash",0)),float(old.get("flash",0)))
 			if float(copy.get("hp",1))<float(old.get("hp",1)):copy["flash"]=.18
+			if int(copy.get("type",-1)) in [12,13,14]:
+				var old_attack:Dictionary=old.get("attack_state",{})
+				var new_attack:Dictionary=copy.get("attack_state",{})
+				var old_attack_id:=int(old_attack.get("id",-1))
+				var new_attack_id:=int(new_attack.get("id",-1))
+				if new_attack_id>=0 and new_attack_id!=old_attack_id and int(boss_attack_sound_seen.get(uid,-1))!=new_attack_id:
+					boss_attack_sound_seen[uid]=new_attack_id
+					var ability:Dictionary=new_attack.get("ability",{})
+					play_boss_spell_sound(str(ability.get("id","basic")))
 		else:
 			copy["pos"] = target
 			if int(copy.get("type",-1)) in [12,13,14] and float(copy.get("boss_spawn_timer",0.0))>0.0 and not boss_spawn_sound_seen.has(uid):
@@ -1327,9 +1342,13 @@ func play_sound(name: String) -> void:
 	player.play()
 
 func desired_music_theme() -> String:
-	if konflux.active: return "dorf" if KonfluxMap.safe(player_pos,konflux.room) else "konflux-pvp"
+	if konflux.active:return "dorf" if KonfluxMap.safe(player_pos,konflux.room) else "konflux-pvp"
 	var region:int=region_at(player_pos)
-	return "dorf" if panel=="start" or interior_id>=0 else ("boss" if arena_mode!="" else (["ruinen","kristall","quelle"][dungeon_id] if dungeon_id>=0 else MUSIC_THEMES[region]))
+	if panel=="start" or interior_id>=0:return "dorf"
+	if arena_mode!="":return "boss"
+	if dungeon_id>=0:return ["ruinen","kristall","quelle"][dungeon_id]
+	var boss_theme:=active_class_boss_music_theme()
+	return boss_theme if boss_theme!="" else MUSIC_THEMES[region]
 
 func update_music(delta: float = 0.0) -> void:
 	if music_player == null or music_incoming == null: return
@@ -1351,7 +1370,7 @@ func update_music(delta: float = 0.0) -> void:
 			else:
 				music_incoming.stop()
 			music_fading = false
-		var path: String = "res://music/%s.ogg" % desired if (desired in CUSTOM_MUSIC_THEMES or desired=="konflux-pvp") else "res://audio/%s.wav" % desired
+		var path:String=music_path_for_theme(desired)
 		var stream: AudioStream = load(path)
 		if stream == null: return
 		if stream is AudioStreamOggVorbis: stream.loop = true
@@ -1456,6 +1475,8 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 
 func _process(delta: float) -> void:
 	combat_feedback.step(delta)
+	boss_music_hold_timer=maxf(0.0,boss_music_hold_timer-delta)
+	if boss_music_hold_timer<=0.0:boss_music_hold_theme=""
 	for boss_fx_index in range(boss_death_end_queue.size()-1,-1,-1):
 		boss_death_end_queue[boss_fx_index]["remaining"]=float(boss_death_end_queue[boss_fx_index].get("remaining",0.0))-delta
 		if float(boss_death_end_queue[boss_fx_index]["remaining"])<=0.0:
@@ -1771,7 +1792,15 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		MobCombat.cancel(enemy);return false
 	var profile:=mob_profile(enemy)
 	var targets:=mob_targets(enemy,server)
+	var previous_attack_state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
 	var action:=MobCombat.step(enemy,profile,targets,delta)
+	if not server and int(enemy.get("type",-1)) in [12,13,14]:
+		var current_attack:Dictionary=enemy.get("attack_state",{})
+		var previous_id:=int(previous_attack_state.get("id",-1))
+		var current_id:=int(current_attack.get("id",-1))
+		if current_id>=0 and current_id!=previous_id:
+			var current_ability:Dictionary=current_attack.get("ability",{})
+			play_boss_spell_sound(str(current_ability.get("id","basic")))
 	var moved:=false
 	var movement:Vector2=action["move"]
 	if movement.length_squared()>.001:
@@ -2136,6 +2165,55 @@ func class_boss_recovery_point(enemy:Dictionary) -> Vector2:
 		if class_boss_arena_walkable(point,mob_hit_radius(enemy)) and not terrain_blocked(point,mob_hit_radius(enemy)):return point
 	return center
 
+func class_boss_house_rect(index:int)->Rect2:
+	var center:Vector2=CLASS_BOSS_HOUSE_POS[clampi(index,0,2)]
+	return Rect2(center-Vector2(CLASS_BOSS_HOUSE_SIZE.x*.5,CLASS_BOSS_HOUSE_SIZE.y),CLASS_BOSS_HOUSE_SIZE)
+
+func point_near_class_boss_house(p:Vector2,margin:float=0.0)->bool:
+	for i in CLASS_BOSS_HOUSE_POS.size():
+		if class_boss_house_rect(i).grow(margin).has_point(p):return true
+	return false
+
+func boss_spell_sound(ability_id:String)->String:
+	match ability_id:
+		"kriegshieb":return "swing"
+		"ansturm":return "skill_12"
+		"erdspalter":return "skill_13"
+		"blutrausch":return "skill_14"
+		"arkansalve":return "skill_16"
+		"arkane_lanze":return "skill_18"
+		"raumbruch":return "skill_21"
+		"sternengewitter":return "skill_23"
+		"praezisionsschuss":return "skill_24"
+		"salve":return "skill_25"
+		"tarnrolle":return "dodge"
+		"jagdrausch":return "skill_28"
+	return "hit"
+
+func play_boss_spell_sound(ability_id:String)->void:
+	var sfx:=boss_spell_sound(ability_id)
+	play_sound(sfx)
+	if ability_id in ["blutrausch","sternengewitter","jagdrausch"]:play_sound("level")
+
+func active_class_boss_music_theme()->String:
+	if boss_music_hold_timer>0.0 and boss_music_hold_theme!="":return boss_music_hold_theme
+	for enemy in enemies:
+		var type:=int(enemy.get("type",-1))
+		if type not in [12,13,14] or float(enemy.get("hp",0.0))<=0.0:continue
+		if region_at(player_pos)!=region_at(Vector2(enemy["pos"])):continue
+		if player_pos.distance_to(Vector2(enemy["pos"]))>1200.0:continue
+		var state:Dictionary=enemy.get("attack_state",{})
+		if int(enemy.get("target_peer",-1))>=0 or not state.is_empty():
+			return CLASS_BOSS_MUSIC_THEMES[type-12]
+	return ""
+
+func music_path_for_theme(theme:String)->String:
+	if theme in CLASS_BOSS_MUSIC_THEMES:
+		var custom:="res://music/%s.ogg" % theme
+		if ResourceLoader.exists(custom):return custom
+		return "res://audio/boss.wav"
+	return "res://music/%s.ogg" % theme if (theme in CUSTOM_MUSIC_THEMES or theme=="konflux-pvp") else "res://audio/%s.wav" % theme
+
 func obstacle_in_cell(cx: int, cy: int) -> Dictionary:
 	var cell := Vector2i(cx, cy)
 	if obstacle_cache.has(cell): return obstacle_cache[cell]
@@ -2147,7 +2225,7 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	var key := hash_cell(cx + 37, cy + 61)
 	if key % 3 == 0: return {}
 	var p := Vector2(cx * 250 + 55 + key % 130, cy * 250 + 45 + (key / 17) % 125)
-	if class_boss_arena_index_at(p,65.0)>=0:return {}
+	if class_boss_arena_index_at(p,65.0)>=0 or point_near_class_boss_house(p,75.0):return {}
 	if p.x < 1900 and p.y < 2700: return {}
 	if p.x < 80 or p.y < 80 or p.x > WORLD.x - 80 or p.y > WORLD.y - 80: return {}
 	var zone := region_at(p)
@@ -2171,7 +2249,7 @@ func decorative_tree_in_cell(tx:int,ty:int) -> Dictionary:
 	if zone == 0: return {}
 	var wet := zone==6 and center.y>6850+sin(center.x/220.0)*125.0
 	var point := Vector2(tx*64+(key%23),ty*64+((key/23)%25))
-	if class_boss_arena_index_at(point+Vector2(24,42),70.0)>=0:return {}
+	if class_boss_arena_index_at(point+Vector2(24,42),70.0)>=0 or point_near_class_boss_house(point+Vector2(24,42),85.0):return {}
 	if not region_rect(zone).grow(-45).encloses(Rect2(point-Vector2(100,160),Vector2(200,210))): return {}
 	if distance_to_trail(point)<120.0:return {}
 	var tree := false
@@ -2193,6 +2271,8 @@ func decorative_tree_in_cell(tx:int,ty:int) -> Dictionary:
 
 func terrain_blocked(p: Vector2,radius:float=-1.0) -> bool:
 	if radius<0:radius=hero_collision_radius()
+	for house_index in CLASS_BOSS_HOUSE_POS.size():
+		if class_boss_house_rect(house_index).grow(radius).has_point(p):return true
 	if region_at(p) == 1:
 		for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			if Rect2(RESCUE_POS + offset - Vector2(73, 54), Vector2(146, 108)).grow(16).has_point(p): return true
@@ -5965,12 +6045,38 @@ func draw_world() -> void:
 	draw_class_boss_arenas()
 	draw_region_gates()
 
+func draw_class_boss_house(index:int)->void:
+	var base:Vector2=CLASS_BOSS_HOUSE_POS[index]
+	var accent:Color=[Color("a94f3d"),Color("7553b9"),Color("5e8d49")][index]
+	var roof:Color=[Color("71382d"),Color("4e3c79"),Color("405f36")][index]
+	var wall:Color=[Color("8d735b"),Color("72677f"),Color("7b7657")][index]
+	# 32px-Tile-Optik: 6x5 Raster, klare Pixelkanten, eigene Klassen-Silhouette.
+	for tx in 6:
+		for ty in 4:
+			var tile:=base+Vector2(-96+tx*32,-128+ty*32)
+			draw_rect(Rect2(tile,Vector2(32,32)),wall.darkened(.06*float((tx+ty)%2)))
+			draw_rect(Rect2(tile,Vector2(32,32)),Color("1d2527",.38),false,2)
+	for tx in 7:
+		var roof_y:=-160+abs(tx-3)*10
+		draw_rect(Rect2(base+Vector2(-112+tx*32,roof_y),Vector2(32,48)),roof)
+		draw_rect(Rect2(base+Vector2(-112+tx*32,roof_y),Vector2(32,48)),accent,false,3)
+	# Tür, Fenster und Klassenzeichen.
+	draw_rect(Rect2(base+Vector2(-20,-64),Vector2(40,64)),Color("392e2b"))
+	draw_rect(Rect2(base+Vector2(-16,-60),Vector2(32,60)),accent.darkened(.35))
+	for wx in [-64,48]:
+		draw_rect(Rect2(base+Vector2(wx,-88),Vector2(28,28)),Color("18252e"))
+		draw_rect(Rect2(base+Vector2(wx+4,-84),Vector2(20,20)),accent.lightened(.32))
+	var symbol:=["⚔","✦","➶"][index]
+	text_at(base+Vector2(-32,-145),symbol,24,accent.lightened(.4),HORIZONTAL_ALIGNMENT_CENTER,64)
+	text_at(base+Vector2(-96,20),["KRIEGSHERRS HALLE","ARKANHÜTERS TURM","JAGDMEISTERS HÜTTE"][index],12,accent.lightened(.35),HORIZONTAL_ALIGNMENT_CENTER,192)
+
 func draw_class_boss_arenas() -> void:
 	for i in CLASS_BOSS_SITES.size():
 		var center:Vector2=CLASS_BOSS_SITES[i]
+		var house:Vector2=CLASS_BOSS_HOUSE_POS[i]
+		if visible_world(house,250.0):draw_class_boss_house(i)
 		if not visible_world(center,CLASS_BOSS_ARENA_RADIUS+80.0):continue
 		var accent:Color=[Color("b65c48"),Color("8062c7"),Color("6f9f56")][i]
-		# Der Boden bleibt vollständig begehbar; Steine/Runen zeigen nur den Kampfraum.
 		draw_circle(center,CLASS_BOSS_ARENA_RADIUS,Color(accent,.055))
 		draw_arc(center,CLASS_BOSS_ARENA_RADIUS,0,TAU,64,Color(accent,.55),5)
 		draw_arc(center,CLASS_BOSS_ARENA_RADIUS-26,0,TAU,64,Color(accent,.20),2)
@@ -6019,7 +6125,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 			elif zone == 5 and key % 8 == 0:
 				draw_rect(Rect2(tile_origin + Vector2(8, 41), Vector2(44, 7)), Color('f0af71', 0.18))
 			var p := Vector2(tx * 64 + (key % 23), ty * 64 + ((key / 23) % 25))
-			if class_boss_arena_index_at(p,55.0)>=0:continue
+			if class_boss_arena_index_at(p,55.0)>=0 or point_near_class_boss_house(p,85.0):continue
 			if not region_rect(zone).grow(-45).encloses(Rect2(p-Vector2(100,160),Vector2(200,210))): continue
 			if distance_to_trail(p) < 120.0: continue
 			if zone == 0:
@@ -10738,6 +10844,8 @@ func receive_mob_death(payload:Dictionary)->void:
 	var death_type:int=int(row.get("type",-1))
 	if death_type in [12,13,14]:
 		row["duration"]=1.45
+		boss_music_hold_timer=1.45
+		boss_music_hold_theme=CLASS_BOSS_MUSIC_THEMES[death_type-12]
 		play_sound("hit")
 		boss_death_end_queue.append({"uid":uid,"remaining":1.35})
 	else:
