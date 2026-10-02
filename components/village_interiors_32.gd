@@ -42,7 +42,7 @@ static func blocked(pos:Vector2,center:Vector2)->bool:
 
 static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:bool,interact_label:String)->void:
 	var kind:=kind_for_id(id)
-	var accent:={
+	var accent:Color={
 		"inn":Color("b56f52"),"elder":Color("8d78a9"),"research":Color("668da0"),
 		"arena":Color("a76252"),"smith":Color("b06448"),"style":Color("b47aa0"),
 		"apprentice":Color("8b7dbd"),"healer":Color("69a98b"),"magic":Color("665ca8")
