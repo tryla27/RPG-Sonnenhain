@@ -9,18 +9,18 @@ const BERRIES := [
 const BERRY_REGIONS := [1,2,3,4,5,6,7,8,9,10,11,12]
 
 const RECIPES := [
-	{"name":"Waldbeer-Kompott","ingredients":{"Himbeeren":2,"Heidelbeeren":2,"__herb__":1},"learn_cost":0,"desc":"Warme Waldbeeren fuer lange Wege.","effect":"+25 HP sofort · +2 HP/s · 6:00"},
-	{"name":"Moosbeeren-Eintopf","ingredients":{"Moosbeeren":3,"Aprikose":1,"__herb__":1},"learn_cost":4,"desc":"Kraeftiger Eintopf aus dem Pilzwald.","effect":"+20 HP sofort · +3 HP/s · 6:00"},
-	{"name":"Steinbeeren-Riegel","ingredients":{"Steinbeeren":3,"Bernsteinfrucht":1,"__herb__":1},"learn_cost":5,"desc":"Fest, haltbar und schuetzend.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
-	{"name":"Kristallgelee","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"__herb__":1},"learn_cost":6,"desc":"Kuehlendes Gelee fuer konzentrierte Kaempfer.","effect":"+3 HP/s · +5% Cooldown-Tempo · 6:00"},
-	{"name":"Nebelpflaumen-Tee","ingredients":{"Nebelbeeren":2,"Pflaume":2,"__herb__":1},"learn_cost":7,"desc":"Leichter Tee fuer schnelle Schritte.","effect":"+2 HP/s · +5% Bewegung · 6:00"},
-	{"name":"Daemmerhimmel-Torte","ingredients":{"Daemmerbeeren":2,"Himmelsfrucht":2,"__herb__":1},"learn_cost":9,"desc":"Almas seltenes Reisegericht.","effect":"+4 HP/s · +4% Schaden · 6:00"},
-	{"name":"Himmelsfrucht-Salat","ingredients":{"Himmelsfrucht":1,"Quellbeeren":2,"Aprikose":1,"__herb__":1},"learn_cost":10,"desc":"Frisch, leicht und ideal zum Sammeln.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
-	{"name":"Quellbeeren-Brei","ingredients":{"Quellbeeren":3,"Moosbeeren":1,"__herb__":1},"learn_cost":10,"desc":"Sanfte, reine Regeneration.","effect":"+3 HP/s · 6:00"},
-	{"name":"Bernstein-Marmelade","ingredients":{"Bernsteinfrucht":2,"Himbeeren":2,"__herb__":1},"learn_cost":11,"desc":"Zaeh und schuetzend wie Harz.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
-	{"name":"Heidelbeer-Pfannkuchen","ingredients":{"Heidelbeeren":3,"Aprikose":1,"__herb__":1},"learn_cost":12,"desc":"Ein ruhiges Sammlerfruehstueck.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
-	{"name":"Schimmerbeeren-Suppe","ingredients":{"Kristallbeeren":2,"Heidelbeeren":2,"__herb__":1},"learn_cost":14,"desc":"Blaue Suppe fuer reine Mana-Erholung.","effect":"+4 Mana/s · nur Mana · 6:00"},
-	{"name":"Blauer Mondkuchen","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"Himmelsfrucht":1,"__herb__":1},"learn_cost":18,"desc":"Almas staerkstes Mana-Gericht.","effect":"+6 Mana/s · nur Mana · 6:00"}
+	{"name":"Waldbeer-Kompott","ingredients":{"Himbeeren":2,"Heidelbeeren":2,"Sonnenkraut":1},"learn_cost":0,"desc":"Warme Waldbeeren fuer lange Wege.","effect":"+25 HP sofort · +2 HP/s · 6:00"},
+	{"name":"Moosbeeren-Eintopf","ingredients":{"Moosbeeren":3,"Aprikose":1,"Moosminze":1},"learn_cost":4,"desc":"Kraeftiger Eintopf aus dem Pilzwald.","effect":"+20 HP sofort · +3 HP/s · 6:00"},
+	{"name":"Steinbeeren-Riegel","ingredients":{"Steinbeeren":3,"Bernsteinfrucht":1,"Steinwurz":1},"learn_cost":5,"desc":"Fest, haltbar und schuetzend.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
+	{"name":"Kristallgelee","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"Kristallthymian":1},"learn_cost":6,"desc":"Kuehlendes Gelee fuer konzentrierte Kaempfer.","effect":"+3 HP/s · +5% Cooldown-Tempo · 6:00"},
+	{"name":"Nebelpflaumen-Tee","ingredients":{"Nebelbeeren":2,"Pflaume":2,"Glutblatt":1},"learn_cost":7,"desc":"Leichter Tee fuer schnelle Schritte.","effect":"+2 HP/s · +5% Bewegung · 6:00"},
+	{"name":"Daemmerhimmel-Torte","ingredients":{"Daemmerbeeren":2,"Himmelsfrucht":2,"Blausalbei":1},"learn_cost":9,"desc":"Almas seltenes Reisegericht.","effect":"+4 HP/s · +4% Schaden · 6:00"},
+	{"name":"Himmelsfrucht-Salat","ingredients":{"Himmelsfrucht":1,"Quellbeeren":2,"Aprikose":1,"Nebelklee":1},"learn_cost":10,"desc":"Frisch, leicht und ideal zum Sammeln.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
+	{"name":"Quellbeeren-Brei","ingredients":{"Quellbeeren":3,"Moosbeeren":1,"Sternenfarn":1},"learn_cost":10,"desc":"Sanfte, reine Regeneration.","effect":"+3 HP/s · 6:00"},
+	{"name":"Bernstein-Marmelade","ingredients":{"Bernsteinfrucht":2,"Himbeeren":2,"Bernsteinblatt":1},"learn_cost":11,"desc":"Zaeh und schuetzend wie Harz.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
+	{"name":"Heidelbeer-Pfannkuchen","ingredients":{"Heidelbeeren":3,"Aprikose":1,"Quellminze":1},"learn_cost":12,"desc":"Ein ruhiges Sammlerfruehstueck.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
+	{"name":"Schimmerbeeren-Suppe","ingredients":{"Kristallbeeren":2,"Heidelbeeren":2,"Daemmerkraut":1},"learn_cost":14,"desc":"Blaue Suppe fuer reine Mana-Erholung.","effect":"+4 Mana/s · nur Mana · 6:00"},
+	{"name":"Blauer Mondkuchen","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"Himmelsfrucht":1,"Himmelslavendel":1},"learn_cost":18,"desc":"Almas seltene Notration fuer Magier.","effect":"Mana sofort vollstaendig wiederherstellen"}
 ]
 
 var selected := 0
@@ -46,14 +46,12 @@ func recipe(index: int = -1) -> Dictionary:
 func inventory_count(g, item_name: String) -> int:
 	var total := 0
 	for item in g.inventory:
-		if item_name=="__herb__":
-			if str(item.get("icon",""))=="herb": total += int(item.get("count",1))
-		elif str(item.get("name","")) == item_name:
+		if str(item.get("name","")) == item_name:
 			total += int(item.get("count",1))
 	return total
 
 func ingredient_label(item_name:String)->String:
-	return "Kraut" if item_name=="__herb__" else item_name
+	return item_name
 
 func ingredient_status(g, index: int = -1) -> Dictionary:
 	var result := {}
@@ -93,8 +91,7 @@ func remove_item_count(g, item_name: String, amount: int) -> bool:
 	var remaining := amount
 	for i in range(g.inventory.size()-1,-1,-1):
 		var item: Dictionary = g.inventory[i]
-		var matches:bool=str(item.get("icon",""))=="herb" if item_name=="__herb__" else str(item.get("name",""))==item_name
-		if not matches: continue
+		if str(item.get("name","")) != item_name: continue
 		var count := int(item.get("count",1))
 		var take := mini(count,remaining)
 		count -= take
@@ -185,8 +182,10 @@ func draw_recipe_detail(g, allow_cook:bool=false) -> void:
 	var y:=327.0
 	var status:=ingredient_status(g)
 	for item_name in detail["ingredients"]:
-		if str(item_name)=="__herb__":
-			g.draw_item_icon(Vector2(746,y-19),"herb",Color("8dbb78"),0.48)
+		var herb_region:int=FoodSystem.herb_region(str(item_name))
+		if herb_region>0:
+			var herb_info:Dictionary=FoodSystem.herb_for_region(herb_region)
+			g.draw_item_icon(Vector2(746,y-19),"herb",Color(herb_info["color"]),0.48)
 		else:
 			var food_id:=FoodSystem.index_for(str(item_name))
 			FoodSystem.icon(g,Vector2(746,y-19),food_id,0.48)
@@ -197,8 +196,10 @@ func draw_recipe_detail(g, allow_cook:bool=false) -> void:
 	g.text_at(Vector2(745,414),"WIRKUNG",12,Color("e9cc90"))
 	g.text_at(Vector2(745,437),str(detail["effect"]),10,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,220)
 	g.text_at(Vector2(745,467),"DAUER  06:00",11,Color("ffe1a0"))
-	if str(detail["name"]) in ["Schimmerbeeren-Suppe","Blauer Mondkuchen"]:
+	if str(detail["name"])=="Schimmerbeeren-Suppe":
 		g.text_at(Vector2(745,490),"Nur Mana-Regeneration, kein HP-Bonus.",9,Color("8fc4ff"),HORIZONTAL_ALIGNMENT_LEFT,220)
+	elif str(detail["name"])=="Blauer Mondkuchen":
+		g.text_at(Vector2(745,490),"Sofort 100% Mana · kein 6-Minuten-Buff.",9,Color("8fc4ff"),HORIZONTAL_ALIGNMENT_LEFT,220)
 	elif allow_cook:
 		g.text_at(Vector2(745,490),"Deine Zutaten bestimmen den Preis.",9,Color("aebfb9"),HORIZONTAL_ALIGNMENT_LEFT,220)
 
@@ -215,7 +216,7 @@ func draw_recipe_page(g) -> void:
 	g.text_at(Vector2(410,525),"Nur kleiner Aufwand: Zutaten bringst du selbst mit.",9,Color("b9cbc3"))
 
 func draw_berries_page(g) -> void:
-	g.text_at(Vector2(410,177),"BEEREN & VORRAT",14,Color("e9cc90"))
+	g.text_at(Vector2(410,177),"BEEREN & KRAEUTER",14,Color("e9cc90"))
 	g.text_at(Vector2(410,198),"Dein Bestand und die Herkunft der 12 Regionalfruechte.",10,Color("b9cbc3"))
 	for i in BERRIES.size():
 		var col:int=i/6
@@ -244,7 +245,7 @@ func draw_effects_page(g) -> void:
 		g.text_at(Vector2(425,220),"Kein Langzeit-Essenseffekt aktiv.",11,Color("c9d6cf"))
 		g.text_at(Vector2(425,244),"Iss ein gekochtes Gericht, um 6:00 Minuten Regeneration zu erhalten.",9,Color("aebfb9"))
 	g.text_at(Vector2(410,296),"GRUNDREGELN",12,Color("e9cc90"))
-	var rules:=["• Immer nur 1 Langzeit-Gericht aktiv.","• Neues Gericht ersetzt den alten Effekt.","• HP-Gerichte regenerieren vor allem Leben.","• Blaue Mana-Gerichte regenerieren nur Mana.","• Die Restzeit laeuft auch waehrend Disconnect weiter."]
+	var rules:=["• Immer nur 1 Langzeit-Gericht aktiv.","• Neues Langzeit-Gericht ersetzt den alten Effekt.","• HP-Gerichte regenerieren vor allem Leben.","• Schimmerbeeren-Suppe regeneriert nur Mana.","• Mondkuchen fuellt Mana sofort und ersetzt keinen Buff."]
 	for i in rules.size():g.text_at(Vector2(420,320+i*22),rules[i],10,Color("d8e6dc"))
 	g.text_at(Vector2(410,444),"GERICHTE IM UEBERBLICK",12,Color("e9cc90"))
 	for i in RECIPES.size():
