@@ -1,3 +1,4 @@
+# Release marker: Steinrose kitchen production rollout.
 extends Node2D
 const PatchNotice = preload("res://components/patch_notice.gd")
 var patch_notice = PatchNotice.new()
