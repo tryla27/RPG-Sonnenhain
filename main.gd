@@ -86,9 +86,9 @@ const ENEMY_TYPES := [
 	{"name":"Lavagolem", "region":5, "hp":260, "damage":38, "speed":52, "xp":82, "color":Color("a75c52")},
 	{"name":"Strandkrabbe", "region":6, "hp":57, "damage":9, "speed":93, "xp":15, "color":Color("e9a67e")},
 	{"name":"Wassergeist", "region":6, "hp":90, "damage":16, "speed":117, "xp":26, "color":Color("76bfd2")},
-	{"name":"Turmwächter", "region":3, "hp":680, "damage":31, "speed":78, "xp":310, "color":Color("8c9b9e")},
-	{"name":"Kristallhüter", "region":4, "hp":850, "damage":38, "speed":87, "xp":410, "color":Color("9bc6dd")},
-	{"name":"Aschefürst", "region":7, "hp":1150, "damage":47, "speed":105, "xp":540, "color":Color("d28467")},
+	{"name":"Kriegsherr", "region":6, "hp":680, "damage":31, "speed":78, "xp":310, "color":Color("c97b5e")},
+	{"name":"Arkanhüter", "region":7, "hp":850, "damage":38, "speed":87, "xp":410, "color":Color("8caee8")},
+	{"name":"Jagdmeister", "region":8, "hp":1150, "damage":47, "speed":105, "xp":540, "color":Color("8fbd72")},
 	{"name":"Sternenschatten", "region":7, "hp":320, "damage":48, "speed":128, "xp":230, "color":Color("b5a3d9")},
 	{"name":"Bruchwächter", "region":7, "hp":470, "damage":55, "speed":72, "xp":280, "color":Color("dfac91")},
 	{"name":"Nebelhirsch", "region":8, "hp":91, "damage":17, "speed":123, "xp":28, "color":Color("b9cfcc")},
@@ -154,7 +154,10 @@ const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
 const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200},{"id":41,"a":1,"b":36,"gold":2200},{"id":42,"a":18,"b":37,"gold":4200}]
 const BORIN_CRYSTAL_POS := Vector2(1608,1970)
-const CLASS_MASTERY_QUEST_INDEX := 16 # "Lichter ohne Namen" · Abschluss von Map 8
+const CLASS_BOSS_SITES := [Vector2(750,6100),Vector2(9700,6500),Vector2(14100,1020)] # Map 06 / 07 / 08
+const CLASS_RELIC_NAMES := ["Herz des Kriegsherrn","Arkansplitter","Herz der Jagd"]
+const CLASS_RELIC_SKILLS := ["WUT + BLUTRAUSCH","ARKANER SCHRITT","JAGDRAUSCH + SCHATTENROLLE"]
+const CLASS_RELIC_RESERVE_MS := 15000
 const QUESTS := [
 	{"title":"Schleime im Blütenwald", "npc":"Mira", "target":0, "count":8, "xp":60, "gold":75, "reward":"Waldklinge"},
 	{"title":"Die Käferplage", "npc":"Mira", "target":1, "count":8, "xp":85, "gold":110, "reward":"Blütenanhänger"},
@@ -168,9 +171,9 @@ const QUESTS := [
 	{"title":"Herz aus Glut", "npc":"Borin", "target":9, "count":11, "xp":550, "gold":600, "reward":"Glutbrecher"},
 	{"title":"Krabben am Strand", "npc":"Mira", "target":10, "count":8, "xp":110, "gold":140, "reward":"Muschelring"},
 	{"title":"Stimmen im Wasser", "npc":"Liora", "target":11, "count":8, "xp":180, "gold":220, "reward":"Gezeitenstein"},
-	{"title":"Der Turmwächter", "npc":"Borin", "target":12, "count":1, "xp":600, "gold":750, "reward":"Turmklinge"},
-	{"title":"Hüter des Kristalls", "npc":"Liora", "target":13, "count":1, "xp":800, "gold":950, "reward":"Frostherz"},
-	{"title":"Der Aschefürst", "npc":"Mira", "target":14, "count":1, "xp":1100, "gold":1300, "reward":"Fürstenklinge"},
+	{"title":"Der Kriegsherr", "npc":"Borin", "target":12, "count":1, "xp":600, "gold":750, "reward":"Kampfsiegel"},
+	{"title":"Der Arkanhüter", "npc":"Liora", "target":13, "count":1, "xp":800, "gold":950, "reward":"Arkankern"},
+	{"title":"Der Jagdmeister", "npc":"Mira", "target":14, "count":1, "xp":1100, "gold":1300, "reward":"Jagdzeichen"},
 	{"title":"Spuren im Nebel", "npc":"Liora", "target":17, "count":9, "xp":310, "gold":280, "reward":"Nebelamulett"},
 	{"title":"Lichter ohne Namen", "npc":"Mira", "target":18, "count":9, "xp":360, "gold":325, "reward":"Lichtsplitter"},
 	{"title":"Das goldene Harz", "npc":"Borin", "target":19, "count":10, "xp":610, "gold":490, "reward":"Harzpanzer"},
@@ -456,6 +459,8 @@ var server_spawn_timer := 0.0
 var server_status_timer := 0.0
 var server_rescue_spawn_timer := 0.0
 var server_next_mob_uid := 1
+var server_next_drop_uid := 1
+var world_drop_request_times: Dictionary = {}
 var server_moving_mobs := 0
 var server_party_of_peer: Dictionary = {}
 var server_parties: Dictionary = {}
@@ -1114,7 +1119,12 @@ func push_world_snapshot() -> void:
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
 		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0)})
-	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows}
+	var drop_rows:Array=[]
+	for drop in drops:
+		if not drop.has("drop_uid") or not drop.has("item"):continue
+		var dp:Vector2=drop["pos"]
+		drop_rows.append({"drop_uid":int(drop["drop_uid"]),"pos":[dp.x,dp.y],"item":drop["item"],"life":float(drop.get("life",0.0)),"reserved_class":int(drop.get("reserved_class",-1)),"reserve_ms":maxi(0,int(drop.get("reserve_until_ms",0))-Time.get_ticks_msec())})
+	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows,"drops":drop_rows}
 	for peer_id in multiplayer.get_peers():
 		var state: Dictionary = remote_players.get(int(peer_id),{})
 		if str(state.get("context","world")) == "world":
@@ -1163,6 +1173,56 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 		shot["dir"] = Vector2(float(sdir[0]),float(sdir[1]))
 		rebuilt_shots.append(shot)
 	enemy_projectiles = rebuilt_shots
+	var rebuilt_drops:Array=[]
+	for raw in snapshot.get("drops",[]):
+		if not raw is Dictionary:continue
+		var coords:Array=raw.get("pos",[])
+		if coords.size()<2:continue
+		var item_raw:Variant=raw.get("item",{})
+		if not item_raw is Dictionary:continue
+		var drop:=raw.duplicate(true)
+		drop["pos"]=Vector2(float(coords[0]),float(coords[1]))
+		drop["item"]=sanitize_network_reward_item(item_raw)
+		drop["reserve_until_ms"]=Time.get_ticks_msec()+maxi(0,int(raw.get("reserve_ms",0)))
+		rebuilt_drops.append(drop)
+	drops=rebuilt_drops
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_request_world_drop_pickup(drop_uid:int) -> void:
+	if network_mode!="host" or not dedicated_server_mode:return
+	var sender:=multiplayer.get_remote_sender_id()
+	if sender<=0 or not remote_players.has(sender) or not server_action_allowed(sender,"pickup:%d" % drop_uid,180):return
+	for i in range(drops.size()-1,-1,-1):
+		var drop:Dictionary=drops[i]
+		if int(drop.get("drop_uid",-1))!=drop_uid:continue
+		if network_player_position(sender).distance_to(Vector2(drop["pos"]))>72.0:return
+		var player_class:=clampi(int(remote_players[sender].get("class",0)),0,2)
+		if class_relic_locked_for_player(drop,player_class):
+			rpc_world_drop_denied.rpc_id(sender,drop_uid,"Dieses Relikt ist noch für %s reserviert." % CLASS_NAMES[int(drop.get("reserved_class",0))])
+			return
+		var payload:Dictionary=drop["item"].duplicate(true)
+		drops.remove_at(i)
+		rpc_world_drop_granted.rpc_id(sender,drop_uid,payload)
+		push_world_snapshot()
+		return
+
+@rpc("authority","call_remote","reliable")
+func rpc_world_drop_granted(drop_uid:int,raw_item:Dictionary) -> void:
+	if network_mode!="client":return
+	var item:=sanitize_network_reward_item(raw_item)
+	if not add_item(item):
+		message("Inventar voll · der Fund konnte nicht aufgenommen werden.")
+		return
+	play_sound("pickup")
+	message("Aufgehoben: %s · %s" % [item["name"],RARITY_NAMES[int(item["rarity"])]])
+	world_drop_request_times.erase(drop_uid)
+	save_game()
+
+@rpc("authority","call_remote","reliable")
+func rpc_world_drop_denied(drop_uid:int,reason:String) -> void:
+	if network_mode!="client":return
+	world_drop_request_times[drop_uid]=Time.get_ticks_msec()+900
+	message(reason.substr(0,120))
 
 func add_chat_line(author: String, value: String) -> void:
 	var clean := value.strip_edges().substr(0,120)
@@ -1853,6 +1913,7 @@ func process_dedicated_server(delta: float) -> void:
 		spawn_dedicated_enemy()
 		server_cleanup_orphan_mobs()
 	update_dedicated_enemies(delta)
+	update_server_world_drops(delta)
 	update_dedicated_player_projectiles(delta)
 	update_dedicated_enemy_projectiles(delta)
 	sync_timer -= delta
@@ -3396,7 +3457,7 @@ func boss_max_hp(type:int)->float:
 func spawn_dedicated_bosses()->void:
 	for i in 3:
 		if boss_cooldowns[i]>0:continue
-		var site:Vector2=LANDMARKS[i+2]["pos"]
+		var site:Vector2=CLASS_BOSS_SITES[i]
 		var type:int=12+i
 		var nearby:=false
 		for peer in remote_players:
@@ -3417,7 +3478,7 @@ func spawn_dedicated_bosses()->void:
 func spawn_nearby_boss() -> void:
 	if uses_server_world():return
 	for i in 3:
-		var site: Vector2 = LANDMARKS[i + 2]["pos"]
+		var site: Vector2 = CLASS_BOSS_SITES[i]
 		if player_pos.distance_to(site) > 700 or boss_cooldowns[i] > 0 or region_at(player_pos) != region_at(site): continue
 		var boss_type := 12 + i
 		var exists := false
@@ -3548,6 +3609,29 @@ func respawn() -> void:
 	message("Du wurdest im Dorf wiederbelebt. -20 Gold")
 	save_game()
 
+func class_relic_item(boss_index:int) -> Dictionary:
+	boss_index=clampi(boss_index,0,2)
+	var item:=make_item(CLASS_RELIC_NAMES[boss_index],"gem",4,0,2500+boss_index*1250)
+	item["class_relic"]=true
+	item["mastery_class"]=boss_index
+	item["mastery_skill"]=CLASS_RELIC_SKILLS[boss_index]
+	return item
+
+func server_spawn_world_drop(item:Dictionary,pos:Vector2,reserved_class:int=-1,life:float=180.0) -> int:
+	var uid:=server_next_drop_uid
+	server_next_drop_uid+=1
+	drops.append({"drop_uid":uid,"pos":safe_drop_position(pos),"item":network_reward_payload(item),"life":life,"reserved_class":reserved_class,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS if reserved_class>=0 else 0})
+	return uid
+
+func update_server_world_drops(delta:float) -> void:
+	for i in range(drops.size()-1,-1,-1):
+		drops[i]["life"]=float(drops[i].get("life",0.0))-delta
+		if float(drops[i]["life"])<=0.0:drops.remove_at(i)
+
+func class_relic_locked_for_player(drop:Dictionary,player_class:int) -> bool:
+	var reserved:=int(drop.get("reserved_class",-1))
+	return reserved>=0 and reserved!=player_class and int(drop.get("reserve_until_ms",0))>Time.get_ticks_msec()
+
 func safe_drop_position(origin: Vector2, offset: Vector2 = Vector2.ZERO) -> Vector2:
 	var wanted := origin+offset
 	var origin_region := region_at(origin)
@@ -3592,10 +3676,9 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	if type in [12, 13, 14]:
 		boss_cooldowns[type - 12] = 90.0
 		bosses_defeated[type - 12] = true
-		var boss_element: String = ["blitz", "eis", "gift"][type - 12]
-		var boss_item := make_item("%s · %s" % [ENEMY_TYPES[type]["name"], String(boss_element).capitalize()], class_weapon_icon(), 3 + int(type == 14), 28 + (type - 12) * 8, 700 + type * 35, boss_element)
-		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)), "item":boss_item, "life":120.0})
-		message("%s besiegt! Ein neuer Weg ist offen." % ENEMY_TYPES[type]["name"])
+		var relic:=class_relic_item(type-12)
+		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)),"item":relic,"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
+		message("%s besiegt! Legendärer Klassenfund: %s." % [ENEMY_TYPES[type]["name"],CLASS_RELIC_NAMES[type-12]])
 		if bosses_defeated.count(true) == bosses_defeated.size() and not final_completed and final_countdown < 0.0:
 			final_countdown = 8.0
 			message("Alle Siegel sind gefallen! In Kürze öffnet sich die Arena der letzten Wache.")
@@ -3739,23 +3822,33 @@ func random_loot(type: int, loot_class: int = -1) -> Dictionary:
 
 func collect_drops() -> void:
 	for i in range(drops.size() - 1, -1, -1):
-		if drops[i]["pos"].distance_to(player_pos) < 36:
-			if drops[i].has("gold"):
-				var amount: int = int(drops[i]["gold"])
-				gold += amount
-				drops.remove_at(i)
-				play_sound("pickup")
-				effect(player_pos + Vector2(0, -36), "+%d Gold" % amount, Color("ffdb83"), 1.0)
-				continue
-			var item: Dictionary = drops[i]["item"]
-			if not can_add_item(item):
-				message("Inventar voll! Verkaufe Gegenstände im Dorf.")
-				continue
-			add_item(item)
+		if Vector2(drops[i]["pos"]).distance_to(player_pos) >= 36:continue
+		if uses_server_world() and drops[i].has("drop_uid"):
+			var uid:=int(drops[i]["drop_uid"])
+			if class_relic_locked_for_player(drops[i],class_id):continue
+			var item:Dictionary=drops[i]["item"]
+			if not can_add_item(item):continue
+			if Time.get_ticks_msec()<int(world_drop_request_times.get(uid,0)):continue
+			world_drop_request_times[uid]=Time.get_ticks_msec()+700
+			rpc_request_world_drop_pickup.rpc_id(1,uid)
+			continue
+		if drops[i].has("gold"):
+			var amount: int = int(drops[i]["gold"])
+			gold += amount
 			drops.remove_at(i)
 			play_sound("pickup")
-			message("Gefunden: %s · %s" % [item["name"], RARITY_NAMES[int(item["rarity"])]] )
-			save_game()
+			effect(player_pos + Vector2(0, -36), "+%d Gold" % amount, Color("ffdb83"), 1.0)
+			continue
+		var item: Dictionary = drops[i]["item"]
+		if class_relic_locked_for_player(drops[i],class_id):continue
+		if not can_add_item(item):
+			message("Inventar voll! Verkaufe Gegenstände im Dorf.")
+			continue
+		add_item(item)
+		drops.remove_at(i)
+		play_sound("pickup")
+		message("Gefunden: %s · %s" % [item["name"], RARITY_NAMES[int(item["rarity"])]])
+		save_game()
 
 func interact() -> void:
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and player_pos.distance_to(BORIN_CRYSTAL_POS) < 95.0:
@@ -4040,10 +4133,7 @@ func quest_dialogue(npc_name: String) -> void:
 			gold += int(QUESTS[i]["gold"])
 			gain_xp(int(QUESTS[i]["xp"]))
 			add_item(reward_item)
-			if i == CLASS_MASTERY_QUEST_INDEX:
-				message("Quest abgeschlossen: %s! +%d XP, +%d Gold · Kehre zu Borin zurück: Deine Klassenmeisterschaft wartet." % [QUESTS[i]["title"], QUESTS[i]["xp"], QUESTS[i]["gold"]])
-			else:
-				message("Quest abgeschlossen: %s! +%d XP, +%d Gold" % [QUESTS[i]["title"], QUESTS[i]["xp"], QUESTS[i]["gold"]])
+			message("Quest abgeschlossen: %s! +%d XP, +%d Gold" % [QUESTS[i]["title"], QUESTS[i]["xp"], QUESTS[i]["gold"]])
 			save_game()
 			announce_quest_state()
 			return
@@ -4778,20 +4868,10 @@ func buy_fusion(index:int) -> bool:
 	skill_points-=sp;gold-=int(fusion["gold"]);learned[id]=true;skill_levels[id]=1
 	message("%s verschmolzen · -%d SP · -%d Gold" % [ABILITIES[id]["name"],sp,int(fusion["gold"])]);save_game();return true
 
-func class_mastery_quest_completed() -> bool:
-	return quests.size() > CLASS_MASTERY_QUEST_INDEX and int(quests[CLASS_MASTERY_QUEST_INDEX].get("state",0)) >= 3
-
-func claim_class_mastery() -> bool:
-	if not class_mastery_quest_completed() or class_mastery_unlocked: return false
-	class_mastery_unlocked=true
-	if class_id==1: arcane_step_learned=true
-	message(["BLUTRAUSCH gemeistert!","ARKANER SCHRITT gemeistert!","JAGDRAUSCH + SCHATTENROLLE gemeistert!"][class_id]);play_sound("level");save_game();return true
-
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
 		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("menu");return
 	if Rect2(718,145,118,38).has_point(mouse): quest_dialogue("Borin");return
-	if Rect2(848,145,118,38).has_point(mouse) and class_mastery_quest_completed() and not class_mastery_unlocked: claim_class_mastery();return
 	for slot in 3:
 		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -4913,6 +4993,19 @@ func use_item(index: int) -> void:
 	if food_system.eat(self,index): return
 	var item: Dictionary = inventory[index]
 	var name: String = item["name"]
+	if bool(item.get("class_relic",false)):
+		var required:=clampi(int(item.get("mastery_class",-1)),0,2)
+		if class_id!=required:
+			message("%s kann nur von %s verwendet werden." % [name,CLASS_NAMES[required]])
+			return
+		if class_mastery_unlocked:
+			message("%s bereits freigeschaltet." % CLASS_RELIC_SKILLS[class_id])
+			return
+		class_mastery_unlocked=true
+		arcane_step_learned=class_id==1
+		inventory.remove_at(index);selected_item=-1
+		message("%s freigeschaltet: %s" % [CLASS_NAMES[class_id],CLASS_RELIC_SKILLS[class_id]])
+		play_sound("level");save_game();return
 	if item["icon"] == "potion":
 		if name in ["Energietrank", "Manatrank"]: energy = minf(max_energy(), energy + 65)
 		else: hp = minf(max_hp(), hp + (90 if name == "Großer Heiltrank" else 45))
@@ -5058,6 +5151,11 @@ func _draw() -> void:
 				draw_item_icon(p + Vector2(-15, -19), String(item["icon"]), rarity_color, 1.0, weapon_visual_stage(item), item_design(item))
 				if int(item["rarity"]) >= 2 and int(world_time * 2.0) % 2 == 0:
 					draw_rect(Rect2(p + Vector2(17, -24), Vector2(4, 4)), rarity_color.lightened(0.3))
+				if bool(item.get("class_relic",false)):
+					var reserved:=int(drop.get("reserved_class",-1))
+					var label:="E · %s" % item["name"]
+					if class_relic_locked_for_player(drop,class_id):label="🔒 %s · für %s reserviert" % [item["name"],CLASS_NAMES[reserved]]
+					text_at(p+Vector2(-105,-34),label,11,Color("fff1bd"),HORIZONTAL_ALIGNMENT_CENTER,210)
 	draw_sorted_world_objects()
 	for cloud in poison_clouds:
 		if visible_world(cloud["pos"], 110):
@@ -7485,8 +7583,9 @@ func draw_minimap(rect: Rect2, compact: bool) -> void:
 
 func region_required_boss(zone:int)->int:
 	match zone:
-		4: return 0
-		5,7: return 1
+		7: return 0 # Map 06 Kriegsherr öffnet Map 07
+		8: return 1 # Map 07 Arkanhüter öffnet Map 08
+		9: return 2 # Map 08 Jagdmeister öffnet den weiteren Osten
 	return -1
 
 func boss_gate_name(boss_index:int)->String:
@@ -7955,7 +8054,7 @@ func draw_skills_panel() -> void:
 	text_at(Vector2(165,125),"BORIN · SKILLZAUBERER",25,Color("ffeda9"))
 	text_at(Vector2(650,124),"LV %d · %d SP · %d GOLD" % [level,skill_points,gold],16,Color("f6dc9a"))
 	for tab in 3: ui_button(Rect2(165+tab*180,145,168,38),SKILL_TREE_NAMES[tab],true,skill_tree_tab==tab)
-	ui_button(Rect2(718,145,118,38),"QUESTS");ui_button(Rect2(848,145,118,38),"MEISTER",class_mastery_quest_completed() and not class_mastery_unlocked,class_mastery_unlocked)
+	ui_button(Rect2(718,145,118,38),"QUESTS")
 	for slot in 3:
 		var sid:int=slots[slot];ui_button(Rect2(165+slot*204,190,193,40),"%d · %s" % [slot+1,"FREI" if sid<0 else ABILITIES[sid]["name"]],true,selected_slot==slot)
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -7969,8 +8068,8 @@ func draw_skills_panel() -> void:
 	text_at(Vector2(165,554),"Verschmelzungen gibt es nur am Kristall neben Borin.",13,Color("b9d9cf"))
 	var mastery:String=str(["Wut: %.0f/100" % warrior_rage,"Arkaner Schritt: %s" % ("bereit" if arcane_step_learned else "gesperrt"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id])
 	if not class_mastery_unlocked:
-		mastery = "bei Borin nach Map-8-Finalquest \"Lichter ohne Namen\"" if not class_mastery_quest_completed() else "BEREIT · MEISTER anklicken"
-	text_at(Vector2(165,578),"Klassenmeisterschaft · "+mastery,13,Color("ffe2aa"))
+		mastery = "Relikt von Map %02d · %s" % [6+class_id,ENEMY_TYPES[12+class_id]["name"]]
+	text_at(Vector2(165,578),"Klassenbonus · "+mastery,13,Color("ffe2aa"))
 
 func draw_fusion_crystal() -> void:
 	var p:=BORIN_CRYSTAL_POS
@@ -8039,10 +8138,10 @@ func draw_inventory_panel() -> void:
 		var detail := "%s · %s · %d Gold" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), item_sale_value(item)]
 		if item["icon"] in ["sword", "staff", "bow", "armor", "ring", "head"]: detail += " · +%d" % int(item["power"])
 		text_at(Vector2(643, 518), detail, 13, Color("e5eddd"), HORIZONTAL_ALIGNMENT_LEFT, 320)
-		var action_label := "ESSEN" if item["icon"] == "food" else "BENUTZEN"
+		var action_label := "MEISTERGABE NUTZEN" if bool(item.get("class_relic",false)) else ("ESSEN" if item["icon"] == "food" else "BENUTZEN")
 		if item["icon"] in ["sword","staff","bow","armor","ring"]:
 			action_label = "AUSZIEHEN" if is_equipped_uid(int(item.get("uid",-1))) else "AUSRÜSTEN"
-		ui_button(Rect2(643, 538, 320, 42), action_label, item["icon"] in ["potion", "food", class_weapon_icon(), "armor", "ring"])
+		ui_button(Rect2(643, 538, 320, 42), action_label, bool(item.get("class_relic",false)) or item["icon"] in ["potion", "food", class_weapon_icon(), "armor", "ring"])
 	else:
 		text_at(Vector2(643, 508), "Wähle einen Gegenstand aus dem Inventar.", 14, Color("dbe8d5"))
 	var mouse := get_viewport().get_mouse_position()
@@ -8353,7 +8452,7 @@ func draw_world_atlas(rect: Rect2) -> void:
 		draw_circle(point, 3, Color("ffe09a") if int(event_states[i]) in [0, 2] else Color("98d6c8"))
 
 	for boss_index in 3:
-		var boss_pos: Vector2 = LANDMARKS[boss_index + 2]["pos"]
+		var boss_pos: Vector2 = CLASS_BOSS_SITES[boss_index]
 		if not region_available(region_at(boss_pos)): continue
 		var marker: Vector2 = inset.position + boss_pos * map_scale
 		draw_circle(marker, 8, Color("292d38"))
@@ -9286,11 +9385,12 @@ func rpc_server_party_progress(payload: Dictionary) -> void:
 		ack_server_transaction(tx_id)
 		return
 	var xp_reward := clampi(int(payload.get("xp",0)),0,100000)
-	if xp_reward > 0:
-		gain_xp(xp_reward)
-		message("+%d XP · Gruppenbelohnung" % xp_reward)
-		add_chat_line("GRUPPE","+%d XP · Gruppenbelohnung" % xp_reward)
-		save_game()
+	var gold_reward := clampi(int(payload.get("gold",0)),0,100000)
+	if xp_reward > 0: gain_xp(xp_reward)
+	if gold_reward > 0: gold += gold_reward
+	if xp_reward > 0 or gold_reward > 0:
+		var reward_text:="+%d XP%s · Gruppenbelohnung" % [xp_reward," · +%d Gold" % gold_reward if gold_reward>0 else ""]
+		message(reward_text);add_chat_line("GRUPPE",reward_text);save_game()
 	ack_server_transaction(tx_id)
 
 @rpc("authority","call_remote","reliable")
@@ -9894,6 +9994,12 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	item["count"] = clampi(int(item.get("count",1)),1,stack_limit(item))
 	item["name"] = str(item.get("name","Fundstück")).substr(0,48)
 	item["element"] = str(item.get("element","")) if str(item.get("element","")) in ["","feuer","eis","blitz","gift"] else ""
+	if bool(item.get("class_relic",false)):
+		item["class_relic"]=true
+		item["mastery_class"]=clampi(int(item.get("mastery_class",-1)),0,2)
+		item["mastery_skill"]=CLASS_RELIC_SKILLS[int(item["mastery_class"])]
+	else:
+		item.erase("mastery_class");item.erase("mastery_skill")
 	return item
 
 func apply_rescue_progress(amount: int, shared: bool = false) -> void:
@@ -10222,33 +10328,33 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	var reward_class := clampi(int(player_state.get("class", 0)), 0, 2)
 	var type := clampi(int(enemy.get("type", 0)), 0, ENEMY_TYPES.size() - 1)
 	var elite_kind := clampi(int(enemy.get("elite", 0)), 0, 2)
-	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
+	var is_boss:=type in [12,13,14]
 	var party_members := server_party_members(peer_id)
 	var eligible_party: Array = []
 	for raw_member in party_members:
 		var member := int(raw_member)
-		if server_party_member_eligible(member,peer_id,enemy): eligible_party.append(member)
+		if not remote_players.has(member):continue
+		if is_boss:
+			var state:Dictionary=remote_players[member]
+			if str(state.get("context","world"))=="world" and str(state.get("instance_id","world"))=="world":eligible_party.append(member)
+		elif server_party_member_eligible(member,peer_id,enemy):eligible_party.append(member)
 	if peer_id not in eligible_party: eligible_party.append(peer_id)
 	var group_bonus := minf(0.15,maxf(0.0,float(eligible_party.size()-1)*0.02))
 	var xp_reward := roundi(float(enemy_xp_reward(type, elite_kind, int(player_state.get("level",1))))*(1.0+group_bonus))
 	var gold_reward := randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
-	var rewards: Array = []
-	if type in [12, 13, 14]:
-		var boss_element: String = ["blitz", "eis", "gift"][type - 12]
-		rewards.append(make_item("%s · %s" % [ENEMY_TYPES[type]["name"], String(boss_element).capitalize()], class_weapon_icon_for(reward_class), 3 + int(type == 14), 28 + (type - 12) * 8, 700 + type * 35, boss_element))
+	# Beute gehört der gemeinsamen Welt: genau ein Relikt pro Klassenboss und
+	# auch normale Itemdrops können von jedem Spieler aufgehoben werden.
+	if is_boss:
+		server_spawn_world_drop(class_relic_item(type-12),Vector2(enemy["pos"])+Vector2(25,0),type-12,180.0)
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
-		rewards.append(random_loot(type, reward_class))
+		server_spawn_world_drop(random_loot(type,reward_class),Vector2(enemy["pos"]),-1,90.0)
 	if randf() < 0.03:
-		rewards.append(make_item("Heiltrank", "potion", 1, 0, 18))
-	var network_rewards: Array = []
-	for reward in rewards:
-		if reward is Dictionary:
-			network_rewards.append(network_reward_payload(reward))
+		server_spawn_world_drop(make_item("Heiltrank","potion",1,0,18),Vector2(enemy["pos"])+Vector2(20,0),-1,90.0)
 	var mob_uid := int(enemy.get("uid",-1))
 	var killer_uuid := str(player_state.get("uuid","peer%d" % peer_id))
 	var reward_tx := "reward:%d:%s" % [mob_uid,killer_uuid]
 	server_register_transaction(peer_id,reward_tx)
-	rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,network_rewards)
+	rpc_server_combat_reward.rpc_id(peer_id,reward_tx,type,xp_reward,gold_reward,[])
 	for raw_member in eligible_party:
 		var member := int(raw_member)
 		if member == peer_id or member <= 0 or not remote_players.has(member): continue
@@ -10256,7 +10362,7 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 		var party_tx := "partyxp:%d:%s" % [mob_uid,member_uuid]
 		server_register_transaction(member,party_tx)
 		var member_xp := roundi(float(server_party_member_xp(type,elite_kind,member))*(1.0+group_bonus))
-		rpc_server_party_progress.rpc_id(member,{"tx":party_tx,"xp":member_xp})
+		rpc_server_party_progress.rpc_id(member,{"tx":party_tx,"xp":member_xp,"gold":gold_reward if is_boss else 0})
 
 func can_enter_konflux() -> bool:
 	return creative_mode or level >= KONFLUX_MIN_LEVEL
