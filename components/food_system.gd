@@ -113,6 +113,11 @@ static func at_plant(p:Vector2,tree:bool)->int:
  return REGION_FOOD[0] if (p in TREES if tree else p in BUSHES) else -1
 static func key(p:Vector2)->String:return "%d:%d" % [int(p.x),int(p.y)]
 func ready_at(p:Vector2,now:float)->bool:return now>=float(harvested.get(key(p),0))
+func regrow_remaining(p:Vector2,now:float=Time.get_unix_time_from_system())->int:
+ return maxi(0,ceili(float(harvested.get(key(p),0))-now))
+func fruit_visible_at(p:Vector2,now:float=Time.get_unix_time_from_system())->bool:
+ var id:int=int(plant_foods.get(key(p),at_plant(p,false)))
+ return id>=0 and ready_at(p,now)
 func prune(now:float)->void:
  for plant in harvested.keys():
   if float(harvested[plant])<=now:harvested.erase(plant)
@@ -415,12 +420,16 @@ func herb_bush(c:CanvasItem,p:Vector2,herb_name:String,herb_color:String)->void:
    c.draw_circle(p+o,4,flower)
    c.draw_circle(p+o+Vector2(2,-1),2,flower.lightened(.28))
  else:
-  var seconds:=maxi(0,ceili(float(harvested.get(key(p),0))-Time.get_unix_time_from_system()))
+  var seconds:=regrow_remaining(p)
   c.draw_string(ThemeDB.fallback_font,p+Vector2(-22,28),"%02d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("e4cf8b"))
 
 func bush(c:CanvasItem,p:Vector2)->void:
  if p in BUSHES:
   preload("res://components/start_scenery_32.gd").bush(c,p,int(p.x+p.y))
+  fruit(c,p,false)
+  if not ready_at(p,Time.get_unix_time_from_system()):
+   var legacy_seconds:=regrow_remaining(p)
+   c.draw_string(ThemeDB.fallback_font,p+Vector2(-22,30),"%02d:%02d" % [legacy_seconds/60,legacy_seconds%60],HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("e4cf8b"))
   return
  # 96x64 pixel silhouette aligned to the existing bush position.
  var dark:=Color("294f39");var leaf:=Color("527348")
