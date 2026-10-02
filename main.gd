@@ -17,6 +17,7 @@ var server_save = ServerSaveClient.new()
 var account_store = AccountStore.new()
 var account_name := ""
 var account_password := ""
+var account_password_confirm := ""
 var account_focus := 0
 var account_status := ""
 var account_characters: Array = []
@@ -850,7 +851,7 @@ func _on_connected_to_server() -> void:
 	if account_pending_action in ["login","register"]:
 		var action:=account_pending_action
 		account_pending_action=""
-		rpc_account_request.rpc_id(1,action,account_name.strip_edges(),account_password)
+		rpc_account_request.rpc_id(1,action,account_name.strip_edges(),account_password,account_password_confirm if action=="register" else "")
 	if character_created:
 		rpc_player_presence.rpc_id(1, local_player_state())
 		push_player_state()
@@ -2815,19 +2816,27 @@ func _unhandled_input(event: InputEvent) -> void:
 		queue_redraw()
 		return
 	if panel in ["account_login","account_register"] and event is InputEventKey and event.pressed and not event.echo:
+		var registering:=panel=="account_register"
+		var focus_count:=3 if registering else 2
 		if event.keycode==KEY_TAB:
-			account_focus=1-account_focus
+			account_focus=(account_focus+1)%focus_count
 		elif event.keycode==KEY_ESCAPE:
-			panel="account_gate";account_password="";account_status=""
+			panel="account_gate";account_password="";account_password_confirm="";account_status=""
 		elif event.keycode==KEY_BACKSPACE:
 			if account_focus==0 and account_name.length()>0:account_name=account_name.left(account_name.length()-1)
 			elif account_focus==1 and account_password.length()>0:account_password=account_password.left(account_password.length()-1)
+			elif registering and account_focus==2 and account_password_confirm.length()>0:account_password_confirm=account_password_confirm.left(account_password_confirm.length()-1)
 		elif event.keycode==KEY_ENTER:
-			if account_name.strip_edges().length()>=3 and account_password.length()>=8:request_account(panel=="account_register")
+			if account_form_valid(registering):request_account(registering)
 		elif event.unicode>=32:
 			var typed:=String.chr(event.unicode)
 			if account_focus==0 and account_name.length()<24 and "abcdefghijklmnopqrstuvwxyzäöüß0123456789_-".contains(typed.to_lower()):account_name+=typed
 			elif account_focus==1 and account_password.length()<72:account_password+=typed
+			elif registering and account_focus==2 and account_password_confirm.length()<72:account_password_confirm+=typed
+		if registering and account_password_confirm!="" and account_password!=account_password_confirm:
+			account_status="Die Passwörter stimmen nicht überein."
+		elif account_status=="Die Passwörter stimmen nicht überein.":
+			account_status=""
 		queue_redraw()
 		return
 	# Texteingabe für einmalige Charaktererstellung.
@@ -4989,17 +4998,19 @@ func handle_panel_click(mouse: Vector2) -> void:
 		return
 	if panel=="account_gate":
 		if Rect2(300,320,550,58).has_point(mouse):
-			account_password="";account_status="";account_focus=0;panel="account_login";join_live_multiplayer()
+			account_password="";account_password_confirm="";account_status="";account_focus=0;panel="account_login";join_live_multiplayer()
 		elif Rect2(300,400,550,58).has_point(mouse):
-			account_password="";account_status="";account_focus=0;panel="account_register";join_live_multiplayer()
+			account_password="";account_password_confirm="";account_status="";account_focus=0;panel="account_register";join_live_multiplayer()
 		return
 	if panel in ["account_login","account_register"]:
+		var registering:=panel=="account_register"
 		if Rect2(300,275,550,48).has_point(mouse):account_focus=0
 		elif Rect2(300,365,550,48).has_point(mouse):account_focus=1
-		elif Rect2(300,455,550,52).has_point(mouse) and account_name.strip_edges().length()>=3 and account_password.length()>=8:
-			request_account(panel=="account_register")
-		elif Rect2(300,525,180,42).has_point(mouse):
-			panel="account_gate";account_password="";account_status=""
+		elif registering and Rect2(300,455,550,48).has_point(mouse):account_focus=2
+		elif Rect2(300,545 if registering else 455,550,52).has_point(mouse) and account_form_valid(registering):
+			request_account(registering)
+		elif Rect2(300,615 if registering else 525,180,42).has_point(mouse):
+			panel="account_gate";account_password="";account_password_confirm="";account_status=""
 		queue_redraw()
 		return
 	if panel=="account_migrate":
@@ -8612,21 +8623,32 @@ func draw_account_gate() -> void:
 	ui_button(Rect2(300,400,550,58),"BENUTZER ERSTELLEN")
 	if account_status!="":text_at(Vector2(300,490),account_status,14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_CENTER,550)
 
-func masked_password()->String:
-	return "•".repeat(account_password.length())
+func masked_password(value:String=account_password)->String:
+	return "•".repeat(value.length())
+
+func account_form_valid(registering:bool)->bool:
+	if account_name.strip_edges().length()<3 or account_password.length()<8:return false
+	if registering and (account_password_confirm.length()<8 or account_password!=account_password_confirm):return false
+	return account_pending_action==""
 
 func draw_account_form(registering:bool)->void:
-	text_at(Vector2(300,165),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",31,Color("ffe2aa"))
-	text_at(Vector2(300,208),"Nur Name und Passwort.",15,Color("d8e6dc"))
-	text_at(Vector2(300,260),"NAME",14,Color("e9cc90"))
-	var nr:=Rect2(300,275,550,48);draw_rect(nr,Color("22363c"));draw_rect(nr,Color("ffe2aa") if account_focus==0 else Color("8ba49c"),false,2)
+	text_at(Vector2(300,145 if registering else 165),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",31,Color("ffe2aa"))
+	text_at(Vector2(300,188 if registering else 208),"Name und Passwort%s." % (" zweimal" if registering else ""),15,Color("d8e6dc"))
+	text_at(Vector2(300,240 if registering else 260),"NAME",14,Color("e9cc90"))
+	var nr:=Rect2(300,255 if registering else 275,550,48);draw_rect(nr,Color("22363c"));draw_rect(nr,Color("ffe2aa") if account_focus==0 else Color("8ba49c"),false,2)
 	text_at(nr.position+Vector2(14,31),account_name if account_name!="" else "Name eingeben …",19,Color("fff0cf") if account_name!="" else Color("9fb4ac"))
-	text_at(Vector2(300,350),"PASSWORT",14,Color("e9cc90"))
-	var pr:=Rect2(300,365,550,48);draw_rect(pr,Color("22363c"));draw_rect(pr,Color("ffe2aa") if account_focus==1 else Color("8ba49c"),false,2)
+	text_at(Vector2(300,330 if registering else 350),"PASSWORT",14,Color("e9cc90"))
+	var pr:=Rect2(300,345 if registering else 365,550,48);draw_rect(pr,Color("22363c"));draw_rect(pr,Color("ffe2aa") if account_focus==1 else Color("8ba49c"),false,2)
 	text_at(pr.position+Vector2(14,31),masked_password() if account_password!="" else "Passwort eingeben …",19,Color("fff0cf") if account_password!="" else Color("9fb4ac"))
-	ui_button(Rect2(300,455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_name.strip_edges().length()>=3 and account_password.length()>=8 and account_pending_action=="")
-	ui_button(Rect2(300,525,180,42),"ZURÜCK")
-	if account_status!="":text_at(Vector2(500,552),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,350)
+	if registering:
+		text_at(Vector2(300,420),"PASSWORT WIEDERHOLEN",14,Color("e9cc90"))
+		var cr:=Rect2(300,435,550,48);draw_rect(cr,Color("22363c"));draw_rect(cr,Color("ffe2aa") if account_focus==2 else (Color("b96f68") if account_password_confirm!="" and account_password_confirm!=account_password else Color("8ba49c")),false,2)
+		text_at(cr.position+Vector2(14,31),masked_password(account_password_confirm) if account_password_confirm!="" else "Passwort erneut eingeben …",19,Color("fff0cf") if account_password_confirm!="" else Color("9fb4ac"))
+		if account_password_confirm!="" and account_password_confirm==account_password:
+			text_at(Vector2(865,466),"✓",18,Color("9de6c2"))
+	ui_button(Rect2(300,545 if registering else 455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_form_valid(registering))
+	ui_button(Rect2(300,615 if registering else 525,180,42),"ZURÜCK")
+	if account_status!="":text_at(Vector2(500,642 if registering else 552),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,350)
 
 func local_migration_slots()->Array:
 	var slots:Array=[]
@@ -8661,6 +8683,9 @@ func finish_account_entry()->void:
 	refresh_save_slot_labels()
 
 func request_account(registering:bool)->void:
+	if not account_form_valid(registering):
+		account_status="Die Passwörter stimmen nicht überein." if registering and account_password!=account_password_confirm else "Name mindestens 3 Zeichen, Passwort mindestens 8 Zeichen."
+		return
 	if network_mode!="client" or multiplayer.multiplayer_peer==null or multiplayer.multiplayer_peer.get_connection_status()!=MultiplayerPeer.CONNECTION_CONNECTED:
 		account_pending_action="register" if registering else "login"
 		join_live_multiplayer()
@@ -8668,7 +8693,7 @@ func request_account(registering:bool)->void:
 		return
 	account_pending_action="register" if registering else "login"
 	account_status="Prüfe Konto …"
-	rpc_account_request.rpc_id(1,account_pending_action,account_name.strip_edges(),account_password)
+	rpc_account_request.rpc_id(1,account_pending_action,account_name.strip_edges(),account_password,account_password_confirm if registering else "")
 
 func claim_local_save(slot:int)->void:
 	if not account_logged_in or network_mode!="client":return
@@ -11391,11 +11416,15 @@ func run_teleport_consistency_smoke() -> bool:
 
 
 @rpc("any_peer","call_remote","reliable")
-func rpc_account_request(action:String,name:String,password:String)->void:
+func rpc_account_request(action:String,name:String,password:String,password_confirm:String="")->void:
 	if not dedicated_server_mode or network_mode!="host":return
 	var peer:=multiplayer.get_remote_sender_id()
 	if peer<=0 or not server_action_allowed(peer,"account_auth",900):return
-	var response:Dictionary=account_store.register(peer,name,password) if action=="register" else account_store.login(peer,name,password)
+	var response:Dictionary
+	if action=="register" and password!=password_confirm:
+		response={"ok":false,"error":"password_mismatch"}
+	else:
+		response=account_store.register(peer,name,password) if action=="register" else account_store.login(peer,name,password)
 	rpc_account_reply.rpc_id(peer,response)
 
 @rpc("any_peer","call_remote","reliable")
@@ -11411,7 +11440,7 @@ func rpc_account_reply(response:Dictionary)->void:
 	account_pending_action=""
 	if not bool(response.get("ok",false)):
 		var error:=str(response.get("error","unknown"))
-		var labels:Dictionary={"invalid_login":"Name oder Passwort falsch.","invalid_name":"Name ungültig.","weak_password":"Passwort muss mindestens 8 Zeichen haben.","name_taken":"Dieser Name ist bereits vergeben.","slot_occupied":"Dieser Kontoplatz ist bereits belegt.","character_limit":"Maximal drei Charaktere pro Konto.","not_logged_in":"Bitte erneut anmelden.","disk_error":"Server konnte das Konto nicht speichern."}
+		var labels:Dictionary={"invalid_login":"Name oder Passwort falsch.","invalid_name":"Name ungültig.","weak_password":"Passwort muss mindestens 8 Zeichen haben.","password_mismatch":"Die Passwörter stimmen nicht überein.","name_taken":"Dieser Name ist bereits vergeben.","slot_occupied":"Dieser Kontoplatz ist bereits belegt.","character_limit":"Maximal drei Charaktere pro Konto.","not_logged_in":"Bitte erneut anmelden.","disk_error":"Server konnte das Konto nicht speichern."}
 		account_status=str(labels.get(error,"Anmeldung fehlgeschlagen."))
 		queue_redraw()
 		return
@@ -11419,6 +11448,7 @@ func rpc_account_reply(response:Dictionary)->void:
 	account_name=str(response.get("name",account_name))
 	account_characters=response.get("characters",[])
 	account_password=""
+	account_password_confirm=""
 	if str(response.get("kind",""))=="claimed":
 		account_status="Spielstand übernommen ✓"
 		if server_save.connected(self):server_save.begin(self)
