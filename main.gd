@@ -1,4 +1,4 @@
-# Release marker: regional herbs, Alma recipes and multiplayer food persistence production rollout.
+# Release marker: stabilized two-client multiplayer, regional herbs and Alma food persistence production rollout.
 extends Node2D
 const PatchNotice = preload("res://components/patch_notice.gd")
 var patch_notice = PatchNotice.new()
