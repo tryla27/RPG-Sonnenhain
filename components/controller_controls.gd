@@ -229,9 +229,19 @@ func panel_points(g) -> Array:
 		"creation_review":
 			points=[Vector2(280,562),Vector2(772,562)]
 		"skills":
-			for i in 3:points.append(Vector2(260+i*204,170))
-			for i in g.skill_choices().size():points.append(Vector2(295+i*275,290))
-			for i in 4:points.append(Vector2(550,421+i*37))
+			for i in 3: points.append(Vector2(249+i*180,164))
+			points.append(Vector2(777,164))
+			points.append(Vector2(907,164))
+			for i in 3: points.append(Vector2(261+i*204,210))
+			var visible_count:int=mini(6,maxi(0,g.SKILL_TREES[g.skill_tree_tab].size()-g.menu_scroll*3))
+			for i in visible_count:
+				var col:=i%3
+				var row:=int(i/3.0)
+				points.append(Vector2(297+col*275,309+row*132))
+			points.append(Vector2(986,109))
+		"fusion":
+			for i in g.FUSIONS.size(): points.append(Vector2(840,245+i*118))
+			points.append(Vector2(986,109))
 		"inventory":
 			points.append(Vector2(229,235))
 			points.append(Vector2(229,314))

@@ -30,15 +30,15 @@ func _initialize() -> void:
 	game.player_uuid="equipment-test"
 	game.level = 3
 	game.skill_points = 2
-	game.skill_points=0
 	assert(not game.learn_arcane_step())
 	game.dodge()
-	assert(game.dash_timer==0.0)
-	game.level = 4
-	game.skill_points=2
-	for id in game.CLASS_SKILLS[1]:
-		game.learned[id]=true;game.skill_levels[id]=1
-	assert(game.learn_arcane_step() and game.skill_points==1)
+	assert(game.dash_timer>0.0 and not game.arcane_step_learned)
+	game.dash_timer=0.0;game.dash_cooldown=0.0
+	assert(not game.claim_class_mastery())
+	game.final_completed=true
+	var points_before:int=game.skill_points
+	assert(game.claim_class_mastery() and game.arcane_step_learned)
+	assert(game.skill_points==points_before)
 	assert(not game.learn_arcane_step())
 	game.dodge()
 	assert(game.dash_timer>0.0)
@@ -50,5 +50,5 @@ func _initialize() -> void:
 	game._unhandled_input(click)
 	assert(game.panel=="map")
 	game.free()
-	print("EQUIPMENT_DEATH_OK six visible armors; merchant pagination stock; delayed single revival")
+	print("EQUIPMENT_DEATH_OK six visible armors; merchant pagination stock; delayed revival; mage mastery dodge")
 	quit()
