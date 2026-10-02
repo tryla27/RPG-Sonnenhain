@@ -314,6 +314,8 @@ var class_mastery_unlocked := false
 var warrior_rage := 0.0
 var ranger_hunt_meter := 0.0
 var ranger_hunt_buff := 0.0
+var ranger_ultimate_speed_timer := 0.0
+var ranger_ultimate_speed_mult := 1.0
 var ranger_stealth_timer := 0.0
 var robotics_overclock_timer := 0.0
 const DEATH_DURATION := 1.15
@@ -785,6 +787,8 @@ func reset_class_skills() -> void:
 	warrior_rage = 0.0
 	ranger_hunt_meter = 0.0
 	ranger_hunt_buff = 0.0
+	ranger_ultimate_speed_timer = 0.0
+	ranger_ultimate_speed_mult = 1.0
 	ranger_stealth_timer = 0.0
 	robotics_overclock_timer = 0.0
 	learned.resize(ABILITIES.size())
@@ -1124,7 +1128,8 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
-		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2
+		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2,
+		"test_mode":bool(state.get("test_mode",false))
 	}
 	clean["teleport_serial"]=int(state.get("teleport_serial",0)) if teleported or context_changed or not remote_players.has(sender) else int(remote_players[sender].get("teleport_serial",0))
 	clean["state_tick"]=Time.get_ticks_msec()
@@ -1622,6 +1627,8 @@ func _process(delta: float) -> void:
 	drain_timer = maxf(0.0, drain_timer - delta)
 	poison_blade_timer = maxf(0.0, poison_blade_timer - delta)
 	ranger_hunt_buff = maxf(0.0, ranger_hunt_buff - delta)
+	ranger_ultimate_speed_timer = maxf(0.0, ranger_ultimate_speed_timer - delta)
+	if ranger_ultimate_speed_timer <= 0.0: ranger_ultimate_speed_mult = 1.0
 	ranger_stealth_timer = maxf(0.0, ranger_stealth_timer - delta)
 	robotics_overclock_timer = maxf(0.0, robotics_overclock_timer - delta)
 	notice_timer = maxf(0.0, notice_timer - delta)
@@ -2095,7 +2102,8 @@ func update_player(delta: float) -> void:
 		var anim_rate:=19.0 if dash_timer>0 else 11.0*lerpf(1.0,1.68,sprint_blend)
 		walk_phase += delta*anim_rate
 	var run_mult:=lerpf(1.0,sprint_speed_mult(),sprint_blend)
-	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult())*delta
+	var ultimate_move_mult := ranger_ultimate_speed_mult if class_id == 2 and ranger_ultimate_speed_timer > 0.0 else 1.0
+	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult() * ultimate_move_mult)*delta
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
@@ -2999,6 +3007,7 @@ func normal_attack() -> void:
 	var variant := equipped_weapon_variant()
 	attack_timer = 0.62 if variant == "axe" else (0.78 if variant == "crossbow" else (0.45 if class_id == 0 else (0.62 if class_id == 1 else 0.52)))
 	if class_id == 2 and ranger_hunt_buff > 0.0: attack_timer /= 1.25
+	if class_id == 2 and ranger_ultimate_speed_timer > 0.0: attack_timer /= ranger_ultimate_speed_mult
 	if robotics_overclock_timer > 0.0: attack_timer /= 1.18
 	if class_mastery_unlocked and class_id == 0: warrior_rage = minf(100.0, warrior_rage + 8.0)
 	if class_mastery_unlocked and class_id == 2 and ranger_hunt_buff <= 0.0:
@@ -3155,7 +3164,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	rank = clampi(rank,1,5)
 	server_relay_combat_visual(sender,{"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))})
 	var level_cap := clampi(int(state.get("level",1)),1,99)
-	power = clampi(power,1,140 + level_cap * 30)
+	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
 	if id in [3,7,16,18,20,25,26,28,29,30]:
 		for shot in ability_projectiles(id,origin,dir,remote_class,power):
 			shot["owner_peer"]=sender
@@ -3169,6 +3178,16 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 			if enemies[i]["pos"].distance_to(origin) <= radius: damage_enemy(i,power+10,dir,false,"",sender)
 	else:
 		hit_arc(origin,dir,190.0,-0.15,power+8,false,"",sender)
+
+func ability_cast_power(id:int,rank:int) -> int:
+	var base:float=(17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012) * food_system.damage_mult()
+	if id == 15:
+		base *= 1.55 + primary_attribute() * 0.030 + rank * 0.10
+	elif id == 24:
+		base *= 1.65 + primary_attribute() * 0.034 + rank * 0.12
+	elif id == 33:
+		base *= 1.10 + primary_attribute() * 0.010 + rank * 0.05
+	return maxi(1,int(base))
 
 func use_ability(slot: int) -> void:
 	if slot < 0 or slot > 3: return
@@ -3192,7 +3211,7 @@ func use_ability(slot: int) -> void:
 	energy -= float(ability["cost"])
 	var rank: int = int(skill_levels[id])
 	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1))
-	var power := int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012) * food_system.damage_mult())
+	var power := ability_cast_power(id,rank)
 	var cast_pos := player_pos
 	var cast_dir := facing
 	if uses_server_world():
@@ -3298,9 +3317,13 @@ func use_ability(slot: int) -> void:
 			for wave in 3:
 				impact_zones.append({"pos":player_pos, "delay":0.25 + wave * 0.38, "radius":130.0 + wave * 95.0, "damage":power + 20, "element":["eis", "blitz", "gift"][wave], "kind":id})
 		33:
-			for wave in 6:
-				var point := player_pos + facing * 210.0 + Vector2.RIGHT.rotated(float(wave) * 2.4) * (35.0 + (wave % 3) * 65.0)
-				impact_zones.append({"pos":point, "delay":0.3 + wave * 0.19, "radius":95.0, "damage":power + 28, "element":"", "kind":id})
+			var agility:=primary_attribute()
+			ranger_ultimate_speed_timer=10.0+rank*2.0+agility*0.10
+			ranger_ultimate_speed_mult=clampf(1.45+rank*0.11+agility*0.012,1.55,2.65)
+			for wave in 8:
+				var point := player_pos + facing * 225.0 + Vector2.RIGHT.rotated(float(wave) * 1.9) * (40.0 + (wave % 4) * 58.0)
+				impact_zones.append({"pos":point, "delay":0.22 + wave * 0.14, "radius":92.0, "damage":power + 24, "element":"", "kind":id})
+			effect(player_pos,"HIMMELSHAGEL · TEMPO x%.2f" % ranger_ultimate_speed_mult,Color("dff4a4"),1.4)
 		16, 18, 20, 25, 26, 28, 29, 30:
 			var count := 3 if id in [20, 26] else 1
 			for shot in count:
@@ -3675,7 +3698,14 @@ func leave_village_house() -> void:
 func leave_tavern() -> void:
 	leave_village_house()
 
+func sanitize_role_shop_stock() -> void:
+	if shop_stock.has("alchemy"):
+		shop_stock["alchemy"]=(shop_stock["alchemy"] as Array).filter(func(item): return str(item.get("icon","")) in ["potion","herb","essence"])
+	if shop_stock.has("smith"):
+		shop_stock["smith"]=(shop_stock["smith"] as Array).filter(func(item): return str(item.get("icon","")) in ["sword","armor","head"])
+
 func open_elara_alchemy() -> void:
+	sanitize_role_shop_stock()
 	merchant_kind="alchemy"
 	shop_page=0
 	panel="shop"
@@ -3718,6 +3748,7 @@ func interact_interior_owner(name:String="") -> void:
 		"Elara": open_elara_alchemy()
 		"Fenna": panel="appearance"
 		"Torvald":
+			sanitize_role_shop_stock()
 			merchant_kind="smith";shop_page=0;panel="shop";selected_item=-1
 		"Arven": panel="arena_entry"
 		"Mira": quest_dialogue("Mira")
@@ -3854,14 +3885,17 @@ func boss_max_hp(type:int)->float:
 
 func spawn_dedicated_bosses()->void:
 	for i in 3:
-		if boss_cooldowns[i]>0:continue
 		var site:Vector2=CLASS_BOSS_SITES[i]
 		var type:int=12+i
 		var nearby:=false
+		var nearby_test:=false
 		for peer in remote_players:
 			var state:Dictionary=remote_players[peer]
-			if str(state.get("context","world"))=="world" and network_player_position(int(peer)).distance_to(site)<=700:nearby=true
+			if str(state.get("context","world"))=="world" and network_player_position(int(peer)).distance_to(site)<=700:
+				nearby=true
+				nearby_test=nearby_test or bool(state.get("test_mode",false))
 		if not nearby:continue
+		if boss_cooldowns[i]>0 and not nearby_test:continue
 		var exists:=false
 		for mob in enemies:
 			if int(mob["type"])==type:exists=true
@@ -4625,9 +4659,9 @@ func write_local_save(data: Dictionary) -> void:
 		pause_status="Lokales Speichern fehlgeschlagen. Vorherige Sicherung bleibt erhalten."
 		message(pause_status)
 		return
-	pause_status="Lokal gesichert ✓" if creative_mode else ("Server gespeichert ✓" if not server_save.dirty else "Lokal gesichert ✓ · Serverbestätigung ausstehend")
+	pause_status="Lokal gesichert OK" if creative_mode else ("Server gespeichert OK" if not server_save.dirty else "Lokal gesichert OK · Serverbestätigung ausstehend")
 	last_save_unix = int(Time.get_unix_time_from_system())
-	save_notice_text = "LOKAL GESICHERT" if creative_mode or server_save.dirty else "SERVER GESPEICHERT ✓"
+	save_notice_text = "LOKAL GESICHERT" if creative_mode or server_save.dirty else "SERVER GESPEICHERT OK"
 	save_notice_timer = 2.8
 	if not creative_mode: refresh_save_slot_labels()
 
@@ -5487,14 +5521,16 @@ func refresh_shop_stock() -> void:
 	var tier := maxi(1, level)
 	var weapon := class_weapon_icon()
 	var weapon_word: String = {"sword":"Klinge", "staff":"Stab", "bow":"Bogen"}[weapon]
+	var smith_weapon := "sword"
+	var smith_weapon_word := "Klinge"
 	var suffix: String = ["der Wiesen", "des Nebels", "der Funken", "der Gezeiten", "des Morgenrots", "des Himmels"].pick_random()
 	var rarity := 1 if tier < 12 else (2 if tier < 30 else 3)
 	var elements := ["eis", "blitz", "gift"]
 	var shop_element: String = elements.pick_random()
 	shop_stock = {
 		"smith":[
-			{"name":"%s %s" % [weapon_word, suffix], "icon":weapon, "power":4 + tier * 2, "price":80 + tier * 20, "rarity":rarity, "level":tier},
-			{"name":"%s · %s" % [weapon_word, shop_element.capitalize()], "icon":weapon, "power":7 + tier * 2, "price":135 + tier * 28, "rarity":rarity, "level":tier, "element":shop_element},
+			{"name":"%s %s" % [smith_weapon_word, suffix], "icon":smith_weapon, "power":4 + tier * 2, "price":80 + tier * 20, "rarity":rarity, "level":tier},
+			{"name":"%s · %s" % [smith_weapon_word, shop_element.capitalize()], "icon":smith_weapon, "power":7 + tier * 2, "price":135 + tier * 28, "rarity":rarity, "level":tier, "element":shop_element},
 			{"name":"Meisterrüstung %s" % suffix, "icon":"armor", "power":5 + int(tier / 3.0), "price":520 + tier * 64, "rarity":mini(3, rarity + 1), "level":tier}],
 		"alchemy":[
 			{"name":"Heiltrank", "icon":"potion", "power":0, "price":35, "rarity":1},
@@ -10866,7 +10902,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
