@@ -39,8 +39,17 @@ ssh -4 -i "$HOME/.ssh/manitu_deploy" -p 22 \
   -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 \
   ssh300011111@ngcobalt378.manitu.net "mkdir -p '$target' /home/sites/site100047525/web/sonnenhain-access-data; chmod 770 /home/sites/site100047525/web/sonnenhain-access-data"
 
-scp -4 -i "$HOME/.ssh/manitu_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new server/website-access.htpasswd ssh300011111@ngcobalt378.manitu.net:/home/sites/site100047525/web/sonnenhain-access.htpasswd
-ssh -4 -i "$HOME/.ssh/manitu_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new ssh300011111@ngcobalt378.manitu.net 'chmod 640 /home/sites/site100047525/web/sonnenhain-access.htpasswd'
+access_file=/home/sites/site100047525/web/sonnenhain-access.htpasswd
+if [ -n "${SONNENHAIN_ACCESS_HTPASSWD:-}" ]; then
+  printf '%s\n' "$SONNENHAIN_ACCESS_HTPASSWD" > /tmp/sonnenhain-access.htpasswd
+  chmod 600 /tmp/sonnenhain-access.htpasswd
+  scp -4 -i "$HOME/.ssh/manitu_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new /tmp/sonnenhain-access.htpasswd ssh300011111@ngcobalt378.manitu.net:"$access_file"
+  rm -f /tmp/sonnenhain-access.htpasswd
+else
+  # Normal deploys must never reset the live password to the repository fixture.
+  ssh -4 -i "$HOME/.ssh/manitu_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new ssh300011111@ngcobalt378.manitu.net "test -s '$access_file'"
+fi
+ssh -4 -i "$HOME/.ssh/manitu_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new ssh300011111@ngcobalt378.manitu.net "chmod 640 '$access_file'"
 
 
 scp -4 -i "$HOME/.ssh/manitu_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new website/access/access.php ssh300011111@ngcobalt378.manitu.net:"$target/access.php"
