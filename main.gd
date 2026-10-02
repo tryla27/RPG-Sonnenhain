@@ -10,8 +10,19 @@ const QuestGuide = preload("res://components/quest_guide.gd")
 var quest_guide = QuestGuide.new()
 const ServerSaveStore = preload("res://components/server_save_store.gd")
 const ServerSaveClient = preload("res://components/server_save_client.gd")
+const AccountStore = preload("res://components/account_store.gd")
 var server_save_store = ServerSaveStore.new()
 var server_save = ServerSaveClient.new()
+var account_store = AccountStore.new()
+var account_name := ""
+var account_password := ""
+var account_focus := 0
+var account_status := ""
+var account_characters: Array = []
+var account_logged_in := false
+var account_pending_action := ""
+var account_pending_load := false
+var account_migration_checked := false
 const KonfluxMap = preload("res://components/konflux_map.gd")
 var konflux = KonfluxMap.new()
 var konflux_preview_mode := false
@@ -717,7 +728,7 @@ func _ready() -> void:
 	previous_region = region_at(player_pos)
 	for i in 4:
 		spawn_enemy()
-	panel = "start"
+	panel = "account_gate"
 	music_player = AudioStreamPlayer.new()
 	music_player.volume_db = -80.0
 	add_child(music_player)
@@ -807,6 +818,10 @@ func _on_connected_to_server() -> void:
 	live_reconnect_timer = 0.0
 	network_status = "Online · Peer %d" % local_peer_id
 	add_chat_line("SYSTEM", "Mit dem Sonnenhain-Live-Server verbunden.")
+	if account_pending_action in ["login","register"]:
+		var action:=account_pending_action
+		account_pending_action=""
+		rpc_account_request.rpc_id(1,action,account_name.strip_edges(),account_password)
 	if character_created:
 		rpc_player_presence.rpc_id(1, local_player_state())
 		push_player_state()
@@ -892,6 +907,9 @@ func start_websocket_server() -> void:
 	var save_dir := command_arg_value("--save-dir=",home_dir.path_join("sonnenhain-server/data/player-saves") if home_dir != "" else "user://server-player-saves")
 	if server_save_store.configure(save_dir) != OK:
 		push_error("Server-Speicherverzeichnis konnte nicht geöffnet werden")
+	var account_dir:=save_dir.get_base_dir().path_join("accounts")
+	if account_store.configure(account_dir)!=OK:
+		push_error("Server-Accountverzeichnis konnte nicht geöffnet werden")
 	websocket_port = clampi(int(command_arg_value("--server-port=", "27845")), 1024, 65535)
 	disconnect_multiplayer(false)
 	var peer := WebSocketMultiplayerPeer.new()
@@ -2639,6 +2657,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.unicode >= 32 and join_code.length() < 28:
 			var code_char := String.chr(event.unicode).to_upper()
 			if "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-".find(code_char) >= 0: join_code += code_char
+		queue_redraw()
+		return
+	if panel in ["account_login","account_register"] and event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode==KEY_TAB:
+			account_focus=1-account_focus
+		elif event.keycode==KEY_ESCAPE:
+			panel="account_gate";account_password="";account_status=""
+		elif event.keycode==KEY_BACKSPACE:
+			if account_focus==0 and account_name.length()>0:account_name=account_name.left(account_name.length()-1)
+			elif account_focus==1 and account_password.length()>0:account_password=account_password.left(account_password.length()-1)
+		elif event.keycode==KEY_ENTER:
+			if account_name.strip_edges().length()>=3 and account_password.length()>=8:request_account(panel=="account_register")
+		elif event.unicode>=32:
+			var typed:=String.chr(event.unicode)
+			if account_focus==0 and account_name.length()<24 and "abcdefghijklmnopqrstuvwxyzäöüß0123456789_-".contains(typed.to_lower()):account_name+=typed
+			elif account_focus==1 and account_password.length()<72:account_password+=typed
 		queue_redraw()
 		return
 	# Texteingabe für einmalige Charaktererstellung.
@@ -4571,6 +4605,28 @@ func handle_panel_click(mouse: Vector2) -> void:
 	if panel == "pause" and Rect2(860,319,130,42).has_point(mouse):
 		panel = "controller"
 		return
+	if panel=="account_gate":
+		if Rect2(300,320,550,58).has_point(mouse):
+			account_password="";account_status="";account_focus=0;panel="account_login";join_live_multiplayer()
+		elif Rect2(300,400,550,58).has_point(mouse):
+			account_password="";account_status="";account_focus=0;panel="account_register";join_live_multiplayer()
+		return
+	if panel in ["account_login","account_register"]:
+		if Rect2(300,275,550,48).has_point(mouse):account_focus=0
+		elif Rect2(300,365,550,48).has_point(mouse):account_focus=1
+		elif Rect2(300,455,550,52).has_point(mouse) and account_name.strip_edges().length()>=3 and account_password.length()>=8:
+			request_account(panel=="account_register")
+		elif Rect2(300,525,180,42).has_point(mouse):
+			panel="account_gate";account_password="";account_status=""
+		queue_redraw()
+		return
+	if panel=="account_migrate":
+		var rows:=local_migration_slots()
+		for i in rows.size():
+			if Rect2(720,245+i*72+9,190,38).has_point(mouse):
+				claim_local_save(int(rows[i]["slot"]));return
+		if Rect2(220,535,280,44).has_point(mouse):finish_account_entry()
+		return
 	if panel == "start":
 		for candidate in 3:
 			if Rect2(168 + candidate * 273, 530, 260, 57).has_point(mouse):
@@ -5282,7 +5338,7 @@ func sell_item(index: int) -> void:
 	save_game()
 
 func _draw() -> void:
-	if panel in ["start","creation","creation_review"] and not dedicated_server_mode:
+	if panel in ["account_gate","account_login","account_register","account_migrate","start","creation","creation_review"] and not dedicated_server_mode:
 		character_canvas_offset=Vector2.ZERO
 		draw_set_transform(Vector2.ZERO)
 		draw_rect(Rect2(Vector2.ZERO,VIEW),Color("071321"))
@@ -7988,8 +8044,12 @@ func draw_panel() -> void:
 	draw_rect(Rect2(164, 598, 824, 2), Color("9d845e"))
 	for index in 7:
 		draw_rect(Rect2(172 + index * 116, 101, 5, 5), Color("c6aa79", 0.6))
-	if panel not in ["start", "creation", "multiplayer", "arena_reward", "victory"]: ui_button(Rect2(965, 91, 41, 35), "X")
+	if panel not in ["account_gate","account_login","account_register","account_migrate","start", "creation", "multiplayer", "arena_reward", "victory"]: ui_button(Rect2(965, 91, 41, 35), "X")
 	match panel:
+		"account_gate": draw_account_gate()
+		"account_login": draw_account_form(false)
+		"account_register": draw_account_form(true)
+		"account_migrate": draw_account_migrate()
 		"start": draw_start_panel()
 		"creation": draw_creation_panel()
 		"creation_review": draw_creation_review_panel()
@@ -8071,10 +8131,103 @@ func draw_mechanics_panel() -> void:
 		text_at(Vector2(190,512), "Normale Oberwelt: maximal 10 aktive Gegner, deutlich längeres Spawnintervall.", 13, Color('dfe9dc'))
 	ui_button(Rect2(820,548,160,38), "SCHLIESSEN")
 
+func draw_account_gate() -> void:
+	text_at(Vector2(300,190),"SONNENHAIN KONTO",34,Color("ffe2aa"))
+	text_at(Vector2(300,235),"Melde dich an oder erstelle einen Benutzer.",17,Color("dce7d8"))
+	ui_button(Rect2(300,320,550,58),"ANMELDEN")
+	ui_button(Rect2(300,400,550,58),"BENUTZER ERSTELLEN")
+	if account_status!="":text_at(Vector2(300,490),account_status,14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_CENTER,550)
+
+func masked_password()->String:
+	return "•".repeat(account_password.length())
+
+func draw_account_form(registering:bool)->void:
+	text_at(Vector2(300,165),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",31,Color("ffe2aa"))
+	text_at(Vector2(300,208),"Nur Name und Passwort.",15,Color("d8e6dc"))
+	text_at(Vector2(300,260),"NAME",14,Color("e9cc90"))
+	var nr:=Rect2(300,275,550,48);draw_rect(nr,Color("22363c"));draw_rect(nr,Color("ffe2aa") if account_focus==0 else Color("8ba49c"),false,2)
+	text_at(nr.position+Vector2(14,31),account_name if account_name!="" else "Name eingeben …",19,Color("fff0cf") if account_name!="" else Color("9fb4ac"))
+	text_at(Vector2(300,350),"PASSWORT",14,Color("e9cc90"))
+	var pr:=Rect2(300,365,550,48);draw_rect(pr,Color("22363c"));draw_rect(pr,Color("ffe2aa") if account_focus==1 else Color("8ba49c"),false,2)
+	text_at(pr.position+Vector2(14,31),masked_password() if account_password!="" else "Passwort eingeben …",19,Color("fff0cf") if account_password!="" else Color("9fb4ac"))
+	ui_button(Rect2(300,455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_name.strip_edges().length()>=3 and account_password.length()>=8 and account_pending_action=="")
+	ui_button(Rect2(300,525,180,42),"ZURÜCK")
+	if account_status!="":text_at(Vector2(500,552),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,350)
+
+func local_migration_slots()->Array:
+	var slots:Array=[]
+	for i in 3:
+		var p:=slot_save_path(i+1)
+		if FileAccess.file_exists(p):
+			var data:Dictionary=preload("res://components/local_save_store.gd").read(p)
+			if not data.is_empty() and bool(data.get("character_created",false)):
+				slots.append({"slot":i+1,"name":str(data.get("hero_name","Held")),"level":int(data.get("level",1))})
+	return slots
+
+func draw_account_migrate()->void:
+	text_at(Vector2(220,145),"ALTEN SPIELSTAND MITNEHMEN",29,Color("ffe2aa"))
+	text_at(Vector2(220,184),"Du hast bereits Sonnenhain gespielt? Verbinde einen bisherigen lokalen Spielstand mit deinem Konto.",14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,720)
+	var rows:=local_migration_slots()
+	if rows.is_empty():
+		text_at(Vector2(220,255),"Kein alter lokaler Spielstand gefunden.",17,Color("b8cbc5"))
+	else:
+		for i in rows.size():
+			var row:Dictionary=rows[i]
+			var y:=245+i*72
+			ui_box(Rect2(220,y,710,56),Color("31474e"))
+			text_at(Vector2(240,y+23),"%s · Level %d · Speicherplatz %d" % [row["name"],row["level"],row["slot"]],16,Color("fff0ce"))
+			ui_button(Rect2(720,y+9,190,38),"ÜBERNEHMEN")
+	ui_button(Rect2(220,535,280,44),"SPÄTER / ÜBERSPRINGEN")
+	if account_status!="":text_at(Vector2(525,565),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,390)
+
+func finish_account_entry()->void:
+	account_migration_checked=true
+	panel="start"
+	account_status=""
+	refresh_save_slot_labels()
+
+func request_account(registering:bool)->void:
+	if network_mode!="client" or multiplayer.multiplayer_peer==null or multiplayer.multiplayer_peer.get_connection_status()!=MultiplayerPeer.CONNECTION_CONNECTED:
+		account_pending_action="register" if registering else "login"
+		join_live_multiplayer()
+		account_status="Verbinde mit Server …"
+		return
+	account_pending_action="register" if registering else "login"
+	account_status="Prüfe Konto …"
+	rpc_account_request.rpc_id(1,account_pending_action,account_name.strip_edges(),account_password)
+
+func claim_local_save(slot:int)->void:
+	if not account_logged_in or network_mode!="client":return
+	var path:=slot_save_path(slot)
+	var data:Dictionary=preload("res://components/local_save_store.gd").read(path)
+	if data.is_empty():return
+	active_save_slot=slot
+	apply_save_data(data)
+	if server_save.token.is_empty() or server_save.uuid!=player_uuid:server_save.restore(data)
+	var meta:Dictionary={"name":hero_name,"level":level,"class_id":class_id}
+	account_pending_action="claim"
+	account_status="Verknüpfe Spielstand …"
+	rpc_account_claim.rpc_id(1,slot,player_uuid,server_save.token,meta)
+
+func open_account_character(index:int)->void:
+	if index<0 or index>=account_characters.size():return
+	var c:Dictionary=account_characters[index]
+	player_uuid=str(c.get("uuid",""))
+	server_save.uuid=player_uuid
+	server_save.token=str(c.get("token",""))
+	server_save.revision=0
+	server_save.ready=false
+	server_save.loading=true
+	server_save.latest={}
+	account_pending_load=true
+	panel="start"
+	rpc_zz_save_open.rpc_id(1,server_save.token,player_uuid)
+
 func draw_start_panel() -> void:
 	text_at(Vector2(300, 210), "SONNENHAIN", 42, Color("ffe2aa"))
 	text_at(Vector2(300, 248), "Deine Reise beginnt hier.", 18, Color("dce7d8"))
 	text_at(Vector2(300, 320), "Lade deinen Spielstand oder erschaffe einen neuen Charakter.", 16, Color("dce7d8"), HORIZONTAL_ALIGNMENT_LEFT, 550)
+	if account_logged_in:text_at(Vector2(300,286),"Angemeldet als %s" % account_name,13,Color("9fd9c4"))
 	ui_button(Rect2(300, 378, 550, 54), "NEUEN CHARAKTER ERSTELLEN")
 	ui_button(Rect2(300, 448, 550, 54), "SPIELSTAND LADEN", FileAccess.file_exists(slot_save_path(selected_save_slot)))
 	text_at(Vector2(168, 521), "SPEICHERPLATZ WÄHLEN", 14, Color("f6dfa9"))
@@ -9827,6 +9980,7 @@ func draw_party_panel() -> void:
 
 func _on_peer_disconnected(id: int) -> void:
 	server_save_store.release(id)
+	account_store.release(id)
 	konflux.fighter_stats.erase(id)
 	if network_mode == "host":
 		server_reserve_party_reconnect(id)
@@ -10694,6 +10848,44 @@ func run_teleport_consistency_smoke() -> bool:
 
 
 @rpc("any_peer","call_remote","reliable")
+func rpc_account_request(action:String,name:String,password:String)->void:
+	if not dedicated_server_mode or network_mode!="host":return
+	var peer:=multiplayer.get_remote_sender_id()
+	if peer<=0 or not server_action_allowed(peer,"account_auth",900):return
+	var response:Dictionary=account_store.register(peer,name,password) if action=="register" else account_store.login(peer,name,password)
+	rpc_account_reply.rpc_id(peer,response)
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_account_claim(slot:int,uuid:String,token:String,meta:Dictionary)->void:
+	if not dedicated_server_mode or network_mode!="host":return
+	var peer:=multiplayer.get_remote_sender_id()
+	if peer<=0 or not server_action_allowed(peer,"account_claim",700):return
+	rpc_account_reply.rpc_id(peer,account_store.claim_character(peer,slot,uuid,token,meta))
+
+@rpc("authority","call_remote","reliable")
+func rpc_account_reply(response:Dictionary)->void:
+	if network_mode!="client":return
+	account_pending_action=""
+	if not bool(response.get("ok",false)):
+		var error:=str(response.get("error","unknown"))
+		var labels:Dictionary={"invalid_login":"Name oder Passwort falsch.","invalid_name":"Name ungültig.","weak_password":"Passwort muss mindestens 8 Zeichen haben.","name_taken":"Dieser Name ist bereits vergeben.","slot_occupied":"Dieser Kontoplatz ist bereits belegt.","character_limit":"Maximal drei Charaktere pro Konto.","not_logged_in":"Bitte erneut anmelden.","disk_error":"Server konnte das Konto nicht speichern."}
+		account_status=str(labels.get(error,"Anmeldung fehlgeschlagen."))
+		queue_redraw()
+		return
+	account_logged_in=true
+	account_name=str(response.get("name",account_name))
+	account_characters=response.get("characters",[])
+	account_password=""
+	if str(response.get("kind",""))=="claimed":
+		account_status="Spielstand übernommen ✓"
+		if server_save.connected(self):server_save.begin(self)
+		finish_account_entry()
+	else:
+		account_status="Angemeldet ✓"
+		panel="account_migrate" if not local_migration_slots().is_empty() else "start"
+	queue_redraw()
+
+@rpc("any_peer","call_remote","reliable")
 func rpc_zz_save_open(token: String, uuid: String) -> void:
 	if not dedicated_server_mode or network_mode != "host": return
 	var peer := multiplayer.get_remote_sender_id()
@@ -10717,6 +10909,12 @@ func rpc_zz_save_reply(response: Dictionary) -> void:
 	if network_mode != "client": return
 	server_last_reply_ms = Time.get_ticks_msec()
 	server_save.reply(self,response)
+	if account_pending_load and server_save.ready:
+		account_pending_load=false
+		panel=""
+		previous_region=region_at(player_pos)
+		ensure_live_multiplayer()
+		message("Server-Spielstand geladen. Willkommen zurück!")
 
 func mob_visual_scale(enemy:Dictionary)->float:
 	var type:int=int(enemy["type"])
