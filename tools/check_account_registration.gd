@@ -32,5 +32,17 @@ func run()->void:
 	if not bool(login_ok.get("ok",false)):failures+=1
 	var login_bad:Dictionary=store.login(3,"tryla_test","abcdefgi")
 	if bool(login_bad.get("ok",false)) or str(login_bad.get("error",""))!="invalid_login":failures+=1
-	print("ACCOUNT_REGISTRATION_CHECK failures=",failures," · confirmation / exact password / case-normalized name")
+
+	# Account metadata must follow successful character autosaves.
+	var token:="a".repeat(64)
+	var claimed:Dictionary=store.claim_character(2,1,"uuid-account-save",token,{"name":"Held","level":4,"class_id":0})
+	if not bool(claimed.get("ok",false)):failures+=1
+	if not store.sync_character_save(2,"uuid-account-save",token,{"hero_name":"Held Neu","level":17,"class_id":0},9):failures+=1
+	store.release(2)
+	var relogin:Dictionary=store.login(4,"TRYLA_TEST","abcdefgh")
+	var chars:Array=relogin.get("characters",[])
+	if chars.size()!=1:failures+=1
+	elif str(chars[0].get("name",""))!="Held Neu" or int(chars[0].get("level",0))!=17:failures+=1
+
+	print("ACCOUNT_REGISTRATION_CHECK failures=",failures," · confirmation / exact password / account autosave metadata / case-normalized name")
 	quit(1 if failures else 0)
