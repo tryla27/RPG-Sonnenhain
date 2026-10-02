@@ -91,7 +91,7 @@ func valid_food_state(raw:Variant)->bool:
 func valid_steinrose_state(raw:Variant)->bool:
 	if not raw is Dictionary or raw.size()>2:return false
 	var learned:Variant=raw.get("learned",[])
-	if not learned is Array or learned.size()>12:return false
+	if not learned is Array or learned.size()>13:return false
 	for value in learned:
 		if not value is bool:return false
 	return true

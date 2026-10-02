@@ -17,14 +17,17 @@ func run():
  for q in g.QUESTS:g.quests.append({"state":0,"progress":0})
  for e in g.WORLD_EVENTS:g.event_states.append(0);g.event_progress.append(0)
  g.food_system.configure(g)
- assert(g.food_system.plants.size()==36)
+ assert(g.food_system.plants.size()==48)
  var region_kinds={}
  for plant in g.food_system.plants:
   var region:int=g.region_at(plant["point"])
-  assert(int(plant["food"])==Food.REGION_FOOD[region])
-  region_kinds[region]=int(plant["food"])
+  if str(plant.get("kind","fruit"))=="fruit":
+   assert(int(plant["food"])==Food.REGION_FOOD[region])
+   region_kinds[region]=int(plant["food"])
+  else:
+   assert(str(plant["name"])==str(Food.herb_for_region(region)["name"]))
  assert(region_kinds.size()==12)
- assert(Food.FOODS.size()==43)
+ assert(Food.FOODS.size()==44)
  # Every edible item stacks and retains its exact fruit design index.
  for info in Food.FOODS:
   var item:Dictionary=g.make_item(info["name"],"food",0,0,info["price"],"",1)
@@ -51,9 +54,10 @@ func run():
   var after_count:int=0
   for owned in g.inventory:
    after_count+=int(owned.get("count",1))
-  assert(after_count==before_count+3)
+  var gained:int=1 if str(plant.get("kind","fruit"))=="herb" else 3
+  assert(after_count==before_count+gained)
  for region in range(1,13):
-  assert(int(expected_regions[region])==3)
+  assert(int(expected_regions[region])==4)
  # Reset after the all-map interaction pass for cooldown/save tests.
  g.inventory.clear()
  g.food_system.harvested={}
@@ -113,5 +117,5 @@ func run():
  data["food_state"]["regen_rate"]=999
  assert(not store.valid_data(data,g.player_uuid))
  assert(not store.valid_food_state({"plants":[]}))
- print("FOOD_SYSTEM_OK 43 foods incl. 12 Steinrose meals, 12 regions / 36 plants, snacks, six-minute meal buffs and durable server saves")
+ print("FOOD_SYSTEM_OK 44 foods incl. 13 Alma recipes, 12 regional herbs / 48 plants, snacks, six-minute buffs and instant cakes")
  quit()

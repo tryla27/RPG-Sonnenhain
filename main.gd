@@ -3647,7 +3647,11 @@ func random_loot(type: int, loot_class: int = -1) -> Dictionary:
 	var loot_weapon := class_weapon_icon_for(loot_class) if loot_class >= 0 else class_weapon_icon()
 	var icon: String = [loot_weapon, "gem", "ring", "armor", "herb"][randi_range(0, 4)]
 	var item_name: String = "%s %s" % [rank, {"sword":"Klinge", "staff":"Stab", "bow":"Bogen", "gem":"Essenz", "ring":"Ring", "armor":"Rüstung", "herb":"Kräuter"}[icon]]
-	if rarity >= 3: item_name = "%s des %s" % [item_name, name]
+	if icon=="herb":
+		var herb_info:Dictionary=FoodSystem.herb_for_region(int(ENEMY_TYPES[type]["region"]))
+		if not herb_info.is_empty():item_name=str(herb_info["name"])
+	elif rarity >= 3:
+		item_name = "%s des %s" % [item_name, name]
 	var strength: int = (3 + area_level * 2 + rarity * 5 if icon in ["sword", "staff", "bow"] else (1 + int(area_level / 5) + rarity * 2 if icon == "armor" else (8 + area_level + rarity * 4 if icon == "ring" else 0)))
 	var element := ""
 	if icon in ["sword", "staff", "bow"] and rarity >= 1 and randf() < 0.32:
@@ -8636,12 +8640,20 @@ func draw_sorted_world_objects() -> void:
 			"prop": draw_cached_prop(entry["data"])
 			"food_plant":
 				var food_point: Vector2 = entry["data"]["point"]
-				food_system.bush(self,food_point)
-				if player_pos.distance_to(food_point+Vector2(0,20)) < 120.0:
-					var food_id := int(food_system.plant_foods.get(FoodSystem.key(food_point),-1))
-					if food_id >= 0:
-						var food_name := str(FoodSystem.FOODS[food_id]["name"])
-						text_at(food_point+Vector2(-95,42),"E · %s pfluecken" % food_name,13,Color("fff0b8"),HORIZONTAL_ALIGNMENT_CENTER,190)
+				var plant_kind:=str(entry["data"].get("kind","fruit"))
+				if plant_kind=="herb":
+					var herb_name:=str(entry["data"].get("name","Kraut"))
+					var herb_color:=str(entry["data"].get("color","8dbb78"))
+					food_system.herb_bush(self,food_point,herb_name,herb_color)
+					if player_pos.distance_to(food_point+Vector2(0,20)) < 120.0:
+						text_at(food_point+Vector2(-105,42),"E · %s ernten" % herb_name,13,Color("d9f0b7"),HORIZONTAL_ALIGNMENT_CENTER,210)
+				else:
+					food_system.bush(self,food_point)
+					if player_pos.distance_to(food_point+Vector2(0,20)) < 120.0:
+						var food_id := int(food_system.plant_foods.get(FoodSystem.key(food_point),-1))
+						if food_id >= 0:
+							var food_name := str(FoodSystem.FOODS[food_id]["name"])
+							text_at(food_point+Vector2(-95,42),"E · %s pfluecken" % food_name,13,Color("fff0b8"),HORIZONTAL_ALIGNMENT_CENTER,190)
 			"npc": draw_npc(entry["data"])
 			"stone": draw_waystone(entry["point"])
 			"enemy": draw_enemy(entry["data"])
