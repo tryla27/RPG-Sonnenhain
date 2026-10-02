@@ -13,16 +13,30 @@ func run():
 	var f:Dictionary=g.FUSIONS[0];var sp:=g.fusion_skill_cost(f);var before:=g.skill_points;var cash:=g.gold
 	assert(sp==(g.skill_point_cost(0)+g.skill_point_cost(16))*2);assert(g.buy_fusion(0))
 	assert(g.learned[40] and g.learned[0] and g.learned[16]);assert(g.skill_points==before-sp and g.gold==cash-int(f["gold"]))
-	g.class_id=1;g.class_mastery_unlocked=false;g.arcane_step_learned=false
-	g.quests.clear()
-	for i in g.QUESTS.size(): g.quests.append({"state":0,"progress":0})
-	assert(not g.class_mastery_quest_completed());assert(not g.claim_class_mastery())
-	# Das gesamte alte Arena-Finale darf die Meistergabe nicht mehr freischalten.
-	g.final_completed=true;assert(not g.claim_class_mastery())
-	g.quests[g.CLASS_MASTERY_QUEST_INDEX]["state"]=2;assert(not g.claim_class_mastery())
-	g.quests[g.CLASS_MASTERY_QUEST_INDEX]["state"]=3
-	assert(g.class_mastery_quest_completed());assert(g.claim_class_mastery() and g.arcane_step_learned)
+	# Klassenboni kommen aus genau einem Relikt des passenden Bosses.
+	assert(g.region_at(g.CLASS_BOSS_SITES[0])==6 and g.region_at(g.CLASS_BOSS_SITES[1])==7 and g.region_at(g.CLASS_BOSS_SITES[2])==8)
+	for boss_index in 3:
+		var relic:Dictionary=g.class_relic_item(boss_index)
+		assert(bool(relic.get("class_relic",false)) and int(relic.get("mastery_class",-1))==boss_index)
+	# Falsche Klasse darf ein fremdes Relikt besitzen, aber nicht verwenden.
+	g.class_id=0;g.class_mastery_unlocked=false;g.arcane_step_learned=false;g.inventory.clear()
+	assert(g.add_item(g.class_relic_item(1)))
+	g.use_item(0)
+	assert(not g.class_mastery_unlocked and g.inventory.size()==1)
+	# Magier-Relikt schaltet Arkanen Schritt ohne Skillpunktkosten frei.
+	g.class_id=1;g.class_mastery_unlocked=false;g.arcane_step_learned=false;g.inventory.clear()
+	assert(g.add_item(g.class_relic_item(1)))
+	var mastery_points_before:int=g.skill_points
+	g.use_item(0)
+	assert(g.class_mastery_unlocked and g.arcane_step_learned and g.inventory.is_empty())
+	assert(g.skill_points==mastery_points_before)
+	# Reservierung schützt die ersten 15 Sekunden nur die passende Klasse.
+	var reserved_drop:Dictionary={"reserved_class":2,"reserve_until_ms":Time.get_ticks_msec()+10000}
+	assert(g.class_relic_locked_for_player(reserved_drop,0))
+	assert(not g.class_relic_locked_for_player(reserved_drop,2))
+	reserved_drop["reserve_until_ms"]=0
+	assert(not g.class_relic_locked_for_player(reserved_drop,0))
 	g.player_pos=Vector2(6000,1035)
 	g.class_id=2;g.class_mastery_unlocked=true;g.ranger_hunt_meter=90;g.ranger_hunt_buff=0;g.normal_attack();assert(g.ranger_hunt_buff==60 and g.ranger_hunt_meter==0);g.dodge();assert(g.ranger_stealth_timer>g.dodge_duration)
 	g.class_id=0;g.class_mastery_unlocked=true;g.warrior_rage=0;g.normal_attack();assert(g.warrior_rage>0)
-	print("BORIN_SKILL_SYSTEM_OK universal trees; fusion cost; Map-8 mastery quest; rage; arcane step; hunt rush; stealth roll");g.free();quit()
+	print("BORIN_SKILL_SYSTEM_OK universal trees; fusion cost; Map06/07/08 class relics; reservation; rage; arcane step; hunt rush; stealth roll");g.free();quit()
