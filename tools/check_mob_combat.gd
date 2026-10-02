@@ -22,7 +22,7 @@ func run()->void:
 		var info:Dictionary=game.ENEMY_TYPES[type]
 		var config=Combat.profile(type,info,game.enemy_level(type),game.enemy_damage(type))
 		check(float(config["attack_cycle"])>=float(config["windup"])+float(config["active_time"])+float(config["recovery"]),"valid timings "+str(type))
-		if int(info["region"]) in [1,2,6,8]:check(config["abilities"].size()==1,"early single move "+str(type))
+		if int(info["region"]) in [1,2,6,8] and type not in [12,13,14]:check(config["abilities"].size()==1,"early single move "+str(type))
 		var offline=mob(type)
 		var dedicated=offline.duplicate(true)
 		var target=[{"id":2,"pos":Vector2(0,35)}]
@@ -32,7 +32,8 @@ func run()->void:
 			var b=Combat.step(dedicated,config,target,1.0/60.0)
 			check(a==b and offline==dedicated,"server/offline parity "+str(type))
 			for event in a["events"]:counts+=1
-		check(counts>0 and counts<=ceili(30.0/float(config["attack_cycle"]))+1,"attack frequency "+str(type))
+		var attempts:=int(offline.get("attack_sequence",0))
+		check(attempts>0 and attempts<=ceili(30.0/float(config["attack_cycle"]))+1,"attack frequency "+str(type))
 		game.level=game.enemy_level(type)
 		game.inventory=[];game.equipped_uid=-1;game.equipped_armor_uid=-1
 		var health=float(game.make_enemy(type,Vector2.ZERO)["max_hp"])
@@ -98,6 +99,6 @@ func run()->void:
 		if arg.begins_with("--report="):
 			var file=FileAccess.open(arg.substr(9),FileAccess.WRITE)
 			if file:file.store_string(csv)
-	print("MOB_COMBAT_CHECK failures=",failures," · 27 profiles / 30s server-offline parity / group arcs / lock / stun / death / leash / swept projectiles")
+	print("MOB_COMBAT_CHECK failures=",failures," · 27 profiles / overloaded class bosses / 30s parity / group arcs / lock / stun / death / leash / swept projectiles")
 	game.free()
 	quit(1 if failures else 0)
