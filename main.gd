@@ -5361,11 +5361,6 @@ func handle_panel_click(mouse: Vector2) -> void:
 				JavaScriptBridge.get_interface("window").location.assign("/")
 				return
 		elif creative_mode:
-			if Rect2(760,478,182,28).has_point(mouse):
-				test_level_lock=0 if test_level_lock>0 else level
-				pause_status="Level-Lock aufgehoben." if test_level_lock==0 else "Level %d bleibt auch nach Testmodus fixiert." % test_level_lock
-				save_game()
-				return
 			for index in 4:
 				if Rect2(300 + index * 113, 510, 105, 38).has_point(mouse):
 					set_creative_level(level + [-10, -1, 1, 10][index])
@@ -5568,13 +5563,14 @@ func toggle_creative_mode() -> void:
 		copy.close()
 		creative_mode = true
 		load_game()
+		test_level_lock = 0
 		gold = maxi(gold, 50000)
 		skill_points = maxi(skill_points, 60)
 		for i in waystone_unlocked.size(): waystone_unlocked[i] = true
 		pause_status = "Testmodus aktiv · eigener Spielstand, alle Wege offen."
 		save_game()
 	else:
-		var keep_level_lock:=test_level_lock
+		var fixed_test_level:=clampi(level,1,40)
 		creative_mode = false
 		reset_class_skills()
 		for i in WORLD_EVENTS.size():
@@ -5583,6 +5579,12 @@ func toggle_creative_mode() -> void:
 		quests.clear()
 		for i in QUESTS.size(): quests.append({"state":0, "progress":0})
 		load_game()
+		test_level_lock=fixed_test_level
+		level=fixed_test_level
+		xp=0
+		hp=max_hp()
+		energy=max_energy()
+		save_game()
 		enemies.clear()
 		drops.clear()
 		effects.clear()
@@ -5599,12 +5601,11 @@ func toggle_creative_mode() -> void:
 		poison_blade_timer = 0.0
 		previous_region = region_at(player_pos)
 		camera_pos = (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW)
-		pause_status = "Normaler Spielstand wiederhergestellt."
+		pause_status = "Normaler Spielstand wiederhergestellt · Level %d fixiert." % test_level_lock
 
 func set_creative_level(target: int) -> void:
 	if not creative_mode: return
 	level = clampi(target, 1, 40)
-	if test_level_lock>0:test_level_lock=level
 	xp = 0
 	skill_points = maxi(skill_points, 60)
 	if level >= 20:
@@ -9213,8 +9214,7 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
 		ui_button(Rect2(590, 480, 260, 38), "BACKUP IMPORT")
 	if creative_mode:
-		text_at(Vector2(302, 504), "LEVEL %d · %d Skillpunkte" % [level, skill_points], 14, Color("fff0bd"))
-		ui_button(Rect2(760,478,182,28),"LEVEL-LOCK AN" if test_level_lock>0 else "LEVEL-LOCK AUS")
+		text_at(Vector2(302, 504), "LEVEL %d · %d Skillpunkte · wird beim Verlassen fixiert" % [level, skill_points], 14, Color("fff0bd"))
 		for index in 4:
 			ui_button(Rect2(300 + index * 113, 510, 105, 38), ["-10", "-1", "+1", "+10"][index])
 		ui_button(Rect2(762, 510, 180, 38), "REISEN")
