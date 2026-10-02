@@ -470,6 +470,8 @@ var network_ping_ms := -1
 var processed_server_transactions: Array = []
 const FoodSystem = preload("res://components/food_system.gd")
 var food_system = FoodSystem.new()
+const SteinroseKitchen = preload("res://components/steinrose_kitchen.gd")
+var steinrose = SteinroseKitchen.new()
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -1427,11 +1429,11 @@ func _process(delta: float) -> void:
 	attack_anim = maxf(0.0, attack_anim - delta)
 	step_timer = maxf(0.0, step_timer - delta)
 	for i in cooldowns.size():
-		cooldowns[i] = maxf(0.0, float(cooldowns[i]) - delta)
+		cooldowns[i] = maxf(0.0, float(cooldowns[i]) - delta * food_system.cooldown_recovery_mult())
 	for i in boss_cooldowns.size():
 		boss_cooldowns[i] = maxf(0.0, float(boss_cooldowns[i]) - delta)
 	if panel == "":
-		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * delta)
+		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * food_system.energy_regen_mult() * delta)
 		update_player(delta)
 		if arena_mode == "" and dungeon_id < 0 and interior_id < 0: update_rescue()
 		update_battle_zones(delta)
@@ -1831,7 +1833,7 @@ func update_player(delta: float) -> void:
 	var move := movement_vector()
 	is_walking = move.length_squared() > 0.01 or dash_timer > 0
 	if is_walking: walk_phase += delta * (19.0 if dash_timer > 0 else 11.0)
-	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0)*delta
+	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * food_system.move_mult())*delta
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
@@ -2544,7 +2546,7 @@ func equipped_weapon_variant() -> String:
 func normal_attack_power() -> int:
 	# Grundtreffer bleiben schwächer als Fähigkeiten, brauchen aber keine zähen Serien.
 	var base := 7.0 + level * 1.6 + weapon_power() * 0.86 + int(skill_levels[9]) * 4.0
-	return maxi(1, int(base * (1.0 + primary_attribute() * (0.015 if class_id == 0 else 0.019))))
+	return maxi(1, int(base * (1.0 + primary_attribute() * (0.015 if class_id == 0 else 0.019)) * food_system.damage_mult()))
 
 func weapon_element() -> String:
 	for item in inventory:
@@ -2746,7 +2748,7 @@ func use_ability(slot: int) -> void:
 	energy -= float(ability["cost"])
 	var rank: int = int(skill_levels[id])
 	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1))
-	var power := int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012))
+	var power := int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012) * food_system.damage_mult())
 	var cast_pos := player_pos
 	var cast_dir := facing
 	if uses_server_world():
@@ -3173,7 +3175,7 @@ func enter_tavern() -> void:
 	projectiles.clear()
 	enemy_projectiles.clear()
 	battle_zones.clear()
-	message("Zur Steinrose · Alma schenkt Reisenden einen Platz am Feuer. E: ansprechen oder hinausgehen.")
+	message("Zur Steinrose · Steinrose kocht aus deinen Beeren neue Gerichte. E: Rezepte und Kueche.")
 	play_sound("menu")
 	announce_multiplayer_context()
 
@@ -3401,7 +3403,7 @@ func update_enemies(delta:float)->void:
 
 func apply_player_damage(raw: int) -> void:
 	if creative_mode or death_timer > 0.0: return
-	var dealt := maxi(1, raw - equipment_power(equipped_armor_uid))
+	var dealt := maxi(1, int((raw - equipment_power(equipped_armor_uid)) * food_system.damage_taken_mult()))
 	if shield_timer > 0: dealt = maxi(1, int(dealt * 0.35))
 	if class_id == 0 and standing_in_battle_zone(): dealt = maxi(1, int(dealt * 0.78))
 	if class_id == 1 and shield_timer > 0 and learned[21]:
@@ -3701,15 +3703,7 @@ func interact() -> void:
 		if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95:
 			leave_tavern()
 		elif player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -105)) < 130:
-			var cost := 9 + level * 2
-			if hp >= max_hp(): message("Alma: Willkommen, Reisender! Draußen riecht es wieder nach Regen und Abenteuer.")
-			elif gold >= cost:
-				gold -= cost
-				hp = max_hp()
-				message("Alma stellt dir Eintopf hin. Du ruhst dich aus. Vollständig geheilt für %d Gold." % cost)
-				play_sound("pickup")
-				save_game()
-			else: message("Alma: Für eine warme Mahlzeit brauche ich %d Gold. Ruh dich am Feuer aus." % cost)
+			steinrose.open(self)
 		return
 	if dungeon_id >= 0:
 		if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110:
@@ -4014,6 +4008,7 @@ func capture_save_data() -> Dictionary:
 	data["arcane_step_learned"] = arcane_step_learned
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
+	data["steinrose_state"] = steinrose.snapshot()
 	return data.duplicate(true)
 
 func save_game() -> void:
@@ -4091,6 +4086,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	ensure_player_uuid()
 	if not from_server and not creative_mode: server_save.restore(data)
 	food_system.restore(data.get("food_state",{}))
+	steinrose.restore(data.get("steinrose_state",{}))
 	var stored_recent: Variant = data.get("recent_players",[])
 	recent_players = stored_recent if stored_recent is Array else []
 	while recent_players.size() > 12: recent_players.pop_back()
@@ -4216,6 +4212,9 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	validate_equipment_slots()
 
 func handle_panel_click(mouse: Vector2) -> void:
+	if panel == "steinrose":
+		steinrose.click(self,mouse)
+		return
 	if panel == "controller":
 		controller.click(self, mouse)
 		return
@@ -5798,7 +5797,7 @@ func draw_tavern_world() -> void:
 		draw_pixel_tile(29, INTERIOR_CENTER + pos)
 		draw_circle(INTERIOR_CENTER + pos + Vector2(24, 13), 95, Color("ffba74", 0.055))
 	draw_pixel_tile(20, INTERIOR_CENTER + Vector2(-24, 240))
-	draw_npc({"name":"Alma", "role":"Wirtin · Eintopf & Rast", "pos":INTERIOR_CENTER + Vector2(0, -105), "color":Color("ba795e"), "kind":"innkeeper"})
+	draw_npc({"name":"Steinrose", "role":"Kueche · Rezepte & Vorraete", "pos":INTERIOR_CENTER + Vector2(0, -105), "color":Color("ba795e"), "kind":"innkeeper"})
 	text_at(INTERIOR_CENTER + Vector2(-170, -269), "ZUR STEINROSE", 22, Color("fce5b2"), HORIZONTAL_ALIGNMENT_CENTER, 340)
 	text_at(INTERIOR_CENTER + Vector2(-110, 215), ("%s · ZURÜCK NACH SONNENHAIN" % ("AKTION" if touch_enabled else binding_short("interact"))), 14, Color("ffefd0"), HORIZONTAL_ALIGNMENT_CENTER, 220)
 
@@ -7111,6 +7110,8 @@ func draw_hud() -> void:
 		text_at(Vector2(374,562),binding_short("interact")+" · "+(food_info["name"]+" pfluecken" if ripe else "Nachwachsen: %ds" % ceili(float(food_system.harvested.get(FoodSystem.key(nearby_food["point"]),0))-Time.get_unix_time_from_system())),14,Color(food_info["color"]))
 	if food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system():
 		text_at(Vector2(22,126),"NAHRUNG +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],12,Color("aed48c"))
+	if food_system.buff_active():
+		text_at(Vector2(22,177),food_system.buff_label(),11,Color("d9c0ff"))
 	draw_ref_panel(Rect2(10, 8, 348, 104))
 	draw_rect(Rect2(22, 16, 5, 17), [Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id])
 	text_at(Vector2(34, 32), "%s · %s · STUFE %d" % [hero_name if hero_name != "" else CLASS_NAMES[class_id].to_upper(), RACE_NAMES[hero_race], level], 15, Color("ffe9b8"))
@@ -7502,6 +7503,7 @@ func draw_panel() -> void:
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
 		"inventory": draw_inventory_panel()
+		"steinrose": steinrose.draw(self)
 		"shop": draw_shop_panel()
 		"travel": draw_travel_panel()
 		"journal": draw_journal_panel()
