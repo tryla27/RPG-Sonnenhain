@@ -3176,7 +3176,7 @@ func enter_tavern() -> void:
 	projectiles.clear()
 	enemy_projectiles.clear()
 	battle_zones.clear()
-	message("Zur Steinrose · Steinrose kocht aus deinen Beeren neue Gerichte. E: Rezepte und Kueche.")
+	message("Zur Steinrose · Alma kocht aus deinen mitgebrachten Fruechten. E: Rezepte, Vorrat und Kueche.")
 	play_sound("menu")
 	announce_multiplayer_context()
 
@@ -5798,7 +5798,7 @@ func draw_tavern_world() -> void:
 		draw_pixel_tile(29, INTERIOR_CENTER + pos)
 		draw_circle(INTERIOR_CENTER + pos + Vector2(24, 13), 95, Color("ffba74", 0.055))
 	draw_pixel_tile(20, INTERIOR_CENTER + Vector2(-24, 240))
-	draw_npc({"name":"Steinrose", "role":"Kueche · Rezepte & Vorraete", "pos":INTERIOR_CENTER + Vector2(0, -105), "color":Color("ba795e"), "kind":"innkeeper"})
+	draw_npc({"name":"Alma", "role":"Wirtin der Steinrose · Kueche & Rezepte", "pos":INTERIOR_CENTER + Vector2(0, -105), "color":Color("ba795e"), "kind":"innkeeper"})
 	text_at(INTERIOR_CENTER + Vector2(-170, -269), "ZUR STEINROSE", 22, Color("fce5b2"), HORIZONTAL_ALIGNMENT_CENTER, 340)
 	text_at(INTERIOR_CENTER + Vector2(-110, 215), ("%s · ZURÜCK NACH SONNENHAIN" % ("AKTION" if touch_enabled else binding_short("interact"))), 14, Color("ffefd0"), HORIZONTAL_ALIGNMENT_CENTER, 220)
 
@@ -7193,7 +7193,7 @@ func draw_hud() -> void:
 	if dungeon_id >= 0:
 		nearest = "E  ·  Gewölbe verlassen" if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110 else ("E  ·  Versiegelte Truhe" if player_pos.distance_to(DUNGEON_CENTER + Vector2(555, 0)) < 105 and dungeon_chest_ready(dungeon_id) else "")
 	elif interior_id >= 0:
-		nearest = "E  ·  Taverne verlassen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95 else ("E  ·  Steinrose ansprechen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -105)) < 130 else "")
+		nearest = "E  ·  Taverne verlassen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95 else ("E  ·  Alma ansprechen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -105)) < 130 else "")
 	else:
 		if player_pos.distance_to(TAVERN_HOUSE + Vector2(126, 157)) < 112: nearest = "E  ·  Zur Steinrose betreten"
 		for index in DUNGEON_ENTRANCES.size():
