@@ -421,7 +421,7 @@ const PARTY_MAX_MEMBERS := 10
 const PARTY_XP_RANGE := 850.0
 const PARTY_BOSS_RANGE := 1100.0
 const PARTY_BOSS_ACTIVITY_MS := 15000
-const SERVER_WORLD_MOB_CAP := 72
+const SERVER_WORLD_MOB_CAP := 264 # 12 Regionen × max. 22 normale Mobs; keine aktive Map nimmt einer anderen Spawnplaetze weg.
 const WAYSTONE_SAFE_RADIUS := 220.0
 const WAYSTONE_SPAWN_BLOCK_RADIUS := 285.0
 var dedicated_server_mode := false
@@ -1591,10 +1591,21 @@ func server_cleanup_orphan_mobs() -> void:
 	var now := Time.get_ticks_msec()
 	for i in range(enemies.size()-1,-1,-1):
 		var enemy: Dictionary = enemies[i]
-		if int(enemy.get("type",-1)) in [12,13,14] or bool(enemy.get("small_guardian",false)) or bool(enemy.get("invasion",false)): continue
+		var type := int(enemy.get("type",-1))
+		if type in [12,13,14] or bool(enemy.get("small_guardian",false)) or bool(enemy.get("invasion",false)): continue
 		var region := region_at(Vector2(enemy["pos"]))
+		# Alte/falsch platzierte Weltmobs aus frueheren Builds duerfen keinen
+		# Regionsbestand und keinen globalen Spawnplatz blockieren.
+		if type < 0 or type >= ENEMY_TYPES.size() or int(ENEMY_TYPES[type]["region"]) != region:
+			enemies.remove_at(i)
+			continue
 		if active.has(region): continue
-		if now-int(enemy.get("spawned_at_ms",now)) < 30000: continue
+		# Altbestand ohne Spawn-Zeit stammt aus Builds vor dem regionalen
+		# Server-Spawner. Wenn dort niemand mehr ist, sofort entfernen.
+		if not enemy.has("spawned_at_ms"):
+			enemies.remove_at(i)
+			continue
+		if now-int(enemy["spawned_at_ms"]) < 30000: continue
 		enemies.remove_at(i)
 
 func mob_profile(enemy:Dictionary)->Dictionary:
