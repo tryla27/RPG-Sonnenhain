@@ -4367,7 +4367,6 @@ func register_boss_defeat(boss_index:int,shared:bool=false)->bool:
 func gain_xp(amount: int) -> void:
 	if test_level_lock>0:
 		level=clampi(test_level_lock,1,40)
-		xp=0
 		return
 	xp += amount
 	while xp >= xp_required():
@@ -5552,9 +5551,10 @@ func finish_intro() -> void:
 	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
 
 func fix_level_after_test_mode(target_level:int)->void:
+	var preserved_xp:=maxi(0,xp)
 	test_level_lock=clampi(target_level,1,40)
 	level=test_level_lock
-	xp=0
+	xp=preserved_xp
 	hp=max_hp()
 	energy=max_energy()
 
