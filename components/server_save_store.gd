@@ -138,7 +138,7 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 	for quest in data.get("quests",[]):
 		if not quest is Dictionary or not (quest.get("state") is int or quest.get("state") is float) or not (quest.get("progress") is int or quest.get("progress") is float): return false
 		if int(quest["state"]) < 0 or int(quest["state"]) > 3 or int(quest["progress"]) < 0 or int(quest["progress"]) > 1000: return false
-	for field in ["hp","energy","music_volume","effects_volume","shop_timer"]:
+	for field in ["hp","energy","music_volume","effects_volume","shop_timer","warrior_rage","ranger_hunt_meter","ranger_hunt_buff"]:
 		var value: Variant = data.get(field,0)
 		if not (value is int or value is float) or not is_finite(float(value)): return false
 	for field in ["skill_levels","slots","event_states","event_progress","chest_respawn_until","dungeon_chest_respawn_until"]:

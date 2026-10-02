@@ -32,13 +32,13 @@ func run():
 	g.claim_arena_chest();assert(g.arena_reward_item["uid"]==uid)
 	g.inventory.clear();g.claim_arena_chest();assert(g.arena_reward_claimed and g.inventory.size()==1 and g.inventory[0]["uid"]==uid)
 	g.claim_arena_chest();assert(g.inventory.size()==1)
-	g.reset_class_skills();g.skill_points=2;g.class_id=0;g.level=2
-	var offers:Array=g.skill_choices();assert(offers.size()==3 and offers==g.skill_choices())
-	g.upgrade_skill(offers[0]);assert(g.skill_points==1 and g.learned[offers[0]])
-	assert(offers[0] not in g.skill_choices())
-	g.upgrade_skill(offers[0]);assert(g.skill_points==1)
+	g.reset_class_skills();g.skill_points=2;g.class_id=0;g.level=3;g.skill_tree_tab=0
+	var offers:Array=g.skill_choices();assert(not offers.is_empty() and offers==g.skill_choices())
+	var pick:int=offers[0];var cost:int=g.skill_point_cost(pick);g.upgrade_skill(pick);assert(g.skill_points==2-cost and g.learned[pick])
+	assert(pick not in g.skill_choices())
+	g.upgrade_skill(pick);assert(g.skill_points==2-cost)
 	g.creation_name="Test";g.creation_class_selected=false;g.panel="creation"
 	g.review_character_creation();assert(g.panel=="creation")
 	g.creation_class_selected=true;g.review_character_creation();assert(g.panel=="creation_review")
-	print("HEADGEAR_ARENA_CHOICES_OK class boosts; 15 weapons; chances; full-inventory stable roll; single reward; 3 choices one point; creation guard")
+	print("HEADGEAR_ARENA_CHOICES_OK class boosts; 15 weapons; chances; full-inventory stable roll; single reward; Borin direct purchase; creation guard")
 	g.free();quit()

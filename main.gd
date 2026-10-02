@@ -136,11 +136,24 @@ const ABILITIES := [
 	{"name":"Blitzpfeil", "desc":"Springender Blitz am Ziel", "cost":34, "cd":10.0, "req":23, "kind":30},
 	{"name":"Pfeilhagel", "desc":"Pfeile fallen im Zielbereich", "cost":44, "cd":17.0, "req":28, "kind":31},
 	{"name":"Falkenruf", "desc":"Markiert Feinde und stärkt Treffer", "cost":37, "cd":20.0, "req":34, "kind":32},
-	{"name":"Himmelshagel", "desc":"Klassenfähigkeit: großer Pfeilsturm", "cost":60, "cd":45.0, "req":20, "kind":33}
+	{"name":"Himmelshagel", "desc":"Klassenfähigkeit: großer Pfeilsturm", "cost":60, "cd":45.0, "req":20, "kind":33},
+	{"name":"Impulsschuss", "desc":"Robotischer Energieschuss", "cost":24, "cd":5.0, "req":3, "kind":34},
+	{"name":"Reparaturmodul", "desc":"Repariert sofort einen Teil deiner Lebenspunkte", "cost":30, "cd":16.0, "req":8, "kind":35},
+	{"name":"Energieschild", "desc":"Technischer Schild reduziert eingehenden Schaden", "cost":32, "cd":15.0, "req":12, "kind":36},
+	{"name":"Teslawelle", "desc":"Elektrische Welle trifft Gegner im Umkreis", "cost":36, "cd":10.0, "req":15, "kind":37},
+	{"name":"Zielmatrix", "desc":"Überclockt Angriffe für kurze Zeit", "cost":28, "cd":18.0, "req":18, "kind":38},
+	{"name":"EMP-Stoß", "desc":"Betäubt Gegner im Umkreis", "cost":42, "cd":18.0, "req":23, "kind":39},
+	{"name":"Flammenwirbel", "desc":"Fusion aus Wirbelhieb und Feuerball", "cost":42, "cd":12.0, "req":15, "kind":40},
+	{"name":"Reaktorwall", "desc":"Fusion aus Schildwall und Energieschild", "cost":38, "cd":20.0, "req":15, "kind":41},
+	{"name":"Blitzkern", "desc":"Fusion aus Blitzlanze und Teslawelle", "cost":48, "cd":16.0, "req":23, "kind":42}
 ]
 const CLASS_NAMES := ["Krieger", "Magier", "Bogenschütze"]
 const CLASS_SKILLS := [[0, 1, 2, 3, 5, 7, 12, 13, 14], [16, 17, 18, 19, 20, 21, 22, 23], [25, 26, 27, 28, 29, 30, 31, 32]]
 const CLASS_ULTIMATES := [15, 24, 33]
+const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
+const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
+const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200},{"id":41,"a":1,"b":36,"gold":2200},{"id":42,"a":18,"b":37,"gold":4200}]
+const BORIN_CRYSTAL_POS := Vector2(1608,1970)
 const QUESTS := [
 	{"title":"Schleime im Blütenwald", "npc":"Mira", "target":0, "count":8, "xp":60, "gold":75, "reward":"Waldklinge"},
 	{"title":"Die Käferplage", "npc":"Mira", "target":1, "count":8, "xp":85, "gold":110, "reward":"Blütenanhänger"},
@@ -265,6 +278,13 @@ var equipped_armor_uid := -1
 var equipped_head_uid := -1
 var death_timer := 0.0
 var arcane_step_learned := false
+var skill_tree_tab := 0
+var class_mastery_unlocked := false
+var warrior_rage := 0.0
+var ranger_hunt_meter := 0.0
+var ranger_hunt_buff := 0.0
+var ranger_stealth_timer := 0.0
+var robotics_overclock_timer := 0.0
 const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
 var equipped_ring2_uid := -1
@@ -716,6 +736,12 @@ func _ready() -> void:
 
 func reset_class_skills() -> void:
 	arcane_step_learned = false
+	class_mastery_unlocked = false
+	warrior_rage = 0.0
+	ranger_hunt_meter = 0.0
+	ranger_hunt_buff = 0.0
+	ranger_stealth_timer = 0.0
+	robotics_overclock_timer = 0.0
 	learned.resize(ABILITIES.size())
 	skill_levels.resize(ABILITIES.size())
 	cooldowns.resize(ABILITIES.size())
@@ -1426,6 +1452,9 @@ func _process(delta: float) -> void:
 	rage_timer = maxf(0.0, rage_timer - delta)
 	drain_timer = maxf(0.0, drain_timer - delta)
 	poison_blade_timer = maxf(0.0, poison_blade_timer - delta)
+	ranger_hunt_buff = maxf(0.0, ranger_hunt_buff - delta)
+	ranger_stealth_timer = maxf(0.0, ranger_stealth_timer - delta)
+	robotics_overclock_timer = maxf(0.0, robotics_overclock_timer - delta)
 	notice_timer = maxf(0.0, notice_timer - delta)
 	rescue_intro_timer = maxf(0.0, rescue_intro_timer - delta)
 	rescue_banner_timer = maxf(0.0, rescue_banner_timer - delta)
@@ -2501,7 +2530,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				use_ability(slot)
 				break
 
+func near_borin() -> bool:
+	return interior_id < 0 and dungeon_id < 0 and arena_mode == "" and player_pos.distance_to(Vector2(1486,1970)) < 150.0
+
 func toggle_panel(which: String) -> void:
+	if which == "skills" and panel != "skills" and not near_borin():
+		message("Fähigkeiten kannst du nur beim Skillzauberer Borin ändern.")
+		return
 	panel = "" if panel == which else which
 	menu_scroll = 0
 	selected_item = -1
@@ -2509,30 +2544,28 @@ func toggle_panel(which: String) -> void:
 	sell_all_confirm = false
 
 func learn_arcane_step() -> bool:
-	if class_id != 1 or skill_points <= 0 or arcane_step_learned or -2 not in skill_choices(): return false
+	if class_id != 1 or not class_mastery_unlocked or arcane_step_learned: return false
 	arcane_step_learned = true
-	skill_points -= 1
 	save_game()
 	return true
 
 func dodge() -> void:
-	if class_id == 1 and not arcane_step_learned:
-		message("Arkaner Schritt: ab Level 4 im Fähigkeitenmenü erlernen (1 Skillpunkt).")
-		return
+	var arcane := class_id == 1 and arcane_step_learned
 	var dir := movement_vector()
 	dash_dir = dir.normalized() if dir.length() > 0 else facing.normalized()
 	if dash_dir.length_squared() < 0.01: dash_dir = Vector2.DOWN
 	dodge_start = player_pos
-	dodge_duration = 0.20 if class_id == 1 else (0.24 if class_id == 0 else 0.22)
+	dodge_duration = 0.20 if arcane else (0.24 if class_id == 0 else 0.22)
 	dash_timer = dodge_duration
 	dash_cooldown = 1.25
 	invulnerable = 0.38
+	if class_id == 2 and class_mastery_unlocked: ranger_stealth_timer = dodge_duration + 0.4
 	if konflux.active:
 		if network_mode=="client": rpc_konflux_dodge.rpc_id(1)
 		elif konflux.fighter_stats.has(1):
 			konflux.fighter_stats[1]["dodge"]=0.38
 			konflux.fighter_stats[1]["dodge_cd"]=1.25
-	effect(player_pos+Vector2(0,-60), "ARKANER SCHRITT" if class_id == 1 else "ROLLE", Color("c7b5ff") if class_id == 1 else Color("d8f3ff"), 0.65)
+	effect(player_pos+Vector2(0,-60), "ARKANER SCHRITT" if arcane else ("SCHATTENROLLE" if class_id == 2 and class_mastery_unlocked else "ROLLE"), Color("c7b5ff") if arcane else Color("d8f3ff"), 0.65)
 	play_sound("dodge")
 
 func weapon_power() -> int:
@@ -2547,7 +2580,8 @@ func equipped_weapon_variant() -> String:
 func normal_attack_power() -> int:
 	# Grundtreffer bleiben schwächer als Fähigkeiten, brauchen aber keine zähen Serien.
 	var base := 7.0 + level * 1.6 + weapon_power() * 0.86 + int(skill_levels[9]) * 4.0
-	return maxi(1, int(base * (1.0 + primary_attribute() * (0.015 if class_id == 0 else 0.019)) * food_system.damage_mult()))
+	var mastery_mult := 1.0 + (0.30 * warrior_rage / 100.0 if class_id == 0 and class_mastery_unlocked else 0.0)
+	return maxi(1, int(base * (1.0 + primary_attribute() * (0.015 if class_id == 0 else 0.019)) * food_system.damage_mult() * mastery_mult))
 
 func weapon_element() -> String:
 	for item in inventory:
@@ -2565,6 +2599,15 @@ func normal_attack() -> void:
 		return
 	var variant := equipped_weapon_variant()
 	attack_timer = 0.62 if variant == "axe" else (0.78 if variant == "crossbow" else (0.45 if class_id == 0 else (0.62 if class_id == 1 else 0.52)))
+	if class_id == 2 and ranger_hunt_buff > 0.0: attack_timer /= 1.25
+	if robotics_overclock_timer > 0.0: attack_timer /= 1.18
+	if class_mastery_unlocked and class_id == 0: warrior_rage = minf(100.0, warrior_rage + 8.0)
+	if class_mastery_unlocked and class_id == 2 and ranger_hunt_buff <= 0.0:
+		ranger_hunt_meter = minf(100.0, ranger_hunt_meter + 10.0)
+		if ranger_hunt_meter >= 100.0:
+			ranger_hunt_meter = 0.0
+			ranger_hunt_buff = 60.0
+			effect(player_pos+Vector2(0,-70),"JAGDRAUSCH · 60 SEK.",Color("ffe29a"),1.1)
 	swing_duration = 0.29 if variant == "axe" else (0.20 if variant == "crossbow" else (0.24 if class_id == 0 else 0.32))
 	swing_timer = swing_duration
 	attack_anim = swing_timer
@@ -2707,7 +2750,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	if not dir.is_finite() or dir.length_squared() < 0.01: return
 	dir = dir.normalized()
 	var remote_class := clampi(int(state.get("class",0)),0,2)
-	var allowed_ids: Array = CLASS_SKILLS[remote_class].duplicate()
+	var allowed_ids: Array = all_slot_skills()
 	allowed_ids.append(CLASS_ULTIMATES[remote_class])
 	if id not in allowed_ids: return
 	rank = clampi(rank,1,5)
@@ -2720,7 +2763,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 			projectiles.append(shot)
 		return
 	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
-	var radial_ids := [0,5,17,22,23,24,31,33]
+	var radial_ids := [0,5,17,22,23,24,31,33,37,39,40,41,42]
 	if id in radial_ids:
 		var radius := 165.0 + rank * 12.0
 		for i in range(enemies.size()-1,-1,-1):
@@ -2816,6 +2859,35 @@ func use_ability(slot: int) -> void:
 		14:
 			poison_blade_timer = 8.0 + (rank - 1) * 1.5
 			effect(player_pos, "GIFTKLINGE", Color("b7e885"), 0.8)
+		34:
+			projectiles.append({"pos":player_pos,"dir":facing,"speed":760.0,"life":1.0,"damage":power+12,"kind":2,"element":"blitz","hits":[]})
+		35:
+			hp=minf(max_hp(),hp+55.0);effect(player_pos,"REPARATUR +55",Color("8ee8d0"),0.8)
+		36:
+			shield_timer=5.0;effect(player_pos,"ENERGIESCHILD",Color("8edcff"),0.8)
+		37:
+			for i in range(enemies.size()-1,-1,-1):
+				if enemies[i]["pos"].distance_to(player_pos)<185.0: damage_enemy(i,power+14,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+			effect(player_pos,"TESLAWELLE",Color("fff0a5"),0.9)
+		38:
+			robotics_overclock_timer=8.0;effect(player_pos,"ZIELMATRIX",Color("9de9ff"),0.8)
+		39:
+			for i in range(enemies.size()-1,-1,-1):
+				if enemies[i]["pos"].distance_to(player_pos)<175.0: enemies[i]["stun"]=maxf(float(enemies[i].get("stun",0.0)),1.8);damage_enemy(i,power,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+			effect(player_pos,"EMP",Color("b7e9ff"),0.9)
+		40:
+			for i in range(enemies.size()-1,-1,-1):
+				if enemies[i]["pos"].distance_to(player_pos)<190.0: damage_enemy(i,power+30,(enemies[i]["pos"]-player_pos).normalized(),false,"feuer")
+			effect(player_pos,"FLAMMENWIRBEL",Color("ff9858"),1.0)
+		41:
+			shield_timer=7.0
+			for i in range(enemies.size()-1,-1,-1):
+				if enemies[i]["pos"].distance_to(player_pos)<150.0: damage_enemy(i,power+12,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+			effect(player_pos,"REAKTORWALL",Color("8fdcff"),1.0)
+		42:
+			for i in range(enemies.size()-1,-1,-1):
+				if enemies[i]["pos"].distance_to(player_pos)<230.0: damage_enemy(i,power+24,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+			effect(player_pos,"BLITZKERN",Color("fff0a5"),1.0)
 		15:
 			shield_timer = 5.0 + rank
 			for i in range(enemies.size() - 1, -1, -1):
@@ -3683,6 +3755,8 @@ func collect_drops() -> void:
 			save_game()
 
 func interact() -> void:
+	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and player_pos.distance_to(BORIN_CRYSTAL_POS) < 95.0:
+		panel="fusion";play_sound("menu");return
 	if konflux.active:
 		konflux.interact(self)
 		return
@@ -3781,7 +3855,8 @@ func interact() -> void:
 		return
 	play_sound("menu")
 	if closest["kind"] == "quest":
-		quest_dialogue(String(closest["name"]))
+		if String(closest["name"])=="Borin": panel="skills";skill_tree_tab=0;menu_scroll=0
+		else: quest_dialogue(String(closest["name"]))
 	elif closest["kind"] == "healer":
 		visit_healer()
 	elif closest["kind"] == "arena":
@@ -4006,8 +4081,12 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":7, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	data["arcane_step_learned"] = arcane_step_learned
+	data["class_mastery_unlocked"] = class_mastery_unlocked
+	data["warrior_rage"] = warrior_rage
+	data["ranger_hunt_meter"] = ranger_hunt_meter
+	data["ranger_hunt_buff"] = ranger_hunt_buff
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
@@ -4139,7 +4218,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if stored_slots.size() == 3:
 		for i in 3:
 			var id := int(stored_slots[i])
-			if id in CLASS_SKILLS[class_id] and learned[id]: slots[i] = id
+			if is_slot_skill(id) and learned[id]: slots[i] = id
 	var stored_items: Variant = data.get("inventory", [])
 	if stored_items is Array:
 		inventory = []
@@ -4157,7 +4236,12 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	equipped_armor_uid = int(data.get("equipped_armor_uid", -1))
 	equipped_head_uid = int(data.get("equipped_head_uid", -1))
 	arena_reward_item=data.get("arena_reward_item",{}).duplicate(true) if data.get("arena_reward_item",{}) is Dictionary else {}
-	arcane_step_learned = bool(data.get("arcane_step_learned", false))
+	class_mastery_unlocked = bool(data.get("class_mastery_unlocked", false))
+	arcane_step_learned = bool(data.get("arcane_step_learned", false)) if class_id == 1 else false
+	if class_id == 1 and class_mastery_unlocked: arcane_step_learned = true
+	warrior_rage = clampf(float(data.get("warrior_rage",0.0)),0.0,100.0)
+	ranger_hunt_meter = clampf(float(data.get("ranger_hunt_meter",0.0)),0.0,100.0)
+	ranger_hunt_buff = clampf(float(data.get("ranger_hunt_buff",0.0)),0.0,60.0)
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
 	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1)) if class_id == 1 else -1
 	last_waystone = clampi(int(data.get("last_waystone", 1)), 1, WAYSTONES.size() - 1)
@@ -4448,6 +4532,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		return
 	match panel:
 		"skills": click_skills(mouse)
+		"fusion": click_fusion(mouse)
 		"inventory": click_inventory(mouse)
 		"shop": click_shop(mouse)
 		"travel": click_travel(mouse)
@@ -4637,69 +4722,79 @@ func set_creative_level(target: int) -> void:
 	pause_status = "Testmodus: Level %d · volle HP und %s." % [level, "Mana" if class_id == 1 else "Energie"]
 	save_game()
 
+func all_slot_skills() -> Array:
+	var out:Array=[]
+	for tree in SKILL_TREES:
+		for id in tree:
+			if id not in out: out.append(id)
+	for fusion in FUSIONS: out.append(int(fusion["id"]))
+	return out
+
+func is_slot_skill(index:int) -> bool:
+	return index in all_slot_skills()
+
+func skill_point_cost(index:int) -> int:
+	if index < 0 or index >= ABILITIES.size(): return 999
+	var req:int=int(ABILITIES[index]["req"])
+	return 1 if req <= 12 else (2 if req <= 23 else 3)
+
 func skill_choices() -> Array:
-	if skill_levels.size()!=ABILITIES.size() or learned.size()!=ABILITIES.size():return []
-	if skill_points<=0:return []
-	var fresh:Array=[]
-	var upgrades:Array=[]
-	var spent:int=1 if arcane_step_learned else 0
-	for id in CLASS_SKILLS[class_id]:
-		spent+=int(skill_levels[id])
-		if not learned[id]:fresh.append(id)
-		elif int(skill_levels[id])<5:upgrades.append(id)
-	if class_id==1 and not arcane_step_learned:fresh.append(-2)
-	var pool:Array=fresh if fresh.size()>=3 else fresh+upgrades
-	var rng:=RandomNumberGenerator.new()
-	rng.seed=abs((player_uuid+":"+str(class_id)+":"+str(spent)).hash())
-	for i in range(pool.size()-1,0,-1):
-		var j:int=rng.randi_range(0,i)
-		var tmp=pool[i];pool[i]=pool[j];pool[j]=tmp
-	# Remaining new skills always keep priority over improvements.
-	if fresh.size()<3:
-		pool= fresh + pool.filter(func(id):return id not in fresh)
-	return pool.slice(0,mini(3,pool.size()))
+	if skill_tree_tab < 0 or skill_tree_tab >= SKILL_TREES.size(): return []
+	var out:Array=[]
+	for id in SKILL_TREES[skill_tree_tab]:
+		if not learned[id] and level >= int(ABILITIES[id]["req"]) and skill_points >= skill_point_cost(id): out.append(id)
+	return out.slice(0,mini(3,out.size()))
+
+func buy_skill(index:int) -> bool:
+	if index < 0 or index >= ABILITIES.size() or index not in all_slot_skills(): return false
+	if learned[index]: return false
+	if level < int(ABILITIES[index]["req"]): message("%s benötigt Level %d." % [ABILITIES[index]["name"],ABILITIES[index]["req"]]);return false
+	var price:=skill_point_cost(index)
+	if skill_points < price: message("Du brauchst %d Skillpunkte." % price);return false
+	skill_points -= price;learned[index]=true;skill_levels[index]=1
+	message("%s gelernt · %d Skillpunkte" % [ABILITIES[index]["name"],price]);save_game();return true
+
+func fusion_skill_cost(fusion:Dictionary) -> int:
+	return (skill_point_cost(int(fusion["a"])) + skill_point_cost(int(fusion["b"]))) * 2
+
+func can_fuse(fusion:Dictionary) -> bool:
+	var a:=int(fusion["a"]);var b:=int(fusion["b"]);var id:=int(fusion["id"])
+	return not learned[id] and learned[a] and learned[b] and level >= int(ABILITIES[id]["req"]) and skill_points >= fusion_skill_cost(fusion) and gold >= int(fusion["gold"])
+
+func buy_fusion(index:int) -> bool:
+	if index < 0 or index >= FUSIONS.size(): return false
+	var fusion:Dictionary=FUSIONS[index]
+	if not can_fuse(fusion): return false
+	var id:=int(fusion["id"]);var sp:=fusion_skill_cost(fusion)
+	skill_points-=sp;gold-=int(fusion["gold"]);learned[id]=true;skill_levels[id]=1
+	message("%s verschmolzen · -%d SP · -%d Gold" % [ABILITIES[id]["name"],sp,int(fusion["gold"])]);save_game();return true
+
+func claim_class_mastery() -> bool:
+	if not final_completed or class_mastery_unlocked: return false
+	class_mastery_unlocked=true
+	if class_id==1: arcane_step_learned=true
+	message(["BLUTRAUSCH gemeistert!","ARKANER SCHRITT gemeistert!","JAGDRAUSCH + SCHATTENROLLE gemeistert!"][class_id]);play_sound("level");save_game();return true
 
 func click_skills(mouse: Vector2) -> void:
+	for tab in 3:
+		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("menu");return
+	if Rect2(718,145,118,38).has_point(mouse): quest_dialogue("Borin");return
+	if Rect2(848,145,118,38).has_point(mouse) and final_completed and not class_mastery_unlocked: claim_class_mastery();return
 	for slot in 3:
-		if Rect2(165+slot*204,148,193,44).has_point(mouse):selected_slot=slot;return
-	var offers:Array=skill_choices()
-	for card in offers.size():
-		if Rect2(165+card*275,215,265,155).has_point(mouse):
-			if offers[card]==-2:learn_arcane_step()
-			else:upgrade_skill(int(offers[card]))
-			return
-	var known:Array=[]
-	for id in CLASS_SKILLS[class_id]:
-		if learned[id]:known.append(id)
-	for row in 4:
-		var i:int=row+menu_scroll
-		if i>=known.size():break
-		if Rect2(165,405+row*37,815,33).has_point(mouse):
-			var id:int=known[i]
-			for slot in 3:
-				if slots[slot]==id:slots[slot]=-1
-			slots[selected_slot]=id
-			save_game()
+		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
+	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
+	for card in mini(6,maxi(0,ids.size()-start)):
+		var id:int=ids[start+card];var col:=card%3;var row:=int(card/3.0)
+		if Rect2(165+col*275,250+row*132,265,118).has_point(mouse):
+			if learned[id]:
+				for s in 3:
+					if slots[s]==id:slots[s]=-1
+				slots[selected_slot]=id;save_game()
+			else: buy_skill(id)
 			return
 
 func upgrade_skill(index: int) -> void:
-	if index not in skill_choices():
-		message("Wähle eine der drei angebotenen Fähigkeiten.")
-		return
-	var next_rank: int = int(skill_levels[index]) + 1
-	if int(skill_levels[index]) >= 5:
-		message("%s ist bereits auf Rang 5." % ABILITIES[index]["name"])
-		return
-	if skill_points <= 0:
-		message("Du brauchst einen Skillpunkt.")
-		return
-	skill_points -= 1
-	skill_levels[index] = int(skill_levels[index]) + 1
-	learned[index] = true
-	hp = minf(max_hp(), hp + (25 if index == 10 else 0))
-	energy = minf(max_energy(), energy + (25 if index == 11 else 0))
-	message("%s auf Rang %d verbessert" % [ABILITIES[index]["name"], skill_levels[index]])
-	save_game()
+	buy_skill(index)
 
 func click_inventory(mouse: Vector2) -> void:
 	if Rect2(180,205,98,60).has_point(mouse) and equipped_head_uid>=0:
@@ -4933,6 +5028,7 @@ func _draw() -> void:
 	character_canvas_offset = -camera_pos
 	draw_set_transform(-camera_pos)
 	draw_world()
+	if arena_mode=="" and dungeon_id<0 and interior_id<0 and visible_world(BORIN_CRYSTAL_POS,90): draw_fusion_crystal()
 	if arena_mode=="" and dungeon_id<0 and interior_id<0 and visible_world(KonfluxMap.ENTRANCE,260):
 		StartScenery32.gate(self,KonfluxMap.ENTRANCE,false,camera_pos)
 		var konflux_gate_text := "E · KONFLUX · PvP-Welt · LV %d" % KONFLUX_MIN_LEVEL
@@ -6786,7 +6882,8 @@ func draw_shadow(p: Vector2) -> void:
 func draw_player() -> void:
 	draw_shadow(player_pos)
 	if invulnerable > 0: draw_arc(player_pos+Vector2(0,12),31,0,TAU,16,Color("b7e5ee",0.35),2)
-	if dash_timer > 0 and class_id == 1:
+	if ranger_stealth_timer > 0 and class_id == 2: draw_arc(player_pos+Vector2(0,10),34,0,TAU,24,Color("d8f3ff",0.28),4)
+	if dash_timer > 0 and class_id == 1 and arcane_step_learned:
 		var progress := 1.0-dash_timer/dodge_duration
 		draw_line(dodge_start+Vector2(0,10),player_pos+Vector2(0,10),Color("a491e4",0.3),18)
 		for ring in 2:
@@ -7119,6 +7216,9 @@ func draw_hud() -> void:
 	bar(Rect2(23, 40, 324, 21), hp, max_hp(), Color("d94f4f"), "HP  %d / %d" % [ceili(hp), ceili(max_hp())])
 	bar(Rect2(23, 65, 324, 17), energy, max_energy(), Color("3f7fd9") if class_id == 1 else Color("35b381"), "%s  %d / %d" % ["MANA" if class_id == 1 else "ENERGIE", ceili(energy), ceili(max_energy())])
 	bar(Rect2(23, 86, 324, 14), float(xp), float(xp_required()), Color("d9932e"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
+	if class_mastery_unlocked and class_id==0: text_at(Vector2(365,30),"WUT %.0f%%" % warrior_rage,12,Color("efaa75"))
+	elif class_mastery_unlocked and class_id==2: text_at(Vector2(365,30),"JAGD %.0f%%%s" % [ranger_hunt_meter," · %.0fs" % ranger_hunt_buff if ranger_hunt_buff>0 else ""],12,Color("f3d68e"))
+	elif class_mastery_unlocked and class_id==1: text_at(Vector2(365,30),"LEERTASTE · ARKANER SCHRITT",12,Color("cdbaff"))
 	draw_ref_panel(Rect2(10, 118, 348, 46))
 	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL · DETAILS ›", 13, Color("f0cf92"))
 	text_at(Vector2(23, 155), tracked_quest().substr(0, 44), 14, Color("fff2d9"))
@@ -7185,6 +7285,7 @@ func draw_hud() -> void:
 		if chest_ready(i) and player_pos.distance_to(chest_position(i)) < 85:
 			nearest = "E  ·  Schatztruhe öffnen"
 			break
+	if player_pos.distance_to(BORIN_CRYSTAL_POS)<95: nearest="E  ·  Kristall der Verschmelzung"
 	for npc in NPCS:
 		if player_pos.distance_to(npc["pos"]) < 105:
 			nearest = "E  ·  Elara · Vollheilung für %d Gold" % healing_cost() if npc["kind"] == "healer" else "E  ·  %s (%s)" % [npc["name"], npc["role"]]
@@ -7522,6 +7623,7 @@ func draw_panel() -> void:
 		"controls": draw_controls_panel()
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
+		"fusion": draw_fusion_panel()
 		"inventory": draw_inventory_panel()
 		"steinrose": steinrose.draw(self)
 		"shop": draw_shop_panel()
@@ -7828,34 +7930,38 @@ func draw_intro_panel() -> void:
 	text_at(Vector2(230, 413), binding_short("interact")+" / Leertaste / Klick: Überspringen", 15, Color("c7d4ca"))
 
 func draw_skills_panel() -> void:
-	text_at(Vector2(165,125),"%s · FÄHIGKEITEN" % CLASS_NAMES[class_id].to_upper(),26,Color("ffeda9"))
-	text_at(Vector2(700,124),"%d SKILLPUNKTE" % skill_points,18,Color("f6dc9a"))
+	text_at(Vector2(165,125),"BORIN · SKILLZAUBERER",25,Color("ffeda9"))
+	text_at(Vector2(650,124),"LV %d · %d SP · %d GOLD" % [level,skill_points,gold],16,Color("f6dc9a"))
+	for tab in 3: ui_button(Rect2(165+tab*180,145,168,38),SKILL_TREE_NAMES[tab],true,skill_tree_tab==tab)
+	ui_button(Rect2(718,145,118,38),"QUESTS");ui_button(Rect2(848,145,118,38),"MEISTER",final_completed and not class_mastery_unlocked,class_mastery_unlocked)
 	for slot in 3:
-		var id:int=slots[slot]
-		ui_button(Rect2(165+slot*204,148,193,44),"%d: %s" % [slot+1,"Frei" if id<0 else ABILITIES[id]["name"]],true,selected_slot==slot)
-	text_at(Vector2(165,207),"Wähle genau eine Fähigkeit · kostet 1 Skillpunkt",14,Color("daebce"))
-	var offers:Array=skill_choices()
-	for i in offers.size():
-		var id:int=offers[i]
-		var x:float=165+i*275
-		ui_box(Rect2(x,215,265,155),Color("314b54"))
-		if id>=0:draw_skill_icon(Vector2(x+15,232),id,32)
-		text_at(Vector2(x+58,254),"Arkaner Schritt" if id==-2 else ABILITIES[id]["name"],16,Color("fff1bc"),HORIZONTAL_ALIGNMENT_LEFT,195)
-		text_at(Vector2(x+15,294),"Arkanes Ausweichen" if id==-2 else ABILITIES[id]["desc"],12,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,235)
-		var rank:int=1 if id==-2 else int(skill_levels[id])+1
-		text_at(Vector2(x+15,321),"NEU LERNEN" if rank==1 else "AUF RANG %d VERBESSERN" % rank,13,Color("ffe2aa"))
-		text_at(Vector2(x+15,350),"AUSWÄHLEN · 1 PUNKT",13,Color("9de6c2"))
-	if offers.is_empty():text_at(Vector2(185,285),"Keine Auswahl verfügbar. Neue Skillpunkte erhältst du beim Leveln.",16,Color("d8e6dc"))
-	text_at(Vector2(165,394),"GELERNT · anklicken, um den gewählten Slot zu belegen",14,Color("ffe2aa"))
-	var known:Array=[]
-	for id in CLASS_SKILLS[class_id]:
-		if learned[id]:known.append(id)
-	for row in 4:
-		var i:int=row+menu_scroll
-		if i>=known.size():break
-		var id:int=known[i]
-		ui_button(Rect2(165,405+row*37,815,33),"%s · Rang %d · %s" % [ABILITIES[id]["name"],skill_levels[id],ABILITIES[id]["desc"]],true,id in slots)
-	text_at(Vector2(165,575),"Taste 4 ab Level 20: "+str(ABILITIES[class_ultimate()]["name"]),14,Color("d9e6d5"))
+		var sid:int=slots[slot];ui_button(Rect2(165+slot*204,190,193,40),"%d · %s" % [slot+1,"FREI" if sid<0 else ABILITIES[sid]["name"]],true,selected_slot==slot)
+	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
+	for card in mini(6,maxi(0,ids.size()-start)):
+		var id:int=ids[start+card];var col:=card%3;var row:=int(card/3.0);var x:=165+col*275;var y:=250+row*132
+		ui_box(Rect2(x,y,265,118),Color("314b54") if learned[id] else Color("243944"));draw_skill_icon(Vector2(x+12,y+12),id,30)
+		text_at(Vector2(x+50,y+31),ABILITIES[id]["name"],15,Color("fff1bc"),HORIZONTAL_ALIGNMENT_LEFT,198);text_at(Vector2(x+12,y+57),ABILITIES[id]["desc"],11,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,240)
+		var req:=int(ABILITIES[id]["req"]);var price:=skill_point_cost(id)
+		text_at(Vector2(x+12,y+88),"GELERNT · SLOT %d" % (selected_slot+1) if learned[id] else ("KAUFEN · %d SP" % price if level>=req else "GESPERRT · LV %d" % req),12,Color("9de6c2") if learned[id] or level>=req else Color("c98d84"))
+	text_at(Vector2(165,530),"Gelernte Skills anklicken → ausgewählten Slot belegen · Wechsel bei Borin kostenlos.",13,Color("d9e6d5"))
+	text_at(Vector2(165,554),"Verschmelzungen gibt es nur am Kristall neben Borin.",13,Color("b9d9cf"))
+	var mastery:=["Wut: %.0f/100" % warrior_rage,"Arkaner Schritt: %s" % ("bereit" if arcane_step_learned else "nach Finalquest"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id]
+	text_at(Vector2(165,578),"Klassenmeisterschaft · "+mastery,13,Color("ffe2aa"))
+
+func draw_fusion_crystal() -> void:
+	var p:=BORIN_CRYSTAL_POS
+	draw_circle(p,34,Color("5e53a8",0.22));draw_colored_polygon(PackedVector2Array([p+Vector2(0,-48),p+Vector2(25,-8),p+Vector2(15,40),p+Vector2(-18,40),p+Vector2(-27,-8)]),Color("8f7de8"));draw_colored_polygon(PackedVector2Array([p+Vector2(0,-39),p+Vector2(13,-5),p+Vector2(6,25),p+Vector2(-9,24),p+Vector2(-14,-6)]),Color("d8ccff"))
+	text_at(p+Vector2(-62,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,124)
+
+func draw_fusion_panel() -> void:
+	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(720,124),"%d SP · %d GOLD" % [skill_points,gold],16,Color("f6dc9a"));text_at(Vector2(165,160),"Beide Ausgangsskills bleiben erhalten.",13,Color("cbd9da"))
+	for i in FUSIONS.size():
+		var f:Dictionary=FUSIONS[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
+		ui_box(Rect2(165,y,800,104),Color("342f51") if learned[id] else Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s %s  +  %s %s" % [ABILITIES[a]["name"],"✓" if learned[a] else "✗",ABILITIES[b]["name"],"✓" if learned[b] else "✗"],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Skillpunkte · %d Gold" % [fusion_skill_cost(f),int(f["gold"])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),"GELERNT" if learned[id] else ("VERSCHMELZEN" if can_fuse(f) else "GESPERRT"),can_fuse(f),learned[id])
+
+func click_fusion(mouse:Vector2) -> void:
+	for i in FUSIONS.size():
+		if Rect2(745,223+i*118,190,45).has_point(mouse): buy_fusion(i);return
 
 func draw_skill_star(center: Vector2, tint: Color, lit: bool) -> void:
 	if lit: draw_rect(Rect2(center - Vector2(7, 7), Vector2(14, 14)), Color(tint, 0.2))
