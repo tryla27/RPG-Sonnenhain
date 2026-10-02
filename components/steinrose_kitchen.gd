@@ -152,7 +152,7 @@ func cook(g, index: int = -1) -> bool:
 		if not remove_item_count(g,item_name,int(RECIPES[use_index]["ingredients"][item_name])):
 			return false
 	var info := FoodSystem.by_name(str(RECIPES[use_index]["name"]))
-	var item := g.make_item(str(RECIPES[use_index]["name"]),"food",1,0,int(info.get("price",30)),"",g.level)
+	var item: Dictionary = g.make_item(str(RECIPES[use_index]["name"]),"food",1,0,int(info.get("price",30)),"",g.level)
 	if not g.add_item(item):
 		g.message("Steinrose: Das Gericht konnte nicht eingepackt werden.")
 		return false
