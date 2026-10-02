@@ -130,16 +130,16 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 				var spread:=float(ability.get("spread",0.0))
 				for shot_index in projectile_count:
 					var centered:=float(shot_index)-float(projectile_count-1)*.5
-					result["events"].append({"kind":"projectile","dir":direction.rotated(centered*spread),"damage":ability["damage"],"attack_id":state["id"]})
+					result["events"].append({"kind":"projectile","dir":direction.rotated(centered*spread),"damage":ability["damage"],"attack_id":state["id"],"ability_id":str(ability.get("id","basic"))})
 			else:
 				for victim in targets:
 					if hits(position,direction,victim["pos"],ability,float(config["hit_radius"])):
 						for hit_index in maxi(1,int(ability.get("multi",1))):
-							result["events"].append({"kind":"damage","target":victim["id"],"damage":ability["damage"],"attack_id":state["id"]})
+							result["events"].append({"kind":"damage","target":victim["id"],"damage":ability["damage"],"attack_id":state["id"],"ability_id":str(ability.get("id","basic"))})
 			if float(ability.get("dash",0.0))>0.0:
-				result["events"].append({"kind":"boss_move","dir":direction,"distance":float(ability["dash"])})
+				result["events"].append({"kind":"boss_move","dir":direction,"distance":float(ability["dash"]),"ability_id":str(ability.get("id","basic"))})
 			if float(ability.get("blink",0.0))>0.0:
-				result["events"].append({"kind":"boss_move","dir":-direction,"distance":float(ability["blink"])})
+				result["events"].append({"kind":"boss_move","dir":-direction,"distance":float(ability["blink"]),"ability_id":str(ability.get("id","basic"))})
 		var finish=strike+float(config["active_time"])+float(config["recovery"])
 		if float(state["age"])>=finish:
 			enemy["attack_wait"]=maxf(0,float(config["attack_cycle"])-float(state["age"]))
