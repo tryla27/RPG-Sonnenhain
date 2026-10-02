@@ -7571,11 +7571,6 @@ func ui_button(rect: Rect2, label: String, enabled: bool = true, active: bool = 
 
 func draw_hud() -> void:
 	var nearby_food := food_system.nearest(self)
-	if not nearby_food.is_empty():
-		var food_info:Dictionary=FoodSystem.FOODS[int(nearby_food["food"])]
-		var ripe:bool=food_system.ready_at(nearby_food["point"],Time.get_unix_time_from_system())
-		draw_ref_panel(Rect2(362,540,405,32))
-		text_at(Vector2(374,562),binding_short("interact")+" · "+(food_info["name"]+" pfluecken" if ripe else "Nachwachsen: %ds" % ceili(float(food_system.harvested.get(FoodSystem.key(nearby_food["point"]),0))-Time.get_unix_time_from_system())),14,Color(food_info["color"]))
 	draw_ref_panel(Rect2(10, 8, 348, 104))
 	draw_rect(Rect2(22, 16, 5, 17), [Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id])
 	text_at(Vector2(34, 32), "%s · %s · STUFE %d" % [hero_name if hero_name != "" else CLASS_NAMES[class_id].to_upper(), RACE_NAMES[hero_race], level], 15, Color("ffe9b8"))
@@ -7636,12 +7631,16 @@ func draw_hud() -> void:
 		var save_status_y:float=239.0 if food_system.meal_active() else (207.0 if food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system() else 181.0)
 		text_at(Vector2(14,save_status_y),server_save.status,10,Color("c9f0c4") if not server_save.dirty and server_save.ready else Color("ffe498"))
 	if save_notice_timer > 0.0:
-		text_at(Vector2(925, 205), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+		text_at(Vector2(925, 204), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, 180)
 	if notice_timer > 0:
 		ui_box(Rect2(12, 549, 510, 36), Color("415f59"))
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
 		text_at(Vector2(23, 573), short_notice, 15, Color("fff3c3"))
 	var nearest := ""
+	if not nearby_food.is_empty():
+		var nearby_food_info:Dictionary=FoodSystem.FOODS[int(nearby_food["food"])]
+		var nearby_ripe:bool=food_system.ready_at(nearby_food["point"],Time.get_unix_time_from_system())
+		nearest="E  ·  %s" % (nearby_food_info["name"]+" pflücken" if nearby_ripe else "Nachwachsen %02d:%02d" % [food_system.regrow_remaining(nearby_food["point"])/60,food_system.regrow_remaining(nearby_food["point"])%60])
 	for i in WAYSTONES.size():
 		if player_pos.distance_to(WAYSTONES[i]) < 185:
 			nearest = "F  ·  Wegstein: %s" % ("Reiseziele wählen" if i == 0 else ("zurück ins Dorf · aktiviert" if waystone_unlocked[i] else "aktivieren und zurück ins Dorf"))
@@ -9741,8 +9740,15 @@ func draw_remote_combat_visuals() -> void:
 			draw_arc(pos,radius,0.0,TAU,28,Color(accent,0.88*(1.0-progress)),4.0)
 			draw_line(pos,pos+dir*(70.0+progress*70.0),Color(accent,0.72*(1.0-progress)),7.0)
 
+func class_boss_hud_active()->bool:
+	for enemy in enemies:
+		if int(enemy.get("type",-1)) in [12,13,14] and float(enemy.get("hp",0.0))>0.0 and Vector2(enemy.get("pos",Vector2.ZERO)).distance_to(player_pos)<620.0:return true
+	return false
+
 func party_widget_rect() -> Rect2:
-	return Rect2((VIEW.x-300.0)*0.5,12.0,300.0,42.0)
+	# Bossleiste belegt die obere Mitte. Gruppeneinladung/-status wandert
+	# währenddessen darunter statt dieselben Pixel zu benutzen.
+	return Rect2((VIEW.x-300.0)*0.5,82.0 if class_boss_hud_active() else 12.0,300.0,42.0)
 
 func draw_party_widget() -> void:
 	var invite_from := int(party_state.get("invite_from",0))
@@ -9761,14 +9767,18 @@ func draw_party_widget() -> void:
 		text_at(box.position+Vector2(10,17),"GRUPPE · %d/%d" % [members.size(),PARTY_MAX_MEMBERS],12,Color("ffe0a1"))
 		text_at(box.position+Vector2(10,34),", ".join(member_names).substr(0,42),11,Color("e7f2e8"))
 
+func multiplayer_debug_rect() -> Rect2:
+	# Oberhalb liegen Regionskopf + Minimap + KOOP/Save-Hinweise.
+	return Rect2(VIEW.x-265.0,218.0,253.0,39.0)
+
 func draw_multiplayer_debug_overlay() -> void:
-	if not is_web_platform() or network_mode == "offline" or not character_created: return
-	var peer_id := multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else local_peer_id
-	var box := Rect2(VIEW.x-265.0,8.0,253.0,39.0)
-	draw_rect(box,Color(0.02,0.05,0.07,0.62))
+	if not is_web_platform() or network_mode == "offline" or not character_created:return
+	var peer_id:=multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else local_peer_id
+	var box:=multiplayer_debug_rect()
+	draw_rect(box,Color(0.02,0.05,0.07,0.72))
 	draw_rect(box,Color("78c7d9",0.55),false,1.0)
 	text_at(box.position+Vector2(7,15),"NET v%d · #%d · %d online · %dms" % [NETWORK_PROTOCOL_VERSION,peer_id,int(server_sync_status.get("online",0)),maxi(0,network_ping_ms)],10,Color("d9f7ff"))
-	text_at(box.position+Vector2(7,31),"%d Mobs · %d bewegen · Remote %d" % [int(server_sync_status.get("mobs",enemies.size())),int(server_sync_status.get("moving_mobs",0)),remote_players.size()],10,Color("d5dfb8"))
+	text_at(box.position+Vector2(7,31),"%d Mobs · %d aktiv · Remote %d" % [int(server_sync_status.get("mobs",enemies.size())),int(server_sync_status.get("moving_mobs",0)),remote_players.size()],10,Color("d5dfb8"))
 
 func draw_party_panel() -> void:
 	text_at(Vector2(205,150),"GRUPPE",31,Color("ffe1a0"))
