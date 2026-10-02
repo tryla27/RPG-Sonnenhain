@@ -17,6 +17,7 @@ var server_save = ServerSaveClient.new()
 var account_store = AccountStore.new()
 var account_name := ""
 var account_password := ""
+var account_password_confirm := ""
 var account_focus := 0
 var account_status := ""
 var account_characters: Array = []
@@ -188,39 +189,44 @@ const CLASS_RELIC_RESERVE_MS := 15000
 const QUESTS := [
 	{"title":"Schleime im Blütenwald", "npc":"Mira", "target":0, "count":8, "xp":60, "gold":75, "reward":"Waldklinge"},
 	{"title":"Die Käferplage", "npc":"Mira", "target":1, "count":8, "xp":85, "gold":110, "reward":"Blütenanhänger"},
-	{"title":"Pilze auf Beinen", "npc":"Liora", "target":2, "count":9, "xp":110, "gold":130, "reward":"Waldelixier"},
-	{"title":"Wölfe im Pilzwald", "npc":"Borin", "target":3, "count":9, "xp":140, "gold":160, "reward":"Wolfszahn"},
-	{"title":"Die alten Wächter", "npc":"Borin", "target":4, "count":9, "xp":190, "gold":220, "reward":"Wächterschild"},
+	{"title":"Pilze auf Beinen", "npc":"Mira", "target":2, "count":9, "xp":110, "gold":130, "reward":"Waldelixier"},
+	{"title":"Wölfe im Pilzwald", "npc":"Mira", "target":3, "count":9, "xp":140, "gold":160, "reward":"Wolfszahn"},
+	{"title":"Die alten Wächter", "npc":"Mira", "target":4, "count":9, "xp":190, "gold":220, "reward":"Wächterschild"},
 	{"title":"Spuk in den Ruinen", "npc":"Mira", "target":5, "count":9, "xp":230, "gold":250, "reward":"Geisterklinge"},
-	{"title":"Kristallfieber", "npc":"Liora", "target":6, "count":10, "xp":270, "gold":300, "reward":"Kristallherz"},
-	{"title":"Splitter im Mondlicht", "npc":"Liora", "target":7, "count":10, "xp":320, "gold":360, "reward":"Splitterkrone"},
-	{"title":"Asche vor den Toren", "npc":"Borin", "target":8, "count":11, "xp":380, "gold":420, "reward":"Aschenklinge"},
-	{"title":"Herz aus Glut", "npc":"Borin", "target":9, "count":11, "xp":550, "gold":600, "reward":"Glutbrecher"},
+	{"title":"Kristallfieber", "npc":"Mira", "target":6, "count":10, "xp":270, "gold":300, "reward":"Kristallherz"},
+	{"title":"Splitter im Mondlicht", "npc":"Mira", "target":7, "count":10, "xp":320, "gold":360, "reward":"Splitterkrone"},
+	{"title":"Asche vor den Toren", "npc":"Mira", "target":8, "count":11, "xp":380, "gold":420, "reward":"Aschenklinge"},
+	{"title":"Herz aus Glut", "npc":"Mira", "target":9, "count":11, "xp":550, "gold":600, "reward":"Glutbrecher"},
 	{"title":"Krabben am Strand", "npc":"Mira", "target":10, "count":8, "xp":110, "gold":140, "reward":"Muschelring"},
-	{"title":"Stimmen im Wasser", "npc":"Liora", "target":11, "count":8, "xp":180, "gold":220, "reward":"Gezeitenstein"},
-	{"title":"Der Kriegsherr", "npc":"Borin", "target":12, "count":1, "xp":600, "gold":750, "reward":"Kampfsiegel"},
-	{"title":"Der Arkanhüter", "npc":"Liora", "target":13, "count":1, "xp":800, "gold":950, "reward":"Arkankern"},
+	{"title":"Stimmen im Wasser", "npc":"Mira", "target":11, "count":8, "xp":180, "gold":220, "reward":"Gezeitenstein"},
+	{"title":"Der Kriegsherr", "npc":"Mira", "target":12, "count":1, "xp":600, "gold":750, "reward":"Kampfsiegel"},
+	{"title":"Der Arkanhüter", "npc":"Mira", "target":13, "count":1, "xp":800, "gold":950, "reward":"Arkankern"},
 	{"title":"Der Jagdmeister", "npc":"Mira", "target":14, "count":1, "xp":1100, "gold":1300, "reward":"Jagdzeichen"},
-	{"title":"Spuren im Nebel", "npc":"Liora", "target":17, "count":9, "xp":310, "gold":280, "reward":"Nebelamulett"},
+	{"title":"Spuren im Nebel", "npc":"Mira", "target":17, "count":9, "xp":310, "gold":280, "reward":"Nebelamulett"},
 	{"title":"Lichter ohne Namen", "npc":"Mira", "target":18, "count":9, "xp":360, "gold":325, "reward":"Lichtsplitter"},
-	{"title":"Das goldene Harz", "npc":"Borin", "target":19, "count":10, "xp":610, "gold":490, "reward":"Harzpanzer"},
-	{"title":"Wurzeln der Plage", "npc":"Liora", "target":20, "count":10, "xp":680, "gold":540, "reward":"Wurzelring"},
+	{"title":"Das goldene Harz", "npc":"Mira", "target":19, "count":10, "xp":610, "gold":490, "reward":"Harzpanzer"},
+	{"title":"Wurzeln der Plage", "npc":"Mira", "target":20, "count":10, "xp":680, "gold":540, "reward":"Wurzelring"},
 	{"title":"Die versunkene Quelle", "npc":"Mira", "target":21, "count":11, "xp":880, "gold":760, "reward":"Quellensiegel"},
-	{"title":"Perlen im Dunkel", "npc":"Liora", "target":22, "count":11, "xp":960, "gold":820, "reward":"Perlenring"},
-	{"title":"Ruf vom Dämmergrat", "npc":"Borin", "target":23, "count":12, "xp":1200, "gold":1080, "reward":"Greifenfeder"},
+	{"title":"Perlen im Dunkel", "npc":"Mira", "target":22, "count":11, "xp":960, "gold":820, "reward":"Perlenring"},
+	{"title":"Ruf vom Dämmergrat", "npc":"Mira", "target":23, "count":12, "xp":1200, "gold":1080, "reward":"Greifenfeder"},
 	{"title":"Ritter der letzten Nacht", "npc":"Mira", "target":24, "count":12, "xp":1380, "gold":1180, "reward":"Dämmerrüstung"},
-	{"title":"Flügel über dem Garten", "npc":"Liora", "target":25, "count":13, "xp":1750, "gold":1500, "reward":"Himmelslicht"},
-	{"title":"Die letzte Wache", "npc":"Borin", "target":26, "count":13, "xp":2100, "gold":1750, "reward":"Sternenring"}
+	{"title":"Flügel über dem Garten", "npc":"Mira", "target":25, "count":13, "xp":1750, "gold":1500, "reward":"Himmelslicht"},
+	{"title":"Die letzte Wache", "npc":"Mira", "target":26, "count":13, "xp":2100, "gold":1750, "reward":"Sternenring"}
+]
+const BORIN_QUESTS := [
+	{"title":"Borins erste Prüfung","req":3,"target":0,"count":6,"skill_points":1,"item_rarity":1,"item_power":9},
+	{"title":"Borins Meisterprobe","req":20,"target":19,"count":8,"skill_points":2,"item_rarity":2,"item_power":30},
+	{"title":"Borins letzte Lehre","req":39,"target":25,"count":10,"skill_points":3,"item_rarity":3,"item_power":58}
 ]
 const NPCS := [
-	{"name":"Mira", "role":"Älteste · Quests & Dorf", "pos":Vector2(1476, 1560), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 490), "color":Color("6783bd"), "kind":"quest"},
-	{"name":"Liora", "role":"Forscherin · Quests & Wissen", "pos":Vector2(276, 430), "color":Color("6bbba4"), "kind":"quest"},
-	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(276, 2040), "color":Color("ab6e60"), "kind":"smith"},
-	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(276, 1010), "color":Color("c080aa"), "kind":"stylist"},
-	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1126, 490), "color":Color("9f8bcc"), "kind":"apprentice"},
-	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(546, 1410), "color":Color("e2bc91"), "kind":"healer_alchemy"},
-	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1316, 2050), "color":Color("a48cbd"), "kind":"arena"}
+	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1476, 1550), "color":Color("a77ccb"), "kind":"quest"},
+	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 470), "color":Color("6783bd"), "kind":"quest"},
+	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1476, 1550), "color":Color("6bbba4"), "kind":"quest"},
+	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(276, 2030), "color":Color("ab6e60"), "kind":"smith"},
+	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(276, 1000), "color":Color("c080aa"), "kind":"stylist"},
+	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1126, 480), "color":Color("9f8bcc"), "kind":"apprentice"},
+	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(546, 1400), "color":Color("e2bc91"), "kind":"healer_alchemy"},
+	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1412, 2120), "color":Color("a48cbd"), "kind":"arena"}
 ]
 const SHOPS := {
 	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
@@ -314,6 +320,8 @@ var class_mastery_unlocked := false
 var warrior_rage := 0.0
 var ranger_hunt_meter := 0.0
 var ranger_hunt_buff := 0.0
+var ranger_ultimate_speed_timer := 0.0
+var ranger_ultimate_speed_mult := 1.0
 var ranger_stealth_timer := 0.0
 var robotics_overclock_timer := 0.0
 const DEATH_DURATION := 1.15
@@ -326,6 +334,8 @@ var last_inventory_click_uid := -1
 var last_inventory_click_msec := -10000
 var shop_page := 0
 var quests: Array = []
+var borin_quests: Array = []
+var pip_loan_received := false
 var enemies: Array = []
 var drops: Array = []
 var effects: Array = []
@@ -420,6 +430,7 @@ var is_walking := false
 var is_sprinting := false
 var stamina := 100.0
 var sprint_blend := 0.0
+var sprint_heading := Vector2.ZERO
 var sprint_regen_delay := 0.0
 var sprint_block_timer := 0.0
 var sprint_exhausted := false
@@ -733,6 +744,8 @@ func _ready() -> void:
 	reset_class_skills()
 	for i in QUESTS.size():
 		quests.append({"state":0, "progress":0})
+	for i in BORIN_QUESTS.size():
+		borin_quests.append({"state":0,"progress":0})
 	for i in WORLD_EVENTS.size():
 		event_states.append(0)
 		event_progress.append(0)
@@ -785,6 +798,8 @@ func reset_class_skills() -> void:
 	warrior_rage = 0.0
 	ranger_hunt_meter = 0.0
 	ranger_hunt_buff = 0.0
+	ranger_ultimate_speed_timer = 0.0
+	ranger_ultimate_speed_mult = 1.0
 	ranger_stealth_timer = 0.0
 	robotics_overclock_timer = 0.0
 	learned.resize(ABILITIES.size())
@@ -836,7 +851,7 @@ func _on_connected_to_server() -> void:
 	if account_pending_action in ["login","register"]:
 		var action:=account_pending_action
 		account_pending_action=""
-		rpc_account_request.rpc_id(1,action,account_name.strip_edges(),account_password)
+		rpc_account_request.rpc_id(1,action,account_name.strip_edges(),account_password,account_password_confirm if action=="register" else "")
 	if character_created:
 		rpc_player_presence.rpc_id(1, local_player_state())
 		push_player_state()
@@ -992,6 +1007,26 @@ func disconnect_multiplayer(show_message: bool = true) -> void:
 	invite_code = ""
 	if show_message: network_status = "Offline"
 
+func save_and_return_to_start() -> bool:
+	# Ein P2P-Host darf die Sitzung nicht schließen, solange andere Spieler
+	# verbunden sind. close() auf dem Host würde sonst alle Peers herauswerfen.
+	if network_mode == "host" and multiplayer.multiplayer_peer != null and not multiplayer.get_peers().is_empty():
+		save_game()
+		pause_status = "Andere Spieler sind noch verbunden. Als Host kannst du erst ins Hauptmenü, wenn sie die Sitzung verlassen haben."
+		message(pause_status)
+		play_sound("menu")
+		return false
+	save_game()
+	refresh_save_slot_labels()
+	# Client-Abmeldung trennt nur diesen Spieler vom Dedicated Server.
+	# Offline bleibt offline; ein Host ohne Peers kann gefahrlos schließen.
+	if network_mode != "offline":
+		disconnect_multiplayer(false)
+	panel = "start"
+	selected_save_slot = active_save_slot
+	play_sound("menu")
+	return true
+
 func server_action_allowed(peer_id: int, action_key: String, cooldown_ms: int) -> bool:
 	if peer_id <= 0: return false
 	var now := Time.get_ticks_msec()
@@ -1107,6 +1142,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"rescue_state":clampi(int(state.get("rescue_state",0)),0,3),
 		"rescue_kills":clampi(int(state.get("rescue_kills",0)),0,RESCUE_GOAL),
 		"active_quests":sanitize_active_quest_rows(state.get("active_quests",[])),
+		"active_borin_quests":sanitize_active_borin_quest_rows(state.get("active_borin_quests",[])),
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
@@ -1124,7 +1160,8 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
-		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2
+		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2,
+		"test_mode":bool(state.get("test_mode",false))
 	}
 	clean["teleport_serial"]=int(state.get("teleport_serial",0)) if teleported or context_changed or not remote_players.has(sender) else int(remote_players[sender].get("teleport_serial",0))
 	clean["state_tick"]=Time.get_ticks_msec()
@@ -1446,20 +1483,38 @@ func max_stamina() -> float:
 	return [100.0,120.0,105.0][clampi(hero_race,0,2)] + [15.0,-10.0,5.0][clampi(class_id,0,2)]
 
 func sprint_speed_mult() -> float:
-	var race_mult:float=[1.45,1.40,1.50][clampi(hero_race,0,2)]
-	var class_mult:float=[1.0,1.0,1.05][clampi(class_id,0,2)]
+	var race_mult:float=[1.46,1.42,1.50][clampi(hero_race,0,2)]
+	# Schütze erreicht das höchste Tempo, Krieger hält den Sprint dafür länger.
+	var class_mult:float=[1.00,1.02,1.08][clampi(class_id,0,2)]
 	return race_mult*class_mult
 
 func sprint_drain_rate() -> float:
 	var race_rate:float=[18.0,17.0,20.0][clampi(hero_race,0,2)]
-	return race_rate*(0.95 if class_id==0 else 1.0)
+	return race_rate*[0.86,1.0,1.05][clampi(class_id,0,2)]
 
 func stamina_regen_rate() -> float:
 	var race_rate:float=[24.0,22.0,27.0][clampi(hero_race,0,2)]
 	return race_rate*(1.10 if class_id in [1,2] else 1.0)
 
 func sprint_acceleration() -> float:
-	return [3.8,2.9,5.0][clampi(hero_race,0,2)]
+	# Rund 0.8-1.2 Sekunden bis zum vollen Sprint; Schütze zieht am schnellsten an.
+	return [1.02,0.92,1.34][clampi(class_id,0,2)] * [1.0,0.92,1.08][clampi(hero_race,0,2)]
+
+func sprint_speed_curve(blend:float)->float:
+	var t:=clampf(blend,0.0,1.0)
+	# Smoothstep hält die ersten ~0.4 s als fühlbaren Anlauf und zieht danach deutlich an.
+	return t*t*(3.0-2.0*t)
+
+func sprint_stamina_mult(blend:float)->float:
+	return lerpf(0.62,1.18,sprint_speed_curve(blend))
+
+func sprint_turn_retention(previous:Vector2,current:Vector2)->float:
+	if previous.length_squared()<0.01 or current.length_squared()<0.01:return 1.0
+	var alignment:=previous.normalized().dot(current.normalized())
+	if alignment < -0.15:return 0.34
+	if alignment < 0.35:return 0.58
+	if alignment < 0.72:return 0.82
+	return 1.0
 
 func stamina_in_combat() -> bool:
 	if attack_timer>0.0 or swing_timer>0.0 or hurt_until>combat_feedback.clock:return true
@@ -1475,6 +1530,8 @@ func sprint_requested(move:Vector2) -> bool:
 
 func stop_sprint(block_for:float=0.0)->void:
 	is_sprinting=false
+	sprint_heading=Vector2.ZERO
+	if block_for>0.0:sprint_blend=minf(sprint_blend,0.24)
 	sprint_block_timer=maxf(sprint_block_timer,block_for)
 
 func equipment_power(uid: int) -> int:
@@ -1622,6 +1679,8 @@ func _process(delta: float) -> void:
 	drain_timer = maxf(0.0, drain_timer - delta)
 	poison_blade_timer = maxf(0.0, poison_blade_timer - delta)
 	ranger_hunt_buff = maxf(0.0, ranger_hunt_buff - delta)
+	ranger_ultimate_speed_timer = maxf(0.0, ranger_ultimate_speed_timer - delta)
+	if ranger_ultimate_speed_timer <= 0.0: ranger_ultimate_speed_mult = 1.0
 	ranger_stealth_timer = maxf(0.0, ranger_stealth_timer - delta)
 	robotics_overclock_timer = maxf(0.0, robotics_overclock_timer - delta)
 	notice_timer = maxf(0.0, notice_timer - delta)
@@ -2076,26 +2135,34 @@ func update_player(delta: float) -> void:
 	if sprint_exhausted and stamina>=15.0:sprint_exhausted=false
 	var wants_sprint:=sprint_requested(move) and not sprint_exhausted
 	if wants_sprint:
-		sprint_regen_delay=0.75
-		stamina=maxf(0.0,stamina-sprint_drain_rate()*delta)
+		var retention:=sprint_turn_retention(sprint_heading,move)
+		if retention < 1.0:
+			sprint_blend*=retention
+			if retention <= 0.34:sprint_block_timer=maxf(sprint_block_timer,0.10)
+		sprint_heading=move.normalized()
+		sprint_regen_delay=0.85
+		stamina=maxf(0.0,stamina-sprint_drain_rate()*sprint_stamina_mult(sprint_blend)*delta)
 		if stamina<=0.01:
 			stamina=0.0
 			sprint_exhausted=true
 			wants_sprint=false
 	else:
+		sprint_heading=Vector2.ZERO
 		sprint_regen_delay=maxf(0.0,sprint_regen_delay-delta)
 		if sprint_regen_delay<=0.0:
 			var regen:=stamina_regen_rate()*(1.33 if not stamina_in_combat() else 1.0)
 			stamina=minf(max_stamina(),stamina+regen*delta)
 	var target_sprint:=1.0 if wants_sprint else 0.0
-	sprint_blend=move_toward(sprint_blend,target_sprint,delta*sprint_acceleration())
+	var accel:=sprint_acceleration() if wants_sprint else 2.6
+	sprint_blend=move_toward(sprint_blend,target_sprint,delta*accel)
 	is_sprinting=sprint_blend>0.18 and wants_sprint
 	is_walking = move.length_squared() > 0.01 or dash_timer > 0
 	if is_walking:
-		var anim_rate:=19.0 if dash_timer>0 else 11.0*lerpf(1.0,1.68,sprint_blend)
+		var anim_rate:=19.0 if dash_timer>0 else 11.0*lerpf(1.0,1.72,sprint_speed_curve(sprint_blend))
 		walk_phase += delta*anim_rate
-	var run_mult:=lerpf(1.0,sprint_speed_mult(),sprint_blend)
-	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult())*delta
+	var run_mult:=lerpf(1.0,sprint_speed_mult(),sprint_speed_curve(sprint_blend))
+	var ultimate_move_mult := ranger_ultimate_speed_mult if class_id == 2 and ranger_ultimate_speed_timer > 0.0 else 1.0
+	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult() * ultimate_move_mult)*delta
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
@@ -2194,8 +2261,16 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	for origin in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]:
 		if Rect2(origin+Vector2(-6,-4),Vector2(112,12)).grow(12).has_point(pos):return true
 	for house in house_positions():
-		if house==BORIN_HOUSE_POS:
+		var house_info:Dictionary={}
+		for candidate in VillageLayout.SHOPS:
+			if candidate["house"]==house and not candidate.has("shared_with"):
+				house_info=candidate
+				break
+		var house_kind:=str(house_info.get("kind","home"))
+		if house_kind=="borin":
 			if Rect2(house+Vector2(12,105),Vector2(232,110)).grow(hero_collision_radius()).has_point(pos):return true
+		elif house_kind=="arena":
+			if Rect2(house+Vector2(8,88),Vector2(368,136)).grow(hero_collision_radius()).has_point(pos):return true
 		elif Rect2(house + Vector2(8, 73), Vector2(176, 75)).grow(hero_collision_radius()).has_point(pos):
 			return true
 	for solid in (VILLAGE_REF_SOLIDS if USE_VILLAGE_REFERENCE_BACKGROUND else []):
@@ -2442,12 +2517,19 @@ func village_house(name:String)->Dictionary:
 
 func village_house_door(house:Dictionary)->Vector2:
 	var p:Vector2=house["house"]
-	return p + (Vector2(128,240) if str(house["kind"])=="borin" else Vector2(96,180))
+	match str(house["kind"]):
+		"borin": return p+Vector2(128,240)
+		"arena": return p+Vector2(192,260)
+		_: return p+Vector2(96,180)
+
+func village_resident_is_indoors(name:String)->bool:
+	return not village_house(name).is_empty()
 
 func nearby_village_house_door(max_distance:float=86.0)->Dictionary:
 	var best:Dictionary={}
 	var best_distance:=max_distance
 	for house in VillageLayout.SHOPS:
+		if house.has("shared_with"): continue
 		var d:=player_pos.distance_to(village_house_door(house))
 		if d<best_distance:
 			best=house
@@ -2754,19 +2836,27 @@ func _unhandled_input(event: InputEvent) -> void:
 		queue_redraw()
 		return
 	if panel in ["account_login","account_register"] and event is InputEventKey and event.pressed and not event.echo:
+		var registering:=panel=="account_register"
+		var focus_count:=3 if registering else 2
 		if event.keycode==KEY_TAB:
-			account_focus=1-account_focus
+			account_focus=(account_focus+1)%focus_count
 		elif event.keycode==KEY_ESCAPE:
-			panel="account_gate";account_password="";account_status=""
+			panel="account_gate";account_password="";account_password_confirm="";account_status=""
 		elif event.keycode==KEY_BACKSPACE:
 			if account_focus==0 and account_name.length()>0:account_name=account_name.left(account_name.length()-1)
 			elif account_focus==1 and account_password.length()>0:account_password=account_password.left(account_password.length()-1)
+			elif registering and account_focus==2 and account_password_confirm.length()>0:account_password_confirm=account_password_confirm.left(account_password_confirm.length()-1)
 		elif event.keycode==KEY_ENTER:
-			if account_name.strip_edges().length()>=3 and account_password.length()>=8:request_account(panel=="account_register")
+			if account_form_valid(registering):request_account(registering)
 		elif event.unicode>=32:
 			var typed:=String.chr(event.unicode)
 			if account_focus==0 and account_name.length()<24 and "abcdefghijklmnopqrstuvwxyzäöüß0123456789_-".contains(typed.to_lower()):account_name+=typed
 			elif account_focus==1 and account_password.length()<72:account_password+=typed
+			elif registering and account_focus==2 and account_password_confirm.length()<72:account_password_confirm+=typed
+		if registering and account_password_confirm!="" and account_password!=account_password_confirm:
+			account_status="Die Passwörter stimmen nicht überein."
+		elif account_status=="Die Passwörter stimmen nicht überein.":
+			account_status=""
 		queue_redraw()
 		return
 	# Texteingabe für einmalige Charaktererstellung.
@@ -2845,10 +2935,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and panel != "":
 		if event.button_index == MOUSE_BUTTON_LEFT: handle_panel_click(event.position)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "journal"]:
-			var skill_scroll_max := maxi(0, ceili(float(SKILL_TREES[skill_tree_tab].size()-6)/3.0)) if panel=="skills" else 0
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "skill_loadout", "journal"]:
+			var skill_scroll_max := maxi(0, ceili(float(SKILL_TREES[skill_tree_tab].size()-6)/3.0)) if panel=="skills" else (maxi(0, learned_loadout_skills().size()-7) if panel=="skill_loadout" else 0)
 			menu_scroll = mini(maxi(0, QUESTS.size() - 6) if panel == "journal" else skill_scroll_max, menu_scroll + 1)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and panel in ["skills", "journal"]:
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and panel in ["skills", "skill_loadout", "journal"]:
 			menu_scroll = maxi(0, menu_scroll - 1)
 		return
 	if event is InputEventKey and event.keycode == KEY_ESCAPE or event_matches_binding(event, "pause"):
@@ -2898,6 +2988,7 @@ func learn_arcane_step() -> bool:
 	return true
 
 func dodge() -> void:
+	stop_sprint(0.16)
 	var arcane := class_id == 1 and arcane_step_learned
 	var dir := movement_vector()
 	dash_dir = dir.normalized() if dir.length() > 0 else facing.normalized()
@@ -2984,6 +3075,7 @@ func normal_attack() -> void:
 	var variant := equipped_weapon_variant()
 	attack_timer = 0.62 if variant == "axe" else (0.78 if variant == "crossbow" else (0.45 if class_id == 0 else (0.62 if class_id == 1 else 0.52)))
 	if class_id == 2 and ranger_hunt_buff > 0.0: attack_timer /= 1.25
+	if class_id == 2 and ranger_ultimate_speed_timer > 0.0: attack_timer /= ranger_ultimate_speed_mult
 	if robotics_overclock_timer > 0.0: attack_timer /= 1.18
 	if class_mastery_unlocked and class_id == 0: warrior_rage = minf(100.0, warrior_rage + 8.0)
 	if class_mastery_unlocked and class_id == 2 and ranger_hunt_buff <= 0.0:
@@ -3140,7 +3232,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	rank = clampi(rank,1,5)
 	server_relay_combat_visual(sender,{"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))})
 	var level_cap := clampi(int(state.get("level",1)),1,99)
-	power = clampi(power,1,140 + level_cap * 30)
+	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
 	if id in [3,7,16,18,20,25,26,28,29,30]:
 		for shot in ability_projectiles(id,origin,dir,remote_class,power):
 			shot["owner_peer"]=sender
@@ -3155,11 +3247,24 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	else:
 		hit_arc(origin,dir,190.0,-0.15,power+8,false,"",sender)
 
+func ability_cast_power(id:int,rank:int) -> int:
+	var base:float=(17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012) * food_system.damage_mult()
+	if id == 15:
+		base *= 1.55 + primary_attribute() * 0.030 + rank * 0.10
+	elif id == 24:
+		base *= 1.65 + primary_attribute() * 0.034 + rank * 0.12
+	elif id == 33:
+		base *= 1.10 + primary_attribute() * 0.010 + rank * 0.05
+	return maxi(1,int(base))
+
 func use_ability(slot: int) -> void:
 	if slot < 0 or slot > 3: return
 	stop_sprint(0.22)
 	var id: int = class_ultimate() if slot == 3 else int(slots[slot])
 	if id < 0 or id >= ABILITIES.size() or not learned[id]: return
+	if id==19 and skill_levels[19]<=0:
+		message("Arkaner Sprung muss zuerst bei Borin gelernt werden.")
+		return
 	var ability: Dictionary = ABILITIES[id]
 	if float(ability["cd"]) <= 0.0: return
 	if float(cooldowns[id]) > 0 or energy < float(ability["cost"]): return
@@ -3177,7 +3282,7 @@ func use_ability(slot: int) -> void:
 	energy -= float(ability["cost"])
 	var rank: int = int(skill_levels[id])
 	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1))
-	var power := int((17 + level * 2.4 + weapon_power() * 1.15 + (rank - 1) * 8) * (1.0 + primary_attribute() * 0.012) * food_system.damage_mult())
+	var power := ability_cast_power(id,rank)
 	var cast_pos := player_pos
 	var cast_dir := facing
 	if uses_server_world():
@@ -3283,9 +3388,13 @@ func use_ability(slot: int) -> void:
 			for wave in 3:
 				impact_zones.append({"pos":player_pos, "delay":0.25 + wave * 0.38, "radius":130.0 + wave * 95.0, "damage":power + 20, "element":["eis", "blitz", "gift"][wave], "kind":id})
 		33:
-			for wave in 6:
-				var point := player_pos + facing * 210.0 + Vector2.RIGHT.rotated(float(wave) * 2.4) * (35.0 + (wave % 3) * 65.0)
-				impact_zones.append({"pos":point, "delay":0.3 + wave * 0.19, "radius":95.0, "damage":power + 28, "element":"", "kind":id})
+			var agility:=primary_attribute()
+			ranger_ultimate_speed_timer=10.0+rank*2.0+agility*0.10
+			ranger_ultimate_speed_mult=clampf(1.45+rank*0.11+agility*0.012,1.55,2.65)
+			for wave in 8:
+				var point := player_pos + facing * 225.0 + Vector2.RIGHT.rotated(float(wave) * 1.9) * (40.0 + (wave % 4) * 58.0)
+				impact_zones.append({"pos":point, "delay":0.22 + wave * 0.14, "radius":92.0, "damage":power + 24, "element":"", "kind":id})
+			effect(player_pos,"HIMMELSHAGEL · TEMPO x%.2f" % ranger_ultimate_speed_mult,Color("dff4a4"),1.4)
 		16, 18, 20, 25, 26, 28, 29, 30:
 			var count := 3 if id in [20, 26] else 1
 			for shot in count:
@@ -3543,6 +3652,7 @@ func finish_survival_run() -> void:
 	enemies.clear()
 	projectiles.clear()
 	enemy_projectiles.clear()
+	ensure_arena_reward_item()
 	panel = "arena_reward"
 	play_sound("level")
 	save_game()
@@ -3562,17 +3672,19 @@ func make_arena_weapon(wave:int) -> Dictionary:
 	item["design"]=2 if class_id==0 and choice in [1,2] else (3 if class_id==2 and choice==3 else choice%4)
 	return item
 
-func claim_arena_chest() -> void:
-	if arena_reward_claimed: return
+func ensure_arena_reward_item() -> void:
+	if not arena_reward_item.is_empty(): return
 	var tier := clampi(int(arena_reward_wave / 5.0), 0, 3)
 	if arena_reward_wave >= 25 and level >= 30: tier = 4
-	if arena_reward_item.is_empty():
-		arena_reward_item = make_item("Truhe der Ewigen Wacht · Welle %d" % arena_reward_wave, class_weapon_icon(), tier, 6 + level * 2 + arena_reward_wave, 0, ["eis", "blitz", "gift"][arena_reward_wave % 3], level)
-		var roll:float=randf()
-		var head_chance:float=0.0 if arena_reward_wave<5 else minf(.08,.02+floorf(arena_reward_wave/10.0)*.02)
-		if roll<head_chance:arena_reward_item=make_class_head(level)
-		elif roll<head_chance+arena_new_weapon_chance(arena_reward_wave):arena_reward_item=make_arena_weapon(arena_reward_wave)
-		save_game()
+	arena_reward_item = make_item("Truhe der Ewigen Wacht · Welle %d" % arena_reward_wave, class_weapon_icon(), tier, 6 + level * 2 + arena_reward_wave, 0, ["eis", "blitz", "gift"][arena_reward_wave % 3], level)
+	var roll:float=randf()
+	var head_chance:float=0.0 if arena_reward_wave<5 else minf(.08,.02+floorf(arena_reward_wave/10.0)*.02)
+	if roll<head_chance:arena_reward_item=make_class_head(level)
+	elif roll<head_chance+arena_new_weapon_chance(arena_reward_wave):arena_reward_item=make_arena_weapon(arena_reward_wave)
+
+func claim_arena_chest() -> void:
+	if arena_reward_claimed: return
+	ensure_arena_reward_item()
 	var reward:Dictionary=arena_reward_item
 	if not can_add_item(reward):
 		message("Inventar voll. Für die Arenabelohnung brauchst du einen freien Platz.")
@@ -3626,7 +3738,8 @@ func tavern_blocked(pos: Vector2) -> bool:
 func enter_village_house(name:String) -> void:
 	var house:=village_house(name)
 	if house.is_empty():return
-	var next_id:=VillageInteriors32.id_for_name(name)
+	var room_name:=str(house.get("shared_with",name))
+	var next_id:=VillageInteriors32.id_for_name(room_name)
 	if next_id<0:return
 	interior_return_pos=village_house_door(house)+Vector2(0,48)
 	save_game()
@@ -3639,7 +3752,7 @@ func enter_village_house(name:String) -> void:
 	battle_zones.clear()
 	play_sound("door_open")
 	update_music(0.05)
-	message("%s · %s" % [name,VillageInteriors32.role_for_id(interior_id)])
+	message("%s · %s" % [room_name,VillageInteriors32.role_for_id(interior_id)])
 	announce_multiplayer_context()
 
 func enter_tavern() -> void:
@@ -3659,7 +3772,14 @@ func leave_village_house() -> void:
 func leave_tavern() -> void:
 	leave_village_house()
 
+func sanitize_role_shop_stock() -> void:
+	if shop_stock.has("alchemy"):
+		shop_stock["alchemy"]=(shop_stock["alchemy"] as Array).filter(func(item): return str(item.get("icon","")) in ["potion","herb","essence"])
+	if shop_stock.has("smith"):
+		shop_stock["smith"]=(shop_stock["smith"] as Array).filter(func(item): return str(item.get("icon","")) in ["sword","armor","head"])
+
 func open_elara_alchemy() -> void:
+	sanitize_role_shop_stock()
 	merchant_kind="alchemy"
 	shop_page=0
 	panel="shop"
@@ -3669,20 +3789,49 @@ func open_elara_alchemy() -> void:
 	pending_purchase=-1
 	pending_purchase_item={}
 
-func interact_interior_owner() -> void:
-	var name:=VillageInteriors32.name_for_id(interior_id)
+func interior_actors() -> Array:
+	var room_name:=VillageInteriors32.name_for_id(interior_id)
+	if room_name in ["Mira","Liora"]:
+		return [
+			{"name":"Mira","role":"Älteste · alle Sonnenhain-Quests","pos":INTERIOR_CENTER+Vector2(-135,-90),"color":Color("a77ccb"),"kind":"quest"},
+			{"name":"Liora","role":"Forscherin · Wissen & Quest-Hinweise","pos":INTERIOR_CENTER+Vector2(135,-90),"color":Color("6bbba4"),"kind":"quest"}
+		]
+	if room_name=="Borin":
+		return [
+			{"name":"Borin","role":"Skillzauberer · Fähigkeiten & Prüfungen","pos":INTERIOR_CENTER+Vector2(-120,-90),"color":Color("6783bd"),"kind":"quest"},
+			{"name":"Pip","role":"Borins Gehilfe · Leihwaffen","pos":INTERIOR_CENTER+Vector2(130,-65),"color":Color("9f8bcc"),"kind":"apprentice"}
+		]
+	var pos:=INTERIOR_CENTER+Vector2(0,-95)
+	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-215,-42)
+	var npc_kind:="innkeeper" if room_name=="Alma" else ("smith" if room_name=="Torvald" else ("stylist" if room_name=="Fenna" else ("apprentice" if room_name=="Pip" else ("healer_alchemy" if room_name=="Elara" else ("arena" if room_name=="Arven" else "quest")))))
+	return [{"name":room_name,"role":VillageInteriors32.role_for_id(interior_id),"pos":pos,"color":Color("c9b58a"),"kind":npc_kind}]
+
+func nearby_interior_actor(max_distance:float=145.0)->Dictionary:
+	var best:Dictionary={}
+	var best_distance:=max_distance
+	for actor in interior_actors():
+		var distance:=player_pos.distance_to(actor["pos"])
+		if distance<best_distance:
+			best=actor
+			best_distance=distance
+	return best
+
+func interact_interior_owner(name:String="") -> void:
+	if name=="": name=VillageInteriors32.name_for_id(interior_id)
 	match name:
 		"Alma": steinrose.open(self)
 		"Borin":
 			panel="skills";skill_tree_tab=0;menu_scroll=0
 		"Pip":
-			message("Pip: Ich lerne bei Borin. Für Fähigkeiten und Fusionen bist du hier genau richtig.")
+			pip_dialogue()
 		"Elara": open_elara_alchemy()
 		"Fenna": panel="appearance"
 		"Torvald":
+			sanitize_role_shop_stock()
 			merchant_kind="smith";shop_page=0;panel="shop";selected_item=-1
 		"Arven": panel="arena_entry"
-		"Mira","Liora": quest_dialogue(name)
+		"Mira": quest_dialogue("Mira")
+		"Liora": message("Liora: Mira verwaltet die Aufgaben von Sonnenhain. Ich helfe dir mit Wissen und Hinweisen.")
 
 func enter_dungeon(index: int) -> void:
 	if dungeon_id >= 0 or arena_mode != "": return
@@ -3815,14 +3964,17 @@ func boss_max_hp(type:int)->float:
 
 func spawn_dedicated_bosses()->void:
 	for i in 3:
-		if boss_cooldowns[i]>0:continue
 		var site:Vector2=CLASS_BOSS_SITES[i]
 		var type:int=12+i
 		var nearby:=false
+		var nearby_test:=false
 		for peer in remote_players:
 			var state:Dictionary=remote_players[peer]
-			if str(state.get("context","world"))=="world" and network_player_position(int(peer)).distance_to(site)<=700:nearby=true
+			if str(state.get("context","world"))=="world" and network_player_position(int(peer)).distance_to(site)<=700:
+				nearby=true
+				nearby_test=nearby_test or bool(state.get("test_mode",false))
 		if not nearby:continue
+		if boss_cooldowns[i]>0 and not nearby_test:continue
 		var exists:=false
 		for mob in enemies:
 			if int(mob["type"])==type:exists=true
@@ -4065,6 +4217,14 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	gain_xp(enemy_xp_reward(type, elite_kind, level))
 	var coins: int = randi_range(2, 7) * (1 + int(type / 3.0)) * int([1, 3, 7][elite_kind])
 	drops.append({"pos":safe_drop_position(pos,Vector2(8,12)), "gold":coins, "life":80.0})
+	for bindex in BORIN_QUESTS.size():
+		var bstate:Dictionary=borin_quests[bindex]
+		var bq:Dictionary=BORIN_QUESTS[bindex]
+		if int(bstate["state"])==1 and int(bq["target"])==type:
+			bstate["progress"]=mini(int(bq["count"]),int(bstate["progress"])+1)
+			if int(bstate["progress"])>=int(bq["count"]):
+				bstate["state"]=2
+				message("Borins Prüfung geschafft: %s. Kehre zu Borin zurück!" % bq["title"])
 	for qindex in quests.size():
 		var quest: Dictionary = quests[qindex]
 		if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == type:
@@ -4251,8 +4411,9 @@ func interact() -> void:
 	if interior_id >= 0:
 		if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 215)) < 100:
 			leave_village_house()
-		elif player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -95)) < 135:
-			interact_interior_owner()
+		else:
+			var actor:=nearby_interior_actor()
+			if not actor.is_empty(): interact_interior_owner(str(actor["name"]))
 		return
 	if dungeon_id >= 0:
 		if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110:
@@ -4321,6 +4482,7 @@ func interact() -> void:
 	var closest: Dictionary = {}
 	var distance := 115.0
 	for npc in NPCS:
+		if village_resident_is_indoors(str(npc["name"])): continue
 		var d: float = player_pos.distance_to(npc["pos"])
 		if d < distance:
 			closest = npc
@@ -4501,6 +4663,55 @@ func quick_potion(restore_energy: bool) -> void:
 			return
 	message("Kein passender Trank im Inventar.")
 
+func borin_reward_item(quest_index:int)->Dictionary:
+	var q:Dictionary=BORIN_QUESTS[quest_index]
+	var icon:=class_weapon_icon()
+	var names:=["Prüfklinge","Prüfstab","Prüfbogen"]
+	var tier_names:=["des Lehrlings","des Meisters","der letzten Lehre"]
+	return make_item("%s %s" % [names[class_id],tier_names[quest_index]],icon,int(q["item_rarity"]),int(q["item_power"]),120+quest_index*550,"",int(q["req"]))
+
+func borin_quest_dialogue()->void:
+	for i in BORIN_QUESTS.size():
+		var q:Dictionary=BORIN_QUESTS[i]
+		var state:Dictionary=borin_quests[i]
+		if int(state["state"])==2:
+			var reward:=borin_reward_item(i)
+			if not can_add_item(reward):
+				message("Borin: Mach erst Platz im Inventar, dann bekommst du deine Belohnung.")
+				return
+			state["state"]=3
+			skill_points+=int(q["skill_points"])
+			add_item(reward)
+			message("Borin: Prüfung bestanden! +%d Skillpunkte · %s" % [int(q["skill_points"]),reward["name"]])
+			play_sound("level");save_game();return
+	for i in BORIN_QUESTS.size():
+		var q:Dictionary=BORIN_QUESTS[i]
+		if int(borin_quests[i]["state"])==0 and level>=int(q["req"]):
+			borin_quests[i]["state"]=1
+			message("Borin: %s — besiege %d %s." % [q["title"],int(q["count"]),ENEMY_TYPES[int(q["target"])]["name"]])
+			save_game();return
+	var next_req:=-1
+	for i in BORIN_QUESTS.size():
+		if int(borin_quests[i]["state"])==0:
+			next_req=int(BORIN_QUESTS[i]["req"]);break
+	message("Borin: Deine nächste Prüfung wartet ab Level %d." % next_req if next_req>0 else "Borin: Du hast alle drei Prüfungen gemeistert.")
+
+func pip_dialogue()->void:
+	if pip_loan_received:
+		message("Pip: Die Leihwaffe hast du schon. Bring sie gut durch deine ersten Kämpfe!")
+		return
+	var icon:=class_weapon_icon()
+	var weapon_names:=["Pips Leihschwert","Pips Leihstab","Pips Leihbogen"]
+	var loan:=make_item(weapon_names[class_id],icon,0,4,20,"",1)
+	loan["loaned"]=true
+	if not can_add_item(loan):
+		message("Pip: Mach einen Platz im Inventar frei, dann leihe ich dir deine Startwaffe.")
+		return
+	add_item(loan)
+	pip_loan_received=true
+	message("Pip: Für den Anfang leihe ich dir %s. Viel Glück!" % loan["name"])
+	play_sound("pickup");save_game()
+
 func quest_dialogue(npc_name: String) -> void:
 	for i in QUESTS.size():
 		if QUESTS[i]["npc"] != npc_name: continue
@@ -4560,7 +4771,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -4584,9 +4795,9 @@ func write_local_save(data: Dictionary) -> void:
 		pause_status="Lokales Speichern fehlgeschlagen. Vorherige Sicherung bleibt erhalten."
 		message(pause_status)
 		return
-	pause_status="Lokal gesichert ✓" if creative_mode else ("Server gespeichert ✓" if not server_save.dirty else "Lokal gesichert ✓ · Serverbestätigung ausstehend")
+	pause_status="Lokal gesichert OK" if creative_mode else ("Server gespeichert OK" if not server_save.dirty else "Lokal gesichert OK · Serverbestätigung ausstehend")
 	last_save_unix = int(Time.get_unix_time_from_system())
-	save_notice_text = "LOKAL GESICHERT" if creative_mode or server_save.dirty else "SERVER GESPEICHERT ✓"
+	save_notice_text = "LOKAL GESICHERT" if creative_mode or server_save.dirty else "SERVER GESPEICHERT OK"
 	save_notice_timer = 2.8
 	if not creative_mode: refresh_save_slot_labels()
 
@@ -4618,6 +4829,8 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	food_system.restore({})
 	quests.clear()
 	for i in QUESTS.size(): quests.append({"state":0, "progress":0})
+	borin_quests.clear()
+	for i in BORIN_QUESTS.size(): borin_quests.append({"state":0,"progress":0})
 	for i in WORLD_EVENTS.size():
 		event_states[i] = 0
 		event_progress[i] = 0
@@ -4647,6 +4860,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	cosmetic_accent=clampi(int(data.get("cosmetic_accent",0)),0,5)
 	stamina = max_stamina()
 	sprint_blend = 0.0
+	sprint_heading = Vector2.ZERO
 	sprint_exhausted = false
 	character_created = bool(data.get("character_created", data.has("class_id")))
 	player_uuid = str(data.get("player_uuid",""))
@@ -4762,6 +4976,11 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if stored_quests.size() > 0:
 		for i in mini(stored_quests.size(), QUESTS.size()):
 			quests[i] = stored_quests[i]
+	var stored_borin_quests:Variant=data.get("borin_quests",[])
+	if stored_borin_quests is Array:
+		for i in mini(stored_borin_quests.size(),BORIN_QUESTS.size()):
+			if stored_borin_quests[i] is Dictionary: borin_quests[i]=stored_borin_quests[i]
+	pip_loan_received=bool(data.get("pip_loan_received",false))
 		if stored_bosses.size() != bosses_defeated.size():
 			for i in 3: bosses_defeated[i] = int(quests[12 + i].get("state", 0)) >= 2
 	# Ältere Spielstände aus der ersten Version übernehmen.
@@ -4776,6 +4995,13 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		player_pos = Vector2(825, 1020)
 	mark_network_teleport()
 	if level < region_level(region_at(WAYSTONES[last_waystone])): last_waystone = 1
+	# Arkaner Sprung (Skill 19) ist ein normal zu lernender Skill ab Level 15.
+	# Alte Spielstände, die ihn fälschlich früh hatten, verlieren nur diesen Früh-Unlock.
+	if class_id==1 and level<int(ABILITIES[19]["req"]):
+		learned[19]=false
+		skill_levels[19]=0
+		for s in 3:
+			if slots[s]==19: slots[s]=-1
 	if level >= 20:
 		learned[class_ultimate()] = true
 		skill_levels[class_ultimate()] = mini(5, 1 + (level - 20) / 5)
@@ -4795,17 +5021,19 @@ func handle_panel_click(mouse: Vector2) -> void:
 		return
 	if panel=="account_gate":
 		if Rect2(300,320,550,58).has_point(mouse):
-			account_password="";account_status="";account_focus=0;panel="account_login";join_live_multiplayer()
+			account_password="";account_password_confirm="";account_status="";account_focus=0;panel="account_login";join_live_multiplayer()
 		elif Rect2(300,400,550,58).has_point(mouse):
-			account_password="";account_status="";account_focus=0;panel="account_register";join_live_multiplayer()
+			account_password="";account_password_confirm="";account_status="";account_focus=0;panel="account_register";join_live_multiplayer()
 		return
 	if panel in ["account_login","account_register"]:
+		var registering:=panel=="account_register"
 		if Rect2(300,275,550,48).has_point(mouse):account_focus=0
 		elif Rect2(300,365,550,48).has_point(mouse):account_focus=1
-		elif Rect2(300,455,550,52).has_point(mouse) and account_name.strip_edges().length()>=3 and account_password.length()>=8:
-			request_account(panel=="account_register")
-		elif Rect2(300,525,180,42).has_point(mouse):
-			panel="account_gate";account_password="";account_status=""
+		elif registering and Rect2(300,455,550,48).has_point(mouse):account_focus=2
+		elif Rect2(300,545 if registering else 455,550,52).has_point(mouse) and account_form_valid(registering):
+			request_account(registering)
+		elif Rect2(300,615 if registering else 525,180,42).has_point(mouse):
+			panel="account_gate";account_password="";account_password_confirm="";account_status=""
 		queue_redraw()
 		return
 	if panel=="account_migrate":
@@ -4814,6 +5042,20 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if Rect2(720,245+i*72+9,190,38).has_point(mouse):
 				claim_local_save(int(rows[i]["slot"]));return
 		if Rect2(220,535,280,44).has_point(mouse):finish_account_entry()
+		return
+	if panel=="account_characters":
+		for i in mini(3,account_characters.size()):
+			var y:=235+i*90
+			if Rect2(720,y+14,190,42).has_point(mouse) and not account_pending_load:
+				open_account_character(i)
+				return
+		if account_characters.is_empty() and Rect2(220,520,330,44).has_point(mouse):
+			active_save_slot=selected_save_slot
+			begin_character_creation()
+			return
+		if Rect2(590,520,340,44).has_point(mouse):
+			panel="start"
+			return
 		return
 	if panel == "start":
 		for candidate in 3:
@@ -4941,10 +5183,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 				play_sound("menu")
 				return
 		if Rect2(190,540,300,44).has_point(mouse):
-			save_game()
-			refresh_save_slot_labels()
-			disconnect_multiplayer(false)
-			panel="start"
+			save_and_return_to_start()
 		return
 	if panel == "settings":
 		if set_volume_from_mouse(mouse):
@@ -4972,10 +5211,6 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif not creative_mode and Rect2(590,480,260,38).has_point(mouse):
 			import_save_backup()
 		elif Rect2(300, 563, 550, 35).has_point(mouse):
-			if is_web_platform():
-				save_game()
-				JavaScriptBridge.get_interface("window").location.assign("/")
-				return
 			if arena_mode != "":
 				arena_mode = ""
 				player_pos = arena_return_pos
@@ -4987,11 +5222,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if interior_id >= 0:
 				interior_id = -1
 				player_pos = interior_return_pos
-			save_game()
-			refresh_save_slot_labels()
-			panel = "start"
-			selected_save_slot = active_save_slot
-			play_sound("menu")
+			var returned_to_start := save_and_return_to_start()
+			if returned_to_start and is_web_platform():
+				JavaScriptBridge.get_interface("window").location.assign("/")
+				return
 		elif creative_mode:
 			for index in 4:
 				if Rect2(300 + index * 113, 510, 105, 38).has_point(mouse):
@@ -5043,6 +5277,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		return
 	match panel:
 		"skills": click_skills(mouse)
+		"skill_loadout": click_skill_loadout(mouse)
 		"fusion": click_fusion(mouse)
 		"appearance": click_appearance(mouse)
 		"inventory": click_inventory(mouse)
@@ -5107,6 +5342,7 @@ func start_new_game() -> void:
 	class_id = pending_class
 	stamina = max_stamina()
 	sprint_blend = 0.0
+	sprint_heading = Vector2.ZERO
 	sprint_exhausted = false
 	rescue_state = 0
 	rescue_kills = 0
@@ -5138,8 +5374,11 @@ func start_new_game() -> void:
 	equipped_ring2_uid = -1
 	next_uid = 1
 	selected_item = -1
+	pip_loan_received = false
 	quests.clear()
 	for i in QUESTS.size(): quests.append({"state":0, "progress":0})
+	borin_quests.clear()
+	for i in BORIN_QUESTS.size(): borin_quests.append({"state":0,"progress":0})
 	for i in opened_chests.size(): opened_chests[i] = false
 	for i in boss_cooldowns.size(): boss_cooldowns[i] = 0.0
 	last_waystone = 1
@@ -5269,25 +5508,62 @@ func buy_skill(index:int) -> bool:
 	skill_points -= price;learned[index]=true;skill_levels[index]=1
 	message("%s gelernt · %d Skillpunkte" % [ABILITIES[index]["name"],price]);save_game();return true
 
+func fusion_source_skills()->Array:
+	var out:Array=[]
+	for id in range(0,40):
+		if id>=learned.size() or not learned[id]:continue
+		if id in CLASS_ULTIMATES or id in [9,10,11]:continue
+		# Nur aktiv nutzbare Fähigkeiten anbieten; passive Werte gehören nicht in den Kristall.
+		if float(ABILITIES[id].get("cd",0.0))<=0.0:continue
+		out.append(id)
+	return out
+
+func available_fusions()->Array:
+	var sources:=fusion_source_skills()
+	var free_outputs:Array=[]
+	for fusion in FUSIONS:
+		var output:=int(fusion["id"])
+		if output<learned.size() and not learned[output]:free_outputs.append(fusion)
+	var offers:Array=[]
+	if sources.size()<2:return offers
+	var pair_index:=0
+	for template in free_outputs:
+		if pair_index+1>=sources.size():pair_index=0
+		var a:=int(sources[pair_index])
+		var b:=int(sources[(pair_index+1)%sources.size()])
+		if a==b:break
+		var offer:=template.duplicate(true)
+		offer["a"]=a;offer["b"]=b
+		offers.append(offer)
+		pair_index+=2
+		if offers.size()>=3:break
+	return offers
+
 func fusion_skill_cost(fusion:Dictionary) -> int:
-	return (skill_point_cost(int(fusion["a"])) + skill_point_cost(int(fusion["b"]))) * 2
+	var a:=int(fusion["a"]);var b:=int(fusion["b"])
+	return maxi(1,ceili(float(skill_point_cost(a)+skill_point_cost(b))*0.75))
 
 func can_fuse(fusion:Dictionary) -> bool:
 	var a:=int(fusion["a"]);var b:=int(fusion["b"]);var id:=int(fusion["id"])
-	return not learned[id] and learned[a] and learned[b] and level >= int(ABILITIES[id]["req"]) and skill_points >= fusion_skill_cost(fusion) and gold >= int(fusion["gold"])
+	return a!=b and not learned[id] and learned[a] and learned[b] and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and skill_points >= fusion_skill_cost(fusion) and gold >= int(fusion["gold"])
 
 func buy_fusion(index:int) -> bool:
-	if index < 0 or index >= FUSIONS.size(): return false
-	var fusion:Dictionary=FUSIONS[index]
-	if not can_fuse(fusion): return false
+	var offers:=available_fusions()
+	if index < 0 or index >= offers.size(): return false
+	var fusion:Dictionary=offers[index]
+	if not can_fuse(fusion):
+		message("Diese Verschmelzung ist gerade nicht verfügbar.")
+		return false
 	var id:=int(fusion["id"]);var sp:=fusion_skill_cost(fusion)
 	skill_points-=sp;gold-=int(fusion["gold"]);learned[id]=true;skill_levels[id]=1
-	message("%s verschmolzen · -%d SP · -%d Gold" % [ABILITIES[id]["name"],sp,int(fusion["gold"])]);save_game();return true
+	message("%s + %s → %s · -%d SP · -%d Gold" % [ABILITIES[int(fusion["a"])]["name"],ABILITIES[int(fusion["b"])]["name"],ABILITIES[id]["name"],sp,int(fusion["gold"])])
+	save_game();return true
 
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
 		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("menu");return
-	if Rect2(718,145,118,38).has_point(mouse): quest_dialogue("Borin");return
+	if Rect2(718,145,118,38).has_point(mouse): borin_quest_dialogue();return
+	if Rect2(848,145,118,38).has_point(mouse): panel="skill_loadout";menu_scroll=0;play_sound("menu");return
 	for slot in 3:
 		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -5299,6 +5575,34 @@ func click_skills(mouse: Vector2) -> void:
 					if slots[s]==id:slots[s]=-1
 				slots[selected_slot]=id;save_game()
 			else: buy_skill(id)
+			return
+
+func learned_loadout_skills()->Array:
+	var out:Array=[]
+	for id in range(ABILITIES.size()):
+		if id>=learned.size() or not learned[id]:continue
+		if id in CLASS_ULTIMATES:continue
+		if id in [9,10,11]:continue
+		out.append(id)
+	return out
+
+func click_skill_loadout(mouse:Vector2)->void:
+	if Rect2(165,145,140,38).has_point(mouse):panel="skills";menu_scroll=0;return
+	for slot in 3:
+		if Rect2(165+slot*204,200,193,44).has_point(mouse):
+			selected_slot=slot
+			return
+	var known:=learned_loadout_skills()
+	for row in 7:
+		var i:=row+menu_scroll
+		if i>=known.size():break
+		if Rect2(165,270+row*40,815,35).has_point(mouse):
+			var id:=int(known[i])
+			for s in 3:
+				if slots[s]==id:slots[s]=-1
+			slots[selected_slot]=id
+			save_game()
+			play_sound("menu")
 			return
 
 func upgrade_skill(index: int) -> void:
@@ -5446,14 +5750,16 @@ func refresh_shop_stock() -> void:
 	var tier := maxi(1, level)
 	var weapon := class_weapon_icon()
 	var weapon_word: String = {"sword":"Klinge", "staff":"Stab", "bow":"Bogen"}[weapon]
+	var smith_weapon := "sword"
+	var smith_weapon_word := "Klinge"
 	var suffix: String = ["der Wiesen", "des Nebels", "der Funken", "der Gezeiten", "des Morgenrots", "des Himmels"].pick_random()
 	var rarity := 1 if tier < 12 else (2 if tier < 30 else 3)
 	var elements := ["eis", "blitz", "gift"]
 	var shop_element: String = elements.pick_random()
 	shop_stock = {
 		"smith":[
-			{"name":"%s %s" % [weapon_word, suffix], "icon":weapon, "power":4 + tier * 2, "price":80 + tier * 20, "rarity":rarity, "level":tier},
-			{"name":"%s · %s" % [weapon_word, shop_element.capitalize()], "icon":weapon, "power":7 + tier * 2, "price":135 + tier * 28, "rarity":rarity, "level":tier, "element":shop_element},
+			{"name":"%s %s" % [smith_weapon_word, suffix], "icon":smith_weapon, "power":4 + tier * 2, "price":80 + tier * 20, "rarity":rarity, "level":tier},
+			{"name":"%s · %s" % [smith_weapon_word, shop_element.capitalize()], "icon":smith_weapon, "power":7 + tier * 2, "price":135 + tier * 28, "rarity":rarity, "level":tier, "element":shop_element},
 			{"name":"Meisterrüstung %s" % suffix, "icon":"armor", "power":5 + int(tier / 3.0), "price":520 + tier * 64, "rarity":mini(3, rarity + 1), "level":tier}],
 		"alchemy":[
 			{"name":"Heiltrank", "icon":"potion", "power":0, "price":35, "rarity":1},
@@ -6451,10 +6757,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 func draw_village_interior() -> void:
 	draw_rect(Rect2(camera_pos,VIEW),Color("141e23"))
 	VillageInteriors32.paint(self,INTERIOR_CENTER,interior_id,font,touch_enabled,binding_short("interact"))
-	var name:=VillageInteriors32.name_for_id(interior_id)
-	var kind:=VillageInteriors32.kind_for_id(interior_id)
-	var npc_kind:="innkeeper" if name=="Alma" else ("smith" if name=="Torvald" else ("stylist" if name=="Fenna" else ("apprentice" if name=="Pip" else ("healer_alchemy" if name=="Elara" else ("arena" if name=="Arven" else "quest")))))
-	draw_npc({"name":name,"role":VillageInteriors32.role_for_id(interior_id),"pos":INTERIOR_CENTER+Vector2(0,-95),"color":Color("c9b58a"),"kind":npc_kind})
+	for actor in interior_actors(): draw_npc(actor)
 
 func draw_tavern_world() -> void:
 	draw_rect(Rect2(camera_pos, VIEW), Color("141e23"))
@@ -7090,9 +7393,12 @@ func draw_house(p: Vector2) -> void:
 		return
 	var kind:="home"
 	for house in VillageLayout.SHOPS:
-		if house["house"]==p:
+		if house["house"]==p and not house.has("shared_with"):
 			kind=str(house["kind"])
 			break
+	if kind=="arena":
+		StartScenery32.arena_building(self,p)
+		return
 	StartScenery32.themed_house(self,p,kind)
 func draw_npc(npc: Dictionary) -> void:
 	var p: Vector2 = npc["pos"]
@@ -7928,16 +8234,22 @@ func draw_hud() -> void:
 			nearest = "E  ·  Schatztruhe öffnen"
 			break
 	if player_pos.distance_to(BORIN_CRYSTAL_POS)<95: nearest="E  ·  Kristall der Verschmelzung"
+	var nearby_house:=nearby_village_house_door(110.0) if interior_id<0 else {}
+	if not nearby_house.is_empty():
+		nearest="E  ·  %s betreten" % ("Rathaus · Mira & Liora" if str(nearby_house["name"])=="Mira" else str(nearby_house["sign"]))
 	for npc in NPCS:
+		if village_resident_is_indoors(str(npc["name"])): continue
 		if player_pos.distance_to(npc["pos"]) < 105:
-			nearest = "E  ·  Elara · Vollheilung für %d Gold" % healing_cost() if npc["kind"] == "healer" else "E  ·  %s (%s)" % [npc["name"], npc["role"]]
+			nearest = "E  ·  %s (%s)" % [npc["name"], npc["role"]]
 			break
 	if rescue_state >= 2 and player_pos.distance_to(RESCUE_POS + Vector2(0, 120)) < 120:
 		nearest = "E  ·  Nela (Bewohnerin)"
 	if dungeon_id >= 0:
 		nearest = "E  ·  Gewölbe verlassen" if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110 else ("E  ·  Versiegelte Truhe" if player_pos.distance_to(DUNGEON_CENTER + Vector2(555, 0)) < 105 and dungeon_chest_ready(dungeon_id) else "")
 	elif interior_id >= 0:
-		nearest = "E  ·  Taverne verlassen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95 else ("E  ·  Alma ansprechen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -105)) < 130 else "")
+		nearest = "E  ·  Gebäude verlassen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95 else ""
+		var interior_actor:=nearby_interior_actor(150.0)
+		if not interior_actor.is_empty(): nearest="E  ·  %s ansprechen" % interior_actor["name"]
 	else:
 		if player_pos.distance_to(TAVERN_HOUSE + Vector2(126, 157)) < 112: nearest = "E  ·  Zur Steinrose betreten"
 		for index in DUNGEON_ENTRANCES.size():
@@ -8252,12 +8564,13 @@ func draw_panel() -> void:
 	draw_rect(Rect2(164, 598, 824, 2), Color("9d845e"))
 	for index in 7:
 		draw_rect(Rect2(172 + index * 116, 101, 5, 5), Color("c6aa79", 0.6))
-	if panel not in ["account_gate","account_login","account_register","account_migrate","start", "creation", "multiplayer", "arena_reward", "victory"]: ui_button(Rect2(965, 91, 41, 35), "X")
+	if panel not in ["account_gate","account_login","account_register","account_migrate","account_characters","start", "creation", "multiplayer", "arena_reward", "victory"]: ui_button(Rect2(965, 91, 41, 35), "X")
 	match panel:
 		"account_gate": draw_account_gate()
 		"account_login": draw_account_form(false)
 		"account_register": draw_account_form(true)
 		"account_migrate": draw_account_migrate()
+		"account_characters": draw_account_characters()
 		"start": draw_start_panel()
 		"creation": draw_creation_panel()
 		"creation_review": draw_creation_review_panel()
@@ -8269,6 +8582,7 @@ func draw_panel() -> void:
 		"controls": draw_controls_panel()
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
+		"skill_loadout": draw_skill_loadout_panel()
 		"fusion": draw_fusion_panel()
 		"appearance": draw_appearance_panel()
 		"inventory": draw_inventory_panel()
@@ -8406,21 +8720,32 @@ func draw_account_gate() -> void:
 	ui_button(Rect2(300,400,550,58),"BENUTZER ERSTELLEN")
 	if account_status!="":text_at(Vector2(300,490),account_status,14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_CENTER,550)
 
-func masked_password()->String:
-	return "•".repeat(account_password.length())
+func masked_password(value:String=account_password)->String:
+	return "•".repeat(value.length())
+
+func account_form_valid(registering:bool)->bool:
+	if account_name.strip_edges().length()<3 or account_password.length()<8:return false
+	if registering and (account_password_confirm.length()<8 or account_password!=account_password_confirm):return false
+	return account_pending_action==""
 
 func draw_account_form(registering:bool)->void:
-	text_at(Vector2(300,165),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",31,Color("ffe2aa"))
-	text_at(Vector2(300,208),"Nur Name und Passwort.",15,Color("d8e6dc"))
-	text_at(Vector2(300,260),"NAME",14,Color("e9cc90"))
-	var nr:=Rect2(300,275,550,48);draw_rect(nr,Color("22363c"));draw_rect(nr,Color("ffe2aa") if account_focus==0 else Color("8ba49c"),false,2)
+	text_at(Vector2(300,145 if registering else 165),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",31,Color("ffe2aa"))
+	text_at(Vector2(300,188 if registering else 208),"Name und Passwort%s." % (" zweimal" if registering else ""),15,Color("d8e6dc"))
+	text_at(Vector2(300,240 if registering else 260),"NAME",14,Color("e9cc90"))
+	var nr:=Rect2(300,255 if registering else 275,550,48);draw_rect(nr,Color("22363c"));draw_rect(nr,Color("ffe2aa") if account_focus==0 else Color("8ba49c"),false,2)
 	text_at(nr.position+Vector2(14,31),account_name if account_name!="" else "Name eingeben …",19,Color("fff0cf") if account_name!="" else Color("9fb4ac"))
-	text_at(Vector2(300,350),"PASSWORT",14,Color("e9cc90"))
-	var pr:=Rect2(300,365,550,48);draw_rect(pr,Color("22363c"));draw_rect(pr,Color("ffe2aa") if account_focus==1 else Color("8ba49c"),false,2)
+	text_at(Vector2(300,330 if registering else 350),"PASSWORT",14,Color("e9cc90"))
+	var pr:=Rect2(300,345 if registering else 365,550,48);draw_rect(pr,Color("22363c"));draw_rect(pr,Color("ffe2aa") if account_focus==1 else Color("8ba49c"),false,2)
 	text_at(pr.position+Vector2(14,31),masked_password() if account_password!="" else "Passwort eingeben …",19,Color("fff0cf") if account_password!="" else Color("9fb4ac"))
-	ui_button(Rect2(300,455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_name.strip_edges().length()>=3 and account_password.length()>=8 and account_pending_action=="")
-	ui_button(Rect2(300,525,180,42),"ZURÜCK")
-	if account_status!="":text_at(Vector2(500,552),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,350)
+	if registering:
+		text_at(Vector2(300,420),"PASSWORT WIEDERHOLEN",14,Color("e9cc90"))
+		var cr:=Rect2(300,435,550,48);draw_rect(cr,Color("22363c"));draw_rect(cr,Color("ffe2aa") if account_focus==2 else (Color("b96f68") if account_password_confirm!="" and account_password_confirm!=account_password else Color("8ba49c")),false,2)
+		text_at(cr.position+Vector2(14,31),masked_password(account_password_confirm) if account_password_confirm!="" else "Passwort erneut eingeben …",19,Color("fff0cf") if account_password_confirm!="" else Color("9fb4ac"))
+		if account_password_confirm!="" and account_password_confirm==account_password:
+			text_at(Vector2(865,466),"OK",14,Color("9de6c2"))
+	ui_button(Rect2(300,545 if registering else 455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_form_valid(registering))
+	ui_button(Rect2(300,615 if registering else 525,180,42),"ZURÜCK")
+	if account_status!="":text_at(Vector2(500,642 if registering else 552),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,350)
 
 func local_migration_slots()->Array:
 	var slots:Array=[]
@@ -8450,11 +8775,14 @@ func draw_account_migrate()->void:
 
 func finish_account_entry()->void:
 	account_migration_checked=true
-	panel="start"
 	account_status=""
 	refresh_save_slot_labels()
+	panel="account_characters" if not account_characters.is_empty() else "start"
 
 func request_account(registering:bool)->void:
+	if not account_form_valid(registering):
+		account_status="Die Passwörter stimmen nicht überein." if registering and account_password!=account_password_confirm else "Name mindestens 3 Zeichen, Passwort mindestens 8 Zeichen."
+		return
 	if network_mode!="client" or multiplayer.multiplayer_peer==null or multiplayer.multiplayer_peer.get_connection_status()!=MultiplayerPeer.CONNECTION_CONNECTED:
 		account_pending_action="register" if registering else "login"
 		join_live_multiplayer()
@@ -8462,7 +8790,7 @@ func request_account(registering:bool)->void:
 		return
 	account_pending_action="register" if registering else "login"
 	account_status="Prüfe Konto …"
-	rpc_account_request.rpc_id(1,account_pending_action,account_name.strip_edges(),account_password)
+	rpc_account_request.rpc_id(1,account_pending_action,account_name.strip_edges(),account_password,account_password_confirm if registering else "")
 
 func claim_local_save(slot:int)->void:
 	if not account_logged_in or network_mode!="client":return
@@ -8480,16 +8808,40 @@ func claim_local_save(slot:int)->void:
 func open_account_character(index:int)->void:
 	if index<0 or index>=account_characters.size():return
 	var c:Dictionary=account_characters[index]
+	active_save_slot=clampi(int(c.get("slot",1)),1,3)
 	player_uuid=str(c.get("uuid",""))
 	server_save.uuid=player_uuid
 	server_save.token=str(c.get("token",""))
 	server_save.revision=0
+	server_save.dirty=false
 	server_save.ready=false
 	server_save.loading=true
 	server_save.latest={}
+	server_save.inflight.clear()
+	server_save.last_request=""
+	server_save.submitted_hash=""
 	account_pending_load=true
-	panel="start"
+	account_status="Lade deinen Server-Spielstand …"
+	panel="account_characters"
 	rpc_zz_save_open.rpc_id(1,server_save.token,player_uuid)
+
+func draw_account_characters()->void:
+	text_at(Vector2(220,145),"DEINE CHARAKTERE",30,Color("ffe2aa"))
+	text_at(Vector2(220,184),"Wähle den Spielstand, der zu deinem Sonnenhain-Konto gehört.",14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,720)
+	if account_characters.is_empty():
+		text_at(Vector2(220,250),"Dieses Konto hat noch keinen verknüpften Charakter.",17,Color("b8cbc5"))
+		ui_button(Rect2(220,520,330,44),"NEUEN CHARAKTER ERSTELLEN")
+	else:
+		for i in mini(3,account_characters.size()):
+			var ch:Dictionary=account_characters[i]
+			var y:=235+i*90
+			ui_box(Rect2(220,y,710,70),Color("31474e"))
+			var cls:=clampi(int(ch.get("class_id",0)),0,CLASS_NAMES.size()-1)
+			text_at(Vector2(242,y+27),str(ch.get("name","Held")),20,Color("fff0ce"))
+			text_at(Vector2(242,y+51),"%s · Level %d · Speicherplatz %d" % [CLASS_NAMES[cls],maxi(1,int(ch.get("level",1))),clampi(int(ch.get("slot",1)),1,3)],14,Color("d8e6dc"))
+			ui_button(Rect2(720,y+14,190,42),"LADEN",not account_pending_load)
+	ui_button(Rect2(590,520,340,44),"ZUM STARTMENÜ")
+	if account_status!="":text_at(Vector2(220,585),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,710)
 
 func draw_start_panel() -> void:
 	preload("res://components/start_emblem.gd").background(self)
@@ -8682,13 +9034,25 @@ func draw_arena_entry_panel() -> void:
 func draw_arena_reward_panel() -> void:
 	text_at(Vector2(255, 154), "DIE PRÜFUNG IST VORBEI", 28, Color("ffe0a2"))
 	text_at(Vector2(260, 190), "Erreicht: Welle %d  ·  Bestleistung: %d" % [arena_reward_wave, arena_best], 19, Color("d9e8dd"))
-	text_at(Vector2(260, 225), "Arvens Truhe wartet auf dich. Ihre Stärke folgt deinem Level und deiner Welle.", 16, Color("edddba"))
-	draw_chest(Vector2(760, 321), arena_reward_claimed)
-	text_at(Vector2(260, 266), "BESTENLISTE", 17, Color("f3d393"))
-	for index in mini(10, arena_leaderboard.size()):
+	ensure_arena_reward_item()
+	var reward:Dictionary=arena_reward_item
+	var rarity:=clampi(int(reward.get("rarity",0)),0,RARITY_COLORS.size()-1)
+	var reward_color:Color=RARITY_COLORS[rarity]
+	text_at(Vector2(260, 225), "ARENABELOHNUNG", 16, Color("f3d393"))
+	ui_box(Rect2(260, 245, 430, 118), Color("1d3542"))
+	draw_rect(Rect2(268,253,414,4),reward_color)
+	draw_item_icon(Vector2(282,272),str(reward.get("icon","gem")),reward_color,1.35,weapon_visual_stage(reward),item_design(reward))
+	draw_item_signature(Vector2(282,272),reward)
+	text_at(Vector2(350,281),str(reward.get("name","Arenabelohnung")),18,reward_color,HORIZONTAL_ALIGNMENT_LEFT,320)
+	text_at(Vector2(350,309),"%s · LV %d · %s" % [RARITY_NAMES[rarity],int(reward.get("level",level)),item_type(str(reward.get("icon","gem")))],13,Color("dce7d9"),HORIZONTAL_ALIGNMENT_LEFT,320)
+	var reward_detail:="Schaden" if str(reward.get("icon","")) in ["sword","staff","bow"] else ("Schutz" if str(reward.get("icon","")) in ["armor","head"] else ("Leben" if str(reward.get("icon",""))=="ring" else "Stärke"))
+	text_at(Vector2(350,336),"%s +%d%s" % [reward_detail,int(reward.get("power",0))," · "+str(reward.get("element","")).capitalize() if str(reward.get("element",""))!="" else ""],14,Color("e9dfbd"),HORIZONTAL_ALIGNMENT_LEFT,320)
+	draw_chest(Vector2(760, 315), arena_reward_claimed)
+	text_at(Vector2(260, 388), "BESTENLISTE", 17, Color("f3d393"))
+	for index in mini(5, arena_leaderboard.size()):
 		var record: Dictionary = arena_leaderboard[index]
-		text_at(Vector2(265, 290 + index * 19), "%d. Welle %d · LV %d %s" % [index + 1, int(record["wave"]), int(record["level"]), str(record["class"])], 13, Color("dce7d9"))
-	ui_button(Rect2(307, 510, 260, 48), "TRUHE GEÖFFNET" if arena_reward_claimed else "TRUHE ÖFFNEN", not arena_reward_claimed)
+		text_at(Vector2(265, 412 + index * 19), "%d. Welle %d · LV %d %s" % [index + 1, int(record["wave"]), int(record["level"]), str(record["class"])], 13, Color("dce7d9"))
+	ui_button(Rect2(307, 510, 260, 48), "ITEM ERHALTEN" if not arena_reward_claimed else "ITEM ERHALTEN", not arena_reward_claimed)
 	ui_button(Rect2(585, 510, 260, 48), "ZURÜCK INS DORF", arena_reward_claimed)
 
 func draw_victory_panel() -> void:
@@ -8728,7 +9092,7 @@ func draw_skills_panel() -> void:
 	text_at(Vector2(165,125),"BORIN · SKILLZAUBERER",25,Color("ffeda9"))
 	text_at(Vector2(650,124),"LV %d · %d SP · %d GOLD" % [level,skill_points,gold],16,Color("f6dc9a"))
 	for tab in 3: ui_button(Rect2(165+tab*180,145,168,38),SKILL_TREE_NAMES[tab],true,skill_tree_tab==tab)
-	ui_button(Rect2(718,145,118,38),"QUESTS")
+	ui_button(Rect2(718,145,118,38),"PRÜFUNGEN");ui_button(Rect2(848,145,118,38),"BELEGUNG")
 	for slot in 3:
 		var sid:int=slots[slot];ui_button(Rect2(165+slot*204,190,193,40),"%d · %s" % [slot+1,"FREI" if sid<0 else ABILITIES[sid]["name"]],true,selected_slot==slot)
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -8745,19 +9109,54 @@ func draw_skills_panel() -> void:
 		mastery = "Relikt von Map %02d · %s" % [6+class_id,ENEMY_TYPES[12+class_id]["name"]]
 	text_at(Vector2(165,578),"Klassenbonus · "+mastery,13,Color("ffe2aa"))
 
+func draw_skill_loadout_panel() -> void:
+	text_at(Vector2(165,125),"ATTACKEN · REIHENFOLGE",25,Color("ffeda9"))
+	ui_button(Rect2(165,145,140,38),"ZURÜCK")
+	text_at(Vector2(330,169),"Wähle Slot 1–3 und danach eine gelernte Attacke.",14,Color("d8e6dc"))
+	for slot in 3:
+		var sid:=int(slots[slot])
+		var label:="%d · %s" % [slot+1,"FREI" if sid<0 else ABILITIES[sid]["name"]]
+		ui_button(Rect2(165+slot*204,200,193,44),label,true,selected_slot==slot)
+	text_at(Vector2(165,258),"GELERNTE ATTACKEN",15,Color("f3d393"))
+	var known:=learned_loadout_skills()
+	for row in 7:
+		var i:=row+menu_scroll
+		if i>=known.size():break
+		var id:=int(known[i])
+		var active_slot:=slots.find(id)
+		ui_button(Rect2(165,270+row*40,815,35),"%s%s" % [ABILITIES[id]["name"]," · SLOT %d" % (active_slot+1) if active_slot>=0 else ""],true,active_slot>=0)
+	if known.is_empty():text_at(Vector2(165,310),"Noch keine Attacken gelernt.",15,Color("c8d8d2"))
+	text_at(Vector2(165,566),"Die Reihenfolge hier entspricht den Tasten 1, 2 und 3.",13,Color("b9d9cf"))
+
 func draw_fusion_crystal() -> void:
 	var p:=BORIN_CRYSTAL_POS
-	draw_circle(p,34,Color("5e53a8",0.22));draw_colored_polygon(PackedVector2Array([p+Vector2(0,-48),p+Vector2(25,-8),p+Vector2(15,40),p+Vector2(-18,40),p+Vector2(-27,-8)]),Color("8f7de8"));draw_colored_polygon(PackedVector2Array([p+Vector2(0,-39),p+Vector2(13,-5),p+Vector2(6,25),p+Vector2(-9,24),p+Vector2(-14,-6)]),Color("d8ccff"))
-	text_at(p+Vector2(-62,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,124)
+	# 32px-Pixelaltar statt glatter Vektor-Raute.
+	draw_rect(Rect2(p+Vector2(-48,34),Vector2(96,16)),Color("3c4144"))
+	draw_rect(Rect2(p+Vector2(-40,26),Vector2(80,16)),Color("77706a"))
+	draw_rect(Rect2(p+Vector2(-32,18),Vector2(64,12)),Color("aaa080"))
+	for x in [-24,-8,8,24]: draw_rect(Rect2(p+Vector2(x,30),Vector2(8,4)),Color("c7b985"))
+	draw_rect(Rect2(p+Vector2(-32,-18),Vector2(64,48)),Color("6758b1",0.14))
+	var outer:=PackedVector2Array([p+Vector2(0,-64),p+Vector2(28,-24),p+Vector2(20,18),p+Vector2(0,34),p+Vector2(-22,18),p+Vector2(-30,-24)])
+	draw_colored_polygon(outer,Color("7967d7"))
+	draw_colored_polygon(PackedVector2Array([p+Vector2(0,-56),p+Vector2(12,-21),p+Vector2(8,16),p+Vector2(0,26)]),Color("ddd5ff"))
+	draw_colored_polygon(PackedVector2Array([p+Vector2(0,-56),p+Vector2(-15,-20),p+Vector2(-10,16),p+Vector2(0,26)]),Color("a993f2"))
+	draw_line(p+Vector2(0,-60),p+Vector2(0,26),Color("f1ebff",0.72),3)
+	for spark in [Vector2(-38,-18),Vector2(36,-34),Vector2(-28,-48),Vector2(42,2)]:
+		draw_rect(Rect2(p+spark,Vector2(4,4)),Color("bdeaff"))
+	text_at(p+Vector2(-72,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,144)
 
 func draw_fusion_panel() -> void:
-	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(720,124),"%d SP · %d GOLD" % [skill_points,gold],16,Color("f6dc9a"));text_at(Vector2(165,160),"Beide Ausgangsskills bleiben erhalten.",13,Color("cbd9da"))
-	for i in FUSIONS.size():
-		var f:Dictionary=FUSIONS[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
-		ui_box(Rect2(165,y,800,104),Color("342f51") if learned[id] else Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s %s  +  %s %s" % [ABILITIES[a]["name"],"✓" if learned[a] else "✗",ABILITIES[b]["name"],"✓" if learned[b] else "✗"],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Skillpunkte · %d Gold" % [fusion_skill_cost(f),int(f["gold"])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),"GELERNT" if learned[id] else ("VERSCHMELZEN" if can_fuse(f) else "GESPERRT"),can_fuse(f),learned[id])
+	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(720,124),"%d SP · %d GOLD" % [skill_points,gold],16,Color("f6dc9a"));text_at(Vector2(165,160),"Der Kristall bietet immer Kombinationen aus deinen bereits gelernten Attacken an.",13,Color("cbd9da"))
+	var offers:=available_fusions()
+	if offers.is_empty():
+		text_at(Vector2(185,225),"Lerne mindestens zwei aktive Attacken. Bereits erschaffene Fusionen bleiben erhalten.",15,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,760)
+	for i in offers.size():
+		var f:Dictionary=offers[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
+		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Skillpunkte · %d Gold" % [fusion_skill_cost(f),int(f["gold"])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),"VERSCHMELZEN" if can_fuse(f) else "GESPERRT",can_fuse(f))
 
 func click_fusion(mouse:Vector2) -> void:
-	for i in FUSIONS.size():
+	var offers:=available_fusions()
+	for i in offers.size():
 		if Rect2(745,223+i*118,190,45).has_point(mouse): buy_fusion(i);return
 
 func draw_skill_star(center: Vector2, tint: Color, lit: bool) -> void:
@@ -9424,7 +9823,12 @@ func invalidate_static_cache() -> void:
 
 func village_props() -> Array:
 	var props: Array = []
-	for house in house_positions(): props.append({"kind":"house","point":house,"depth":house.y+(235 if house==BORIN_HOUSE_POS else 155)})
+	for house in house_positions():
+		var kind:="home"
+		for info in VillageLayout.SHOPS:
+			if info["house"]==house and not info.has("shared_with"):
+				kind=str(info["kind"]);break
+		props.append({"kind":"house","point":house,"depth":house.y+(250 if kind=="arena" else (235 if kind=="borin" else 155)),"house_kind":kind})
 	for tree in REFERENCE_TREES: props.append({"kind":"tree","point":tree,"depth":tree.y+9})
 	props.append({"kind":"magic_tree","point":BORIN_MAGIC_TREE_POS,"depth":BORIN_MAGIC_TREE_POS.y+18})
 	props.append({"kind":"well","point":REFERENCE_WELL,"depth":REFERENCE_WELL.y+32})
@@ -9440,7 +9844,10 @@ func village_props() -> Array:
 func prop_bounds(prop: Dictionary) -> Rect2:
 	var p: Vector2 = prop["point"]
 	match prop["kind"]:
-		"house": return Rect2(p+Vector2(-16,-64),Vector2(288,320)) if p==BORIN_HOUSE_POS else Rect2(p+Vector2(-16,-64),Vector2(224,256))
+		"house":
+			var house_kind:=str(prop.get("house_kind","home"))
+			if house_kind=="arena": return Rect2(p+Vector2(-16,-32),Vector2(416,304))
+			return Rect2(p+Vector2(-16,-64),Vector2(288,320)) if house_kind=="borin" else Rect2(p+Vector2(-16,-64),Vector2(224,256))
 		"tree": return Rect2(p+Vector2(-88,-176),Vector2(176,208))
 		"magic_tree": return Rect2(p+Vector2(-112,-224),Vector2(224,264))
 		"lamp": return Rect2(p+Vector2(-20,-88),Vector2(40,112))
@@ -9457,7 +9864,9 @@ func paint_village_prop(prop: Dictionary) -> void:
 		"house":
 			draw_house(p)
 			for shop in VillageLayout.SHOPS:
-				if shop["house"] == p: StartScenery32.sign(self,p,shop["sign"],font)
+				if shop["house"] == p and not shop.has("shared_with") and str(shop["kind"])!="arena":
+					StartScenery32.sign(self,p,shop["sign"],font)
+					break
 		"tree":
 			StartScenery32.tree(self,p,int(p.x+p.y))
 			food_system.fruit(self,p,true)
@@ -9531,6 +9940,7 @@ func draw_sorted_world_objects() -> void:
 			var food_point: Vector2 = food_prop["point"]
 			if visible_world(food_point,140): entries.append({"kind":"food_plant","depth":food_prop["depth"],"data":food_prop})
 		for npc in NPCS:
+			if village_resident_is_indoors(str(npc["name"])): continue
 			if visible_world(npc["pos"],130): entries.append({"kind":"npc","depth":npc["pos"].y+24,"data":npc})
 		for stone in WAYSTONES:
 			if visible_world(stone,220): entries.append({"kind":"stone","depth":stone.y+70,"point":stone})
@@ -9557,14 +9967,22 @@ func draw_sorted_world_objects() -> void:
 					var herb_color:=str(entry["data"].get("color","8dbb78"))
 					food_system.herb_bush(self,food_point,herb_name,herb_color)
 					if player_pos.distance_to(food_point+Vector2(0,20)) < 120.0:
-						text_at(food_point+Vector2(-105,42),"E · %s ernten" % herb_name,13,Color("d9f0b7"),HORIZONTAL_ALIGNMENT_CENTER,210)
+						if food_system.ready_at(food_point,Time.get_unix_time_from_system()):
+							text_at(food_point+Vector2(-105,42),"E · %s ernten" % herb_name,13,Color("d9f0b7"),HORIZONTAL_ALIGNMENT_CENTER,210)
+						else:
+							var seconds:=food_system.regrow_remaining(food_point)
+							text_at(food_point+Vector2(-105,42),"Nachwachsen %02d:%02d" % [seconds/60,seconds%60],13,Color("e4cf8b"),HORIZONTAL_ALIGNMENT_CENTER,210)
 				else:
 					food_system.bush(self,food_point)
 					if player_pos.distance_to(food_point+Vector2(0,20)) < 120.0:
 						var food_id := int(food_system.plant_foods.get(FoodSystem.key(food_point),-1))
 						if food_id >= 0:
 							var food_name := str(FoodSystem.FOODS[food_id]["name"])
-							text_at(food_point+Vector2(-95,42),"E · %s pfluecken" % food_name,13,Color("fff0b8"),HORIZONTAL_ALIGNMENT_CENTER,190)
+							if food_system.ready_at(food_point,Time.get_unix_time_from_system()):
+								text_at(food_point+Vector2(-95,42),"E · %s pflücken" % food_name,13,Color("fff0b8"),HORIZONTAL_ALIGNMENT_CENTER,190)
+							else:
+								var seconds:=food_system.regrow_remaining(food_point)
+								text_at(food_point+Vector2(-95,42),"Nachwachsen %02d:%02d" % [seconds/60,seconds%60],13,Color("e4cf8b"),HORIZONTAL_ALIGNMENT_CENTER,190)
 			"npc": draw_npc(entry["data"])
 			"stone": draw_waystone(entry["point"])
 			"enemy": draw_enemy(entry["data"])
@@ -10796,7 +11214,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
@@ -10809,6 +11227,14 @@ func active_quest_sync_rows() -> Array:
 		var row: Dictionary = quests[i]
 		if int(row.get("state",0)) == 1:
 			rows.append([i,clampi(int(row.get("progress",0)),0,int(QUESTS[i]["count"]))])
+	return rows
+
+func active_borin_quest_sync_rows() -> Array:
+	var rows:Array=[]
+	for i in mini(BORIN_QUESTS.size(),borin_quests.size()):
+		var row:Dictionary=borin_quests[i]
+		if int(row.get("state",0))==1:
+			rows.append([i,clampi(int(row.get("progress",0)),0,int(BORIN_QUESTS[i]["count"]))])
 	return rows
 
 func active_event_sync_rows() -> Array:
@@ -10828,6 +11254,18 @@ func sanitize_active_quest_rows(raw: Variant) -> Array:
 		if quest_id < 0 or quest_id >= QUESTS.size() or seen.has(quest_id): continue
 		seen[quest_id] = true
 		out.append([quest_id,clampi(int(entry[1]),0,int(QUESTS[quest_id]["count"]))])
+	return out
+
+func sanitize_active_borin_quest_rows(raw:Variant)->Array:
+	var out:Array=[]
+	if not raw is Array:return out
+	var seen:Dictionary={}
+	for entry in raw:
+		if not entry is Array or entry.size()<2:continue
+		var quest_id:=int(entry[0])
+		if quest_id<0 or quest_id>=BORIN_QUESTS.size() or seen.has(quest_id):continue
+		seen[quest_id]=true
+		out.append([quest_id,clampi(int(entry[1]),0,int(BORIN_QUESTS[quest_id]["count"]))])
 	return out
 
 func sanitize_active_event_rows(raw: Variant) -> Array:
@@ -10880,6 +11318,16 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 	var changed := false
 	var shared := bool(payload.get("shared",false))
 	if payload.has("boss"): changed=register_boss_defeat(int(payload["boss"]),shared)
+	for raw_id in (payload.get("borin_quests",[]) as Array):
+		var borin_id:=int(raw_id)
+		if borin_id<0 or borin_id>=borin_quests.size():continue
+		var borin_state:Dictionary=borin_quests[borin_id]
+		if int(borin_state.get("state",0))!=1:continue
+		borin_state["progress"]=mini(int(BORIN_QUESTS[borin_id]["count"]),int(borin_state.get("progress",0))+1)
+		changed=true
+		if int(borin_state["progress"])>=int(BORIN_QUESTS[borin_id]["count"]):
+			borin_state["state"]=2
+			message("%sBorins Prüfung geschafft: %s. Kehre zu Borin zurück!" % ["Gruppe · " if shared else "",BORIN_QUESTS[borin_id]["title"]])
 	for raw_id in (payload.get("quests",[]) as Array):
 		var quest_id := int(raw_id)
 		if quest_id < 0 or quest_id >= quests.size(): continue
@@ -10962,6 +11410,12 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 			var quest_id := int(entry[0])
 			if quest_id >= 0 and quest_id < QUESTS.size() and int(QUESTS[quest_id]["target"]) == enemy_type:
 				matched_quests.append(quest_id)
+		var matched_borin_quests:Array=[]
+		for entry in (state.get("active_borin_quests",[]) as Array):
+			if not entry is Array or entry.size()<1:continue
+			var borin_id:=int(entry[0])
+			if borin_id>=0 and borin_id<BORIN_QUESTS.size() and int(BORIN_QUESTS[borin_id]["target"])==enemy_type:
+				matched_borin_quests.append(borin_id)
 		var matched_events: Array = []
 		for entry in (state.get("active_events",[]) as Array):
 			if not entry is Array or entry.size() < 1: continue
@@ -10970,11 +11424,11 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 				matched_events.append(event_id)
 		var rescue_match := bool(enemy.get("invasion",false)) and int(state.get("rescue_state",0)) == 1
 		var boss_index:int=enemy_type-12 if enemy_type in [12,13,14] else -1
-		if matched_quests.is_empty() and matched_events.is_empty() and not rescue_match and boss_index<0: continue
+		if matched_quests.is_empty() and matched_borin_quests.is_empty() and matched_events.is_empty() and not rescue_match and boss_index<0: continue
 		var uuid := str(state.get("uuid","peer%d" % peer_id))
 		var tx := "quest:%d:%s" % [mob_uid,uuid]
 		server_register_transaction(peer_id,tx)
-		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer,"boss":boss_index})
+		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"borin_quests":matched_borin_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer,"boss":boss_index})
 
 func server_party_member_xp(type: int, elite_kind: int, member: int) -> int:
 	if not remote_players.has(member): return 0
@@ -11118,11 +11572,15 @@ func run_teleport_consistency_smoke() -> bool:
 
 
 @rpc("any_peer","call_remote","reliable")
-func rpc_account_request(action:String,name:String,password:String)->void:
+func rpc_account_request(action:String,name:String,password:String,password_confirm:String="")->void:
 	if not dedicated_server_mode or network_mode!="host":return
 	var peer:=multiplayer.get_remote_sender_id()
 	if peer<=0 or not server_action_allowed(peer,"account_auth",900):return
-	var response:Dictionary=account_store.register(peer,name,password) if action=="register" else account_store.login(peer,name,password)
+	var response:Dictionary
+	if action=="register" and password!=password_confirm:
+		response={"ok":false,"error":"password_mismatch"}
+	else:
+		response=account_store.register(peer,name,password) if action=="register" else account_store.login(peer,name,password)
 	rpc_account_reply.rpc_id(peer,response)
 
 @rpc("any_peer","call_remote","reliable")
@@ -11138,7 +11596,7 @@ func rpc_account_reply(response:Dictionary)->void:
 	account_pending_action=""
 	if not bool(response.get("ok",false)):
 		var error:=str(response.get("error","unknown"))
-		var labels:Dictionary={"invalid_login":"Name oder Passwort falsch.","invalid_name":"Name ungültig.","weak_password":"Passwort muss mindestens 8 Zeichen haben.","name_taken":"Dieser Name ist bereits vergeben.","slot_occupied":"Dieser Kontoplatz ist bereits belegt.","character_limit":"Maximal drei Charaktere pro Konto.","not_logged_in":"Bitte erneut anmelden.","disk_error":"Server konnte das Konto nicht speichern."}
+		var labels:Dictionary={"invalid_login":"Name oder Passwort falsch.","invalid_name":"Name ungültig.","weak_password":"Passwort muss mindestens 8 Zeichen haben.","password_mismatch":"Die Passwörter stimmen nicht überein.","name_taken":"Dieser Name ist bereits vergeben.","slot_occupied":"Dieser Kontoplatz ist bereits belegt.","character_limit":"Maximal drei Charaktere pro Konto.","not_logged_in":"Bitte erneut anmelden.","disk_error":"Server konnte das Konto nicht speichern."}
 		account_status=str(labels.get(error,"Anmeldung fehlgeschlagen."))
 		queue_redraw()
 		return
@@ -11146,13 +11604,19 @@ func rpc_account_reply(response:Dictionary)->void:
 	account_name=str(response.get("name",account_name))
 	account_characters=response.get("characters",[])
 	account_password=""
+	account_password_confirm=""
 	if str(response.get("kind",""))=="claimed":
 		account_status="Spielstand übernommen ✓"
 		if server_save.connected(self):server_save.begin(self)
 		finish_account_entry()
 	else:
 		account_status="Angemeldet ✓"
-		panel="account_migrate" if not local_migration_slots().is_empty() else "start"
+		if not local_migration_slots().is_empty() and not account_migration_checked:
+			panel="account_migrate"
+		elif not account_characters.is_empty():
+			panel="account_characters"
+		else:
+			panel="start"
 	queue_redraw()
 
 @rpc("any_peer","call_remote","reliable")
@@ -11181,8 +11645,10 @@ func rpc_zz_save_reply(response: Dictionary) -> void:
 	server_save.reply(self,response)
 	if account_pending_load and server_save.ready:
 		account_pending_load=false
+		account_status=""
 		panel=""
 		previous_region=region_at(player_pos)
+		refresh_save_slot_labels()
 		ensure_live_multiplayer()
 		message("Server-Spielstand geladen. Willkommen zurück!")
 
@@ -11245,7 +11711,15 @@ func projectile_world_blocked(point:Vector2)->bool:
 	if blocked_by_region_wall(point) or terrain_blocked(point):return true
 	if region_at(point)==0:
 		for home in house_positions():
-			if Rect2(home+Vector2(8,73),Vector2(176,75)).has_point(point):return true
+			var info:Dictionary={}
+			for candidate in VillageLayout.SHOPS:
+				if candidate["house"]==home and not candidate.has("shared_with"):
+					info=candidate
+					break
+			var kind:=str(info.get("kind","home"))
+			if kind=="borin" and Rect2(home+Vector2(12,105),Vector2(232,110)).has_point(point):return true
+			if kind=="arena" and Rect2(home+Vector2(8,88),Vector2(368,136)).has_point(point):return true
+			if kind not in ["borin","arena"] and Rect2(home+Vector2(8,73),Vector2(176,75)).has_point(point):return true
 		for stone in WAYSTONES:
 			if stone==WAYSTONES[0]:
 				if SpawnStoneBody.blocks(point-stone,0):return true

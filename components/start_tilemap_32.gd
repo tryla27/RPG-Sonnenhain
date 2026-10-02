@@ -15,7 +15,7 @@ static var flower_cells: Dictionary = {}
 static var ground_cells: Dictionary = {}
 static var ground_sources: Dictionary = {}
 static var cell_sources: Dictionary = {}
-static var grass_tones := [Color.WHITE,Color(1.22,1.16,0.86),Color(0.94,0.98,0.94),Color(1.035,1.035,0.98),Color(1.08,1.06,0.94)]
+static var grass_tones := [Color(1.0,1.0,1.0),Color(1.08,1.06,0.92),Color(0.94,0.98,0.94),Color(1.02,1.02,0.98),Color(1.04,1.03,0.95)]
 var world_bounds := BOUNDS
 var road_distance: Callable
 var ground: TileMapLayer
@@ -41,10 +41,15 @@ static func prepare(_distance: Callable) -> void:
 	var routes:Array=[PackedVector2Array([Vector2(900,1050),Vector2(1270,1110),Vector2(1460,1210),Vector2(1680,1210),EAST_EXIT]),PackedVector2Array([Vector2(900,1300),Vector2(875,1760),Vector2(850,1920),Vector2(920,2176),Vector2(875,2368),SOUTH_EXIT])]
 	# All live houses and NPCs retain their interaction/collision coordinates.
 	var homes:Array=[]
-	for shop in preload("res://components/village_layout.gd").SHOPS: homes.append(shop["house"])
-	for home:Vector2 in homes:
+	for shop in preload("res://components/village_layout.gd").SHOPS:
+		if shop.has("shared_with"): continue
+		homes.append({"pos":shop["house"],"kind":str(shop["kind"])})
+	for home_info:Dictionary in homes:
+		var home:Vector2=home_info["pos"]
+		var kind:String=home_info["kind"]
 		var door:=home+Vector2(96,180)
-		if home==Vector2(1330,230):door=home+Vector2(128,240)
+		if kind=="borin":door=home+Vector2(128,240)
+		elif kind=="arena":door=home+Vector2(192,260)
 		var entry:=Vector2(clampf(door.x,448,1312),clampf(door.y,704,1600))
 		# Southern homes connect to the nearby main footpath rather than long diagonal tracks.
 		if door.y>1664:entry=Vector2(875,door.y)

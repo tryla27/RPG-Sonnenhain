@@ -9,6 +9,8 @@ class TestGame:
 func _initialize() -> void:
 	var game := TestGame.new()
 	game.refresh_shop_stock()
+	assert(game.shop_stock["alchemy"].all(func(item): return str(item.get("icon","")) in ["potion","herb","essence"]),"Elara offers equipment")
+	assert(game.shop_stock["smith"].all(func(item): return str(item.get("icon","")) in ["sword","armor","head"]),"Torvald offers staff/ring/bow")
 	assert(game.shop_stock["merchant"].filter(func(item):return item.get("icon","")!="food").size()==11)
 	game.append_new_equipment()
 	assert(game.shop_stock["merchant"].filter(func(item):return item.get("icon","")!="food").size()==11)

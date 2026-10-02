@@ -58,7 +58,7 @@ assert source.index('if dungeon_id >= 0: draw_dungeon_atmosphere()') < source.in
 quest_targets = [int(x) for x in re.findall(r'"target":(\d+)', block('QUESTS'))]
 assert len(quest_targets) == 25 and all(0 <= x < 27 for x in quest_targets)
 quest_npcs = set(re.findall(r'"npc":"([^"]+)"', block('QUESTS')))
-assert quest_npcs == {'Mira', 'Borin', 'Liora'}
+assert quest_npcs == {'Mira'}
 # The five arches lead from existing areas into separate stripes; level values are recommendations, not access locks.
 portals = entries('PORTALS')
 for index, row in enumerate(portals):

@@ -1,11 +1,11 @@
 extends RefCounted
 const TILE := 32
 const NAMES := ["Alma","Mira","Liora","Arven","Torvald","Fenna","Pip","Elara","Borin"]
-const KINDS := ["inn","elder","research","arena","smith","style","apprentice","healer","magic"]
+const KINDS := ["inn","elder","elder","arena","smith","style","apprentice","healer","magic"]
 const ROLES := [
 	"Wirtin der Steinrose · Küche & Rezepte",
-	"Älteste · Quests & Dorf",
-	"Forscherin · Quests & Wissen",
+	"Älteste · alle Sonnenhain-Quests",
+	"Forscherin · Wissen & Quest-Hinweise",
 	"Arenameister · Endlose Prüfung",
 	"Schmied · Waffenmeister",
 	"Stilistin · Character Editor",
@@ -80,8 +80,14 @@ static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:boo
 				c.draw_rect(Rect2(center+Vector2(x+7,-124),Vector2(34,48)),accent.lightened(0.28))
 			c.draw_rect(Rect2(center+Vector2(-54,40),Vector2(108,54)),Color("cab493"))
 		"smith":
-			c.draw_rect(Rect2(center+Vector2(-260,-132),Vector2(108,86)),Color("533d37"))
-			c.draw_circle(center+Vector2(-206,-88),30,Color("ef8c4c"))
+			# Torvalds Verkauf ist klar links gebündelt: Esse, Verkaufstisch und Waffenständer.
+			c.draw_rect(Rect2(center+Vector2(-300,-132),Vector2(116,86)),Color("533d37"))
+			c.draw_circle(center+Vector2(-242,-88),30,Color("ef8c4c"))
+			c.draw_rect(Rect2(center+Vector2(-310,18),Vector2(214,54)),Color("4d382f"))
+			c.draw_rect(Rect2(center+Vector2(-302,24),Vector2(198,12)),accent.lightened(0.18))
+			for x in [-276,-230,-184,-138]:
+				c.draw_line(center+Vector2(x,6),center+Vector2(x+18,-38),Color("d5d9ce"),5)
+				c.draw_line(center+Vector2(x-5,-14),center+Vector2(x+15,-8),Color("d4aa66"),3)
 			c.draw_rect(Rect2(center+Vector2(172,-112),Vector2(72,24)),Color("3e484c"))
 			c.draw_line(center+Vector2(184,-126),center+Vector2(224,-78),Color("d6b46f"),6)
 		"research":
@@ -103,6 +109,6 @@ static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:boo
 	# Exit door.
 	c.draw_rect(Rect2(center+Vector2(-32,202),Vector2(64,54)),Color("3d3029"))
 	c.draw_rect(Rect2(center+Vector2(-26,208),Vector2(52,48)),accent.darkened(0.45))
-	var title:="%s · %s" % [name_for_id(id),role_for_id(id)]
+	var title:="Mira & Liora · Rathaus · Quests & Wissen" if name_for_id(id) in ["Mira","Liora"] else "%s · %s" % [name_for_id(id),role_for_id(id)]
 	c.draw_string(font,center+Vector2(-320,-220),title,HORIZONTAL_ALIGNMENT_CENTER,640,18,Color("ffe8b4"))
 	c.draw_string(font,center+Vector2(-130,238),("%s · ZURÜCK" % ("AKTION" if touch_enabled else interact_label)),HORIZONTAL_ALIGNMENT_CENTER,260,13,Color("fff0c9"))

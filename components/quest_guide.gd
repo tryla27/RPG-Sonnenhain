@@ -27,7 +27,7 @@ func title(g, id: int) -> String:
 
 func summary(g) -> String:
 	var id := current_id(g)
-	if id == AUTO: return "Sprich mit Mira, Borin oder Liora im Dorf."
+	if id == AUTO: return "Sprich mit Mira im Rathaus von Sonnenhain."
 	if id == STORY:
 		return ["Mira: Folge dem Weg nach Blütenweiler.", "Dornenplage · %d/%d" % [g.rescue_kills,g.RESCUE_GOAL], "Dornenplage · Abgabe bei Nela"][g.rescue_state]
 	var q: Dictionary = g.QUESTS[id]
