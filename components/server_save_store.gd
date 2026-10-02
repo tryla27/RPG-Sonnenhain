@@ -155,18 +155,14 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 		if fusion_id < learned.size() and learned[fusion_id] is bool and bool(learned[fusion_id]):
 			if fusion[1] >= learned.size() or fusion[2] >= learned.size():return false
 			if not bool(learned[fusion[1]]) or not bool(learned[fusion[2]]):return false
-	# Klassenmeisterschaft ist erst nach der Map-8-Finalquest zulässig. Bereits
-	# abgeschlossene alte Endspielstände bleiben als Migrationspfad gültig.
+	# Klassenboni kommen aus den einmaligen Boss-Relikten auf Map 06/07/08.
+	# Der Save darf deshalb nicht mehr an eine Quest gebunden sein. Die
+	# klassenspezifische Konsistenz bleibt serverseitig strikt.
 	var mastery:Variant=data.get("class_mastery_unlocked",false)
 	var arcane:Variant=data.get("arcane_step_learned",false)
 	if not mastery is bool or not arcane is bool:return false
-	if bool(mastery):
-		var mastery_ready:=false
-		var quest_rows:Array=data.get("quests",[])
-		if quest_rows.size()>16 and quest_rows[16] is Dictionary:
-			mastery_ready=int(quest_rows[16].get("state",0))>=3
-		if not mastery_ready and not bool(data.get("final_completed",false)):return false
 	if bool(arcane) and (int(data.get("class_id",-1))!=1 or not bool(mastery)):return false
+	if int(data.get("class_id",-1))==1 and bool(mastery) and not bool(arcane):return false
 	for quest in data.get("quests",[]):
 		if not quest is Dictionary or not (quest.get("state") is int or quest.get("state") is float) or not (quest.get("progress") is int or quest.get("progress") is float): return false
 		if int(quest["state"]) < 0 or int(quest["state"]) > 3 or int(quest["progress"]) < 0 or int(quest["progress"]) > 1000: return false
