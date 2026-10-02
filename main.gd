@@ -31,6 +31,8 @@ const USE_VILLAGE_REFERENCE_BACKGROUND := false
 const ReferenceScenery = preload("res://components/reference_scenery.gd")
 const VillageLayout = preload("res://components/village_layout.gd")
 const StartScenery32 = preload("res://components/start_scenery_32.gd")
+const VillageInteriors32 = preload("res://components/village_interiors_32.gd")
+const DoorSfx = preload("res://components/door_sfx.gd")
 const CombatFeedback=preload("res://components/combat_feedback.gd")
 var combat_feedback=CombatFeedback.new()
 var creation_class_selected:=false
@@ -56,7 +58,7 @@ const Wagon32 = preload("res://components/wagon_32.gd")
 const StartTileMap32 = preload("res://components/start_tilemap_32.gd")
 var start_tilemap_32_attached := false
 var live_reconnect_timer := 0.0
-const REFERENCE_TREES := [Vector2(170,510),Vector2(970,440),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680),Vector2(190,1590),Vector2(1170,1880),Vector2(120,1910),Vector2(650,1930),Vector2(180,2240),Vector2(1600,2510)]
+const REFERENCE_TREES := [Vector2(80,650),Vector2(860,360),Vector2(720,560),Vector2(80,1580),Vector2(1640,1540),Vector2(920,1810),Vector2(760,2160),Vector2(1580,2320),Vector2(430,2320)]
 const REFERENCE_WELL := Vector2(1184, 832)
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
@@ -86,7 +88,7 @@ const PORTALS := [
 	[Vector2(10100, 2750), Vector2(11850, 6630), 11],
 	[Vector2(9820, 6750), Vector2(11850, 8500), 12]
 ]
-const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
+const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "door_open", "door_close", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
 const CUSTOM_MUSIC_THEMES := ["dorf", "blumen", "kueste", "pilzwald", "ruinen", "kristall", "asche", "sternen", "taverne"]
 const MUSIC_FADE_SECONDS := 1.35
@@ -210,16 +212,15 @@ const QUESTS := [
 	{"title":"Die letzte Wache", "npc":"Borin", "target":26, "count":13, "xp":2100, "gold":1750, "reward":"Sternenring"}
 ]
 const NPCS := [
-	{"name":"Mira", "role":"Älteste · Quests", "pos":Vector2(316, 830), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Quests", "pos":Vector2(1458, 490), "color":Color("6783bd"), "kind":"quest"},
-	{"name":"Liora", "role":"Forscherin · Quests", "pos":Vector2(636, 640), "color":Color("6bbba4"), "kind":"quest"},
-	{"name":"Torvald", "role":"Schmied", "pos":Vector2(316, 1420), "color":Color("ab6e60"), "kind":"smith"},
-	{"name":"Fenna", "role":"Händlerin", "pos":Vector2(596, 1610), "color":Color("87a66b"), "kind":"merchant"},
-	{"name":"Pip", "role":"Alchemist", "pos":Vector2(1206, 1560), "color":Color("d3aa65"), "kind":"alchemy"},
-	{"name":"Elara", "role":"Heilerin · Vollheilung", "pos":Vector2(1536, 1480), "color":Color("e2bc91"), "kind":"healer"},
-	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1196, 630), "color":Color("a48cbd"), "kind":"arena"}
-]
-const SHOPS := {
+	{"name":"Mira", "role":"Älteste · Quests & Dorf", "pos":Vector2(1416, 1210), "color":Color("a77ccb"), "kind":"quest"},
+	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 490), "color":Color("6783bd"), "kind":"quest"},
+	{"name":"Liora", "role":"Forscherin · Quests & Wissen", "pos":Vector2(276, 430), "color":Color("6bbba4"), "kind":"quest"},
+	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(276, 2040), "color":Color("ab6e60"), "kind":"smith"},
+	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(276, 1010), "color":Color("c080aa"), "kind":"stylist"},
+	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1126, 490), "color":Color("9f8bcc"), "kind":"apprentice"},
+	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(546, 1410), "color":Color("e2bc91"), "kind":"healer_alchemy"},
+	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1316, 2050), "color":Color("a48cbd"), "kind":"arena"}
+]const SHOPS := {
 	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
 	"alchemy": [{"name":"Heiltrank", "icon":"potion", "power":0, "price":35}, {"name":"Großer Heiltrank", "icon":"potion", "power":0, "price":85}, {"name":"Energietrank", "icon":"potion", "power":0, "price":45}],
 	"merchant": [{"name":"Reisenderumhang", "icon":"armor", "power":4, "price":125}, {"name":"Wächterrüstung", "icon":"armor", "power":9, "price":520}, {"name":"Glücksring", "icon":"ring", "power":15, "price":240}]
@@ -233,7 +234,7 @@ const DUNGEON_CENTER := Vector2(8000, 4800)
 const DUNGEON_ENTRANCES := [2, 3, 8]
 const DUNGEON_NAMES := ["Turmgewölbe", "Kristallgruft", "Versunkene Krypta"]
 const DUNGEON_ENEMIES := [[4, 5], [6, 7], [21, 22]]
-const TAVERN_HOUSE := Vector2(1380, 700)
+const TAVERN_HOUSE := Vector2(720, 1320)
 const VILLAGE_REF_ORIGIN := Vector2(0, 550)
 const VILLAGE_REF_RECT := Rect2(0, 550, 1672, 840)
 const VILLAGE_REF_SOLIDS := [Rect2(-40, 548, 1752, 112), Rect2(15, 805, 310, 140), Rect2(305, 1025, 310, 145), Rect2(1295, 1015, 365, 145), Rect2(12, 1012, 95, 95), Rect2(325, 825, 345, 30), Rect2(995, 825, 350, 30), Rect2(890, 870, 105, 45), Rect2(1625, 950, 50, 250)]
@@ -456,6 +457,10 @@ var font: Font
 var hero_name := ""
 var hero_gender := 0 # 0 Mann, 1 Frau
 var hero_race := 0 # 0 Mensch, 1 Ork, 2 Roboter
+var cosmetic_hair := 0
+var cosmetic_cloak := 0
+var cosmetic_jewelry := 0
+var cosmetic_accent := 0
 var pending_gender := 0
 var pending_race := 0
 var creation_name := ""
@@ -743,6 +748,8 @@ func _ready() -> void:
 	add_child(music_incoming)
 	for name in SFX_NAMES:
 		sound_streams[name] = load("res://audio/%s.wav" % name)
+	sound_streams["door_open"] = DoorSfx.make(true)
+	sound_streams["door_close"] = DoorSfx.make(false)
 	sound_streams["arrow_break"]=CombatFeedback.break_sound(true)
 	sound_streams["magic_break"]=CombatFeedback.break_sound(false)
 	for i in 8:
@@ -2151,7 +2158,7 @@ func hero_collision_radius() -> float:
 func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	if konflux.active: return KonfluxMap.blocked(pos,player_pos if from_pos.x<0 else from_pos,konflux.room,hero_collision_radius())
 	if arena_mode != "": return pos.distance_to(ARENA_CENTER) > ARENA_RADIUS - 22.0
-	if interior_id >= 0: return tavern_blocked(pos)
+	if interior_id >= 0: return VillageInteriors32.blocked(pos,INTERIOR_CENTER)
 	if dungeon_id >= 0: return dungeon_blocked(pos)
 	if pos.x < 26 or pos.y < 26 or pos.x > WORLD.x - 26 or pos.y > WORLD.y - 26:
 		return true
@@ -2175,7 +2182,7 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
 	for shop in VillageLayout.SHOPS:
-		if shop["kind"]=="borin":continue
+		if shop["kind"]!="smith":continue
 		if Rect2(shop["cart"]+Vector2(-45,-24),Vector2(110,49)).grow(10).has_point(pos): return true
 	for tree in REFERENCE_TREES:
 		if pos.distance_to(tree) < 18.0: return true
@@ -2421,9 +2428,29 @@ func can_cross_gate(from_region: int, to_region: int, start: Vector2, end: Vecto
 	return true
 
 func house_positions() -> Array:
-	var homes: Array = [Vector2(220,260),Vector2(700,200),Vector2(1500,950),TAVERN_HOUSE,Vector2(250,1760),Vector2(450,2020),Vector2(1100,2110),Vector2(340,2280),Vector2(1370,2300)]
-	for shop in VillageLayout.SHOPS: homes.append(shop["house"])
+	var homes: Array = []
+	for shop in VillageLayout.SHOPS:
+		if shop["house"] not in homes: homes.append(shop["house"])
 	return homes
+
+func village_house(name:String)->Dictionary:
+	for house in VillageLayout.SHOPS:
+		if str(house["name"])==name:return house
+	return {}
+
+func village_house_door(house:Dictionary)->Vector2:
+	var p:Vector2=house["house"]
+	return p + (Vector2(128,240) if str(house["kind"])=="borin" else Vector2(96,180))
+
+func nearby_village_house_door(max_distance:float=86.0)->Dictionary:
+	var best:Dictionary={}
+	var best_distance:=max_distance
+	for house in VillageLayout.SHOPS:
+		var d:=player_pos.distance_to(village_house_door(house))
+		if d<best_distance:
+			best=house
+			best_distance=d
+	return best
 
 func load_bindings() -> void:
 	bindings = DEFAULT_BINDINGS.duplicate()
@@ -2850,7 +2877,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				break
 
 func near_borin() -> bool:
-	return interior_id < 0 and dungeon_id < 0 and arena_mode == "" and player_pos.distance_to(Vector2(1486,1970)) < 150.0
+	return (interior_id==VillageInteriors32.id_for_name("Borin")) or (interior_id < 0 and dungeon_id < 0 and arena_mode == "" and player_pos.distance_to(Vector2(1458,490)) < 150.0)
 
 func toggle_panel(which: String) -> void:
 	if which == "skills" and panel != "skills" and not near_borin():
@@ -2884,8 +2911,43 @@ func dodge() -> void:
 		elif konflux.fighter_stats.has(1):
 			konflux.fighter_stats[1]["dodge"]=0.38
 			konflux.fighter_stats[1]["dodge_cd"]=1.25
-	effect(player_pos+Vector2(0,-60), "ARKANER SCHRITT" if arcane else ("SCHATTENROLLE" if class_id == 2 and class_mastery_unlocked else "ROLLE"), Color("c7b5ff") if arcane else Color("d8f3ff"), 0.65)
+	if hero_race==1 and not arcane:
+		orc_jump_knockback()
+		effect(player_pos+Vector2(0,-60),"ORK-SPRUNG",Color("d8b47a"),0.65)
+	else:
+		effect(player_pos+Vector2(0,-60), "ARKANER SCHRITT" if arcane else ("SCHATTENROLLE" if class_id == 2 and class_mastery_unlocked else "ROLLE"), Color("c7b5ff") if arcane else Color("d8f3ff"), 0.65)
 	play_sound("dodge")
+
+func orc_jump_knockback() -> void:
+	if uses_server_world():
+		if network_mode=="client":rpc_orc_jump_knockback.rpc_id(1,[player_pos.x,player_pos.y])
+		return
+	for i in range(enemies.size()-1,-1,-1):
+		var offset:Vector2=enemies[i]["pos"]-player_pos
+		if offset.length()>135.0:continue
+		var push:=offset.normalized() if offset.length_squared()>.01 else dash_dir
+		move_enemy_with_collision(enemies[i],push*78.0)
+		enemies[i]["stun"]=maxf(float(enemies[i].get("stun",0.0)),0.42)
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_orc_jump_knockback(pos_data:Array)->void:
+	if network_mode!="host" or pos_data.size()<2:return
+	var sender:=multiplayer.get_remote_sender_id()
+	if sender<=0 or not remote_players.has(sender):return
+	if not server_action_allowed(sender,"orc_jump",900):return
+	var state:Dictionary=remote_players[sender]
+	if clampi(int(state.get("race",0)),0,2)!=1 or str(state.get("context","world"))!="world":return
+	var state_pos:Array=state.get("pos",[])
+	if state_pos.size()<2:return
+	var origin:=Vector2(float(state_pos[0]),float(state_pos[1]))
+	var requested:=Vector2(float(pos_data[0]),float(pos_data[1]))
+	if requested.distance_to(origin)>120.0:return
+	for i in range(enemies.size()-1,-1,-1):
+		var offset:Vector2=enemies[i]["pos"]-origin
+		if offset.length()>135.0:continue
+		var push:=offset.normalized() if offset.length_squared()>.01 else Vector2.DOWN
+		move_enemy_with_collision(enemies[i],push*78.0)
+		enemies[i]["stun"]=maxf(float(enemies[i].get("stun",0.0)),0.42)
 
 func weapon_power() -> int:
 	return equipment_power(equipped_uid)
@@ -3559,28 +3621,66 @@ func tavern_blocked(pos: Vector2) -> bool:
 		if Rect2(INTERIOR_CENTER + offset - Vector2(49, 35), Vector2(98, 70)).has_point(pos): return true
 	return false
 
-func enter_tavern() -> void:
-	interior_return_pos = TAVERN_HOUSE + Vector2(126, 205)
+func enter_village_house(name:String) -> void:
+	var house:=village_house(name)
+	if house.is_empty():return
+	var next_id:=VillageInteriors32.id_for_name(name)
+	if next_id<0:return
+	interior_return_pos=village_house_door(house)+Vector2(0,48)
 	save_game()
-	interior_id = 0
-	player_pos = INTERIOR_CENTER + Vector2(0, 178)
+	interior_id=next_id
+	player_pos=INTERIOR_CENTER+Vector2(0,170)
 	enemies.clear()
 	drops.clear()
 	projectiles.clear()
 	enemy_projectiles.clear()
 	battle_zones.clear()
-	message("Zur Steinrose · Alma kocht aus deinen mitgebrachten Fruechten. E: Rezepte, Vorrat und Kueche.")
-	play_sound("menu")
+	play_sound("door_open")
+	update_music(0.05)
+	message("%s · %s" % [name,VillageInteriors32.role_for_id(interior_id)])
+	announce_multiplayer_context()
+
+func enter_tavern() -> void:
+	enter_village_house("Alma")
+
+func leave_village_house() -> void:
+	var left_name:=VillageInteriors32.name_for_id(interior_id)
+	interior_id=-1
+	player_pos=interior_return_pos
+	previous_region=region_at(player_pos)
+	play_sound("door_close")
+	update_music(0.05)
+	message("Du verlässt %s und trittst wieder nach Sonnenhain." % left_name)
+	save_game()
 	announce_multiplayer_context()
 
 func leave_tavern() -> void:
-	interior_id = -1
-	player_pos = interior_return_pos
-	previous_region = region_at(player_pos)
-	message("Du trittst wieder auf die Gassen von Sonnenhain.")
-	play_sound("menu")
-	save_game()
-	announce_multiplayer_context()
+	leave_village_house()
+
+func open_elara_alchemy() -> void:
+	merchant_kind="alchemy"
+	shop_page=0
+	panel="shop"
+	selected_item=-1
+	menu_scroll=0
+	sell_all_confirm=false
+	pending_purchase=-1
+	pending_purchase_item={}
+
+func interact_interior_owner() -> void:
+	var name:=VillageInteriors32.name_for_id(interior_id)
+	match name:
+		"Alma": steinrose.open(self)
+		"Borin":
+			panel="skills";skill_tree_tab=0;menu_scroll=0
+		"Pip":
+			message("Pip: Ich lerne bei Borin. Für Fähigkeiten und Fusionen bist du hier genau richtig.")
+		"Elara": open_elara_alchemy()
+		"Fenna": panel="appearance"
+		"Torvald":
+			merchant_kind="smith";shop_page=0;panel="shop";selected_item=-1
+		"Arven": panel="arena_entry"
+		"Mira","Liora": quest_dialogue(name)
 
 func enter_dungeon(index: int) -> void:
 	if dungeon_id >= 0 or arena_mode != "": return
@@ -4147,10 +4247,10 @@ func interact() -> void:
 				return
 	if arena_mode != "": return
 	if interior_id >= 0:
-		if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95:
-			leave_tavern()
-		elif player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -105)) < 130:
-			steinrose.open(self)
+		if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 215)) < 100:
+			leave_village_house()
+		elif player_pos.distance_to(INTERIOR_CENTER + Vector2(0, -95)) < 135:
+			interact_interior_owner()
 		return
 	if dungeon_id >= 0:
 		if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110:
@@ -4163,8 +4263,9 @@ func interact() -> void:
 	# in der Naehe nicht versehentlich vor die sichtbare Pflanzenaktion gesetzt.
 	if food_system.harvest(self):
 		return
-	if player_pos.distance_to(TAVERN_HOUSE + Vector2(126, 157)) < 112:
-		enter_tavern()
+	var house_at_door:=nearby_village_house_door()
+	if not house_at_door.is_empty():
+		enter_village_house(str(house_at_door["name"]))
 		return
 	for index in DUNGEON_ENTRANCES.size():
 		var entrance: Vector2 = LANDMARKS[int(DUNGEON_ENTRANCES[index])]["pos"] + Vector2(-30, 70)
@@ -4229,12 +4330,16 @@ func interact() -> void:
 	if closest["kind"] == "quest":
 		if String(closest["name"])=="Borin": panel="skills";skill_tree_tab=0;menu_scroll=0
 		else: quest_dialogue(String(closest["name"]))
-	elif closest["kind"] == "healer":
-		visit_healer()
+	elif closest["kind"] == "healer_alchemy":
+		open_elara_alchemy()
+	elif closest["kind"] == "stylist":
+		panel="appearance"
+	elif closest["kind"] == "apprentice":
+		message("Pip: Ich bin Borins Lehrling. Komm mit Fragen zu Fähigkeiten gern in unsere Häuser.")
 	elif closest["kind"] == "arena":
 		panel = "arena_entry"
 	else:
-		merchant_kind = String(closest["kind"] )
+		merchant_kind = String(closest["kind"])
 		shop_page = 0
 		panel = "shop"
 		selected_item = -1
@@ -4453,7 +4558,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -4534,6 +4639,10 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	hero_name = str(data.get("hero_name", "Held"))
 	hero_gender = clampi(int(data.get("hero_gender", 0)), 0, 1)
 	hero_race = clampi(int(data.get("hero_race", 0)), 0, 2)
+	cosmetic_hair=clampi(int(data.get("cosmetic_hair",0)),0,3)
+	cosmetic_cloak=clampi(int(data.get("cosmetic_cloak",0)),0,3)
+	cosmetic_jewelry=clampi(int(data.get("cosmetic_jewelry",0)),0,3)
+	cosmetic_accent=clampi(int(data.get("cosmetic_accent",0)),0,5)
 	stamina = max_stamina()
 	sprint_blend = 0.0
 	sprint_exhausted = false
@@ -4933,6 +5042,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 	match panel:
 		"skills": click_skills(mouse)
 		"fusion": click_fusion(mouse)
+		"appearance": click_appearance(mouse)
 		"inventory": click_inventory(mouse)
 		"shop": click_shop(mouse)
 		"travel": click_travel(mouse)
@@ -5245,6 +5355,9 @@ func click_shop(mouse: Vector2) -> void:
 		elif Rect2(578, 391, 204, 45).has_point(mouse) or not Rect2(315, 210, 522, 247).has_point(mouse):
 			pending_purchase = -1
 			pending_purchase_item = {}
+		return
+	if merchant_kind=="alchemy" and Rect2(600,145,150,40).has_point(mouse):
+		visit_healer()
 		return
 	if Rect2(760,145,80,40).has_point(mouse):
 		shop_page = maxi(0,shop_page-1)
@@ -5975,9 +6088,9 @@ func npc_sprite_row(kind: String, name: String) -> int:
 		if name == "Liora": return 2
 	match kind:
 		"smith": return 3
-		"merchant": return 4
-		"alchemy": return 5
-		"healer": return 6
+		"merchant","stylist": return 4
+		"alchemy","apprentice": return 5
+		"healer","healer_alchemy": return 6
 		"arena": return 7
 		"innkeeper": return 8
 		"rescued": return 9
@@ -6178,7 +6291,7 @@ func draw_world() -> void:
 		draw_arena_world()
 		return
 	if interior_id >= 0:
-		draw_tavern_world()
+		draw_village_interior()
 		return
 	if dungeon_id >= 0:
 		draw_dungeon_world()
@@ -6332,6 +6445,14 @@ func draw_static_overworld(bounds: Rect2) -> void:
 	draw_village_ground()
 	if bounds.intersects(Rect2(WAYSTONES[0]-Vector2(280,280),Vector2(560,560))):SpawnPlatform32.platform(self,WAYSTONES[0])
 	draw_rect(Rect2(Vector2.ZERO, WORLD), Color('45726d'), false, 7)
+
+func draw_village_interior() -> void:
+	draw_rect(Rect2(camera_pos,VIEW),Color("141e23"))
+	VillageInteriors32.paint(self,INTERIOR_CENTER,interior_id,font,touch_enabled,binding_short("interact"))
+	var name:=VillageInteriors32.name_for_id(interior_id)
+	var kind:=VillageInteriors32.kind_for_id(interior_id)
+	var npc_kind:="innkeeper" if name=="Alma" else ("smith" if name=="Torvald" else ("stylist" if name=="Fenna" else ("apprentice" if name=="Pip" else ("healer_alchemy" if name=="Elara" else ("arena" if name=="Arven" else "quest")))))
+	draw_npc({"name":name,"role":VillageInteriors32.role_for_id(interior_id),"pos":INTERIOR_CENTER+Vector2(0,-95),"color":Color("c9b58a"),"kind":npc_kind})
 
 func draw_tavern_world() -> void:
 	draw_rect(Rect2(camera_pos, VIEW), Color("141e23"))
@@ -6965,11 +7086,12 @@ func draw_house(p: Vector2) -> void:
 	if p==BORIN_HOUSE_POS:
 		StartScenery32.borin_house(self,p)
 		return
-	var house_kind:int=2 if p==TAVERN_HOUSE else 0
-	for shop in VillageLayout.SHOPS:
-		if shop["house"]==p and shop["kind"]=="healer":house_kind=1
-	StartScenery32.house(self,p,house_kind)
-	if p==TAVERN_HOUSE:StartScenery32.sign(self,p,"STEINROSE",font)
+	var kind:="home"
+	for house in VillageLayout.SHOPS:
+		if house["house"]==p:
+			kind=str(house["kind"])
+			break
+	StartScenery32.themed_house(self,p,kind)
 func draw_npc(npc: Dictionary) -> void:
 	var p: Vector2 = npc["pos"]
 	var kind: String = str(npc["kind"])
@@ -7456,6 +7578,8 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	# Facing north: the body masks the rear arm and weapon across the head.
 	if base_look == Vector2.UP:
 		draw_character_sprite(p,visual_class,walking,look,scale_factor,attack_now,use_race,use_gender,-2,-1.0,0.0,-2,-2,is_sprinting if preview_class<0 else false)
+	if preview_class < 0:
+		draw_character_cosmetics(p,look,scale_factor,use_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
 
 
 func weapon_attack_look(look: Vector2, family: int, design: int, progress: float) -> Vector2:
@@ -8144,6 +8268,7 @@ func draw_panel() -> void:
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
 		"fusion": draw_fusion_panel()
+		"appearance": draw_appearance_panel()
 		"inventory": draw_inventory_panel()
 		"steinrose": steinrose.draw(self)
 		"shop": draw_shop_panel()
@@ -8212,6 +8337,65 @@ func draw_mechanics_panel() -> void:
 		text_at(Vector2(190,483), "Gegner erscheinen nicht auf Wegen, an NPCs, Wegsteinen, Portalen, Landmarken oder Gebäuden.", 13, Color('dfe9dc'))
 		text_at(Vector2(190,512), "Normale Oberwelt: maximal 10 aktive Gegner, deutlich längeres Spawnintervall.", 13, Color('dfe9dc'))
 	ui_button(Rect2(820,548,160,38), "SCHLIESSEN")
+
+func draw_appearance_panel() -> void:
+	text_at(Vector2(165,130),"FENNA · CHARACTER EDITOR",27,Color("ffd8ef"))
+	text_at(Vector2(165,160),"Nur Optik: Frisur, Umhang, Schmuck und Farbakzent. Rasse und Klasse bleiben unverändert.",13,Color("d9e3dd"))
+	ui_box(Rect2(175,200,330,340),Color("5d495d"))
+	draw_character_sprite(Vector2(340,390),class_id,false,Vector2.DOWN,2.0,false,hero_race,hero_gender,-1,-1.0,0.0,-1,0,false)
+	draw_character_cosmetics(Vector2(340,390),Vector2.DOWN,2.0,hero_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
+	var labels:=["FRISUR","UMHANG","SCHMUCK","FARBAKZENT"]
+	var values:=[cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent]
+	var max_values:=[4,4,4,6]
+	for row in 4:
+		var y:=220+row*72
+		text_at(Vector2(555,y),labels[row],16,Color("ffe4b7"))
+		ui_button(Rect2(555,y+18,50,38),"<")
+		ui_box(Rect2(615,y+18,180,38),Color("45545a"))
+		text_at(Vector2(615,y+44),"%d / %d" % [values[row]+1,max_values[row]],15,Color("f6edda"),HORIZONTAL_ALIGNMENT_CENTER,180)
+		ui_button(Rect2(805,y+18,50,38),">")
+	ui_button(Rect2(555,518,300,44),"FERTIG")
+
+func click_appearance(mouse:Vector2) -> void:
+	if Rect2(555,518,300,44).has_point(mouse):
+		save_game();panel="";return
+	var limits:=[4,4,4,6]
+	for row in 4:
+		var y:=220+row*72
+		var delta:=0
+		if Rect2(555,y+18,50,38).has_point(mouse):delta=-1
+		elif Rect2(805,y+18,50,38).has_point(mouse):delta=1
+		if delta==0:continue
+		match row:
+			0: cosmetic_hair=posmod(cosmetic_hair+delta,limits[row])
+			1: cosmetic_cloak=posmod(cosmetic_cloak+delta,limits[row])
+			2: cosmetic_jewelry=posmod(cosmetic_jewelry+delta,limits[row])
+			3: cosmetic_accent=posmod(cosmetic_accent+delta,limits[row])
+		play_sound("menu")
+		save_game()
+		return
+
+func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int,hair:int,cloak:int,jewelry:int,accent_index:int)->void:
+	var accents:=[Color("be5368"),Color("557fc0"),Color("5f9b68"),Color("b7894f"),Color("8d62aa"),Color("55a5a5")]
+	var accent:Color=accents[clampi(accent_index,0,accents.size()-1)]
+	if cloak>0:
+		var width:=18.0+cloak*3.0
+		PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-width,-6)*scale_factor,p+Vector2(width,-6)*scale_factor,p+Vector2((14+cloak*2),31)*scale_factor,p+Vector2(-(14+cloak*2),31)*scale_factor]),accent.darkened(0.18))
+		PixelStyle32.line(self,p+Vector2(-width,-5)*scale_factor,p+Vector2(width,-5)*scale_factor,accent.lightened(0.25),2.0*scale_factor)
+	if hair>0:
+		if race==2:
+			for side in [-1.0,1.0]:
+				PixelStyle32.line(self,p+Vector2(side*5,-39)*scale_factor,p+Vector2(side*(7+hair*2),-51-hair*2)*scale_factor,accent,2.5*scale_factor)
+		else:
+			var y:=-39.0
+			for i in range(-hair,hair+1):
+				PixelStyle32.rect(self,Rect2(p+Vector2(i*5-3,y-abs(i)*2)*scale_factor,Vector2(7,6)*scale_factor),accent.darkened(0.05*abs(i)))
+	if jewelry>0:
+		for side in [-1.0,1.0]:
+			PixelStyle32.circle(self,p+Vector2(side*12,-20)*scale_factor,(1.7+jewelry*.45)*scale_factor,accent.lightened(.35))
+		if jewelry>=2:
+			PixelStyle32.line(self,p+Vector2(-6,-8)*scale_factor,p+Vector2(0,-1)*scale_factor,accent.lightened(.35),1.5*scale_factor)
+			PixelStyle32.line(self,p+Vector2(6,-8)*scale_factor,p+Vector2(0,-1)*scale_factor,accent.lightened(.35),1.5*scale_factor)
 
 func draw_account_gate() -> void:
 	text_at(Vector2(300,190),"SONNENHAIN KONTO",34,Color("ffe2aa"))
@@ -8739,12 +8923,13 @@ func draw_skill_icon(p: Vector2, id: int, size: float) -> void:
 	draw_rect(box, Color(border,0.35), false, 1)
 
 func draw_shop_panel() -> void:
-	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("PIP (ALCHEMIST)" if merchant_kind == "alchemy" else "FENNA (HÄNDLERIN)")
+	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else "HÄNDLER")
 	text_at(Vector2(165, 125), shop_name, 25, Color("ffeda9"))
 	text_at(Vector2(804, 126), "%d GOLD" % gold, 17, Color("f9dba0"))
 	text_at(Vector2(169, 174), "KAUFEN · Neues Angebot in %d:%02d" % [int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 17, Color("e8f2de"))
 	ui_button(Rect2(760,145,80,40),"<",shop_page>0)
 	ui_button(Rect2(850,145,100,40),str(shop_page+1)+" / "+str(int((shop_stock[merchant_kind].size()+2)/3)),(shop_page+1)*3 < shop_stock[merchant_kind].size())
+	if merchant_kind=="alchemy": ui_button(Rect2(600,145,150,40),"VOLLHEILUNG")
 	var stock: Array = shop_stock[merchant_kind].slice(shop_page*3,shop_page*3+3)
 	for i in stock.size():
 		var item: Dictionary = stock[i]
@@ -9246,7 +9431,7 @@ func village_props() -> Array:
 	for p in [Vector2(460,940),Vector2(1220,1290),Vector2(520,1660),Vector2(1470,1215)]: props.append({"kind":"barrel","point":p,"depth":p.y+17})
 	for p in [Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]: props.append({"kind":"bush","point":p,"depth":p.y+28})
 	for shop in VillageLayout.SHOPS:
-		if shop["kind"]!="borin":props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
+		if shop["kind"]=="smith":props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
 	return props
 
 func prop_bounds(prop: Dictionary) -> Rect2:
