@@ -1358,9 +1358,7 @@ func start_coop_world() -> void:
 	active_save_slot = selected_save_slot
 	if FileAccess.file_exists(slot_save_path(active_save_slot)):
 		load_game()
-		if keep_level_lock>0:
-			test_level_lock=0
-			save_game()
+		test_level_lock=0
 		enemies.clear()
 		drops.clear()
 		battle_zones.clear()
@@ -5672,7 +5670,7 @@ func available_fusions()->Array:
 		var a:=int(sources[pair_index])
 		var b:=int(sources[(pair_index+1)%sources.size()])
 		if a==b:break
-		var offer:=template.duplicate(true)
+		var offer:Dictionary=template.duplicate(true)
 		offer["a"]=a;offer["b"]=b
 		offers.append(offer)
 		pair_index+=2
