@@ -7110,9 +7110,7 @@ func draw_hud() -> void:
 		draw_ref_panel(Rect2(362,540,405,32))
 		text_at(Vector2(374,562),binding_short("interact")+" · "+(food_info["name"]+" pfluecken" if ripe else "Nachwachsen: %ds" % ceili(float(food_system.harvested.get(FoodSystem.key(nearby_food["point"]),0))-Time.get_unix_time_from_system())),14,Color(food_info["color"]))
 	if food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system():
-		text_at(Vector2(22,126),"NAHRUNG +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],12,Color("aed48c"))
-	if food_system.buff_active():
-		text_at(Vector2(22,198),food_system.buff_label(),11,Color("d9c0ff"))
+		text_at(Vector2(22,126),"SNACK +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],10,Color("aed48c"))
 	draw_ref_panel(Rect2(10, 8, 348, 104))
 	draw_rect(Rect2(22, 16, 5, 17), [Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id])
 	text_at(Vector2(34, 32), "%s · %s · STUFE %d" % [hero_name if hero_name != "" else CLASS_NAMES[class_id].to_upper(), RACE_NAMES[hero_race], level], 15, Color("ffe9b8"))
@@ -7125,6 +7123,17 @@ func draw_hud() -> void:
 	draw_ref_panel(Rect2(10, 118, 348, 46))
 	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL · DETAILS ›", 13, Color("f0cf92"))
 	text_at(Vector2(23, 155), tracked_quest().substr(0, 44), 14, Color("fff2d9"))
+	if food_system.meal_active():
+		var food_index:int=FoodSystem.index_for(food_system.active_food_name)
+		draw_ref_panel(Rect2(10,168,348,58))
+		if food_index>=0: FoodSystem.icon(self,Vector2(18,174),food_index,0.95)
+		var remain:int=food_system.meal_remaining()
+		text_at(Vector2(58,188),food_system.active_food_name,12,Color("ffe5b5"))
+		text_at(Vector2(58,205),food_system.meal_effect_text(),10,Color("bde8bd"))
+		text_at(Vector2(300,188),"%02d:%02d" % [remain/60,remain%60],11,Color("d8e7ff"))
+		var progress:float=clampf(float(remain)/360.0,0.0,1.0)
+		draw_rect(Rect2(58,212,276,5),Color("1b2f35"))
+		draw_rect(Rect2(58,212,276*progress,5),Color("6fbf79") if food_system.meal_mana_regen<=0 else Color("4f8bd8"))
 	for enemy in enemies:
 		if int(enemy["type"]) in [12, 13, 14] and enemy["pos"].distance_to(player_pos) < 620:
 			ui_box(Rect2(430, 10, 480, 64), Color("5b4547"))
