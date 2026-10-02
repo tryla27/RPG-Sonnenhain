@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/workflows/multiplayer-spawn-diagnostics.yml"
       - "tools/check_region_spawn_matrix.gd"
+      - "tools/check_multiregion_spawn_budget.gd"
+      - "main.gd"
   workflow_dispatch:
 
 permissions:
@@ -27,6 +29,8 @@ jobs:
         run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --editor --import --quit
       - name: Spawn matrix
         run: timeout 120 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_region_spawn_matrix.gd
+      - name: Multi-region spawn budget
+        run: timeout 120 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_multiregion_spawn_budget.gd
       - name: Spawn network
         run: timeout 120 /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tools/check_spawn_network.gd
       - name: Combat feedback network
