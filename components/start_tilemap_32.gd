@@ -40,10 +40,11 @@ static func prepare(_distance: Callable) -> void:
 	var noise:=FastNoiseLite.new();noise.seed=7041;noise.frequency=0.008;noise.fractal_octaves=2
 	var routes:Array=[PackedVector2Array([Vector2(900,1050),Vector2(1270,1110),EAST_EXIT]),PackedVector2Array([Vector2(900,1300),Vector2(875,1760),Vector2(850,1920),Vector2(920,2176),Vector2(875,2368),SOUTH_EXIT])]
 	# All live houses and NPCs retain their interaction/collision coordinates.
-	var homes:Array=[Vector2(220,260),Vector2(700,200),Vector2(1440,280),Vector2(1380,700),Vector2(250,1760),Vector2(450,2020),Vector2(1100,2110),Vector2(340,2280),Vector2(1370,2300)]
+	var homes:Array=[Vector2(220,260),Vector2(700,200),Vector2(1500,950),Vector2(1380,700),Vector2(250,1760),Vector2(450,2020),Vector2(1100,2110),Vector2(340,2280),Vector2(1370,2300)]
 	for shop in preload("res://components/village_layout.gd").SHOPS:homes.append(shop["house"])
 	for home:Vector2 in homes:
 		var door:=home+Vector2(96,180)
+		if home==Vector2(1330,230):door=home+Vector2(128,240)
 		var entry:=Vector2(clampf(door.x,448,1312),clampf(door.y,704,1600))
 		# Southern homes connect to the nearby main footpath rather than long diagonal tracks.
 		if door.y>1664:entry=Vector2(875,door.y)
