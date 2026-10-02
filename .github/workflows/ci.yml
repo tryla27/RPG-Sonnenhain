@@ -68,6 +68,44 @@ jobs:
           set -euo pipefail
           "$GODOT_BIN" --headless --path . --editor --import --quit
 
+      - name: Focused multiplayer diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in check_region_spawn_matrix check_spawn_network check_combat_feedback_network check_mob_combat_network check_party_xp_network; do
+            echo "::group::$script"
+            timeout 120 "$GODOT_BIN" --headless --path . --script "tools/$script.gd"
+            echo "::endgroup::"
+          done
+
+      - name: Inspect live server release
+        env:
+          VSERVER_HOST: ${{ secrets.VSERVER_HOST }}
+          VSERVER_USER: ${{ secrets.VSERVER_USER }}
+          VSERVER_SSH_KEY: ${{ secrets.VSERVER_SSH_KEY }}
+          VSERVER_PORT: ${{ secrets.VSERVER_PORT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${VSERVER_HOST:-}" ] || [ -z "${VSERVER_USER:-}" ] || [ -z "${VSERVER_SSH_KEY:-}" ]; then
+            echo "LIVE_SERVER_DIAG_SKIPPED missing VServer secret"
+            exit 0
+          fi
+          port="${VSERVER_PORT:-22}"
+          umask 077
+          install -d -m 700 "$HOME/.ssh"
+          trap 'rm -f "$HOME/.ssh/live_diag"' EXIT
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          raw=os.environ["VSERVER_SSH_KEY"].replace("\r","").strip()
+          key=raw.replace("\\n","\n") if "BEGIN OPENSSH PRIVATE KEY" in raw else base64.b64decode("".join(raw.split()),validate=True).decode().strip()
+          Path.home().joinpath(".ssh/live_diag").write_text(key+"\n")
+          PY
+          chmod 600 "$HOME/.ssh/live_diag"
+          ssh_opts="-4 -i $HOME/.ssh/live_diag -p $port -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
+          ssh $ssh_opts "$VSERVER_USER@$VSERVER_HOST" 'echo "LIVE_BUILD_COMMIT=$(cat "$HOME/sonnenhain-server/releases/current/BUILD_COMMIT.txt" 2>/dev/null || echo missing)"; pgrep -af "sonnenhain-server.x86_64.*dedicated-server" || true'
+
       - name: Run gameplay regression tests
         shell: bash
         run: |
