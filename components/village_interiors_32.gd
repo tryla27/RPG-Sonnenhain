@@ -109,6 +109,6 @@ static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:boo
 	# Exit door.
 	c.draw_rect(Rect2(center+Vector2(-32,202),Vector2(64,54)),Color("3d3029"))
 	c.draw_rect(Rect2(center+Vector2(-26,208),Vector2(52,48)),accent.darkened(0.45))
-	var title:="Mira & Liora · Ratshaus · Quests & Wissen" if name_for_id(id) in ["Mira","Liora"] else "%s · %s" % [name_for_id(id),role_for_id(id)]
+	var title:="Mira & Liora · Rathaus · Quests & Wissen" if name_for_id(id) in ["Mira","Liora"] else "%s · %s" % [name_for_id(id),role_for_id(id)]
 	c.draw_string(font,center+Vector2(-320,-220),title,HORIZONTAL_ALIGNMENT_CENTER,640,18,Color("ffe8b4"))
 	c.draw_string(font,center+Vector2(-130,238),("%s · ZURÜCK" % ("AKTION" if touch_enabled else interact_label)),HORIZONTAL_ALIGNMENT_CENTER,260,13,Color("fff0c9"))
