@@ -1,3 +1,4 @@
+# Release marker: [deploy] Map 0 NPC homes, themed interiors, tavern music, door SFX, Fenna editor, Elara alchemy and Ork jump knockback.
 # Release marker: [deploy] class bosses, shared loot, boss arenas/houses, harvest visuals/timers, HUD separation and audiovisual combat.
 # Release marker: production rollout for class bosses, HUD separation, Borin route, harvest timers and boss audiovisual combat.
 extends Node2D
