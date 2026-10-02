@@ -544,7 +544,8 @@ var recent_players: Array = []
 var save_notice_timer := 0.0
 var save_notice_text := ""
 var last_save_unix := 0
-var server_save_timer := 5.0
+const AUTOSAVE_INTERVAL := 3.0
+var server_save_timer := AUTOSAVE_INTERVAL
 var client_ping_timer := 0.0
 var server_last_reply_ms := 0
 var network_ping_ms := -1
@@ -1663,7 +1664,7 @@ func _process(delta: float) -> void:
 	if character_created and panel not in ["start","creation"]:
 		server_save_timer -= delta
 		if server_save_timer <= 0:
-			server_save_timer = 5.0
+			server_save_timer = AUTOSAVE_INTERVAL
 			save_game()
 	process_multiplayer_smoke(delta)
 	update_music(delta)
@@ -11890,7 +11891,11 @@ func rpc_zz_save_put(token: String, uuid: String, revision: int, request: String
 	if not server_action_allowed(peer,"save_put",200):
 		rpc_zz_save_reply.rpc_id(peer,{"ok":false,"uuid":uuid,"error":"retry"})
 		return
-	rpc_zz_save_reply.rpc_id(peer,server_save_store.put(peer,token,uuid,revision,request,data))
+	var response:=server_save_store.put(peer,token,uuid,revision,request,data)
+	if bool(response.get("ok",false)) and str(response.get("kind",""))=="saved":
+		if not account_store.sync_character_save(peer,uuid,token,data,int(response.get("revision",revision))):
+			print("ACCOUNT_SAVE_META_PENDING peer=",peer," uuid=",uuid)
+	rpc_zz_save_reply.rpc_id(peer,response)
 
 @rpc("authority","call_remote","reliable")
 func rpc_zz_save_reply(response: Dictionary) -> void:
