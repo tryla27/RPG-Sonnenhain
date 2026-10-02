@@ -1361,7 +1361,7 @@ func start_coop_world() -> void:
 		if keep_level_lock>0:
 			test_level_lock=clampi(keep_level_lock,1,40)
 			level=test_level_lock
-			xp=0
+			xp=maxi(0,xp)
 			hp=max_hp()
 			energy=max_energy()
 			save_game()
@@ -4367,6 +4367,7 @@ func register_boss_defeat(boss_index:int,shared:bool=false)->bool:
 func gain_xp(amount: int) -> void:
 	if test_level_lock>0:
 		level=clampi(test_level_lock,1,40)
+		xp=maxi(0,xp+maxi(0,amount))
 		return
 	xp += amount
 	while xp >= xp_required():
@@ -5578,6 +5579,7 @@ func toggle_creative_mode() -> void:
 		save_game()
 	else:
 		var fixed_test_level:=clampi(level,1,40)
+		var carried_test_xp:=maxi(0,xp)
 		creative_mode = false
 		reset_class_skills()
 		for i in WORLD_EVENTS.size():
@@ -5586,6 +5588,7 @@ func toggle_creative_mode() -> void:
 		quests.clear()
 		for i in QUESTS.size(): quests.append({"state":0, "progress":0})
 		load_game()
+		xp=carried_test_xp
 		fix_level_after_test_mode(fixed_test_level)
 		save_game()
 		enemies.clear()
