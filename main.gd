@@ -332,6 +332,10 @@ var selected_item := -1
 var inventory_page := 0
 var last_inventory_click_uid := -1
 var last_inventory_click_msec := -10000
+var inventory_drag_index := -1
+var inventory_drag_origin := Vector2.ZERO
+var party_reward_notice := ""
+var party_reward_notice_timer := 0.0
 var shop_page := 0
 var quests: Array = []
 var borin_quests: Array = []
@@ -1284,6 +1288,18 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 	drops=rebuilt_drops
 
 @rpc("any_peer","call_remote","reliable")
+func rpc_request_player_world_drop(raw_item:Dictionary,raw_pos:Array)->void:
+	if not dedicated_server_mode or network_mode!="host":return
+	var peer:=multiplayer.get_remote_sender_id()
+	if peer<=0 or not remote_players.has(peer) or not server_action_allowed(peer,"world_drop",250):return
+	var item:=sanitize_network_reward_item(raw_item)
+	var p:=network_player_position(peer)
+	if raw_pos.size()==2:
+		var wanted:=Vector2(float(raw_pos[0]),float(raw_pos[1]))
+		if wanted.is_finite() and wanted.distance_to(p)<=110:p=wanted
+	server_spawn_world_drop(item,p,-1,180.0)
+
+@rpc("any_peer","call_remote","reliable")
 func rpc_request_world_drop_pickup(drop_uid:int) -> void:
 	if network_mode!="host" or not dedicated_server_mode:return
 	var sender:=multiplayer.get_remote_sender_id()
@@ -1684,6 +1700,8 @@ func _process(delta: float) -> void:
 	ranger_stealth_timer = maxf(0.0, ranger_stealth_timer - delta)
 	robotics_overclock_timer = maxf(0.0, robotics_overclock_timer - delta)
 	notice_timer = maxf(0.0, notice_timer - delta)
+	party_reward_notice_timer = maxf(0.0,party_reward_notice_timer-delta)
+	if party_reward_notice_timer<=0.0: party_reward_notice=""
 	rescue_intro_timer = maxf(0.0, rescue_intro_timer - delta)
 	rescue_banner_timer = maxf(0.0, rescue_banner_timer - delta)
 	reward_scene_timer = maxf(0.0, reward_scene_timer - delta)
@@ -1696,6 +1714,7 @@ func _process(delta: float) -> void:
 	if panel == "":
 		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * food_system.energy_regen_mult() * delta)
 		update_player(delta)
+		update_waystone_activation()
 		if arena_mode == "" and dungeon_id < 0 and interior_id < 0: update_rescue()
 		update_battle_zones(delta)
 		update_impact_zones(delta)
@@ -2823,6 +2842,26 @@ func _unhandled_input(event: InputEvent) -> void:
 	# nicht doppelt auslösen; eine echte Maus funktioniert danach weiterhin.
 	if is_web_platform() and touch_enabled and event is InputEventMouseButton and Time.get_ticks_msec() - last_touch_msec < 900:
 		return
+	if panel=="inventory":
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_Q:
+			drop_inventory_item(selected_item)
+			return
+		if event is InputEventMouseButton:
+			if event.button_index==MOUSE_BUTTON_RIGHT and event.pressed:
+				var right_index:=inventory_index_at(event.position)
+				if right_index>=0:
+					selected_item=right_index
+					use_item(right_index)
+				return
+			if event.button_index==MOUSE_BUTTON_LEFT:
+				if event.pressed:
+					var drag_index:=inventory_index_at(event.position)
+					if drag_index>=0:
+						inventory_drag_index=drag_index
+						inventory_drag_origin=event.position
+				elif inventory_drag_index>=0 and event.position.distance_to(inventory_drag_origin)>8.0:
+					finish_inventory_drag(event.position)
+					return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			panel = "start"
@@ -3837,6 +3876,7 @@ func enter_dungeon(index: int) -> void:
 	if dungeon_id >= 0 or arena_mode != "": return
 	dungeon_return_pos = player_pos
 	save_game()
+	reset_combat_transition_state()
 	dungeon_id = index
 	player_pos = DUNGEON_CENTER + Vector2(-555, 0)
 	enemies.clear()
@@ -3852,7 +3892,21 @@ func enter_dungeon(index: int) -> void:
 	play_sound("menu")
 	announce_multiplayer_context()
 
+func reset_combat_transition_state() -> void:
+	attack_timer=0.0
+	attack_anim=0.0
+	swing_timer=0.0
+	dash_timer=0.0
+	invulnerable=0.0
+	projectiles.clear()
+	enemy_projectiles.clear()
+	battle_zones.clear()
+	impact_zones.clear()
+	poison_clouds.clear()
+	remote_combat_visuals.clear()
+
 func leave_dungeon() -> void:
+	reset_combat_transition_state()
 	dungeon_id = -1
 	player_pos = dungeon_return_pos
 	enemies.clear()
@@ -4043,7 +4097,8 @@ func update_enemies(delta:float)->void:
 		var enemy:Dictionary=enemies[i]
 		if float(enemy.get("hp",0))<=0:
 			MobCombat.cancel(enemy);defeat_enemy(i);continue
-		if enemy["pos"].distance_to(player_pos)>1250 and arena_mode=="":
+		var despawn_range:=3600.0 if int(enemy.get("type",-1)) in [12,13,14] else 1250.0
+		if enemy["pos"].distance_to(player_pos)>despawn_range and arena_mode=="":
 			enemies.remove_at(i);continue
 		advance_mob(enemy,delta,false)
 		if panel=="arena_reward":return
@@ -4134,6 +4189,9 @@ func class_relic_item(boss_index:int) -> Dictionary:
 	item["class_relic"]=true
 	item["mastery_class"]=boss_index
 	item["mastery_skill"]=CLASS_RELIC_SKILLS[boss_index]
+	item["boss_relic"]=true
+	item["tooltip"]="Schaltet %s dauerhaft frei." % CLASS_RELIC_SKILLS[boss_index]
+	if boss_index==0:item["tooltip"]="Kriegsherrenblut · schaltet WUT + BLUTRAUSCH dauerhaft frei."
 	return item
 
 func class_boss_hat_item(boss_index:int) -> Dictionary:
@@ -4472,7 +4530,7 @@ func interact() -> void:
 			message("Nela: Hinter dem Turm in den Ruinen liegt die Quelle der Plage. Sei vorsichtig!")
 		return
 	for i in LANDMARKS.size():
-		if chest_ready(i) and player_pos.distance_to(chest_position(i)) < 85:
+		if player_pos.distance_to(chest_position(i)) < 125:
 			open_chest(i)
 			return
 	for i in WORLD_EVENTS.size():
@@ -4610,6 +4668,18 @@ func waystone_arrival(index: int) -> Vector2:
 		if is_blocked(candidate, candidate): continue
 		return candidate
 	return safe_world_teleport_destination(base, region)
+
+func update_waystone_activation() -> void:
+	if arena_mode!="" or dungeon_id>=0 or interior_id>=0 or konflux.active:return
+	for i in range(1,WAYSTONES.size()):
+		if waystone_unlocked[i]:continue
+		if player_pos.distance_to(WAYSTONES[i])<=225.0:
+			waystone_unlocked[i]=true
+			last_waystone=i
+			message("Wegstein %s aktiviert. Reise vom Dorf aus dorthin." % region_name(region_at(WAYSTONES[i])))
+			play_sound("level")
+			save_game()
+			break
 
 func use_waystone() -> void:
 	if konflux.active:
@@ -5608,6 +5678,62 @@ func click_skill_loadout(mouse:Vector2)->void:
 func upgrade_skill(index: int) -> void:
 	buy_skill(index)
 
+func inventory_index_at(mouse:Vector2)->int:
+	for cell in 25:
+		var col:=cell%5
+		var row:=int(cell/5.0)
+		if Rect2(641+col*65,200+row*55,54,48).has_point(mouse):
+			var index:=inventory_page*25+cell
+			return index if index<inventory.size() else -1
+	return -1
+
+func toggle_item_lock(index:int)->void:
+	if index<0 or index>=inventory.size():return
+	var item:Dictionary=inventory[index]
+	item["locked"]=not bool(item.get("locked",false))
+	message(("%s ist jetzt unverkäuflich." if bool(item["locked"]) else "%s ist wieder verkäuflich.") % str(item.get("name","Item")))
+	save_game();queue_redraw()
+
+func drop_inventory_item(index:int)->bool:
+	if index<0 or index>=inventory.size():return false
+	var item:Dictionary=inventory[index]
+	var uid:=int(item.get("uid",-1))
+	if uid in equipped_item_uids():
+		if uid==equipped_uid:equipped_uid=-1
+		if uid==equipped_armor_uid:equipped_armor_uid=-1
+		if uid==equipped_head_uid:equipped_head_uid=-1
+		if uid==equipped_ring_uid:equipped_ring_uid=-1
+		if uid==equipped_ring2_uid:equipped_ring2_uid=-1
+	var dropped:=item.duplicate(true)
+	if int(item.get("count",1))>1:
+		item["count"]=int(item["count"])-1
+		dropped["count"]=1
+		dropped["uid"]=next_uid;next_uid+=1
+	else:
+		inventory.remove_at(index)
+		selected_item=-1
+	var drop_pos:=safe_drop_position(player_pos,facing.normalized()*42.0 if facing.length_squared()>.01 else Vector2(42,0))
+	if uses_server_world() and network_mode=="client":
+		rpc_request_player_world_drop.rpc_id(1,network_reward_payload(dropped),[drop_pos.x,drop_pos.y])
+	else:
+		drops.append({"pos":drop_pos,"item":dropped,"life":180.0})
+	message("Fallen gelassen: %s" % str(dropped.get("name","Item")))
+	save_game();queue_redraw();return true
+
+func finish_inventory_drag(mouse:Vector2)->void:
+	if inventory_drag_index<0 or inventory_drag_index>=inventory.size():inventory_drag_index=-1;return
+	var source:=inventory_drag_index
+	var target:=inventory_index_at(mouse)
+	if target>=0 and target!=source:
+		var moved=inventory[source]
+		inventory[source]=inventory[target]
+		inventory[target]=moved
+		selected_item=target
+	elif Rect2(180,205,98,60).has_point(mouse) or Rect2(180,275,98,77).has_point(mouse) or Rect2(501,235,98,77).has_point(mouse) or Rect2(300,440,203,77).has_point(mouse):
+		use_item(source)
+	inventory_drag_index=-1
+	save_game();queue_redraw()
+
 func click_inventory(mouse: Vector2) -> void:
 	if Rect2(180,205,98,60).has_point(mouse) and equipped_head_uid>=0:
 		unequip_slot("head")
@@ -5644,7 +5770,7 @@ func click_inventory(mouse: Vector2) -> void:
 				if uid == last_inventory_click_uid and now-last_inventory_click_msec <= 420:
 					last_inventory_click_uid = -1
 					last_inventory_click_msec = -10000
-					use_item(selected_item)
+					toggle_item_lock(selected_item)
 				else:
 					last_inventory_click_uid = uid
 					last_inventory_click_msec = now
@@ -5701,7 +5827,7 @@ func sell_all_unequipped() -> void:
 	var count := 0
 	for i in range(inventory.size() - 1, -1, -1):
 		var item: Dictionary = inventory[i]
-		if int(item["uid"]) in equipped_item_uids(): continue
+		if int(item["uid"]) in equipped_item_uids() or bool(item.get("locked",false)): continue
 		total += item_sale_value(item)
 		count += int(item.get("count", 1))
 		inventory.remove_at(i)
@@ -5823,6 +5949,9 @@ func buy_item(stock_item: Dictionary) -> void:
 
 func sell_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
+	if bool(inventory[index].get("locked",false)):
+		message("Dieses Item ist als unverkäuflich markiert.")
+		return
 	var item: Dictionary = inventory[index]
 	if is_equipped_uid(int(item.get("uid",-1))):
 		message("Ausgerüstete Gegenstände können nicht verkauft werden. Erst ausziehen.")
@@ -8160,6 +8289,9 @@ func draw_hud() -> void:
 	var stamina_color:=Color("e5bd62") if stamina/maxf(1.0,max_stamina())>=0.20 else (Color("f08a63") if int(world_time*6.0)%2==0 else Color("d75f52"))
 	bar(Rect2(23, 81, 324, 11), stamina, max_stamina(), stamina_color, "AUSDAUER  %d / %d%s" % [ceili(stamina),ceili(max_stamina())," · RENNEN" if is_sprinting else ""])
 	bar(Rect2(23, 95, 324, 10), float(xp), float(xp_required()), Color("d9932e"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
+	if party_reward_notice_timer>0.0 and party_reward_notice!="":
+		draw_ref_panel(Rect2(365,8,410,42))
+		text_at(Vector2(378,35),party_reward_notice,13,Color("bfe8ad"),HORIZONTAL_ALIGNMENT_CENTER,384)
 	if class_mastery_unlocked and class_id==0: text_at(Vector2(365,30),"WUT %.0f%%" % warrior_rage,12,Color("efaa75"))
 	elif class_mastery_unlocked and class_id==2: text_at(Vector2(365,30),"JAGD %.0f%%%s" % [ranger_hunt_meter," · %.0fs" % ranger_hunt_buff if ranger_hunt_buff>0 else ""],12,Color("f3d68e"))
 	elif class_mastery_unlocked and class_id==1: text_at(Vector2(365,30),"LEERTASTE · ARKANER SCHRITT",12,Color("cdbaff"))
@@ -9201,6 +9333,7 @@ func draw_inventory_panel() -> void:
 			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 4)), RARITY_COLORS[int(item["rarity"])])
 			draw_item_icon(pos + Vector2(11, 9), String(item["icon"]), RARITY_COLORS[int(item["rarity"])], 0.88, weapon_visual_stage(item), item_design(item))
 			draw_item_signature(pos + Vector2(11, 9), item)
+			if bool(item.get("locked",false)): text_at(pos+Vector2(38,14),"L",10,Color("ffd66e"))
 			if int(item.get("count", 1)) > 1:
 				draw_rect(Rect2(pos + Vector2(19, 32), Vector2(32, 14)), Color("1d2d35"))
 				text_at(pos + Vector2(20, 44), "×%d" % int(item["count"]), 12, Color("fff2ce"))
@@ -9261,8 +9394,12 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var attribute_diff := int(item.get(primary_key, 0)) - int(worn.get(primary_key, 0))
 		var arrow := "▲ +" if attribute_diff > 0 else ("▼ " if attribute_diff < 0 else "= ")
 		text_at(pos + Vector2(14, 145), "%s für %s: %s%d" % [primary_key.to_upper(), CLASS_NAMES[class_id], arrow, attribute_diff], 13, Color("83e4a0") if attribute_diff > 0 else (Color("ee8a86") if attribute_diff < 0 else Color("dfdcc3")))
+	if bool(item.get("boss_relic",false)):
+		text_at(pos+Vector2(14,168),str(item.get("tooltip","Bossrelikt")),11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	elif bool(item.get("locked",false)):
+		text_at(pos+Vector2(14,168),"UNVERKÄUFLICH · Doppelklick zum Entsperren",10,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
 	var price_text := "Kaufpreis: %d Gold" % purchase_price if purchase_price >= 0 else "Verkauf: %d Gold" % item_sale_value(item)
-	text_at(pos + Vector2(14, 171), price_text, 13, Color("f0d69b"))
+	text_at(pos + Vector2(14, 190), price_text, 13, Color("f0d69b"))
 
 func draw_item_signature(p: Vector2, item: Dictionary) -> void:
 	if item.get("icon") == "food": return
@@ -10487,7 +10624,10 @@ func rpc_server_party_progress(payload: Dictionary) -> void:
 	if gold_reward > 0: gold += gold_reward
 	if xp_reward > 0 or gold_reward > 0:
 		var reward_text:="+%d XP%s · Gruppenbelohnung" % [xp_reward," · +%d Gold" % gold_reward if gold_reward>0 else ""]
-		message(reward_text);add_chat_line("GRUPPE",reward_text);save_game()
+		message(reward_text)
+		party_reward_notice=reward_text
+		party_reward_notice_timer=3.5
+		save_game()
 	ack_server_transaction(tx_id)
 
 @rpc("authority","call_remote","reliable")
