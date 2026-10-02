@@ -10,6 +10,17 @@ func run() -> void:
 	g.panel = ""
 	g.network_mode = "host"
 	var failures := 0
+	# Sprintdynamik: gestufter Anlauf, Kurvenverlust und Klassenunterschiede.
+	if g.sprint_speed_curve(0.25) >= g.sprint_speed_curve(0.75): failures += 1
+	if g.sprint_turn_retention(Vector2.RIGHT,Vector2.LEFT) >= 0.5: failures += 1
+	if g.sprint_turn_retention(Vector2.RIGHT,Vector2(1,0.15)) < 0.8: failures += 1
+	g.class_id=0
+	var warrior_drain:=g.sprint_drain_rate()
+	var warrior_accel:=g.sprint_acceleration()
+	g.class_id=2
+	if g.sprint_drain_rate() <= warrior_drain: failures += 1
+	if g.sprint_acceleration() <= warrior_accel: failures += 1
+	if g.sprint_stamina_mult(1.0) <= g.sprint_stamina_mult(0.1): failures += 1
 	var origin := Vector2(2050,900)
 	g.remote_players = {
 		2:{"context":"world","pos":[1770.0,900.0]},
@@ -31,7 +42,7 @@ func run() -> void:
 	if g.server_moving_mobs != 1: failures += 1
 	g.remote_players.erase(3)
 	if int(g.nearest_network_player(origin,1300,g.region_at(origin))["peer"]) != 0: failures += 1
-	print("SERVER_MOVEMENT_CHECK failures=",failures," · same-region targeting / interior excluded / straight pursuit / moving counter")
+	print("SERVER_MOVEMENT_CHECK failures=",failures," · sprint momentum / turn loss / class pacing / same-region targeting / interior excluded / straight pursuit / moving counter")
 	g.queue_free()
 	await process_frame
 	quit(1 if failures else 0)
