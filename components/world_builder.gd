@@ -244,14 +244,14 @@ func draw(g)->void:
 				else:g.draw_circle(center,6,mark)
 	g.text_at(Vector2(165,175),"AUSWAHL",13,Color("ffe4ad"))
 	var options:Array=choices()
-	for i in range(mini(options.size(),9)):
+	for i in range(mini(options.size(),10)):
 		var id:String=str(options[i])
-		var y:float=198+i*31
+		var y:float=198+i*27
 		if layer in ["ground","walls"]:g.draw_rect(Rect2(165,y+3,20,20),Palette.color(id,2))
 		else:g.draw_circle(Vector2(175,y+13),7,layer_marker_color(layer))
-		g.ui_button(Rect2(192,y,158,27),Palette.display_name(id) if layer in ["ground","walls"] else id.to_upper(),true,selection_id==id)
-	g.text_at(Vector2(165,492),"PINSEL",12,Color("ffe4ad"))
-	for i in 3:g.ui_button(Rect2(165+i*62,505,55,28),str([1,3,5][i]),true,brush_size==[1,3,5][i])
+		g.ui_button(Rect2(192,y,158,24),Palette.display_name(id) if layer in ["ground","walls"] else id.to_upper(),true,selection_id==id)
+	g.text_at(Vector2(165,476),"PINSEL",12,Color("ffe4ad"))
+	for i in 3:g.ui_button(Rect2(165+i*62,489,55,28),str([1,3,5][i]),true,brush_size==[1,3,5][i])
 	g.text_at(Vector2(165,548),"Kamera %d,%d · %s"%[camera_cell.x,camera_cell.y,str(LAYER_NAMES[layer])],11,Color("b7c8c3"))
 	g.ui_button(Rect2(370,540,82,32),"UNDO",not undo_stack.is_empty())
 	g.ui_button(Rect2(458,540,82,32),"REDO",not redo_stack.is_empty())
@@ -262,6 +262,10 @@ func draw(g)->void:
 	g.text_at(Vector2(165,590),status,11,Color("ffe1a0"),HORIZONTAL_ALIGNMENT_LEFT,790)
 
 func click(g,pos:Vector2)->bool:
+	if Rect2(965,91,41,35).has_point(pos):
+		active=false
+		g.panel="settings"
+		return true
 	if CANVAS.has_point(pos):
 		paint(screen_to_cell(pos))
 		return true
@@ -273,12 +277,12 @@ func click(g,pos:Vector2)->bool:
 			select_default()
 			return true
 	var options:Array=choices()
-	for i in range(mini(options.size(),9)):
-		if Rect2(192,198+i*31,158,27).has_point(pos):
+	for i in range(mini(options.size(),10)):
+		if Rect2(192,198+i*27,158,24).has_point(pos):
 			selection_id=str(options[i])
 			return true
 	for i in 3:
-		if Rect2(165+i*62,505,55,28).has_point(pos):
+		if Rect2(165+i*62,489,55,28).has_point(pos):
 			brush_size=[1,3,5][i]
 			return true
 	if Rect2(370,540,82,32).has_point(pos):undo();return true
