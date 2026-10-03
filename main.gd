@@ -862,7 +862,7 @@ func _on_peer_connected(id: int) -> void:
 	if network_mode == "host":
 		push_world_snapshot()
 		if not dedicated_server_mode:
-			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id,"ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id,"mage_rift_blink":mage_rift_blink_unlocked(),"ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
@@ -1179,6 +1179,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
+		"mage_rift_blink":bool(state.get("mage_rift_blink",false)) and clampi(int(state.get("class",0)),0,2)==1,
 		"ranger_falcon_rune":bool(state.get("ranger_falcon_rune",false)),
 		"race":clampi(int(state.get("race",0)),0,2),
 		"gender":clampi(int(state.get("gender",0)),0,1),
@@ -3110,7 +3111,10 @@ func mage_rift_blink() -> bool:
 	energy-=BLINK_MANA
 	player_pos=best
 	facing=dir
-	mark_network_teleport()
+	if uses_server_world():
+		rpc_mage_rift_blink.rpc_id(1,[origin.x,origin.y],[best.x,best.y])
+	else:
+		mark_network_teleport()
 	dash_timer=0.0
 	dodge_start=origin
 	dodge_duration=0.0
@@ -3146,6 +3150,38 @@ func dodge() -> void:
 	else:
 		effect(player_pos+Vector2(0,-60),"SCHATTENROLLE" if class_id == 2 and class_mastery_unlocked else "ROLLE",Color("d8f3ff"),0.65)
 	play_sound("dodge")
+
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_mage_rift_blink(origin_data:Array,target_data:Array)->void:
+	if network_mode!="host" or origin_data.size()<2 or target_data.size()<2:return
+	var sender:=multiplayer.get_remote_sender_id()
+	if sender<=0 or not remote_players.has(sender):return
+	if not server_action_allowed(sender,"mage_rift_blink",2200):return
+	var state:Dictionary=remote_players[sender]
+	if int(state.get("class",-1))!=1 or not bool(state.get("mage_rift_blink",false)):return
+	if str(state.get("context","world"))!="world":return
+	var pos_data:Array=state.get("pos",[])
+	if pos_data.size()<2:return
+	var origin:=Vector2(float(pos_data[0]),float(pos_data[1]))
+	var requested_origin:=Vector2(float(origin_data[0]),float(origin_data[1]))
+	var target:=Vector2(float(target_data[0]),float(target_data[1]))
+	if not target.is_finite() or requested_origin.distance_to(origin)>90.0:return
+	if target.distance_to(origin)<48.0 or target.distance_to(origin)>265.0:return
+	if region_at(target)!=region_at(origin):return
+	var steps:=maxi(1,ceili(target.distance_to(origin)/12.0))
+	var accepted:=origin
+	for step in range(1,steps+1):
+		var candidate:=origin.lerp(target,float(step)/steps)
+		if blocked_by_region_wall(candidate) or terrain_blocked(candidate,12.0):break
+		accepted=candidate
+	if accepted.distance_to(target)>18.0:return
+	state["pos"]=[target.x,target.y]
+	state["teleport_serial"]=int(state.get("teleport_serial",0))+1
+	state["state_tick"]=Time.get_ticks_msec()
+	remote_players[sender]=state
+	for peer_id in multiplayer.get_peers():
+		if int(peer_id)!=sender:rpc_receive_player_state.rpc_id(int(peer_id),sender,state)
 
 func orc_jump_knockback() -> void:
 	if uses_server_world():
@@ -3387,6 +3423,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	rank = clampi(rank,1,5)
 	server_relay_combat_visual(sender,{"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))})
 	var level_cap := clampi(int(state.get("level",1)),1,99)
+	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
 	if id in [3,7,16,18,20,25,26,28,29,30]:
 		for shot in ability_projectiles(id,origin,dir,remote_class,power):
@@ -4441,9 +4478,10 @@ func gain_xp(amount: int) -> void:
 		level += 1
 		var earned_point := level % 2 == 0 or level in [3, 8, 12]
 		if earned_point: skill_points += 1
-		if level >= 20:
+		var ultimate_level:=ultimate_unlock_level()
+		if level >= ultimate_level:
 			learned[class_ultimate()] = true
-			skill_levels[class_ultimate()] = mini(5, 1 + (level - 20) / 5)
+			skill_levels[class_ultimate()] = mini(5,1+int((level-ultimate_level)/5.0))
 		hp = max_hp()
 		energy = max_energy()
 		message("LEVEL %d! %s" % [level, "+1 Skillpunkt · öffne K." if earned_point else "Neue Stärke und Gesundheit."])
