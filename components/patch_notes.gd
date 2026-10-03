@@ -14,6 +14,7 @@ const NOTES=[
 ["Inventar", "Unverkäuflich markierte Items bleiben über Speichern/Login hinweg geschützt, werden nicht mit verkäuflichen Stapeln vermischt und im Inventar ausgegraut dargestellt."],
 ["Pip", "Pips Leihwaffe wird jetzt auf dem Ausleih-Level gespeichert. Nach dem nächsten Levelaufstieg fordert Pip sie mit fünf wechselnden Sprüchen zurück und nimmt ausschließlich sein eigenes Leih-Item."],
 ["Pip", "Wenn eine Rückgabe fällig ist, meldet sich Pip automatisch beim Ansprechen von Borin, da er direkt daneben steht; danach öffnet sich Borins Essenzlehre."],
+["Pip", "Pip ist jetzt Borins Arkanhändler und verkauft Stäbe, Elementstäbe, Arkanroben, Fokusringe, Kristallreife und Arkankerne; seine Leihwaffen-Rolle bleibt erhalten."],
 ["Anmeldung", "Zu kurze Passwörter werden jetzt direkt im Formular rot markiert und mit Mindestlänge sowie aktuellem Zeichenstand angezeigt."],
 ["Alma", "Bei bereits gelernten Rezepten wird der funktionslose Lern-Button nicht mehr angezeigt; der Lernstatus bleibt nur als Kennzeichnung in der Liste sichtbar."],
 ["Verschmelzung", "Frostnova + Blitzlanze ergibt jetzt den Eisball. Er besitzt vier Kristallstufen: Slow; Slow + Blitzkette; zusätzlich Blitzstun; auf Stufe 4 zusätzlich ein kleiner Eiswirbelsturm. Fusionsrezepte sind feste Kombinationen und Quellen bleiben erhalten."],
