@@ -1204,6 +1204,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"active_quests":sanitize_active_quest_rows(state.get("active_quests",[])),
 		"active_borin_quests":sanitize_active_borin_quest_rows(state.get("active_borin_quests",[])),
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
+		"fusions":sanitize_fusion_rows(state.get("fusions",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -6086,6 +6087,7 @@ func restore_fusion_progress(raw:Variant,legacy_history:Variant=[])->void:
 			var definition:=fusion_definition_by_key(key)
 			var state:Variant=raw[raw_key]
 			if definition.is_empty() or not state is Dictionary:continue
+			if state.has("fusion_id") and int(state.get("fusion_id",-1))!=int(definition["id"]):continue
 			var max_rank:=clampi(int(definition.get("max_rank",4)),1,4)
 			var rank:=clampi(int(state.get("rank",0)),0,max_rank)
 			if rank>0:learned_fusions[key]={"fusion_id":int(definition["id"]),"rank":rank}
@@ -10961,6 +10963,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"rescue_kills":clampi(int(state.get("rescue_kills",0)),0,RESCUE_GOAL),
 		"active_quests":sanitize_active_quest_rows(state.get("active_quests",[])),
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
+		"fusions":sanitize_fusion_rows(state.get("fusions",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -12165,6 +12168,21 @@ func local_player_state() -> Dictionary:
 func rpc_server_quest_progress(payload: Dictionary) -> void:
 	if network_mode != "client": return
 	apply_server_quest_progress(payload)
+
+func sanitize_fusion_rows(raw:Variant)->Array:
+	var out:Array=[]
+	if not raw is Array:return out
+	var seen:Dictionary={}
+	for row in raw:
+		if not row is Array or row.size()<3:continue
+		var key:=str(row[0])
+		var fusion_id:=int(row[1])
+		var definition:=fusion_definition_by_key(key)
+		if definition.is_empty() or int(definition["id"])!=fusion_id or seen.has(key):continue
+		var rank:=clampi(int(row[2]),1,clampi(int(definition.get("max_rank",4)),1,4))
+		seen[key]=true
+		out.append([key,fusion_id,rank])
+	return out
 
 func active_quest_sync_rows() -> Array:
 	var rows: Array = []
