@@ -2,8 +2,22 @@ extends Node2D
 ## Real TileMapLayers, matching the existing world coordinates and navigation.
 const TILE := 32
 const BOUNDS := Rect2(0,0,1780,2600)
-const PLAZA := Rect2(384,640,992,1024)
-const GARDENS := [Rect2(416,672,192,224),Rect2(1152,672,192,224),Rect2(416,1344,224,288),Rect2(1152,1344,192,256)]
+const PLAZA := Rect2(384,608,896,832)
+const GARDENS := [
+	Rect2(416,640,192,192),
+	Rect2(1056,640,192,192),
+	Rect2(416,1216,224,192),
+	Rect2(1024,1216,224,192)
+]
+const PROPERTY_PADS := [
+	Rect2(128,608,288,320),
+	Rect2(128,1088,288,320),
+	Rect2(128,1536,320,352),
+	Rect2(128,2016,352,320),
+	Rect2(1216,288,352,352),
+	Rect2(1248,1056,320,352),
+	Rect2(1088,1872,448,352)
+]
 # Exact live exits: east -> meadow, south -> coast. Do not snap gate coordinates.
 const EAST_EXIT := Vector2(1780,1120)
 const SOUTH_EXIT := Vector2(875,2600)
@@ -15,7 +29,13 @@ static var flower_cells: Dictionary = {}
 static var ground_cells: Dictionary = {}
 static var ground_sources: Dictionary = {}
 static var cell_sources: Dictionary = {}
-static var grass_tones := [Color(1.0,1.0,1.0),Color(1.08,1.06,0.92),Color(0.94,0.98,0.94),Color(1.02,1.02,0.98),Color(1.04,1.03,0.95)]
+static var grass_tones := [
+	Color(0.96,1.00,0.92),
+	Color(1.05,1.02,0.88),
+	Color(0.89,0.96,0.86),
+	Color(0.98,0.99,0.93),
+	Color(1.02,1.00,0.90)
+]
 var world_bounds := BOUNDS
 var road_distance: Callable
 var ground: TileMapLayer
@@ -38,7 +58,12 @@ static func prepare(_distance: Callable) -> void:
 				atlas.get_tile_data(Vector2i(x,y),0).modulate=grass_tones[source_id]
 		shared_tileset.add_source(atlas,source_id)
 	var noise:=FastNoiseLite.new();noise.seed=7041;noise.frequency=0.008;noise.fractal_octaves=2
-	var routes:Array=[PackedVector2Array([Vector2(900,1050),Vector2(1270,1110),Vector2(1460,1210),Vector2(1680,1210),EAST_EXIT]),PackedVector2Array([Vector2(900,1300),Vector2(875,1760),Vector2(850,1920),Vector2(920,2176),Vector2(875,2368),SOUTH_EXIT])]
+	var routes:Array=[
+		PackedVector2Array([Vector2(832,1024),Vector2(1120,1024),Vector2(1456,1088),Vector2(1680,1120),EAST_EXIT]),
+		PackedVector2Array([Vector2(832,1184),Vector2(864,1568),Vector2(864,1984),Vector2(896,2304),SOUTH_EXIT]),
+		PackedVector2Array([Vector2(384,1024),Vector2(832,1024),Vector2(1280,1024)]),
+		PackedVector2Array([Vector2(832,608),Vector2(832,1024),Vector2(832,1440)])
+	]
 	# All live houses and NPCs retain their interaction/collision coordinates.
 	var homes:Array=[]
 	for shop in preload("res://components/village_layout.gd").SHOPS:
@@ -50,9 +75,10 @@ static func prepare(_distance: Callable) -> void:
 		var door:=home+Vector2(96,180)
 		if kind=="borin":door=home+Vector2(128,240)
 		elif kind=="arena":door=home+Vector2(192,260)
-		var entry:=Vector2(clampf(door.x,448,1312),clampf(door.y,704,1600))
-		# Southern homes connect to the nearby main footpath rather than long diagonal tracks.
-		if door.y>1664:entry=Vector2(875,door.y)
+		var entry:=Vector2(clampf(door.x,416,1248),clampf(door.y,640,1408))
+		if door.y>1500:entry=Vector2(864,door.y)
+		elif door.x<480:entry=Vector2(416,clampf(door.y,704,2208))
+		elif door.x>1184:entry=Vector2(1248,clampf(door.y,640,2208))
 		var bend:=door.lerp(entry,0.5)+Vector2(0,16)
 		routes.append(PackedVector2Array([door,bend,entry]))
 	for x in 56:
@@ -60,17 +86,20 @@ static func prepare(_distance: Callable) -> void:
 			var cell:=Vector2i(x,y);var center:=Vector2(cell*TILE)+Vector2.ONE*16
 			var garden:=false
 			for r in GARDENS:
-				if ((center-r.get_center())/(r.size*0.5)).length_squared()<=1.0:garden=true
-			var near:=Vector2(clampf(center.x,PLAZA.position.x+96,PLAZA.end.x-96),clampf(center.y,PLAZA.position.y+96,PLAZA.end.y-96))
-			var paved:=PLAZA.has_point(center) and center.distance_to(near)<=96 and not garden
+				if r.has_point(center):garden=true
+			var property_pad:=false
+			for r in PROPERTY_PADS:
+				if r.has_point(center):property_pad=true
+			var near:=Vector2(clampf(center.x,PLAZA.position.x+64,PLAZA.end.x-64),clampf(center.y,PLAZA.position.y+64,PLAZA.end.y-64))
+			var paved:=PLAZA.has_point(center) and center.distance_to(near)<=72 and not garden
 			var route_d:=route_distance(center,routes)
 			var block_center:=Vector2(floori(x/4.0)*128+64,floori(y/4.0)*128+64)
-			var flowers:=noise.get_noise_2dv(block_center)>0.28 and route_d>96 and not PLAZA.grow(64).has_point(center)
+			var flowers:=noise.get_noise_2dv(block_center)>0.32 and route_d>112 and not PLAZA.grow(64).has_point(center) and not property_pad
 			var tone:=noise.get_noise_2dv(center)
 			ground_cells[cell]=Vector2i(posmod(x,4)+(4 if flowers else 0),posmod(y,4))
 			ground_sources[cell]=2 if tone< -0.12 else (3 if tone>0.12 else 0)
-			terrain[cell]=2 if paved else (1 if route_d<64 else 0)
-			cell_sources[cell]=0 if paved else (1 if route_d<36 else 4)
+			terrain[cell]=2 if paved else (1 if route_d<80 else 0)
+			cell_sources[cell]=0 if paved else (1 if route_d<46 else 4)
 	for cell:Vector2i in terrain:
 		cells[cell]=Vector2i(posmod(cell.x,4),posmod(cell.y,4))
 		if terrain[cell]==2:
