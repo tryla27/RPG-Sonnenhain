@@ -59,7 +59,7 @@ static func prepare(_distance: Callable) -> void:
 		shared_tileset.add_source(atlas,source_id)
 	var noise:=FastNoiseLite.new();noise.seed=7041;noise.frequency=0.008;noise.fractal_octaves=2
 	var routes:Array=[
-		PackedVector2Array([Vector2(832,1024),Vector2(1120,1024),Vector2(1456,1088),Vector2(1680,1120),EAST_EXIT]),
+		PackedVector2Array([Vector2(832,960),Vector2(1120,960),Vector2(1456,960),Vector2(1664,1024),EAST_EXIT]),
 		PackedVector2Array([Vector2(832,1184),Vector2(864,1568),Vector2(864,1984),Vector2(896,2304),SOUTH_EXIT]),
 		PackedVector2Array([Vector2(384,1024),Vector2(832,1024),Vector2(1280,1024)]),
 		PackedVector2Array([Vector2(832,608),Vector2(832,1024),Vector2(832,1440)])
