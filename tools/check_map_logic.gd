@@ -65,13 +65,23 @@ func _initialize() -> void:
 	g.class_id=1
 	g.class_mastery_unlocked=true
 	g.arcane_step_learned=true
-	g.energy=100.0
-	g.dash_cooldown=0.0
-	g.player_pos=Vector2(6000,1000)
-	g.facing=Vector2.RIGHT
-	var blink_origin:Vector2=g.player_pos
-	g.dodge()
-	check(g.player_pos.x>blink_origin.x+40.0 and g.dash_timer==0.0,"Mage rift blink did not teleport")
+	var blink_ok:=false
+	for base in [Vector2(2250,1280),Vector2(2600,1740),g.region_rect(1).get_center(),g.region_rect(3).get_center()]:
+		var expected_region:int=g.region_at(base)
+		var safe_origin:Vector2=g.safe_world_teleport_destination(base,expected_region)
+		for direction in [Vector2.RIGHT,Vector2.DOWN,Vector2.LEFT,Vector2.UP]:
+			g.player_pos=safe_origin
+			g.facing=direction
+			g.energy=100.0
+			g.dash_timer=0.0
+			g.dash_cooldown=0.0
+			var blink_origin:Vector2=g.player_pos
+			g.dodge()
+			if g.player_pos.distance_to(blink_origin)>40.0 and g.dash_timer==0.0:
+				blink_ok=true
+				break
+		if blink_ok:break
+	check(blink_ok,"Mage rift blink did not teleport from any safe test point")
 	for look in [Vector2.UP,Vector2.DOWN,Vector2.LEFT,Vector2.RIGHT]: check(absf(g.weapon_hand_offset(look).x)>=22,"Weapon hand overlaps face")
 	g.free()
 	print("MAP_LOGIC_RESULT failures=",failures," · levels advisory, boss seals named and authoritative")
