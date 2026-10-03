@@ -25,7 +25,7 @@ func _initialize()->void:
 
 	# Gate corridors must remain authored as road materials.
 	for gate in [Plan.EAST_GATE,Plan.SOUTH_GATE]:
-		var inside:=gate
+		var inside:Vector2=Vector2(gate)
 		if gate==Plan.EAST_GATE:inside.x-=48
 		else:inside.y-=48
 		assert(Map0.material_at(inside) in ["village_stone","earth_path"])

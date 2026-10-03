@@ -21,15 +21,15 @@ func run():
 	assert(float(g.enemies[0]["hp"])<hp_before,"Magier-Kampfskill verursacht keinen Schaden")
 	g.enemies.clear()
 	g.reset_class_skills();g.level=40;g.skill_points=30;g.gold=20000
-	assert(g.buy_skill(16));assert(g.buy_skill(20));assert(g.buy_skill(18))
+	assert(g.buy_skill(16));assert(g.buy_skill(20));assert(g.buy_skill(17));assert(g.buy_skill(18))
 	var offers:Array=g.available_fusions()
 	assert(not offers.is_empty(),"Gelernte Attacken müssen als Verschmelzungsangebote erscheinen")
 	var f:Dictionary=offers[0]
 	assert(g.learned[int(f["a"])] and g.learned[int(f["b"])],"Fusion darf nur gelernte Attacken anbieten")
-	var sp:=g.fusion_skill_cost(f);var before:=g.skill_points;var cash:=g.gold
-	assert(sp>0 and sp<=before);assert(g.buy_fusion(0))
+	var before:=g.skill_points;var cash:=g.gold
+	assert(g.buy_fusion(0))
 	assert(g.learned[int(f["id"])] and g.learned[int(f["a"])] and g.learned[int(f["b"])])
-	assert(g.skill_points==before-sp and g.gold==cash-int(f["gold"]))
+	assert(g.skill_points==before and g.gold==cash-int(f["gold"]))
 	# Das Belegungsmenü listet gelernte aktive Attacken separat von passiven Werten.
 	var loadout:Array=g.learned_loadout_skills()
 	assert(16 in loadout and 18 in loadout and 20 in loadout)
@@ -43,8 +43,8 @@ func run():
 	assert(g.add_item(g.class_relic_item(1)))
 	g.use_item(0)
 	assert(not g.class_mastery_unlocked and g.inventory.size()==1)
-	# Magier-Relikt schaltet Arkanen Schritt ohne Skillpunktkosten frei.
-	# Arkaner Sprung ist kein Startskill: vor Level 15 nicht kaufbar, ab Level 15 nur gegen Skillpunkte.
+	# Magier-Relikt schaltet den Risssprung ohne Skillpunktkosten frei.
+	# Rissnova ist kein Startskill: vor Level 15 nicht kaufbar, ab Level 15 nur gegen Skillpunkte.
 	g.class_id=1;g.reset_class_skills();g.level=1;g.skill_points=30
 	assert(not g.learned[19] and not g.buy_skill(19))
 	g.level=15
@@ -74,4 +74,5 @@ func run():
 	g.player_pos=Vector2(6000,1035)
 	g.class_id=2;g.class_mastery_unlocked=true;g.ranger_hunt_meter=90;g.ranger_hunt_buff=0;g.normal_attack();assert(g.ranger_hunt_buff==60 and g.ranger_hunt_meter==0);g.dodge();assert(g.ranger_stealth_timer>g.dodge_duration)
 	g.class_id=0;g.class_mastery_unlocked=true;g.warrior_rage=0;g.normal_attack();assert(g.warrior_rage>0)
-	g.reset_class_skills();g.class_id=1;g.level=39;assert(g.ultimate_unlock_level()==40 and not g.learned[g.class_ultimate()]);g.set_creative_level(39);assert(not g.learned[g.class_ultimate()]);g.set_creative_level(40);assert(g.learned[g.class_ultimate()])\n\tprint("BORIN_SKILL_SYSTEM_OK universal trees; fusion; relic mastery; mage Risssprung on Space; mage ultimate level 40; rage; hunt rush; stealth roll");g.free();quit()
+	g.reset_class_skills();g.class_id=1;g.level=39;g.creative_mode=true;assert(g.ultimate_unlock_level()==40 and not g.learned[g.class_ultimate()]);g.set_creative_level(39);assert(not g.learned[g.class_ultimate()]);g.set_creative_level(40);assert(g.learned[g.class_ultimate()])
+	print("BORIN_SKILL_SYSTEM_OK universal trees; gold-only fusion; relic mastery; mage Risssprung on Space; mage ultimate level 40; rage; hunt rush; stealth roll");g.free();quit()

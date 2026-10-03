@@ -10,6 +10,10 @@ const ControllerControls = preload("res://components/controller_controls.gd")
 var controller = ControllerControls.new()
 const QuestGuide = preload("res://components/quest_guide.gd")
 var quest_guide = QuestGuide.new()
+const EssenceSystem = preload("res://components/essence_system.gd")
+const BookSystem = preload("res://components/book_system.gd")
+var essence = EssenceSystem.new()
+var book_system = BookSystem.new()
 const ServerSaveStore = preload("res://components/server_save_store.gd")
 const ServerSaveClient = preload("res://components/server_save_client.gd")
 const AccountStore = preload("res://components/account_store.gd")
@@ -36,6 +40,7 @@ const VillageLayout = preload("res://components/village_layout.gd")
 const StartScenery32 = preload("res://components/start_scenery_32.gd")
 const VillageInteriors32 = preload("res://components/village_interiors_32.gd")
 const DoorSfx = preload("res://components/door_sfx.gd")
+const EquipmentSfx = preload("res://components/equipment_sfx.gd")
 const CombatFeedback=preload("res://components/combat_feedback.gd")
 var combat_feedback=CombatFeedback.new()
 var creation_class_selected:=false
@@ -50,7 +55,6 @@ var boss_attack_sound_seen:Dictionary={}
 var boss_death_end_queue:Array=[]
 var boss_music_hold_timer:=0.0
 var boss_music_hold_theme:=""
-const INVENTORY_HUD_RECT:=Rect2(112,610,82,26)
 const QUEST_HUD_RECT:=Rect2(10,118,348,46)
 
 func hud_action_rect(index:int)->Rect2:
@@ -177,14 +181,15 @@ const ABILITIES := [
 	{"name":"EMP-Stoß", "desc":"Betäubt Gegner im Umkreis", "cost":42, "cd":18.0, "req":23, "kind":39},
 	{"name":"Flammenwirbel", "desc":"Fusion aus Wirbelhieb und Feuerball", "cost":42, "cd":12.0, "req":15, "kind":40},
 	{"name":"Reaktorwall", "desc":"Fusion aus Schildwall und Energieschild", "cost":38, "cd":20.0, "req":15, "kind":41},
-	{"name":"Blitzkern", "desc":"Fusion aus Blitzlanze und Teslawelle", "cost":48, "cd":16.0, "req":23, "kind":42}
+	{"name":"Blitzkern", "desc":"Fusion aus Blitzlanze und Teslawelle", "cost":48, "cd":16.0, "req":23, "kind":42},
+	{"name":"Eisball", "desc":"Fusion aus Frostnova und Blitzlanze · 4 Entwicklungsstufen", "cost":40, "cd":10.0, "req":12, "kind":43}
 ]
 const CLASS_NAMES := ["Krieger", "Magier", "Bogenschütze"]
 const CLASS_SKILLS := [[0, 1, 2, 3, 5, 7, 12, 13, 14], [16, 17, 18, 19, 20, 21, 22, 23], [25, 26, 27, 28, 29, 30, 31, 32]]
 const CLASS_ULTIMATES := [15, 24, 33]
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
-const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200},{"id":41,"a":1,"b":36,"gold":2200},{"id":42,"a":18,"b":37,"gold":4200}]
+const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200,"max_rank":4},{"id":41,"a":1,"b":36,"gold":2200,"max_rank":4},{"id":42,"a":18,"b":37,"gold":4200,"max_rank":4},{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}]
 const BORIN_HOUSE_POS := Vector2(1248,320)
 const BORIN_MAGIC_TREE_POS := Vector2(1552,544)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
@@ -337,6 +342,7 @@ var ranger_ultimate_speed_mult := 1.0
 var ranger_stealth_timer := 0.0
 var ranger_falcon_rune := false
 var robotics_overclock_timer := 0.0
+var arcane_resonance := 0
 const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
 var equipped_ring2_uid := -1
@@ -353,6 +359,11 @@ var shop_page := 0
 var quests: Array = []
 var borin_quests: Array = []
 var pip_loan_received := false
+var pip_loan_level := 0
+var pip_return_dialogue_index := 0
+var fusion_history:Array=[]
+# Dauerhafter, normalisierter Fusionsfortschritt: "kleinereID:groessereID" -> {fusion_id, rank}.
+var learned_fusions:Dictionary={}
 var enemies: Array = []
 var drops: Array = []
 var effects: Array = []
@@ -791,6 +802,8 @@ func _ready() -> void:
 	sound_streams["door_close"] = DoorSfx.make(false)
 	sound_streams["arrow_break"]=CombatFeedback.break_sound(true)
 	sound_streams["magic_break"]=CombatFeedback.break_sound(false)
+	sound_streams["equip"]=EquipmentSfx.make(true)
+	sound_streams["unequip"]=EquipmentSfx.make(false)
 	for i in 8:
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -15.0
@@ -816,7 +829,24 @@ func _ready() -> void:
 		arcane_step_learned=true
 		konflux.enter(self)
 
+func ensure_skill_state_size() -> void:
+	var target_size:int=ABILITIES.size()
+	var learned_old:int=learned.size()
+	var levels_old:int=skill_levels.size()
+	var cooldowns_old:int=cooldowns.size()
+	if learned_old<target_size:
+		learned.resize(target_size)
+		for i in range(learned_old,target_size):learned[i]=false
+	if levels_old<target_size:
+		skill_levels.resize(target_size)
+		for i in range(levels_old,target_size):skill_levels[i]=0
+	if cooldowns_old<target_size:
+		cooldowns.resize(target_size)
+		for i in range(cooldowns_old,target_size):cooldowns[i]=0.0
+
 func reset_class_skills() -> void:
+	ensure_skill_state_size()
+	arcane_resonance = 0
 	arcane_step_learned = false
 	class_mastery_unlocked = false
 	warrior_rage = 0.0
@@ -1174,9 +1204,13 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"active_quests":sanitize_active_quest_rows(state.get("active_quests",[])),
 		"active_borin_quests":sanitize_active_borin_quest_rows(state.get("active_borin_quests",[])),
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
+		"fusions":sanitize_fusion_rows(state.get("fusions",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
+		"essence_magic_unstable":clampi(int(state.get("essence_magic_unstable",0)),0,4),
+		"essence_magic_element":clampi(int(state.get("essence_magic_element",0)),0,4),
+		"essence_magic_aoe":clampi(int(state.get("essence_magic_aoe",0)),0,4),
 		"mage_rift_blink":bool(state.get("mage_rift_blink",false)) and clampi(int(state.get("class",0)),0,2)==1,
 		"ranger_falcon_rune":bool(state.get("ranger_falcon_rune",false)),
 		"race":clampi(int(state.get("race",0)),0,2),
@@ -2774,6 +2808,9 @@ func handle_touch_event(event: InputEvent) -> bool:
 		if action != "":
 			if action == "attack":
 				begin_touch_aim(touch_event.index, pos)
+				if detonate_mage_autoattack():
+					queue_redraw()
+					return true
 				if attack_timer <= 0.0: normal_attack()
 				queue_redraw()
 				return true
@@ -2865,6 +2902,9 @@ func open_mobile_chat() -> void:
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		var hud_hovered:=panel=="" and (hud_action_at(event.position)!="" or QUEST_HUD_RECT.has_point(event.position))
+		Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if hud_hovered else Input.CURSOR_ARROW)
 	if server_save.loading: return
 	if world_builder.active and world_builder.input(self,event):return
 	if controller.handle(self, event): return
@@ -3004,6 +3044,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey: triggered = event.pressed and not event.echo
 	elif event is InputEventMouseButton: triggered = event.pressed
 	if not triggered: return
+	if panel=="" and event_matches_binding(event,"attack") and detonate_mage_autoattack():
+		queue_redraw()
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "":
 		var hud_action:=hud_action_at(event.position)
 		if hud_action!="":
@@ -3273,12 +3316,12 @@ func normal_attack() -> void:
 	if uses_server_world():
 		rpc_client_normal_attack.rpc_id(1, [player_pos.x,player_pos.y], [facing.x,facing.y], class_id, design, power, weapon_element())
 		if class_id != 0:
-			projectiles.append({"pos":player_pos,"dir":facing,"speed":790.0 if variant=="crossbow" else (650.0 if class_id==2 else 520.0),"life":1.2,"damage":0,"kind":3 if class_id==2 else 2,"element":weapon_element(),"hits":[],"network_visual":true})
+			projectiles.append({"pos":player_pos,"dir":facing,"speed":790.0 if variant=="crossbow" else (650.0 if class_id==2 else 520.0),"life":1.2,"damage":0,"kind":3 if class_id==2 else 2,"element":weapon_element(),"hits":[],"network_visual":true,"mage_auto":class_id==1 and essence.unstable_projectile_rank()>0})
 		return
 	if class_id == 0:
 		hit_arc(player_pos, facing, 116.0 if variant == "axe" else 100.0, 0.08 if variant == "axe" else 0.13, power, false, "gift" if poison_blade_timer > 0 else weapon_element())
 	else:
-		projectiles.append({"pos":player_pos, "dir":facing, "speed":790.0 if variant == "crossbow" else (650.0 if class_id == 2 else 520.0), "life":1.2, "damage":power, "kind":3 if class_id == 2 else 2, "element":weapon_element(), "hits":[]})
+		projectiles.append({"pos":player_pos, "dir":facing, "speed":790.0 if variant == "crossbow" else (650.0 if class_id == 2 else 520.0), "life":1.2, "damage":power, "kind":3 if class_id == 2 else 2, "element":weapon_element(), "hits":[],"mage_auto":class_id==1 and essence.unstable_projectile_rank()>0})
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class: int, design: int, power: int, element: String) -> void:
@@ -3307,7 +3350,7 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 		hit_arc(origin,dir,116.0 if axe else 100.0,0.08 if axe else 0.13,power,false,element,sender)
 	else:
 		var crossbow := remote_class == 2 and design % 4 == 3
-		projectiles.append({"pos":origin,"dir":dir,"speed":790.0 if crossbow else (650.0 if remote_class==2 else 520.0),"life":1.2,"damage":power,"kind":3 if remote_class==2 else 2,"element":element,"hits":[],"owner_peer":sender})
+		projectiles.append({"pos":origin,"dir":dir,"speed":790.0 if crossbow else (650.0 if remote_class==2 else 520.0),"life":1.2,"damage":power,"kind":3 if remote_class==2 else 2,"element":element,"hits":[],"owner_peer":sender,"mage_auto":remote_class==1 and int(state.get("essence_magic_unstable",0))>0})
 
 func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float, damage: int, stun: bool, element: String = "", source_peer: int = 0) -> void:
 	for i in range(enemies.size() - 1, -1, -1):
@@ -3362,6 +3405,9 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 			enemy["falcon_mark"]=4.0
 	if float(enemy.get("marked", 0.0)) > 0.0:
 		amount = int(amount * 1.22)
+	if element!="":
+		var element_rank:=essence.rank(2,1) if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("essence_magic_element",0)),0,4)
+		amount=maxi(1,roundi(float(amount)*(1.0+0.05*element_rank)))
 	match element:
 		"feuer":
 			amount += 5
@@ -3418,20 +3464,35 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var allowed_ids: Array = all_slot_skills()
 	allowed_ids.append(CLASS_ULTIMATES[remote_class])
 	if id not in allowed_ids: return
-	rank = clampi(rank,1,5)
-	server_relay_combat_visual(sender,{"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))})
+	var fusion_definition:=fusion_definition_by_id(id)
+	var fusion_key_value:=""
+	if not fusion_definition.is_empty():
+		var server_fusion_rank:=fusion_rank_from_network_state(state,id)
+		if server_fusion_rank<=0:return
+		rank=server_fusion_rank
+		fusion_key_value=fusion_key(int(fusion_definition["a"]),int(fusion_definition["b"]))
+	else:
+		rank = clampi(rank,1,5)
+	var visual_payload:Dictionary={"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))}
+	if fusion_key_value!="":
+		visual_payload["fusion_key"]=fusion_key_value
+		visual_payload["fusion_rank"]=rank
+	server_relay_combat_visual(sender,visual_payload)
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
-	if id in [3,7,16,18,20,25,26,28,29,30]:
+	if id in [3,7,16,18,20,25,26,28,29,30,43]:
 		for shot in ability_projectiles(id,origin,dir,remote_class,power):
 			shot["owner_peer"]=sender
+			if id==43:shot["fusion_rank"]=rank
 			projectiles.append(shot)
 		return
 	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
 	var radial_ids := [0,5,17,19,22,23,24,31,33,37,39,40,41,42]
 	if id in radial_ids:
-		var radius := 165.0 + rank * 12.0
+		var aoe_rank:=clampi(int(state.get("essence_magic_aoe",0)),0,4)
+		var radius := (165.0 + rank * 12.0)*(1.0+(0.05 if aoe_rank>=3 else 0.0)+(0.05 if aoe_rank>=4 else 0.0))
+		power=roundi(float(power)*(1.0+0.05*aoe_rank))
 		for i in range(enemies.size()-1,-1,-1):
 			if enemies[i]["pos"].distance_to(origin) <= radius: damage_enemy(i,power+10,dir,false,"",sender)
 	else:
@@ -3469,7 +3530,15 @@ func use_ability(slot: int) -> void:
 	energy -= float(ability["cost"])
 	var rank: int = int(skill_levels[id])
 	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1))
-	var power := ability_cast_power(id,rank)
+	var power := maxi(1,roundi(float(ability_cast_power(id,rank))*essence.ability_power_mult()))
+	var resonance_rank:=essence.resonance_rank()
+	if resonance_rank>0:
+		if arcane_resonance>=4:
+			power=maxi(1,roundi(float(power)*[1.0,1.12,1.18,1.25,1.35][resonance_rank]))
+			arcane_resonance=0
+			effect(player_pos+Vector2(0,-58),"ARKANE RESONANZ",Color("d8c5ff"),0.8)
+		else:
+			arcane_resonance=mini(4,arcane_resonance+1)
 	var cast_pos := player_pos
 	var cast_dir := facing
 	if uses_server_world():
@@ -3544,27 +3613,29 @@ func use_ability(slot: int) -> void:
 			shield_timer=5.0;effect(player_pos,"ENERGIESCHILD",Color("8edcff"),0.8)
 		37:
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<185.0: damage_enemy(i,power+14,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+				if enemies[i]["pos"].distance_to(player_pos)<185.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+14)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"TESLAWELLE",Color("fff0a5"),0.9)
 		38:
 			robotics_overclock_timer=8.0;effect(player_pos,"ZIELMATRIX",Color("9de9ff"),0.8)
 		39:
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<175.0: enemies[i]["stun"]=maxf(float(enemies[i].get("stun",0.0)),1.8);damage_enemy(i,power,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+				if enemies[i]["pos"].distance_to(player_pos)<175.0*essence.aoe_radius_mult(): enemies[i]["stun"]=maxf(float(enemies[i].get("stun",0.0)),1.8);damage_enemy(i,roundi(power*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"EMP",Color("b7e9ff"),0.9)
 		40:
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<190.0: damage_enemy(i,power+30,(enemies[i]["pos"]-player_pos).normalized(),false,"feuer")
+				if enemies[i]["pos"].distance_to(player_pos)<190.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+30)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"feuer")
 			effect(player_pos,"FLAMMENWIRBEL",Color("ff9858"),1.0)
 		41:
 			shield_timer=7.0
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<150.0: damage_enemy(i,power+12,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+				if enemies[i]["pos"].distance_to(player_pos)<150.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+12)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"REAKTORWALL",Color("8fdcff"),1.0)
 		42:
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<230.0: damage_enemy(i,power+24,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+				if enemies[i]["pos"].distance_to(player_pos)<230.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+24)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"BLITZKERN",Color("fff0a5"),1.0)
+		43:
+			projectiles.append({"pos":player_pos,"dir":facing,"speed":535.0,"life":1.45,"damage":power+18,"kind":2,"element":"eis","spell_id":43,"fusion_rank":rank,"pierce":false,"hits":[],"trail":[]})
 		15:
 			shield_timer = 5.0 + rank
 			for i in range(enemies.size() - 1, -1, -1):
@@ -3573,7 +3644,7 @@ func use_ability(slot: int) -> void:
 			effect(player_pos, ABILITIES[id]["name"], Color("ffdc8a"), 1.6)
 		24:
 			for wave in 3:
-				impact_zones.append({"pos":player_pos, "delay":0.25 + wave * 0.38, "radius":130.0 + wave * 95.0, "damage":power + 20, "element":["eis", "blitz", "gift"][wave], "kind":id})
+				impact_zones.append({"pos":player_pos, "delay":0.25 + wave * 0.38, "radius":(130.0 + wave * 95.0)*essence.aoe_radius_mult(), "damage":roundi((power + 20)*essence.aoe_damage_mult()), "element":["eis", "blitz", "gift"][wave], "kind":id})
 		33:
 			var agility:=primary_attribute()
 			ranger_ultimate_speed_timer=10.0+rank*2.0+agility*0.10
@@ -3596,16 +3667,16 @@ func use_ability(slot: int) -> void:
 					damage_enemy(i, int(power * 0.72) + 5, delta_pos.normalized(), true, "eis")
 		23:
 			for wave in 3:
-				impact_zones.append({"pos":player_pos, "delay":0.12 + wave * 0.22, "radius":110.0 + wave * 47.0, "damage":int(power * 0.47), "element":["eis", "blitz", "feuer"][wave], "kind":id})
+				impact_zones.append({"pos":player_pos, "delay":0.12 + wave * 0.22, "radius":(110.0 + wave * 47.0)*essence.aoe_radius_mult(), "damage":roundi(int(power * 0.47)*essence.aoe_damage_mult()), "element":["eis", "blitz", "feuer"][wave], "kind":id})
 		22, 31:
 			for wave in 4:
 				var point := player_pos + facing * (185.0 if id == 22 else 245.0) + Vector2.RIGHT.rotated(float(wave) * 2.0) * (30.0 + (wave % 2) * 65.0)
-				impact_zones.append({"pos":point, "delay":0.35 + wave * 0.25, "radius":105.0 if id == 22 else 85.0, "damage":power + (22 if id == 22 else 7), "element":"feuer" if id == 22 else "", "kind":id})
+				impact_zones.append({"pos":point, "delay":0.35 + wave * 0.25, "radius":(105.0 if id == 22 else 85.0)*essence.aoe_radius_mult(), "damage":roundi((power + (22 if id == 22 else 7))*essence.aoe_damage_mult()), "element":"feuer" if id == 22 else "", "kind":id})
 		19:
 			for i in range(enemies.size()-1,-1,-1):
 				var offset:Vector2=enemies[i]["pos"]-player_pos
-				if offset.length()<185.0+rank*10.0:
-					damage_enemy(i,int(power*0.82)+10,offset.normalized(),false,"blitz")
+				if offset.length()<(185.0+rank*10.0)*essence.aoe_radius_mult():
+					damage_enemy(i,roundi((int(power*0.82)+10)*essence.aoe_damage_mult()),offset.normalized(),false,"blitz")
 			effect(player_pos,"RISSNOVA",Color("c7b5ff"),0.9)
 		27:
 			var destination := player_pos - facing * (210 + (rank - 1) * 15)
@@ -3665,6 +3736,7 @@ func update_projectiles(delta: float) -> void:
 					28: create_poison_cloud(impact, int(p["damage"]))
 					29: frost_burst(impact, int(p["damage"] * 0.32), uid)
 					30: chain_spell(impact, int(p["damage"] * 0.55), uid, 2)
+					43: iceball_impact(impact,int(p["damage"]),uid,clampi(int(p.get("fusion_rank",1)),1,4))
 					18: spell_visuals.append({"kind":18, "pos":impact, "end":impact, "dir":p["dir"], "rank":1, "life":0.28, "max":0.28})
 				if not bool(p.get("pierce", false)):
 					if spell_id == 16: explode_fireball(p)
@@ -3688,6 +3760,54 @@ func update_poison_clouds(delta: float) -> void:
 		for e in range(enemies.size() - 1, -1, -1):
 			if cloud["pos"].distance_to(enemies[e]["pos"]) < 86:
 				damage_enemy(e, int(cloud["damage"]), Vector2.ZERO, false, "gift")
+
+func iceball_chain(center:Vector2,damage:int,main_uid:int,jumps:int,stun_enabled:bool)->void:
+	var seen:Array=[main_uid]
+	var origin:=center
+	for jump in jumps:
+		var best:=-1
+		var nearest:=170.0
+		for e in enemies.size():
+			if int(enemies[e]["uid"]) in seen:continue
+			var distance:float=origin.distance_to(enemies[e]["pos"])
+			if distance<nearest:
+				best=e
+				nearest=distance
+		if best<0:break
+		var target:Vector2=enemies[best]["pos"]
+		seen.append(int(enemies[best]["uid"]))
+		lightning_lines.append({"from":origin,"to":target,"life":0.32})
+		damage_enemy(best,maxi(2,damage-jump*4),Vector2.ZERO,false,"")
+		if stun_enabled and best<enemies.size():
+			enemies[best]["stun"]=maxf(float(enemies[best].get("stun",0.0)),0.85)
+		origin=target
+
+func iceball_impact(center:Vector2,damage:int,main_uid:int,rank:int)->void:
+	rank=clampi(rank,1,4)
+	for enemy in enemies:
+		if int(enemy.get("uid",-1))==main_uid:
+			enemy["slow"]=maxf(float(enemy.get("slow",0.0)),3.0+rank*0.5)
+			break
+	if rank>=2:
+		iceball_chain(center,maxi(3,roundi(damage*0.42)),main_uid,2,rank>=3)
+	if rank>=3:
+		for enemy in enemies:
+			if int(enemy.get("uid",-1))==main_uid:
+				enemy["stun"]=maxf(float(enemy.get("stun",0.0)),1.15)
+				effect(enemy["pos"]+Vector2(0,-50),"BLITZSTUN",Color("fff0a5"),0.75)
+				break
+	if rank>=4:
+		for i in range(enemies.size()-1,-1,-1):
+			if i>=enemies.size():continue
+			var delta:Vector2=center-enemies[i]["pos"]
+			var distance:=delta.length()
+			if distance>118.0 or distance<1.0:continue
+			move_enemy_with_collision(enemies[i],delta.normalized()*minf(34.0,distance*0.28))
+			damage_enemy(i,maxi(2,roundi(damage*0.18)),Vector2.ZERO,false,"eis")
+		spell_visuals.append({"kind":23,"pos":center,"end":center,"dir":Vector2.RIGHT,"rank":4,"life":0.8,"max":0.8})
+		effect(center+Vector2(0,-42),"EISWIRBEL",Color("b8eaff"),0.8)
+	else:
+		spell_visuals.append({"kind":17,"pos":center,"end":center,"dir":Vector2.RIGHT,"rank":rank,"life":0.5,"max":0.5})
 
 func frost_burst(center: Vector2, damage: int, main_uid: int) -> void:
 	for e in range(enemies.size() - 1, -1, -1):
@@ -3969,10 +4089,23 @@ func sanitize_role_shop_stock() -> void:
 		shop_stock["alchemy"]=(shop_stock["alchemy"] as Array).filter(func(item): return str(item.get("icon","")) in ["potion","herb","essence"])
 	if shop_stock.has("smith"):
 		shop_stock["smith"]=(shop_stock["smith"] as Array).filter(func(item): return str(item.get("icon","")) in ["sword","armor","head"])
+	if shop_stock.has("arcane"):
+		shop_stock["arcane"]=(shop_stock["arcane"] as Array).filter(func(item): return str(item.get("icon","")) in ["staff","armor","ring","head","essence"])
 
 func open_elara_alchemy() -> void:
 	sanitize_role_shop_stock()
 	merchant_kind="alchemy"
+	shop_page=0
+	panel="shop"
+	selected_item=-1
+	menu_scroll=0
+	sell_all_confirm=false
+	pending_purchase=-1
+	pending_purchase_item={}
+
+func open_pip_arcane_shop() -> void:
+	sanitize_role_shop_stock()
+	merchant_kind="arcane"
 	shop_page=0
 	panel="shop"
 	selected_item=-1
@@ -3991,7 +4124,7 @@ func interior_actors() -> Array:
 	if room_name=="Borin":
 		return [
 			{"name":"Borin","role":"Skillzauberer · Fähigkeiten & Prüfungen","pos":INTERIOR_CENTER+Vector2(-120,-90),"color":Color("6783bd"),"kind":"quest"},
-			{"name":"Pip","role":"Borins Gehilfe · Leihwaffen","pos":INTERIOR_CENTER+Vector2(130,-65),"color":Color("9f8bcc"),"kind":"apprentice"}
+			{"name":"Pip","role":"Arkanhändler · Stäbe & Magie","pos":INTERIOR_CENTER+Vector2(130,-65),"color":Color("9f8bcc"),"kind":"arcane_merchant"}
 		]
 	var pos:=INTERIOR_CENTER+Vector2(0,-95)
 	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-215,-42)
@@ -4013,9 +4146,13 @@ func interact_interior_owner(name:String="") -> void:
 	match name:
 		"Alma": steinrose.open(self)
 		"Borin":
-			panel="skills";skill_tree_tab=0;menu_scroll=0
+			if pip_loan_received and level>pip_loan_level:
+				pip_dialogue()
+			panel="essence";essence.selected_tree=0;menu_scroll=0
 		"Pip":
-			pip_dialogue()
+			if not pip_loan_received or level>pip_loan_level:
+				pip_dialogue()
+			open_pip_arcane_shop()
 		"Elara": open_elara_alchemy()
 		"Fenna": panel="appearance"
 		"Torvald":
@@ -4474,15 +4611,16 @@ func gain_xp(amount: int) -> void:
 	while xp >= xp_required():
 		xp -= xp_required()
 		level += 1
-		var earned_point := level % 2 == 0 or level in [3, 8, 12]
-		if earned_point: skill_points += 1
+		var earned_point := false
+		# Essenz ist das Level-Fortschrittssystem: XP bleibt unangetastet,
+		# jeder Charakter besitzt auf Level N insgesamt N Essenz (max. 40).
 		var ultimate_level:=ultimate_unlock_level()
 		if level >= ultimate_level:
 			learned[class_ultimate()] = true
 			skill_levels[class_ultimate()] = mini(5,1+int((level-ultimate_level)/5.0))
 		hp = max_hp()
 		energy = max_energy()
-		message("LEVEL %d! %s" % [level, "+1 Skillpunkt · öffne K." if earned_point else "Neue Stärke und Gesundheit."])
+		message("LEVEL %d! +1 ESSENZ · %d/%d frei" % [level,essence.available(level),essence.total_for_level(level)])
 		play_sound("level")
 
 func skill_rank_level(index: int, rank: int) -> int:
@@ -4495,7 +4633,7 @@ func make_item(name: String, icon: String, rarity: int, power: int, value: int, 
 	var agility: int = bonus if icon == "bow" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
 	var intellect: int = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
 	var fair_value := value if icon == "potion" else 10 + ilvl * 4 + maxi(0, power) * (3 if icon in ["sword", "staff", "bow"] else 2) + rarity * rarity * 32 + (25 if element != "" else 0) + (strength + agility + intellect) * 5
-	var item := {"uid":next_uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4}
+	var item := {"uid":next_uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4, "locked":false}
 	if icon == "food":
 		item["value"] = value
 		item["design"] = maxi(0,FoodSystem.index_for(name))
@@ -4510,7 +4648,7 @@ func stack_limit(item: Dictionary) -> int:
 	return 1
 
 func stack_matches(a: Dictionary, b: Dictionary) -> bool:
-	return a.get("icon") == b.get("icon") and a.get("name") == b.get("name") and a.get("rarity") == b.get("rarity") and a.get("element", "") == b.get("element", "")
+	return a.get("icon") == b.get("icon") and a.get("name") == b.get("name") and a.get("rarity") == b.get("rarity") and a.get("element", "") == b.get("element", "") and bool(a.get("locked",false)) == bool(b.get("locked",false))
 
 func item_sale_value(item: Dictionary) -> int:
 	return int(item.get("stack_value", int(item.get("value", 0)) * int(item.get("count", 1))))
@@ -4720,7 +4858,9 @@ func interact() -> void:
 	elif closest["kind"] == "stylist":
 		panel="appearance"
 	elif closest["kind"] == "apprentice":
-		message("Pip: Ich bin Borins Lehrling. Komm mit Fragen zu Fähigkeiten gern in unsere Häuser.")
+		message("Pip: Meine magischen Waren findest du bei Borin im Haus.")
+	elif closest["kind"] == "arcane_merchant":
+		open_pip_arcane_shop()
 	elif closest["kind"] == "arena":
 		panel = "arena_entry"
 	else:
@@ -4929,20 +5069,66 @@ func borin_quest_dialogue()->void:
 			next_req=int(BORIN_QUESTS[i]["req"]);break
 	message("Borin: Deine nächste Prüfung wartet ab Level %d." % next_req if next_req>0 else "Borin: Du hast alle drei Prüfungen gemeistert.")
 
+func pip_loan_item_index()->int:
+	for i in inventory.size():
+		if bool(inventory[i].get("loaned",false)):return i
+	return -1
+
+func pip_return_loan_weapon()->String:
+	var index:=pip_loan_item_index()
+	if index<0:return ""
+	var uid:=int(inventory[index].get("uid",-1))
+	if is_equipped_uid(uid):
+		if equipped_uid==uid:equipped_uid=-1
+		if equipped_armor_uid==uid:equipped_armor_uid=-1
+		if equipped_head_uid==uid:equipped_head_uid=-1
+		if equipped_ring_uid==uid:equipped_ring_uid=-1
+		if equipped_ring2_uid==uid:equipped_ring2_uid=-1
+		play_sound("unequip")
+	var item_name:=str(inventory[index].get("name","Leihwaffe"))
+	inventory.remove_at(index)
+	selected_item=-1
+	validate_equipment_slots()
+	pip_loan_received=false
+	pip_loan_level=0
+	play_sound("pickup")
+	save_game()
+	return item_name
+
 func pip_dialogue()->void:
 	if pip_loan_received:
-		message("Pip: Die Leihwaffe hast du schon. Bring sie gut durch deine ersten Kämpfe!")
+		if level>pip_loan_level:
+			var lines:Array[String]=[
+				"Pip: He, du bist stärker geworden! Zeit, dass meine Leihwaffe wieder zurückkommt.",
+				"Pip: Ein neues Level, hm? Dann hast du bewiesen, dass du allein klarkommst. Gib mir bitte die Leihwaffe zurück.",
+				"Pip: Borin sagt, Fortschritt macht selbstständig. Und selbstständig heißt: meine Waffe wieder her!",
+				"Pip: Sie hat dir gute Dienste geleistet. Jetzt brauche ich die Leihwaffe für den nächsten Anfänger.",
+				"Pip: Gratuliere zum Levelaufstieg! Feier später — zuerst hätte ich gern meine Leihwaffe zurück."
+			]
+			var line:=lines[pip_return_dialogue_index%lines.size()]
+			pip_return_dialogue_index=(pip_return_dialogue_index+1)%lines.size()
+			if pip_loan_item_index()<0:
+				message(line+" ... Moment, du hast sie gar nicht mehr dabei. Bring sie mir zurück, sobald du sie wiederfindest.")
+				save_game()
+				return
+			# Rückgabe geschieht im selben Gespräch nach der Forderung.
+			var returned_name:=pip_return_loan_weapon()
+			message("%s · %s zurückgegeben." % [line,returned_name])
+			return
+		message("Pip: Die Leihwaffe hast du schon. Sammle erst etwas Erfahrung damit — nach deinem nächsten Level brauche ich sie zurück.")
 		return
 	var icon:=class_weapon_icon()
 	var weapon_names:=["Pips Leihschwert","Pips Leihstab","Pips Leihbogen"]
 	var loan:=make_item(weapon_names[class_id],icon,0,4,20,"",1)
 	loan["loaned"]=true
+	loan["locked"]=true
 	if not can_add_item(loan):
 		message("Pip: Mach einen Platz im Inventar frei, dann leihe ich dir deine Startwaffe.")
 		return
 	add_item(loan)
 	pip_loan_received=true
-	message("Pip: Für den Anfang leihe ich dir %s. Viel Glück!" % loan["name"])
+	pip_loan_level=level
+	message("Pip: Für den Anfang leihe ich dir %s. Nach deinem nächsten Level brauche ich sie zurück." % loan["name"])
 	play_sound("pickup");save_game()
 
 func quest_dialogue(npc_name: String) -> void:
@@ -5004,7 +5190,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5014,6 +5200,8 @@ func capture_save_data() -> Dictionary:
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
+	data["essence_state"] = essence.snapshot()
+	data["book_state"] = book_system.snapshot()
 	data["world_fog"] = world_fog.snapshot()
 	return data.duplicate(true)
 
@@ -5125,6 +5313,8 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		player_pos = Vector2(825, 1020)
 	mark_network_teleport()
 	level = maxi(1, int(data.get("level", 1)))
+	essence.restore(data.get("essence_state",{}))
+	book_system.restore(data.get("book_state",{}),level)
 	xp = maxi(0, int(data.get("xp", 0)))
 	gold = maxi(0, int(data.get("gold", 55)))
 	music_enabled = bool(data.get("music_enabled", true))
@@ -5225,6 +5415,11 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		for i in mini(stored_borin_quests.size(),BORIN_QUESTS.size()):
 			if stored_borin_quests[i] is Dictionary: borin_quests[i]=stored_borin_quests[i]
 	pip_loan_received=bool(data.get("pip_loan_received",false))
+	pip_loan_level=maxi(0,int(data.get("pip_loan_level",level if pip_loan_received else 0)))
+	pip_return_dialogue_index=clampi(int(data.get("pip_return_dialogue_index",0)),0,4)
+	var stored_fusions:Variant=data.get("fusion_history",[])
+	fusion_history=stored_fusions.duplicate(true) if stored_fusions is Array else []
+	restore_fusion_progress(data.get("learned_fusions",{}),fusion_history)
 	# Older multiplayer saves may contain completed boss quests but missing boss flags.
 	for q in mini(quests.size(),QUESTS.size()):
 		var target:int=int(QUESTS[q]["target"])
@@ -5526,6 +5721,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		pending_purchase = -1
 		return
 	match panel:
+		"essence": click_essence(mouse)
 		"skills": click_skills(mouse)
 		"skill_loadout": click_skill_loadout(mouse)
 		"fusion": click_fusion(mouse)
@@ -5614,6 +5810,11 @@ func start_new_game() -> void:
 	xp = 0
 	gold = 55
 	skill_points = 0
+	essence.reset()
+	book_system.learned.clear()
+	book_system.active.clear()
+	fusion_history.clear()
+	learned_fusions.clear()
 	reset_class_skills()
 	selected_slot = 0
 	inventory_page = 0
@@ -5847,6 +6048,108 @@ func buy_skill(index:int) -> bool:
 	skill_points -= price;learned[index]=true;skill_levels[index]=1
 	message("%s gelernt · %d Skillpunkte" % [ABILITIES[index]["name"],price]);save_game();return true
 
+func fusion_key(source_a:int,source_b:int)->String:
+	var low:=mini(source_a,source_b)
+	var high:=maxi(source_a,source_b)
+	return "%d:%d" % [low,high]
+
+func fusion_definition_by_key(key:String)->Dictionary:
+	for fusion in FUSIONS:
+		if fusion_key(int(fusion["a"]),int(fusion["b"]))==key:
+			return fusion
+	return {}
+
+func fusion_definition_by_id(fusion_id:int)->Dictionary:
+	for fusion in FUSIONS:
+		if int(fusion["id"])==fusion_id:
+			return fusion
+	return {}
+
+func fusion_progress_snapshot()->Dictionary:
+	var out:Dictionary={}
+	for raw_key in learned_fusions.keys():
+		var key:=str(raw_key)
+		var definition:=fusion_definition_by_key(key)
+		if definition.is_empty():continue
+		var state:Variant=learned_fusions[raw_key]
+		if not state is Dictionary:continue
+		var max_rank:=clampi(int(definition.get("max_rank",4)),1,4)
+		var rank:=clampi(int(state.get("rank",0)),0,max_rank)
+		if rank<=0:continue
+		out[key]={"fusion_id":int(definition["id"]),"rank":rank}
+	return out
+
+func restore_fusion_progress(raw:Variant,legacy_history:Variant=[])->void:
+	learned_fusions.clear()
+	if raw is Dictionary:
+		for raw_key in raw.keys():
+			var key:=str(raw_key)
+			var definition:=fusion_definition_by_key(key)
+			var state:Variant=raw[raw_key]
+			if definition.is_empty() or not state is Dictionary:continue
+			if state.has("fusion_id") and int(state.get("fusion_id",-1))!=int(definition["id"]):continue
+			var max_rank:=clampi(int(definition.get("max_rank",4)),1,4)
+			var rank:=clampi(int(state.get("rank",0)),0,max_rank)
+			if rank>0:learned_fusions[key]={"fusion_id":int(definition["id"]),"rank":rank}
+	# Migration alter Saves: a/b/id/rank werden in den normalisierten Schlüssel überführt.
+	if legacy_history is Array:
+		for entry in legacy_history:
+			if not entry is Dictionary:continue
+			var source_a:=int(entry.get("a",-1))
+			var source_b:=int(entry.get("b",-1))
+			var output:=int(entry.get("id",-1))
+			if source_a<0 or source_b<0:continue
+			var key:=fusion_key(source_a,source_b)
+			var definition:=fusion_definition_by_key(key)
+			if definition.is_empty() or int(definition["id"])!=output:continue
+			var max_rank:=clampi(int(definition.get("max_rank",4)),1,4)
+			var rank:=clampi(int(entry.get("rank",1)),1,max_rank)
+			var previous:Variant=learned_fusions.get(key,{})
+			var previous_rank:=int(previous.get("rank",0)) if previous is Dictionary else 0
+			learned_fusions[key]={"fusion_id":output,"rank":maxi(previous_rank,rank)}
+	apply_fusion_progress_to_skills()
+
+func apply_fusion_progress_to_skills()->void:
+	ensure_skill_state_size()
+	for raw_key in learned_fusions.keys():
+		var key:=str(raw_key)
+		var definition:=fusion_definition_by_key(key)
+		var state:Variant=learned_fusions[raw_key]
+		if definition.is_empty() or not state is Dictionary:continue
+		var output:=int(definition["id"])
+		var source_a:=int(definition["a"])
+		var source_b:=int(definition["b"])
+		var rank:=clampi(int(state.get("rank",1)),1,clampi(int(definition.get("max_rank",4)),1,4))
+		learned[output]=true
+		skill_levels[output]=maxi(int(skill_levels[output]),rank)
+		learned[source_a]=true
+		learned[source_b]=true
+		skill_levels[source_a]=maxi(1,int(skill_levels[source_a]))
+		skill_levels[source_b]=maxi(1,int(skill_levels[source_b]))
+
+func fusion_progress_rows()->Array:
+	var rows:Array=[]
+	var snapshot:=fusion_progress_snapshot()
+	var keys:Array=snapshot.keys()
+	keys.sort()
+	for raw_key in keys:
+		var key:=str(raw_key)
+		var state:Dictionary=snapshot[key]
+		rows.append([key,int(state["fusion_id"]),int(state["rank"])])
+	return rows
+
+func fusion_rank_from_network_state(state:Dictionary,fusion_id:int)->int:
+	var definition:=fusion_definition_by_id(fusion_id)
+	if definition.is_empty():return 0
+	var expected_key:=fusion_key(int(definition["a"]),int(definition["b"]))
+	var raw_rows:Variant=state.get("fusions",[])
+	if not raw_rows is Array:return 0
+	for row in raw_rows:
+		if not row is Array or row.size()<3:continue
+		if str(row[0])!=expected_key or int(row[1])!=fusion_id:continue
+		return clampi(int(row[2]),0,clampi(int(definition.get("max_rank",4)),1,4))
+	return 0
+
 func fusion_source_skills()->Array:
 	var out:Array=[]
 	for id in range(0,40):
@@ -5858,24 +6161,17 @@ func fusion_source_skills()->Array:
 	return out
 
 func available_fusions()->Array:
-	var sources:=fusion_source_skills()
-	var free_outputs:Array=[]
+	ensure_skill_state_size()
+	var offers:Array=[]
 	for fusion in FUSIONS:
 		var output:=int(fusion["id"])
-		if output<learned.size() and not learned[output]:free_outputs.append(fusion)
-	var offers:Array=[]
-	if sources.size()<2:return offers
-	var pair_index:=0
-	for template in free_outputs:
-		if pair_index+1>=sources.size():pair_index=0
-		var a:=int(sources[pair_index])
-		var b:=int(sources[(pair_index+1)%sources.size()])
-		if a==b:break
-		var offer:Dictionary=template.duplicate(true)
-		offer["a"]=a;offer["b"]=b
-		offers.append(offer)
-		pair_index+=2
-		if offers.size()>=3:break
+		var source_a:=int(fusion["a"])
+		var source_b:=int(fusion["b"])
+		var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
+		if output>=learned.size() or source_a>=learned.size() or source_b>=learned.size():continue
+		if not learned[source_a] or not learned[source_b]:continue
+		if learned[output] and int(skill_levels[output])>=max_rank:continue
+		offers.append(fusion.duplicate(true))
 	return offers
 
 func fusion_skill_cost(fusion:Dictionary) -> int:
@@ -5883,8 +6179,10 @@ func fusion_skill_cost(fusion:Dictionary) -> int:
 	return maxi(1,ceili(float(skill_point_cost(a)+skill_point_cost(b))*0.75))
 
 func can_fuse(fusion:Dictionary) -> bool:
+	ensure_skill_state_size()
 	var a:=int(fusion["a"]);var b:=int(fusion["b"]);var id:=int(fusion["id"])
-	return a!=b and not learned[id] and learned[a] and learned[b] and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and skill_points >= fusion_skill_cost(fusion) and gold >= int(fusion["gold"])
+	var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
+	return a!=b and learned[a] and learned[b] and int(skill_levels[id])<max_rank and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
 
 func buy_fusion(index:int) -> bool:
 	var offers:=available_fusions()
@@ -5893,10 +6191,42 @@ func buy_fusion(index:int) -> bool:
 	if not can_fuse(fusion):
 		message("Diese Verschmelzung ist gerade nicht verfügbar.")
 		return false
-	var id:=int(fusion["id"]);var sp:=fusion_skill_cost(fusion)
-	skill_points-=sp;gold-=int(fusion["gold"]);learned[id]=true;skill_levels[id]=1
-	message("%s + %s → %s · -%d SP · -%d Gold" % [ABILITIES[int(fusion["a"])]["name"],ABILITIES[int(fusion["b"])]["name"],ABILITIES[id]["name"],sp,int(fusion["gold"])])
-	save_game();return true
+	var id:=int(fusion["id"])
+	var a:=int(fusion["a"])
+	var b:=int(fusion["b"])
+	var price:=int(fusion["gold"])
+	var learned_before:=learned.duplicate()
+	var levels_before:=skill_levels.duplicate()
+	var slots_before:=slots.duplicate()
+	var gold_before:=gold
+	var history_before:=fusion_history.duplicate(true)
+	var learned_fusions_before:=learned_fusions.duplicate(true)
+
+	# Quellen bleiben immer gelernt. Erst Output setzen, validieren, dann Kosten festschreiben.
+	learned[a]=true
+	learned[b]=true
+	skill_levels[a]=maxi(1,int(skill_levels[a]))
+	skill_levels[b]=maxi(1,int(skill_levels[b]))
+	learned[id]=true
+	skill_levels[id]=clampi(int(skill_levels[id])+1,1,clampi(int(fusion.get("max_rank",4)),1,4))
+
+	if not learned[id] or not learned[a] or not learned[b]:
+		learned=learned_before
+		skill_levels=levels_before
+		slots=slots_before
+		gold=gold_before
+		fusion_history=history_before
+		learned_fusions=learned_fusions_before
+		message("Verschmelzung abgebrochen · deine Attacken wurden nicht verändert.")
+		return false
+
+	gold-=price
+	var key:=fusion_key(a,b)
+	learned_fusions[key]={"fusion_id":id,"rank":int(skill_levels[id])}
+	fusion_history.append({"key":key,"id":id,"a":a,"b":b,"rank":int(skill_levels[id]),"gold":price,"at":int(Time.get_unix_time_from_system())})
+	message("%s + %s → %s · STUFE %d/4 · -%d Gold · Ausgangsattacken bleiben erhalten" % [ABILITIES[a]["name"],ABILITIES[b]["name"],ABILITIES[id]["name"],int(skill_levels[id]),price])
+	save_game()
+	return true
 
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
@@ -6198,6 +6528,13 @@ func refresh_shop_stock() -> void:
 			{"name":"Heiltrank", "icon":"potion", "power":0, "price":35, "rarity":1},
 			{"name":"Großer Heiltrank", "icon":"potion", "power":0, "price":85, "rarity":1},
 			{"name":"Manatrank" if class_id == 1 else "Energietrank", "icon":"potion", "power":0, "price":45, "rarity":1}],
+		"arcane":[
+			{"name":"Runenstab %s" % suffix, "icon":"staff", "power":6 + tier * 2, "price":110 + tier * 24, "rarity":rarity, "level":tier},
+			{"name":"Elementstab · %s" % shop_element.capitalize(), "icon":"staff", "power":9 + tier * 2, "price":175 + tier * 30, "rarity":mini(3,rarity+1), "level":tier, "element":shop_element},
+			{"name":"Arkanrobe %s" % suffix, "icon":"armor", "power":4 + int(tier / 3.0), "price":210 + tier * 26, "rarity":rarity, "level":tier},
+			{"name":"Fokusring %s" % suffix, "icon":"ring", "power":10 + tier * 2, "price":160 + tier * 22, "rarity":rarity, "level":tier},
+			{"name":"Kristallreif %s" % suffix, "icon":"head", "power":5 + int(tier / 2.0), "price":260 + tier * 31, "rarity":mini(3,rarity+1), "level":tier},
+			{"name":"Arkankern · %s" % shop_element.capitalize(), "icon":"essence", "power":0, "price":240 + tier * 20, "rarity":mini(3,rarity+1), "level":tier, "element":shop_element}],
 		"merchant":[
 			{"name":"Reisendenring %s" % suffix, "icon":"ring", "power":8 + tier * 2, "price":80 + tier * 19, "rarity":rarity, "level":tier},
 			{"name":"Umhang %s" % suffix, "icon":"armor", "power":1 + int(tier / 4.0), "price":65 + tier * 14, "rarity":rarity, "level":tier},
@@ -9051,6 +9388,7 @@ func draw_panel() -> void:
 		"controls": draw_controls_panel()
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
+		"essence": draw_essence_panel()
 		"skill_loadout": draw_skill_loadout_panel()
 		"fusion": draw_fusion_panel()
 		"appearance": draw_appearance_panel()
@@ -9204,8 +9542,11 @@ func draw_account_form(registering:bool)->void:
 	var nr:=Rect2(300,255 if registering else 275,550,48);draw_rect(nr,Color("22363c"));draw_rect(nr,Color("ffe2aa") if account_focus==0 else Color("8ba49c"),false,2)
 	text_at(nr.position+Vector2(14,31),account_name if account_name!="" else "Name eingeben …",19,Color("fff0cf") if account_name!="" else Color("9fb4ac"))
 	text_at(Vector2(300,330 if registering else 350),"PASSWORT",14,Color("e9cc90"))
-	var pr:=Rect2(300,345 if registering else 365,550,48);draw_rect(pr,Color("22363c"));draw_rect(pr,Color("ffe2aa") if account_focus==1 else Color("8ba49c"),false,2)
+	var password_too_short:=account_password!="" and account_password.length()<8
+	var pr:=Rect2(300,345 if registering else 365,550,48);draw_rect(pr,Color("22363c"));draw_rect(pr,Color("b96f68") if password_too_short else (Color("ffe2aa") if account_focus==1 else Color("8ba49c")),false,2)
 	text_at(pr.position+Vector2(14,31),masked_password() if account_password!="" else "Passwort eingeben …",19,Color("fff0cf") if account_password!="" else Color("9fb4ac"))
+	if password_too_short:
+		text_at(Vector2(300,408 if registering else 428),"PASSWORT ZU KURZ · mindestens 8 Zeichen (%d/8)" % account_password.length(),12,Color("e7a09a"))
 	if registering:
 		text_at(Vector2(300,420),"PASSWORT WIEDERHOLEN",14,Color("e9cc90"))
 		var cr:=Rect2(300,435,550,48);draw_rect(cr,Color("22363c"));draw_rect(cr,Color("ffe2aa") if account_focus==2 else (Color("b96f68") if account_password_confirm!="" and account_password_confirm!=account_password else Color("8ba49c")),false,2)
@@ -9560,6 +9901,109 @@ func draw_intro_panel() -> void:
 	draw_rect(Rect2(230, 365, 675, 3), Color("c3a673"))
 	text_at(Vector2(230, 413), binding_short("interact")+" / Leertaste / Klick: Überspringen", 15, Color("c7d4ca"))
 
+func draw_essence_panel() -> void:
+	text_at(Vector2(165,124),"BORIN · ESSENZLEHRE",25,Color("ffeda9"))
+	text_at(Vector2(700,124),"LV %d · ESSENZ %d/%d" % [level,essence.available(level),essence.total_for_level(level)],15,Color("f6dc9a"))
+	for tree in EssenceSystem.TREE_COUNT:
+		var x:=165+tree*162
+		ui_button(Rect2(x,148,152,36),EssenceSystem.TREE_NAMES[tree],true,essence.selected_tree==tree)
+	var selected:int=essence.selected_tree
+	text_at(Vector2(165,214),"%s · Ursprung: %s · %d/%d" % [EssenceSystem.TREE_NAMES[selected],EssenceSystem.TREE_ORIGINS[selected],essence.tree_spent(selected),EssenceSystem.TREE_CAP],16,Color("ffe2aa"))
+	for talent in EssenceSystem.TALENTS_PER_TREE:
+		var info:Dictionary=EssenceSystem.TALENTS[selected][talent]
+		var rank:=essence.rank(selected,talent)
+		var y:=242+talent*62
+		ui_box(Rect2(165,y,700,54),Color("314b54") if rank>0 else Color("243944"))
+		text_at(Vector2(178,y+20),str(info["name"]),15,Color("fff1bc"))
+		text_at(Vector2(178,y+41),str(info["desc"]),11,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,520)
+		var label:="%d/4" % rank
+		if rank<4:label+=" · +1 ESSENZ"
+		ui_button(Rect2(875,y+8,105,38),label,essence.can_invest(level,selected,talent),false)
+	text_at(Vector2(165,570),"Jeder Baum: 5 Talente × 4 Ränge = 20 · Level 40: maximal 40 von 100 Essenz.",12,Color("b9d9cf"))
+
+func click_essence(mouse:Vector2)->void:
+	for tree in EssenceSystem.TREE_COUNT:
+		if Rect2(165+tree*162,148,152,36).has_point(mouse):
+			essence.selected_tree=tree
+			play_sound("menu")
+			queue_redraw()
+			return
+	for talent in EssenceSystem.TALENTS_PER_TREE:
+		if Rect2(875,250+talent*62,105,38).has_point(mouse):
+			if essence.invest(level,essence.selected_tree,talent):
+				var info:Dictionary=EssenceSystem.TALENTS[essence.selected_tree][talent]
+				message("%s · Rang %d/4" % [info["name"],essence.rank(essence.selected_tree,talent)])
+				play_sound("level")
+				save_game()
+			else:
+				message("Dafür fehlt freie Essenz oder mehr Bindung an diesen Baum.")
+			queue_redraw()
+			return
+
+func mage_unstable_explosion(pos:Vector2,rank:int,base_damage:int,element:String="",source_peer:int=0,aoe_rank:int=-1)->void:
+	rank=clampi(rank,1,4)
+	var effective_aoe:=essence.rank(2,2) if aoe_rank<0 else clampi(aoe_rank,0,4)
+	var radius_mult:=1.0+(0.05 if effective_aoe>=3 else 0.0)+(0.05 if effective_aoe>=4 else 0.0)
+	var damage_mult:=1.0+0.05*effective_aoe
+	var radius:float=[0.0,70.0,82.0,94.0,108.0][rank]*radius_mult
+	var mult:float=[0.0,0.60,0.75,0.90,1.00][rank]*damage_mult
+	var damage:=maxi(1,roundi(float(base_damage)*mult))
+	for i in range(enemies.size()-1,-1,-1):
+		if i>=enemies.size():continue
+		var offset:Vector2=enemies[i]["pos"]-pos
+		if offset.length()>radius:continue
+		var local_damage:=damage
+		if rank>=2 and offset.length()<=radius*0.35:local_damage=maxi(local_damage,base_damage)
+		damage_enemy(i,local_damage,offset.normalized() if offset.length_squared()>.01 else Vector2.ZERO,false,element,source_peer)
+		if rank>=4 and i<enemies.size():
+			move_enemy_with_collision(enemies[i],(pos-enemies[i]["pos"]).normalized()*18.0)
+	effect(pos+Vector2(0,-24),"ARKANE DETONATION",Color("c9b6ff"),0.75)
+	spell_visuals.append({"kind":19,"pos":pos,"end":pos,"dir":Vector2.RIGHT,"rank":rank,"life":0.55,"max":0.55})
+	play_sound("skill_19")
+
+func detonate_mage_autoattack()->bool:
+	if class_id!=1:return false
+	var rank:=essence.unstable_projectile_rank()
+	if rank<=0:return false
+	for i in range(projectiles.size()-1,-1,-1):
+		var shot:Dictionary=projectiles[i]
+		if not bool(shot.get("mage_auto",false)):continue
+		var pos:Vector2=shot["pos"]
+		var element:=str(shot.get("element",""))
+		var damage:=int(shot.get("damage",normal_attack_power()))
+		projectiles.remove_at(i)
+		if uses_server_world() and network_mode=="client":
+			rpc_mage_auto_detonate.rpc_id(1,[pos.x,pos.y])
+			effect(pos+Vector2(0,-24),"DETONATION",Color("c9b6ff"),0.55)
+		else:
+			mage_unstable_explosion(pos,rank,damage,element)
+		attack_timer=maxf(attack_timer,0.12)
+		return true
+	return false
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_mage_auto_detonate(pos_data:Array)->void:
+	if network_mode!="host" or pos_data.size()<2:return
+	var sender:=multiplayer.get_remote_sender_id()
+	if sender<=0 or not remote_players.has(sender):return
+	if not server_action_allowed(sender,"mage_auto_detonate",120):return
+	var state:Dictionary=remote_players[sender]
+	if int(state.get("class",-1))!=1:return
+	var rank:=clampi(int(state.get("essence_magic_unstable",0)),0,4)
+	if rank<=0:return
+	var requested:=Vector2(float(pos_data[0]),float(pos_data[1]))
+	if not requested.is_finite():return
+	for i in range(projectiles.size()-1,-1,-1):
+		var shot:Dictionary=projectiles[i]
+		if int(shot.get("owner_peer",0))!=sender or not bool(shot.get("mage_auto",false)):continue
+		var pos:Vector2=shot["pos"]
+		if pos.distance_to(requested)>90.0:return
+		var damage:=int(shot.get("damage",1))
+		var element:=str(shot.get("element",""))
+		projectiles.remove_at(i)
+		mage_unstable_explosion(pos,rank,damage,element,sender,clampi(int(state.get("essence_magic_aoe",0)),0,4))
+		return
+
 func draw_skills_panel() -> void:
 	text_at(Vector2(165,125),"BORIN · SKILLZAUBERER",25,Color("ffeda9"))
 	text_at(Vector2(650,124),"LV %d · %d SP · %d GOLD" % [level,skill_points,gold],16,Color("f6dc9a"))
@@ -9618,13 +10062,13 @@ func draw_fusion_crystal() -> void:
 	text_at(p+Vector2(-72,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,144)
 
 func draw_fusion_panel() -> void:
-	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(720,124),"%d SP · %d GOLD" % [skill_points,gold],16,Color("f6dc9a"));text_at(Vector2(165,160),"Der Kristall bietet immer Kombinationen aus deinen bereits gelernten Attacken an.",13,Color("cbd9da"))
+	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(760,124),"%d GOLD" % gold,16,Color("f6dc9a"));text_at(Vector2(165,160),"Verschmelzen kostet nur Gold. Essenz und Ausgangsattacken bleiben erhalten.",13,Color("cbd9da"))
 	var offers:=available_fusions()
 	if offers.is_empty():
 		text_at(Vector2(185,225),"Lerne mindestens zwei aktive Attacken. Bereits erschaffene Fusionen bleiben erhalten.",15,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,760)
 	for i in offers.size():
 		var f:Dictionary=offers[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
-		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Skillpunkte · %d Gold" % [fusion_skill_cost(f),int(f["gold"])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),"VERSCHMELZEN" if can_fuse(f) else "GESPERRT",can_fuse(f))
+		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Gold · Stufe %d/4 · Quellen bleiben gelernt" % [int(f["gold"]),int(skill_levels[id])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),("VERSTÄRKEN" if learned[id] else "VERSCHMELZEN") if can_fuse(f) else "GESPERRT",can_fuse(f))
 
 func click_fusion(mouse:Vector2) -> void:
 	var offers:=available_fusions()
@@ -9666,14 +10110,17 @@ func draw_inventory_panel() -> void:
 		var row := cell / 5
 		var pos := Vector2(641 + col * 65, 200 + row * 55)
 		var is_equipped := i < inventory.size() and int(inventory[i]["uid"]) in equipped_item_uids()
-		draw_rect(Rect2(pos, Vector2(54, 48)), Color("ffdda0") if is_equipped else (Color("e3c78c") if i == selected_item else Color("16344b")))
-		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("16344b"))
+		var is_locked := i < inventory.size() and bool(inventory[i].get("locked",false))
+		draw_rect(Rect2(pos, Vector2(54, 48)), Color("ffdda0") if is_equipped else (Color("8d9492") if is_locked else (Color("e3c78c") if i == selected_item else Color("16344b"))))
+		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("27343a") if is_locked else Color("16344b"))
 		if i < inventory.size():
 			var item: Dictionary = inventory[i]
-			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 4)), RARITY_COLORS[int(item["rarity"])])
-			draw_item_icon(pos + Vector2(11, 9), String(item["icon"]), RARITY_COLORS[int(item["rarity"])], 0.88, weapon_visual_stage(item), item_design(item))
+			var rarity_color:Color=RARITY_COLORS[int(item["rarity"])]
+			var display_color:Color=Color("7d8582") if is_locked else rarity_color
+			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 4)), display_color)
+			draw_item_icon(pos + Vector2(11, 9), String(item["icon"]), display_color, 0.88, weapon_visual_stage(item), item_design(item))
 			draw_item_signature(pos + Vector2(11, 9), item)
-			if bool(item.get("locked",false)): text_at(pos+Vector2(38,14),"L",10,Color("ffd66e"))
+			if bool(item.get("locked",false)): text_at(pos+Vector2(29,14),"LOCK",8,Color("b8bebb"))
 			if int(item.get("count", 1)) > 1:
 				draw_rect(Rect2(pos + Vector2(19, 32), Vector2(32, 14)), Color("1d2d35"))
 				text_at(pos + Vector2(20, 44), "×%d" % int(item["count"]), 12, Color("fff2ce"))
@@ -9681,7 +10128,7 @@ func draw_inventory_panel() -> void:
 	if selected_item >= 0 and selected_item < inventory.size():
 		var item: Dictionary = inventory[selected_item]
 		text_at(Vector2(643, 491), String(item["name"]), 17, RARITY_COLORS[int(item["rarity"])], HORIZONTAL_ALIGNMENT_LEFT, 310)
-		var detail := "%s · %s · %d Gold" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), item_sale_value(item)]
+		var detail := "%s · %s · %s" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), "UNVERKÄUFLICH" if bool(item.get("locked",false)) else "%d Gold" % item_sale_value(item)]
 		if item["icon"] in ["sword", "staff", "bow", "armor", "ring", "head"]: detail += " · +%d" % int(item["power"])
 		text_at(Vector2(643, 518), detail, 13, Color("e5eddd"), HORIZONTAL_ALIGNMENT_LEFT, 320)
 		var action_label := "MEISTERGABE NUTZEN" if bool(item.get("class_relic",false)) else ("ESSEN" if item["icon"] == "food" else "BENUTZEN")
@@ -9803,7 +10250,7 @@ func draw_skill_icon(p: Vector2, id: int, size: float) -> void:
 	draw_rect(box, Color(border,0.35), false, 1)
 
 func draw_shop_panel() -> void:
-	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else "HÄNDLER")
+	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else ("PIP (ARKANHANDEL)" if merchant_kind == "arcane" else "HÄNDLER"))
 	text_at(Vector2(165, 125), shop_name, 25, Color("ffeda9"))
 	text_at(Vector2(804, 126), "%d GOLD" % gold, 17, Color("f9dba0"))
 	text_at(Vector2(169, 174), "KAUFEN · Neues Angebot in %d:%02d" % [int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 17, Color("e8f2de"))
@@ -10516,6 +10963,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"rescue_kills":clampi(int(state.get("rescue_kills",0)),0,RESCUE_GOAL),
 		"active_quests":sanitize_active_quest_rows(state.get("active_quests",[])),
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
+		"fusions":sanitize_fusion_rows(state.get("fusions",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -11476,8 +11924,17 @@ func item_icon_for_uid(uid: int) -> String:
 			return str(item.get("icon",""))
 	return ""
 
+func equipped_head_allowed() -> bool:
+	if equipped_head_uid < 0: return true
+	for item in inventory:
+		if int(item.get("uid",-1)) != equipped_head_uid: continue
+		if str(item.get("icon","")) != "head": return false
+		# Boss-Kopfrüstungen sind Trophäen und dürfen klassenübergreifend getragen werden.
+		return bool(item.get("boss_hat",false)) or int(item.get("head_class",-1)) == class_id
+	return false
+
 func validate_equipment_slots() -> void:
-	if head_visual()!=class_id:equipped_head_uid=-1
+	if not equipped_head_allowed():equipped_head_uid=-1
 	var weapon_icon := item_icon_for_uid(equipped_uid)
 	if equipped_uid >= 0 and (weapon_icon == "" or weapon_icon != class_weapon_icon()):
 		equipped_uid = -1
@@ -11516,10 +11973,12 @@ func toggle_equipment_item(index: int) -> bool:
 	var uid := int(item.get("uid",-1))
 	var icon := str(item.get("icon",""))
 	if icon=="head":
-		if int(item.get("head_class",-1))!=class_id:
+		if not bool(item.get("boss_hat",false)) and int(item.get("head_class",-1))!=class_id:
 			message("Diese Kopfbedeckung gehört einer anderen Klasse.")
 			return true
-		equipped_head_uid=-1 if equipped_head_uid==uid else uid
+		var removing:=equipped_head_uid==uid
+		equipped_head_uid=-1 if removing else uid
+		play_sound("unequip" if removing else "equip")
 		validate_equipment_slots()
 		save_game()
 		announce_multiplayer_context()
@@ -11530,9 +11989,11 @@ func toggle_equipment_item(index: int) -> bool:
 			return true
 		if equipped_uid == uid:
 			equipped_uid = -1
+			play_sound("unequip")
 			message("Ausgezogen: %s" % str(item.get("name","Waffe")))
 		else:
 			equipped_uid = uid
+			play_sound("equip")
 			message("Ausgerüstet: %s (+%d Schaden)" % [str(item.get("name","Waffe")),int(item.get("power",0))])
 		save_game()
 		announce_multiplayer_context()
@@ -11540,9 +12001,11 @@ func toggle_equipment_item(index: int) -> bool:
 	if icon == "armor":
 		if equipped_armor_uid == uid:
 			equipped_armor_uid = -1
+			play_sound("unequip")
 			message("Ausgezogen: %s" % str(item.get("name","Rüstung")))
 		else:
 			equipped_armor_uid = uid
+			play_sound("equip")
 			message("Ausgerüstet: %s (%d Schutz)" % [str(item.get("name","Rüstung")),int(item.get("power",0))])
 		save_game()
 		announce_multiplayer_context()
@@ -11557,6 +12020,7 @@ func toggle_equipment_item(index: int) -> bool:
 		else: equipped_ring_uid = uid
 		validate_equipment_slots()
 		hp = minf(max_hp(),hp+maxf(0,max_hp()-old_max))
+		play_sound("unequip" if removing else "equip")
 		message(("Ausgezogen: " if removing else "Ausgerüstet: ")+str(item.get("name","Ring")))
 		save_game()
 		announce_multiplayer_context()
@@ -11698,12 +12162,27 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
 	if network_mode != "client": return
 	apply_server_quest_progress(payload)
+
+func sanitize_fusion_rows(raw:Variant)->Array:
+	var out:Array=[]
+	if not raw is Array:return out
+	var seen:Dictionary={}
+	for row in raw:
+		if not row is Array or row.size()<3:continue
+		var key:=str(row[0])
+		var fusion_id:=int(row[1])
+		var definition:=fusion_definition_by_key(key)
+		if definition.is_empty() or int(definition["id"])!=fusion_id or seen.has(key):continue
+		var rank:=clampi(int(row[2]),1,clampi(int(definition.get("max_rank",4)),1,4))
+		seen[key]=true
+		out.append([key,fusion_id,rank])
+	return out
 
 func active_quest_sync_rows() -> Array:
 	var rows: Array = []
@@ -12241,9 +12720,9 @@ func ability_projectiles(id:int,origin:Vector2,dir:Vector2,cls:int,power:int)->A
 	var result:Array=[]
 	var count:int=3 if id in [7,20,26] else 1
 	for n in count:
-		var speed:float=650 if id==3 else (700 if id==7 else (920 if id in [18,25] else (390 if id==20 else (570 if id in [16,29] else 720))))
+		var speed:float=535 if id==43 else (650 if id==3 else (700 if id==7 else (920 if id in [18,25] else (390 if id==20 else (570 if id in [16,29] else 720)))))
 		var damage:int=power+15 if id==3 else (power+10 if id==7 else int(power*(.72 if id in [20,26] else (.68 if id==16 else 1.0)))+(22 if id in [18,25] else 7))
-		result.append({"pos":origin,"dir":dir.rotated((n-(count-1)*.5)*.24),"speed":speed,"life":.9 if id==3 else (.8 if id==7 else (1.65 if id==20 else 1.25)),"damage":damage,"kind":0 if id==3 else (1 if id==7 else (3 if cls==2 else 2)),"element":"gift" if id==28 else ("eis" if id==29 else ("blitz" if id in [18,30] else ("feuer" if id==16 else ""))),"spell_id":id,"pierce":id in [3,18,25],"hits":[],"trail":[]})
+		result.append({"pos":origin,"dir":dir.rotated((n-(count-1)*.5)*.24),"speed":speed,"life":.9 if id==3 else (.8 if id==7 else (1.65 if id==20 else 1.25)),"damage":damage,"kind":0 if id==3 else (1 if id==7 else (3 if cls==2 else 2)),"element":"gift" if id==28 else ("eis" if id in [29,43] else ("blitz" if id in [18,30] else ("feuer" if id==16 else ""))),"spell_id":id,"pierce":id in [3,18,25],"hits":[],"trail":[]})
 	return result
 
 func steer_homing_shot(shot:Dictionary,delta:float)->void:

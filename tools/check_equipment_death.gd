@@ -43,8 +43,9 @@ func _initialize() -> void:
 	assert(game.class_mastery_unlocked and game.arcane_step_learned)
 	assert(game.skill_points==points_before)
 	assert(not game.learn_arcane_step())
+	var blink_origin:Vector2=game.player_pos
 	game.dodge()
-	assert(game.dash_timer>0.0)
+	assert(game.dash_timer==0.0 and game.dash_cooldown>0.0 and game.player_pos!=blink_origin)
 	game.panel = ""
 	var click := InputEventMouseButton.new()
 	click.position = Vector2(1035,116)

@@ -183,7 +183,7 @@ func click(g, mouse: Vector2) -> void:
 			if Rect2(410,190+row_index*27,300,24).has_point(mouse):
 				selected=shown[row_index]
 				g.play_sound("menu");g.queue_redraw();return
-	if tab==0 and Rect2(410,548,180,38).has_point(mouse):
+	if tab==0 and not learned[selected] and Rect2(410,548,180,38).has_point(mouse):
 		learn_recipe(g);return
 	if tab==3 and Rect2(610,548,180,38).has_point(mouse):
 		cook(g);return
@@ -312,6 +312,7 @@ func draw(g) -> void:
 		1:draw_berries_page(g)
 		2:draw_effects_page(g)
 		3:draw_cook_page(g)
-	if tab==0:g.ui_button(Rect2(410,548,180,38),"REZEPT LERNEN",not learned[selected])
+	if tab==0 and not learned[selected]:
+		g.ui_button(Rect2(410,548,180,38),"REZEPT LERNEN",true)
 	if tab==3:g.ui_button(Rect2(610,548,180,38),"KOCHEN",can_cook(g))
 	g.ui_button(Rect2(810,548,170,38),"SCHLIESSEN")
