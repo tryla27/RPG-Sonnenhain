@@ -154,12 +154,12 @@ const ABILITIES := [
 	{"name":"Feuerball", "desc":"Feuerprojektil mit Explosion", "cost":23, "cd":4.0, "req":3, "kind":16},
 	{"name":"Frostnova", "desc":"Eiskreis verlangsamt Gegner", "cost":29, "cd":8.0, "req":8, "kind":17},
 	{"name":"Blitzlanze", "desc":"Blitz durch mehrere Ziele", "cost":34, "cd":7.0, "req":12, "kind":18},
-	{"name":"Arkaner Sprung", "desc":"Weiter arkaner Sprung und Schutz", "cost":25, "cd":10.0, "req":15, "kind":19},
+	{"name":"Rissnova", "desc":"Arkane Druckwelle um den Magier", "cost":27, "cd":9.0, "req":15, "kind":19},
 	{"name":"Sternenfunken", "desc":"Drei magische Geschosse", "cost":32, "cd":8.0, "req":18, "kind":20},
 	{"name":"Eisschild", "desc":"Schützt und friert Angreifer", "cost":30, "cd":15.0, "req":23, "kind":21},
 	{"name":"Meteorschauer", "desc":"Feuer trifft eine Fläche", "cost":44, "cd":18.0, "req":28, "kind":22},
 	{"name":"Elementarwirbel", "desc":"Eis, Blitz und Feuer im Kreis", "cost":49, "cd":21.0, "req":34, "kind":23},
-	{"name":"Arkaner Sturm", "desc":"Klassenfähigkeit: Elementarwellen", "cost":60, "cd":45.0, "req":20, "kind":24},
+	{"name":"Arkaner Sturm", "desc":"Ultimate ab Level 40: Elementarwellen", "cost":60, "cd":45.0, "req":40, "kind":24},
 	{"name":"Präzisionsschuss", "desc":"Gezielter Schuss mit Durchschlag", "cost":22, "cd":5.0, "req":3, "kind":25},
 	{"name":"Mehrfachschuss", "desc":"Drei Pfeile im Fächer", "cost":27, "cd":7.0, "req":8, "kind":26},
 	{"name":"Rückwärtssprung", "desc":"Abstand gewinnen und ausweichen", "cost":23, "cd":9.0, "req":12, "kind":27},
@@ -196,7 +196,7 @@ const CLASS_BOSS_HOUSE_POS := [Vector2(430,5940),Vector2(9700,5940),Vector2(1430
 const CLASS_BOSS_HOUSE_SIZE := Vector2(192,160)
 const CLASS_BOSS_MUSIC_THEMES := ["boss_kriegsherr","boss_arkanhueter","boss_jagdmeister"]
 const CLASS_RELIC_NAMES := ["Herz des Kriegsherrn","Arkansplitter","Herz der Jagd"]
-const CLASS_RELIC_SKILLS := ["WUT + BLUTRAUSCH","ARKANER SCHRITT","JAGDRAUSCH + SCHATTENROLLE"]
+const CLASS_RELIC_SKILLS := ["WUT + BLUTRAUSCH","RISSSPRUNG · LEERTASTE","JAGDRAUSCH + SCHATTENROLLE"]
 const CLASS_RELIC_RESERVE_MS := 15000
 const QUESTS := [
 	{"title":"Schleime im Blütenwald", "npc":"Mira", "target":0, "count":8, "xp":60, "gold":75, "reward":"Waldklinge"},
@@ -842,6 +842,12 @@ func class_weapon_icon() -> String:
 
 func class_ultimate() -> int:
 	return CLASS_ULTIMATES[class_id]
+
+func ultimate_unlock_level(for_class:int=class_id)->int:
+	return 40 if for_class==1 else 20
+
+func mage_rift_blink_unlocked()->bool:
+	return class_id==1 and class_mastery_unlocked and arcane_step_learned
 
 func setup_multiplayer_signals() -> void:
 	if not multiplayer.peer_connected.is_connected(_on_peer_connected): multiplayer.peer_connected.connect(_on_peer_connected)
@@ -3070,19 +3076,61 @@ func toggle_panel(which: String) -> void:
 	sell_all_confirm = false
 
 func learn_arcane_step() -> bool:
+	# Legacy save/API name: this now unlocks the mage's Space-key Risssprung.
 	if class_id != 1 or not class_mastery_unlocked or arcane_step_learned: return false
 	arcane_step_learned = true
 	save_game()
 	return true
 
+func mage_rift_blink() -> bool:
+	if not mage_rift_blink_unlocked() or dash_cooldown>0.0:return false
+	const BLINK_RANGE:=250.0
+	const BLINK_MANA:=18.0
+	if energy<BLINK_MANA:
+		message("Risssprung benötigt 18 Mana.")
+		return false
+	var dir:=movement_vector()
+	if dir.length_squared()<0.01:dir=facing
+	if dir.length_squared()<0.01:dir=Vector2.DOWN
+	dir=dir.normalized()
+	var origin:=player_pos
+	var best:=origin
+	# Der Blink ist sofort, darf aber keine Mauern, Regionsgrenzen oder feste Geometrie überspringen.
+	for distance in range(24,251,12):
+		var candidate:=origin+dir*float(distance)
+		if not candidate.is_finite() or not Rect2(Vector2.ZERO,WORLD).has_point(candidate):break
+		if region_at(candidate)!=region_at(origin) or blocked_by_region_wall(candidate):break
+		if dungeon_id>=0 and dungeon_blocked(candidate):break
+		if interior_id>=0 and tavern_blocked(candidate):break
+		if dungeon_id<0 and interior_id<0 and terrain_blocked(candidate,12.0):break
+		best=candidate
+	if best.distance_to(origin)<48.0:
+		message("Der Riss kann hier nicht geöffnet werden.")
+		return false
+	energy-=BLINK_MANA
+	player_pos=best
+	facing=dir
+	mark_network_teleport()
+	dash_timer=0.0
+	dodge_start=origin
+	dodge_duration=0.0
+	dash_cooldown=2.35
+	invulnerable=0.22
+	spell_visuals.append({"kind":19,"pos":origin,"end":player_pos,"dir":dir,"rank":1,"life":0.55,"max":0.55})
+	effect(player_pos+Vector2(0,-48),"RISSSPRUNG",Color("c7b5ff"),0.7)
+	play_sound("dodge")
+	return true
+
 func dodge() -> void:
 	stop_sprint(0.16)
-	var arcane := class_id == 1 and arcane_step_learned
+	if mage_rift_blink_unlocked():
+		if mage_rift_blink():return
+		if dash_cooldown>0.0:return
 	var dir := movement_vector()
 	dash_dir = dir.normalized() if dir.length() > 0 else facing.normalized()
 	if dash_dir.length_squared() < 0.01: dash_dir = Vector2.DOWN
 	dodge_start = player_pos
-	dodge_duration = 0.20 if arcane else (0.24 if class_id == 0 else 0.22)
+	dodge_duration = 0.24 if class_id == 0 else 0.22
 	dash_timer = dodge_duration
 	dash_cooldown = 1.25
 	invulnerable = 0.38
@@ -3092,11 +3140,11 @@ func dodge() -> void:
 		elif konflux.fighter_stats.has(1):
 			konflux.fighter_stats[1]["dodge"]=0.38
 			konflux.fighter_stats[1]["dodge_cd"]=1.25
-	if hero_race==1 and not arcane:
+	if hero_race==1:
 		orc_jump_knockback()
 		effect(player_pos+Vector2(0,-60),"ORK-SPRUNG",Color("d8b47a"),0.65)
 	else:
-		effect(player_pos+Vector2(0,-60), "ARKANER SCHRITT" if arcane else ("SCHATTENROLLE" if class_id == 2 and class_mastery_unlocked else "ROLLE"), Color("c7b5ff") if arcane else Color("d8f3ff"), 0.65)
+		effect(player_pos+Vector2(0,-60),"SCHATTENROLLE" if class_id == 2 and class_mastery_unlocked else "ROLLE",Color("d8f3ff"),0.65)
 	play_sound("dodge")
 
 func orc_jump_knockback() -> void:
@@ -3346,7 +3394,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 			projectiles.append(shot)
 		return
 	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
-	var radial_ids := [0,5,17,22,23,24,31,33,37,39,40,41,42]
+	var radial_ids := [0,5,17,19,22,23,24,31,33,37,39,40,41,42]
 	if id in radial_ids:
 		var radius := 165.0 + rank * 12.0
 		for i in range(enemies.size()-1,-1,-1):
@@ -3369,9 +3417,6 @@ func use_ability(slot: int) -> void:
 	stop_sprint(0.22)
 	var id: int = class_ultimate() if slot == 3 else int(slots[slot])
 	if id < 0 or id >= ABILITIES.size() or not learned[id]: return
-	if id==19 and skill_levels[19]<=0:
-		message("Arkaner Sprung muss zuerst bei Borin gelernt werden.")
-		return
 	var ability: Dictionary = ABILITIES[id]
 	if float(ability["cd"]) <= 0.0: return
 	if float(cooldowns[id]) > 0 or energy < float(ability["cost"]): return
@@ -3521,9 +3566,14 @@ func use_ability(slot: int) -> void:
 			for wave in 4:
 				var point := player_pos + facing * (185.0 if id == 22 else 245.0) + Vector2.RIGHT.rotated(float(wave) * 2.0) * (30.0 + (wave % 2) * 65.0)
 				impact_zones.append({"pos":point, "delay":0.35 + wave * 0.25, "radius":105.0 if id == 22 else 85.0, "damage":power + (22 if id == 22 else 7), "element":"feuer" if id == 22 else "", "kind":id})
-		19, 27:
-			var direction := facing if id == 19 else -facing
-			var destination := player_pos + direction * (210 + (rank - 1) * 15)
+		19:
+			for i in range(enemies.size()-1,-1,-1):
+				var offset:Vector2=enemies[i]["pos"]-player_pos
+				if offset.length()<185.0+rank*10.0:
+					damage_enemy(i,int(power*0.82)+10,offset.normalized(),false,"blitz")
+			effect(player_pos,"RISSNOVA",Color("c7b5ff"),0.9)
+		27:
+			var destination := player_pos - facing * (210 + (rank - 1) * 15)
 			move_with_collision(destination-player_pos)
 			invulnerable = 0.5
 		21:
@@ -5147,16 +5197,19 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		player_pos = Vector2(825, 1020)
 	mark_network_teleport()
 	if level < region_level(region_at(WAYSTONES[last_waystone])): last_waystone = 1
-	# Arkaner Sprung (Skill 19) ist ein normal zu lernender Skill ab Level 15.
-	# Alte Spielstände, die ihn fälschlich früh hatten, verlieren nur diesen Früh-Unlock.
+	# Skill 19 ist jetzt Rissnova; der Klassen-Risssprung lebt separat auf Leertaste.
 	if class_id==1 and level<int(ABILITIES[19]["req"]):
 		learned[19]=false
 		skill_levels[19]=0
 		for s in 3:
 			if slots[s]==19: slots[s]=-1
-	if level >= 20:
+	var ultimate_level:=ultimate_unlock_level()
+	if level >= ultimate_level:
 		learned[class_ultimate()] = true
-		skill_levels[class_ultimate()] = mini(5, 1 + (level - 20) / 5)
+		skill_levels[class_ultimate()] = mini(5,1+int((level-ultimate_level)/5.0))
+	else:
+		learned[class_ultimate()] = false
+		skill_levels[class_ultimate()] = 0
 	hp = clampf(float(data.get("hp", 100)), 1, max_hp())
 	energy = clampf(float(data.get("energy", 100)), 0, max_energy())
 	validate_equipment_slots()
@@ -5714,9 +5767,10 @@ func set_creative_level(target: int) -> void:
 	level = clampi(target, 1, 40)
 	xp = 0
 	skill_points = maxi(skill_points, 60)
-	if level >= 20:
+	var ultimate_level:=ultimate_unlock_level()
+	if level >= ultimate_level:
 		learned[class_ultimate()] = true
-		skill_levels[class_ultimate()] = mini(5, 1 + int((level - 20) / 5.0))
+		skill_levels[class_ultimate()] = mini(5,1+int((level-ultimate_level)/5.0))
 	else:
 		learned[class_ultimate()] = false
 		skill_levels[class_ultimate()] = 0
@@ -9486,7 +9540,7 @@ func draw_skills_panel() -> void:
 		text_at(Vector2(x+12,y+88),"GELERNT · SLOT %d" % (selected_slot+1) if learned[id] else ("KAUFEN · %d SP" % price if level>=req else "GESPERRT · LV %d" % req),12,Color("9de6c2") if learned[id] or level>=req else Color("c98d84"))
 	text_at(Vector2(165,530),"Gelernte Skills anklicken → ausgewählten Slot belegen · Wechsel bei Borin kostenlos.",13,Color("d9e6d5"))
 	text_at(Vector2(165,554),"Verschmelzungen gibt es nur am Kristall neben Borin.",13,Color("b9d9cf"))
-	var mastery:String=str(["Wut: %.0f/100" % warrior_rage,"Arkaner Schritt: %s" % ("bereit" if arcane_step_learned else "gesperrt"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id])
+	var mastery:String=str(["Wut: %.0f/100" % warrior_rage,"Risssprung (LEER): %s" % ("bereit" if mage_rift_blink_unlocked() else "gesperrt"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id])
 	if not class_mastery_unlocked:
 		mastery = "Relikt von Map %02d · %s" % [6+class_id,ENEMY_TYPES[12+class_id]["name"]]
 	text_at(Vector2(165,578),"Klassenbonus · "+mastery,13,Color("ffe2aa"))
