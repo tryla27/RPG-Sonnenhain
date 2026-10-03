@@ -51,9 +51,11 @@ func reveal(pos:Vector2,radius:float=REVEAL_RADIUS)->void:
 			if world_center.distance_to(pos)<=radius+CELL*.72:set_seen(cell)
 
 func party_positions(g)->Array:
-	var out:Array=[g.player_pos]
 	var local_context:=str(g.multiplayer_context()) if g.has_method("multiplayer_context") else "world"
 	var local_instance:=str(g.multiplayer_instance_id()) if g.has_method("multiplayer_instance_id") else "world"
+	var out:Array=[]
+	if local_context!="world":return out
+	out.append(g.player_pos)
 	for raw in (g.party_state.get("members",[]) as Array):
 		if not raw is Dictionary:continue
 		var row:Dictionary=raw
