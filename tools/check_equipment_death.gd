@@ -53,5 +53,5 @@ func _initialize() -> void:
 	game._unhandled_input(click)
 	assert(game.panel=="map")
 	game.free()
-	print("EQUIPMENT_DEATH_OK six visible armors; merchant pagination stock; delayed revival; Map-07 mage relic mastery dodge")
+	print("EQUIPMENT_DEATH_OK six visible armors; merchant pagination stock; delayed revival; Map-07 mage relic unlocks server-safe Space-key rift blink")
 	quit()
