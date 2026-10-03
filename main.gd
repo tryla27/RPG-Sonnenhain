@@ -361,6 +361,7 @@ var borin_quests: Array = []
 var pip_loan_received := false
 var pip_loan_level := 0
 var pip_return_dialogue_index := 0
+var fusion_history:Array=[]
 var enemies: Array = []
 var drops: Array = []
 var effects: Array = []
@@ -5086,7 +5087,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5313,6 +5314,18 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	pip_loan_received=bool(data.get("pip_loan_received",false))
 	pip_loan_level=maxi(0,int(data.get("pip_loan_level",level if pip_loan_received else 0)))
 	pip_return_dialogue_index=clampi(int(data.get("pip_return_dialogue_index",0)),0,4)
+	var stored_fusions:Variant=data.get("fusion_history",[])
+	fusion_history=stored_fusions.duplicate(true) if stored_fusions is Array else []
+	for entry in fusion_history:
+		if not entry is Dictionary:continue
+		var output:=int(entry.get("id",-1))
+		var source_a:=int(entry.get("a",-1))
+		var source_b:=int(entry.get("b",-1))
+		if output>=0 and output<learned.size():
+			learned[output]=true
+			skill_levels[output]=maxi(1,int(skill_levels[output]))
+		if source_a>=0 and source_a<learned.size():learned[source_a]=true;skill_levels[source_a]=maxi(1,int(skill_levels[source_a]))
+		if source_b>=0 and source_b<learned.size():learned[source_b]=true;skill_levels[source_b]=maxi(1,int(skill_levels[source_b]))
 	# Older multiplayer saves may contain completed boss quests but missing boss flags.
 	for q in mini(quests.size(),QUESTS.size()):
 		var target:int=int(QUESTS[q]["target"])
@@ -5976,7 +5989,7 @@ func fusion_skill_cost(fusion:Dictionary) -> int:
 
 func can_fuse(fusion:Dictionary) -> bool:
 	var a:=int(fusion["a"]);var b:=int(fusion["b"]);var id:=int(fusion["id"])
-	return a!=b and not learned[id] and learned[a] and learned[b] and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and skill_points >= fusion_skill_cost(fusion) and gold >= int(fusion["gold"])
+	return a!=b and not learned[id] and learned[a] and learned[b] and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
 
 func buy_fusion(index:int) -> bool:
 	var offers:=available_fusions()
@@ -5985,10 +5998,38 @@ func buy_fusion(index:int) -> bool:
 	if not can_fuse(fusion):
 		message("Diese Verschmelzung ist gerade nicht verfügbar.")
 		return false
-	var id:=int(fusion["id"]);var sp:=fusion_skill_cost(fusion)
-	skill_points-=sp;gold-=int(fusion["gold"]);learned[id]=true;skill_levels[id]=1
-	message("%s + %s → %s · -%d SP · -%d Gold" % [ABILITIES[int(fusion["a"])]["name"],ABILITIES[int(fusion["b"])]["name"],ABILITIES[id]["name"],sp,int(fusion["gold"])])
-	save_game();return true
+	var id:=int(fusion["id"])
+	var a:=int(fusion["a"])
+	var b:=int(fusion["b"])
+	var price:=int(fusion["gold"])
+	var learned_before:=learned.duplicate()
+	var levels_before:=skill_levels.duplicate()
+	var slots_before:=slots.duplicate()
+	var gold_before:=gold
+	var history_before:=fusion_history.duplicate(true)
+
+	# Quellen bleiben immer gelernt. Erst Output setzen, validieren, dann Kosten festschreiben.
+	learned[a]=true
+	learned[b]=true
+	skill_levels[a]=maxi(1,int(skill_levels[a]))
+	skill_levels[b]=maxi(1,int(skill_levels[b]))
+	learned[id]=true
+	skill_levels[id]=maxi(1,int(skill_levels[id]))
+
+	if not learned[id] or not learned[a] or not learned[b]:
+		learned=learned_before
+		skill_levels=levels_before
+		slots=slots_before
+		gold=gold_before
+		fusion_history=history_before
+		message("Verschmelzung abgebrochen · deine Attacken wurden nicht verändert.")
+		return false
+
+	gold-=price
+	fusion_history.append({"id":id,"a":a,"b":b,"gold":price,"at":int(Time.get_unix_time_from_system())})
+	message("%s + %s → %s · -%d Gold · Ausgangsattacken bleiben erhalten" % [ABILITIES[a]["name"],ABILITIES[b]["name"],ABILITIES[id]["name"],price])
+	save_game()
+	return true
 
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
@@ -9817,13 +9858,13 @@ func draw_fusion_crystal() -> void:
 	text_at(p+Vector2(-72,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,144)
 
 func draw_fusion_panel() -> void:
-	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(720,124),"%d SP · %d GOLD" % [skill_points,gold],16,Color("f6dc9a"));text_at(Vector2(165,160),"Der Kristall bietet immer Kombinationen aus deinen bereits gelernten Attacken an.",13,Color("cbd9da"))
+	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(760,124),"%d GOLD" % gold,16,Color("f6dc9a"));text_at(Vector2(165,160),"Verschmelzen kostet nur Gold. Essenz und Ausgangsattacken bleiben erhalten.",13,Color("cbd9da"))
 	var offers:=available_fusions()
 	if offers.is_empty():
 		text_at(Vector2(185,225),"Lerne mindestens zwei aktive Attacken. Bereits erschaffene Fusionen bleiben erhalten.",15,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,760)
 	for i in offers.size():
 		var f:Dictionary=offers[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
-		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Skillpunkte · %d Gold" % [fusion_skill_cost(f),int(f["gold"])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),"VERSCHMELZEN" if can_fuse(f) else "GESPERRT",can_fuse(f))
+		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Gold · Quellen bleiben gelernt" % int(f["gold"]),13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),"VERSCHMELZEN" if can_fuse(f) else "GESPERRT",can_fuse(f))
 
 func click_fusion(mouse:Vector2) -> void:
 	var offers:=available_fusions()
