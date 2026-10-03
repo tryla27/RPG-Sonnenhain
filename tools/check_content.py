@@ -222,7 +222,8 @@ for name, xs, ys, kind in shop_rows:
         assert not overlaps, f'{name} footprint blocks village gate approach: {rect}'
 
 tilemap32 = (root / 'components' / 'start_tilemap_32.gd').read_text(encoding='utf8')
-pads_block = tilemap32.split('const PROPERTY_PADS := [', 1)[1].split(']', 1)[0]
+map0_plan = (root / 'components' / 'map0_ground_plan_32.gd').read_text(encoding='utf8')
+pads_block = map0_plan.split('const PROPERTY_PADS:=[', 1)[1].split(']', 1)[0]
 pads = [(int(x), int(y), int(w), int(h)) for x, y, w, h in re.findall(r'Rect2\((\d+),(\d+),(\d+),(\d+)\)', pads_block)]
 assert len(pads) == 7, f'expected 7 village property pads, got {len(pads)}'
 for rect in pads:
@@ -231,8 +232,9 @@ for rect in pads:
     for gx, gy, gw, gh in gate_corridors:
         overlaps = rx < gx + gw and rx + rw > gx and ry < gy + gh and ry + rh > gy
         assert not overlaps, f'property pad blocks village gate approach: {rect}'
-assert 'const EAST_EXIT := Vector2(1780,1120)' in tilemap32, 'east village gate moved'
-assert 'const SOUTH_EXIT := Vector2(875,2600)' in tilemap32, 'south village gate moved'
+assert 'const EAST_GATE:=Vector2(1780,1120)' in map0_plan, 'east village gate moved'
+assert 'const SOUTH_GATE:=Vector2(875,2600)' in map0_plan, 'south village gate moved'
+assert 'const EAST_EXIT:=Plan.EAST_GATE' in tilemap32 and 'const SOUTH_EXIT:=Plan.SOUTH_GATE' in tilemap32, 'runtime tilemap must use authoritative Map 0 gate plan'
 
 
 # v27.5 visuals, weapons, roads, daylight, performance, chat, co-op and web preset checks.
