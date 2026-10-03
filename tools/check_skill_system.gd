@@ -74,5 +74,5 @@ func run():
 	g.player_pos=Vector2(6000,1035)
 	g.class_id=2;g.class_mastery_unlocked=true;g.ranger_hunt_meter=90;g.ranger_hunt_buff=0;g.normal_attack();assert(g.ranger_hunt_buff==60 and g.ranger_hunt_meter==0);g.dodge();assert(g.ranger_stealth_timer>g.dodge_duration)
 	g.class_id=0;g.class_mastery_unlocked=true;g.warrior_rage=0;g.normal_attack();assert(g.warrior_rage>0)
-	g.reset_class_skills();g.class_id=1;g.level=39;assert(g.ultimate_unlock_level()==40 and not g.learned[g.class_ultimate()]);g.set_creative_level(39);assert(not g.learned[g.class_ultimate()]);g.set_creative_level(40);assert(g.learned[g.class_ultimate()])
+	g.reset_class_skills();g.class_id=1;g.level=39;g.creative_mode=true;assert(g.ultimate_unlock_level()==40 and not g.learned[g.class_ultimate()]);g.set_creative_level(39);assert(not g.learned[g.class_ultimate()]);g.set_creative_level(40);assert(g.learned[g.class_ultimate()])
 	print("BORIN_SKILL_SYSTEM_OK universal trees; gold-only fusion; relic mastery; mage Risssprung on Space; mage ultimate level 40; rage; hunt rush; stealth roll");g.free();quit()
