@@ -365,6 +365,9 @@ var last_waystone := 1
 var waystone_unlocked: Array = [true, false, false, false, false, false, false, false, false, false, false, false]
 var shop_timer := 0.0
 var shop_stock: Dictionary = {}
+var shop_roll_history: Dictionary = {"smith":[],"alchemy":[],"merchant":[]}
+const SHOP_ROLL_HISTORY_LIMIT := 4
+const SHOP_ROLL_DISCOUNTS := [1.06,1.00,0.94,0.88]
 var previous_region := 0
 var discovered_regions: Array = [true, false, false, false, false, false, false, false, false, false, false, false, false]
 var opened_chests: Array = [false, false, false, false, false, false, false, false, false, false, false]
@@ -1715,6 +1718,7 @@ func _process(delta: float) -> void:
 		if shop_timer >= 420.0:
 			shop_timer = 0.0
 			refresh_shop_stock()
+			save_game()
 	attack_timer = maxf(0.0, attack_timer - delta)
 	swing_timer = maxf(0.0, swing_timer - delta)
 	dash_timer = maxf(0.0, dash_timer - delta)
@@ -5004,7 +5008,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "shop_roll_history":shop_roll_history, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5187,9 +5191,20 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	for i in mini(stored_stones.size(), WAYSTONES.size()): waystone_unlocked[i] = bool(stored_stones[i])
 	if stored_stones.is_empty(): waystone_unlocked[last_waystone] = true
 	shop_timer = clampf(float(data.get("shop_timer", 0.0)), 0.0, 419.0)
-	var stored_shop: Variant = data.get("shop_stock", {})
-	if stored_shop is Dictionary and stored_shop.has("smith"): shop_stock = stored_shop
-	append_new_equipment()
+	var stored_history:Variant=data.get("shop_roll_history",{})
+	var stored_shop:Variant=data.get("shop_stock",{})
+	if stored_history is Dictionary and stored_history.has("smith"):
+		shop_roll_history={"smith":[],"alchemy":[],"merchant":[]}
+		for kind in ["smith","alchemy","merchant"]:
+			var history:Variant=stored_history.get(kind,[])
+			if history is Array:
+				for age in mini(SHOP_ROLL_HISTORY_LIMIT,history.size()):
+					if history[age] is Array:shop_roll_history[kind].append(history[age].duplicate(true))
+		rebuild_shop_stock_from_history()
+	elif stored_shop is Dictionary and stored_shop.has("smith"):
+		migrate_legacy_shop_stock(stored_shop)
+	else:
+		refresh_shop_stock()
 	var stored_chests: Array = data.get("opened_chests", [])
 	var stored_chest_until: Array = data.get("chest_respawn_until", [])
 	for i in opened_chests.size():
@@ -5635,6 +5650,7 @@ func start_new_game() -> void:
 	last_waystone = 1
 	waystone_unlocked = [true, false, false, false, false, false, false, false, false, false, false, false]
 	shop_timer = 0.0
+	shop_roll_history={"smith":[],"alchemy":[],"merchant":[]}
 	refresh_shop_stock()
 	for i in bosses_defeated.size(): bosses_defeated[i] = false
 	enemies.clear()
@@ -6179,32 +6195,78 @@ func use_item(index: int) -> void:
 		message("%s ist ein wertvoller Fund. Du kannst ihn verkaufen." % name)
 	save_game()
 
-func refresh_shop_stock() -> void:
-	var tier := maxi(1, level)
-	var weapon := class_weapon_icon()
-	var weapon_word: String = {"sword":"Klinge", "staff":"Stab", "bow":"Bogen"}[weapon]
-	var smith_weapon := "sword"
-	var smith_weapon_word := "Klinge"
-	var suffix: String = ["der Wiesen", "des Nebels", "der Funken", "der Gezeiten", "des Morgenrots", "des Himmels"].pick_random()
-	var rarity := 1 if tier < 12 else (2 if tier < 30 else 3)
-	var elements := ["eis", "blitz", "gift"]
-	var shop_element: String = elements.pick_random()
-	shop_stock = {
+func shop_roll_discount(age:int)->float:
+	return SHOP_ROLL_DISCOUNTS[clampi(age,0,SHOP_ROLL_DISCOUNTS.size()-1)]
+
+func normalize_shop_offer(raw:Dictionary,age:int)->Dictionary:
+	var offer:=raw.duplicate(true)
+	var base_price:=maxi(0,int(offer.get("base_price",offer.get("price",0))))
+	offer["base_price"]=base_price
+	offer["roll_age"]=clampi(age,0,SHOP_ROLL_HISTORY_LIMIT-1)
+	offer["shop_roll"]=true
+	offer["price"]=maxi(1,roundi(float(base_price)*shop_roll_discount(age)))
+	return offer
+
+func make_shop_rolls()->Dictionary:
+	var tier:=maxi(1,level)
+	var weapon:=class_weapon_icon()
+	var weapon_word:String={"sword":"Klinge","staff":"Stab","bow":"Bogen"}[weapon]
+	var suffix:String=["der Wiesen","des Nebels","der Funken","der Gezeiten","des Morgenrots","des Himmels"].pick_random()
+	var rarity:=1 if tier<12 else (2 if tier<30 else 3)
+	var shop_element:String=["eis","blitz","gift"].pick_random()
+	return {
 		"smith":[
-			{"name":"%s %s" % [smith_weapon_word, suffix], "icon":smith_weapon, "power":4 + tier * 2, "price":80 + tier * 20, "rarity":rarity, "level":tier},
-			{"name":"%s · %s" % [smith_weapon_word, shop_element.capitalize()], "icon":smith_weapon, "power":7 + tier * 2, "price":135 + tier * 28, "rarity":rarity, "level":tier, "element":shop_element},
-			{"name":"Meisterrüstung %s" % suffix, "icon":"armor", "power":5 + int(tier / 3.0), "price":520 + tier * 64, "rarity":mini(3, rarity + 1), "level":tier}],
+			{"name":"Klinge %s"%suffix,"icon":"sword","power":4+tier*2,"base_price":80+tier*20,"rarity":rarity,"level":tier},
+			{"name":"Klinge · %s"%shop_element.capitalize(),"icon":"sword","power":7+tier*2,"base_price":135+tier*28,"rarity":rarity,"level":tier,"element":shop_element},
+			{"name":"Meisterrüstung %s"%suffix,"icon":"armor","power":5+int(tier/3.0),"base_price":520+tier*64,"rarity":mini(3,rarity+1),"level":tier}
+		],
 		"alchemy":[
-			{"name":"Heiltrank", "icon":"potion", "power":0, "price":35, "rarity":1},
-			{"name":"Großer Heiltrank", "icon":"potion", "power":0, "price":85, "rarity":1},
-			{"name":"Manatrank" if class_id == 1 else "Energietrank", "icon":"potion", "power":0, "price":45, "rarity":1}],
+			{"name":"Heiltrank","icon":"potion","power":0,"base_price":35,"rarity":1,"level":1},
+			{"name":"Großer Heiltrank","icon":"potion","power":0,"base_price":85,"rarity":1,"level":1},
+			{"name":"Manatrank" if class_id==1 else "Energietrank","icon":"potion","power":0,"base_price":45,"rarity":1,"level":1}
+		],
 		"merchant":[
-			{"name":"Reisendenring %s" % suffix, "icon":"ring", "power":8 + tier * 2, "price":80 + tier * 19, "rarity":rarity, "level":tier},
-			{"name":"Umhang %s" % suffix, "icon":"armor", "power":1 + int(tier / 4.0), "price":65 + tier * 14, "rarity":rarity, "level":tier},
-			{"name":"Meister-%s %s" % [weapon_word, suffix], "icon":weapon, "power":10 + tier * 3, "price":680 + tier * 83, "rarity":mini(3, rarity + 1), "level":tier, "element":shop_element}]
+			{"name":"Reisendenring %s"%suffix,"icon":"ring","power":8+tier*2,"base_price":80+tier*19,"rarity":rarity,"level":tier},
+			{"name":"Umhang %s"%suffix,"icon":"armor","power":1+int(tier/4.0),"base_price":65+tier*14,"rarity":rarity,"level":tier},
+			{"name":"Meister-%s %s"%[weapon_word,suffix],"icon":weapon,"power":10+tier*3,"base_price":680+tier*83,"rarity":mini(3,rarity+1),"level":tier,"element":shop_element}
+		]
 	}
+
+func rebuild_shop_stock_from_history()->void:
+	shop_stock={"smith":[],"alchemy":[],"merchant":[]}
+	for kind in ["smith","alchemy","merchant"]:
+		var history:Array=shop_roll_history.get(kind,[])
+		for age in mini(SHOP_ROLL_HISTORY_LIMIT,history.size()):
+			var raw_roll:Variant=history[age]
+			if raw_roll is not Array:continue
+			for raw_offer in raw_roll:
+				if raw_offer is Dictionary:
+					shop_stock[kind].append(normalize_shop_offer(raw_offer,age))
 	append_new_equipment()
 
+func migrate_legacy_shop_stock(stored_shop:Dictionary)->void:
+	shop_roll_history={"smith":[],"alchemy":[],"merchant":[]}
+	for kind in ["smith","alchemy","merchant"]:
+		var items:Variant=stored_shop.get(kind,[])
+		if items is Array and not items.is_empty():
+			var roll:Array=[]
+			for i in mini(3,items.size()):
+				if items[i] is Dictionary:
+					var offer:Dictionary=items[i].duplicate(true)
+					offer["base_price"]=maxi(0,int(offer.get("price",0)))
+					roll.append(offer)
+			if not roll.is_empty():shop_roll_history[kind].append(roll)
+	rebuild_shop_stock_from_history()
+
+func refresh_shop_stock()->void:
+	var fresh:Dictionary=make_shop_rolls()
+	for kind in ["smith","alchemy","merchant"]:
+		var history:Array=shop_roll_history.get(kind,[])
+		history.push_front(fresh[kind])
+		while history.size()>SHOP_ROLL_HISTORY_LIMIT:history.pop_back()
+		shop_roll_history[kind]=history
+	rebuild_shop_stock_from_history()
+	shop_page=0
 func append_food_stock() -> void:
 	if not shop_stock.has("merchant"): shop_stock["merchant"]=[]
 	for nutrition in FoodSystem.FOODS.slice(11,23):
@@ -9821,7 +9883,13 @@ func draw_shop_panel() -> void:
 		var stat_label := "Schaden" if item["icon"] in ["sword", "staff", "bow"] else ("Rüstung" if item["icon"] == "armor" else "Leben")
 		if int(item["power"]) > 0: text_at(pos + Vector2(58, 77), "+%d %s" % [item["power"], stat_label], 14, Color("d3eacb"))
 		if str(item.get("element", "")) != "": text_at(pos + Vector2(58, 96), "%s-Schaden" % str(item["element"]).capitalize(), 13, element_color(str(item["element"])))
-		text_at(pos + Vector2(58, 119), "%d Gold%s" % [int(item["price"]), " · SPAREN" if int(item["price"]) > 500 + level * 50 else ""], 14, Color("f4d18c"))
+		if bool(item.get("shop_roll",false)):
+			var age:=clampi(int(item.get("roll_age",0)),0,SHOP_ROLL_HISTORY_LIMIT-1)
+			var age_label:=["NEU · +6%","1 ROLL ALT","2 ROLLS ALT · -6%","3 ROLLS ALT · -12%"][age]
+			text_at(pos + Vector2(58,101),age_label,11,Color("b9d6c7"))
+		else:
+			text_at(pos + Vector2(58,101),"DAUERANGEBOT",11,Color("b9d6c7"))
+		text_at(pos + Vector2(58,119),"%d Gold"%int(item["price"]),14,Color("f4d18c"))
 	text_at(Vector2(169, 378), "VERKAUFEN · Gegenstand wählen, dann rechts unten bestätigen", 17, Color("e8f2de"))
 	for i in inventory.size():
 		var col := i % 11
