@@ -362,6 +362,8 @@ var pip_loan_received := false
 var pip_loan_level := 0
 var pip_return_dialogue_index := 0
 var fusion_history:Array=[]
+# Dauerhafter, normalisierter Fusionsfortschritt: "kleinereID:groessereID" -> {fusion_id, rank}.
+var learned_fusions:Dictionary={}
 var enemies: Array = []
 var drops: Array = []
 var effects: Array = []
@@ -3461,8 +3463,20 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var allowed_ids: Array = all_slot_skills()
 	allowed_ids.append(CLASS_ULTIMATES[remote_class])
 	if id not in allowed_ids: return
-	rank = clampi(rank,1,5)
-	server_relay_combat_visual(sender,{"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))})
+	var fusion_definition:=fusion_definition_by_id(id)
+	var fusion_key_value:=""
+	if not fusion_definition.is_empty():
+		var server_fusion_rank:=fusion_rank_from_network_state(state,id)
+		if server_fusion_rank<=0:return
+		rank=server_fusion_rank
+		fusion_key_value=fusion_key(int(fusion_definition["a"]),int(fusion_definition["b"]))
+	else:
+		rank = clampi(rank,1,5)
+	var visual_payload:Dictionary={"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))}
+	if fusion_key_value!="":
+		visual_payload["fusion_key"]=fusion_key_value
+		visual_payload["fusion_rank"]=rank
+	server_relay_combat_visual(sender,visual_payload)
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
@@ -5175,7 +5189,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5404,16 +5418,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	pip_return_dialogue_index=clampi(int(data.get("pip_return_dialogue_index",0)),0,4)
 	var stored_fusions:Variant=data.get("fusion_history",[])
 	fusion_history=stored_fusions.duplicate(true) if stored_fusions is Array else []
-	for entry in fusion_history:
-		if not entry is Dictionary:continue
-		var output:=int(entry.get("id",-1))
-		var source_a:=int(entry.get("a",-1))
-		var source_b:=int(entry.get("b",-1))
-		if output>=0 and output<learned.size():
-			learned[output]=true
-			skill_levels[output]=maxi(maxi(1,int(entry.get("rank",1))),int(skill_levels[output]))
-		if source_a>=0 and source_a<learned.size():learned[source_a]=true;skill_levels[source_a]=maxi(1,int(skill_levels[source_a]))
-		if source_b>=0 and source_b<learned.size():learned[source_b]=true;skill_levels[source_b]=maxi(1,int(skill_levels[source_b]))
+	restore_fusion_progress(data.get("learned_fusions",{}),fusion_history)
 	# Older multiplayer saves may contain completed boss quests but missing boss flags.
 	for q in mini(quests.size(),QUESTS.size()):
 		var target:int=int(QUESTS[q]["target"])
@@ -5807,6 +5812,8 @@ func start_new_game() -> void:
 	essence.reset()
 	book_system.learned.clear()
 	book_system.active.clear()
+	fusion_history.clear()
+	learned_fusions.clear()
 	reset_class_skills()
 	selected_slot = 0
 	inventory_page = 0
@@ -6040,6 +6047,107 @@ func buy_skill(index:int) -> bool:
 	skill_points -= price;learned[index]=true;skill_levels[index]=1
 	message("%s gelernt · %d Skillpunkte" % [ABILITIES[index]["name"],price]);save_game();return true
 
+func fusion_key(source_a:int,source_b:int)->String:
+	var low:=mini(source_a,source_b)
+	var high:=maxi(source_a,source_b)
+	return "%d:%d" % [low,high]
+
+func fusion_definition_by_key(key:String)->Dictionary:
+	for fusion in FUSIONS:
+		if fusion_key(int(fusion["a"]),int(fusion["b"]))==key:
+			return fusion
+	return {}
+
+func fusion_definition_by_id(fusion_id:int)->Dictionary:
+	for fusion in FUSIONS:
+		if int(fusion["id"])==fusion_id:
+			return fusion
+	return {}
+
+func fusion_progress_snapshot()->Dictionary:
+	var out:Dictionary={}
+	for raw_key in learned_fusions.keys():
+		var key:=str(raw_key)
+		var definition:=fusion_definition_by_key(key)
+		if definition.is_empty():continue
+		var state:Variant=learned_fusions[raw_key]
+		if not state is Dictionary:continue
+		var max_rank:=clampi(int(definition.get("max_rank",4)),1,4)
+		var rank:=clampi(int(state.get("rank",0)),0,max_rank)
+		if rank<=0:continue
+		out[key]={"fusion_id":int(definition["id"]),"rank":rank}
+	return out
+
+func restore_fusion_progress(raw:Variant,legacy_history:Variant=[])->void:
+	learned_fusions.clear()
+	if raw is Dictionary:
+		for raw_key in raw.keys():
+			var key:=str(raw_key)
+			var definition:=fusion_definition_by_key(key)
+			var state:Variant=raw[raw_key]
+			if definition.is_empty() or not state is Dictionary:continue
+			var max_rank:=clampi(int(definition.get("max_rank",4)),1,4)
+			var rank:=clampi(int(state.get("rank",0)),0,max_rank)
+			if rank>0:learned_fusions[key]={"fusion_id":int(definition["id"]),"rank":rank}
+	# Migration alter Saves: a/b/id/rank werden in den normalisierten Schlüssel überführt.
+	if legacy_history is Array:
+		for entry in legacy_history:
+			if not entry is Dictionary:continue
+			var source_a:=int(entry.get("a",-1))
+			var source_b:=int(entry.get("b",-1))
+			var output:=int(entry.get("id",-1))
+			if source_a<0 or source_b<0:continue
+			var key:=fusion_key(source_a,source_b)
+			var definition:=fusion_definition_by_key(key)
+			if definition.is_empty() or int(definition["id"])!=output:continue
+			var max_rank:=clampi(int(definition.get("max_rank",4)),1,4)
+			var rank:=clampi(int(entry.get("rank",1)),1,max_rank)
+			var previous:Variant=learned_fusions.get(key,{})
+			var previous_rank:=int(previous.get("rank",0)) if previous is Dictionary else 0
+			learned_fusions[key]={"fusion_id":output,"rank":maxi(previous_rank,rank)}
+	apply_fusion_progress_to_skills()
+
+func apply_fusion_progress_to_skills()->void:
+	ensure_skill_state_size()
+	for raw_key in learned_fusions.keys():
+		var key:=str(raw_key)
+		var definition:=fusion_definition_by_key(key)
+		var state:Variant=learned_fusions[raw_key]
+		if definition.is_empty() or not state is Dictionary:continue
+		var output:=int(definition["id"])
+		var source_a:=int(definition["a"])
+		var source_b:=int(definition["b"])
+		var rank:=clampi(int(state.get("rank",1)),1,clampi(int(definition.get("max_rank",4)),1,4))
+		learned[output]=true
+		skill_levels[output]=maxi(int(skill_levels[output]),rank)
+		learned[source_a]=true
+		learned[source_b]=true
+		skill_levels[source_a]=maxi(1,int(skill_levels[source_a]))
+		skill_levels[source_b]=maxi(1,int(skill_levels[source_b]))
+
+func fusion_progress_rows()->Array:
+	var rows:Array=[]
+	var snapshot:=fusion_progress_snapshot()
+	var keys:Array=snapshot.keys()
+	keys.sort()
+	for raw_key in keys:
+		var key:=str(raw_key)
+		var state:Dictionary=snapshot[key]
+		rows.append([key,int(state["fusion_id"]),int(state["rank"])])
+	return rows
+
+func fusion_rank_from_network_state(state:Dictionary,fusion_id:int)->int:
+	var definition:=fusion_definition_by_id(fusion_id)
+	if definition.is_empty():return 0
+	var expected_key:=fusion_key(int(definition["a"]),int(definition["b"]))
+	var raw_rows:Variant=state.get("fusions",[])
+	if not raw_rows is Array:return 0
+	for row in raw_rows:
+		if not row is Array or row.size()<3:continue
+		if str(row[0])!=expected_key or int(row[1])!=fusion_id:continue
+		return clampi(int(row[2]),0,clampi(int(definition.get("max_rank",4)),1,4))
+	return 0
+
 func fusion_source_skills()->Array:
 	var out:Array=[]
 	for id in range(0,40):
@@ -6090,6 +6198,7 @@ func buy_fusion(index:int) -> bool:
 	var slots_before:=slots.duplicate()
 	var gold_before:=gold
 	var history_before:=fusion_history.duplicate(true)
+	var learned_fusions_before:=learned_fusions.duplicate(true)
 
 	# Quellen bleiben immer gelernt. Erst Output setzen, validieren, dann Kosten festschreiben.
 	learned[a]=true
@@ -6105,11 +6214,14 @@ func buy_fusion(index:int) -> bool:
 		slots=slots_before
 		gold=gold_before
 		fusion_history=history_before
+		learned_fusions=learned_fusions_before
 		message("Verschmelzung abgebrochen · deine Attacken wurden nicht verändert.")
 		return false
 
 	gold-=price
-	fusion_history.append({"id":id,"a":a,"b":b,"rank":int(skill_levels[id]),"gold":price,"at":int(Time.get_unix_time_from_system())})
+	var key:=fusion_key(a,b)
+	learned_fusions[key]={"fusion_id":id,"rank":int(skill_levels[id])}
+	fusion_history.append({"key":key,"id":id,"a":a,"b":b,"rank":int(skill_levels[id]),"gold":price,"at":int(Time.get_unix_time_from_system())})
 	message("%s + %s → %s · STUFE %d/4 · -%d Gold · Ausgangsattacken bleiben erhalten" % [ABILITIES[a]["name"],ABILITIES[b]["name"],ABILITIES[id]["name"],int(skill_levels[id]),price])
 	save_game()
 	return true
@@ -12047,7 +12159,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
