@@ -50,7 +50,17 @@ var boss_attack_sound_seen:Dictionary={}
 var boss_death_end_queue:Array=[]
 var boss_music_hold_timer:=0.0
 var boss_music_hold_theme:=""
-const INVENTORY_HUD_RECT:=Rect2(584,590,98,42)
+const INVENTORY_HUD_RECT:=Rect2(112,610,82,26)
+const QUEST_HUD_RECT:=Rect2(10,118,348,46)
+
+func hud_action_rect(index:int)->Rect2:
+	return Rect2(18+index*94,610,88,26)
+
+func hud_action_at(pos:Vector2)->String:
+	var actions:Array=["skills","inventory","journal","map","mechanics","party","chat"]
+	for i in actions.size():
+		if hud_action_rect(i).has_point(pos):return str(actions[i])
+	return ""
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
 const ItemStyle32=preload("res://components/item_style_32.gd")
@@ -2741,9 +2751,6 @@ func handle_touch_event(event: InputEvent) -> bool:
 			queue_redraw()
 			return true
 
-		if INVENTORY_HUD_RECT.has_point(pos):
-			toggle_panel("inventory")
-			return true
 		if party_widget_rect().has_point(pos) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 			panel = "party"
 			play_sound("menu")
@@ -2984,12 +2991,19 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey: triggered = event.pressed and not event.echo
 	elif event is InputEventMouseButton: triggered = event.pressed
 	if not triggered: return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and INVENTORY_HUD_RECT.has_point(event.position):
-		toggle_panel("inventory")
-		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and Rect2(10,118,348,46).has_point(event.position):
-		quest_guide.open(self,quest_guide.current_id(self),"")
-		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "":
+		var hud_action:=hud_action_at(event.position)
+		if hud_action!="":
+			if hud_action=="chat":
+				chat_open=true;chat_input="";queue_redraw()
+			elif hud_action=="mechanics":
+				panel="mechanics";queue_redraw()
+			else:
+				toggle_panel(hud_action)
+			return
+		if QUEST_HUD_RECT.has_point(event.position):
+			quest_guide.open(self,quest_guide.current_id(self),"")
+			return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and party_widget_rect().has_point(event.position) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 		panel = "party"
 		play_sound("menu")
@@ -5304,13 +5318,13 @@ func handle_panel_click(mouse: Vector2) -> void:
 			save_game()
 			play_sound("menu")
 			return
-		var destinations:Array=["","inventory","skills","journal","map","party","settings"]
+		var destinations:Array=["","party","settings","settings"]
 		for i in destinations.size():
-			if Rect2(540,155+i*51,410,42).has_point(mouse):
-				if destinations[i]=="skills" and not near_borin():
-					message("Skillwechsel nur bei Borin.")
-					return
+			if Rect2(540,155+i*58,410,46).has_point(mouse):
 				panel=destinations[i]
+				if i==3 and not creative_mode:
+					toggle_creative_mode()
+					panel="settings"
 				play_sound("menu")
 				return
 		if Rect2(190,540,300,44).has_point(mouse):
@@ -8480,9 +8494,11 @@ func draw_hud() -> void:
 	if class_mastery_unlocked and class_id==0: text_at(Vector2(365,30),"WUT %.0f%%" % warrior_rage,12,Color("efaa75"))
 	elif class_mastery_unlocked and class_id==2: text_at(Vector2(365,30),"JAGD %.0f%%%s" % [ranger_hunt_meter," · %.0fs" % ranger_hunt_buff if ranger_hunt_buff>0 else ""],12,Color("f3d68e"))
 	elif class_mastery_unlocked and class_id==1: text_at(Vector2(365,30),"LEERTASTE · ARKANER SCHRITT",12,Color("cdbaff"))
-	draw_ref_panel(Rect2(10, 118, 348, 46))
-	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL · DETAILS ›", 13, Color("f0cf92"))
+	draw_ref_panel(QUEST_HUD_RECT)
+	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL · HOVER FÜR INFOS", 13, Color("f0cf92"))
 	text_at(Vector2(23, 155), tracked_quest().substr(0, 44), 14, Color("fff2d9"))
+	if not touch_enabled and QUEST_HUD_RECT.has_point(get_viewport().get_mouse_position()):
+		quest_guide.draw_hud_hover(self)
 	if food_system.meal_active():
 		var food_index:int=FoodSystem.index_for(food_system.active_food_name)
 		draw_ref_panel(Rect2(10,168,348,58))
@@ -8581,15 +8597,21 @@ func draw_hud() -> void:
 		else:
 			ui_box(Rect2(610, 549, 520, 36), Color("587767"))
 			text_at(Vector2(623, 573), nearest.replace("E  ·", "%s  ·" % binding_short("interact")), 15, Color("fff4ca"))
-	if not touch_enabled:
-		ui_button(INVENTORY_HUD_RECT,"INVENTAR")
 	if touch_enabled:
 		draw_touch_controls()
 	else:
 		draw_ref_panel(Rect2(9, 586, 1134, 53))
-		text_at(Vector2(22, 609), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 11, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 550)
-		text_at(Vector2(22, 626), controller.label(int(controller.bindings["pause"]))+": Einstellungen / Belegung" if controller.used else "%s Skills · %s Inventar · %s Quests · %s Karte · %s Chat · %s Hilfe · %s Gruppe" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map"), binding_short("chat"), binding_short("mechanics"), binding_short("party")], 11, Color("becfc6"), HORIZONTAL_ALIGNMENT_LEFT, 550)
-		ui_button(INVENTORY_HUD_RECT,"INVENTAR")
+		text_at(Vector2(22, 605), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 10, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 650)
+		var hud_labels:Array=[
+			"%s SKILLS" % binding_short("skills"),
+			"%s INVENTAR" % binding_short("inventory"),
+			"%s QUESTS" % binding_short("journal"),
+			"%s KARTE" % binding_short("map"),
+			"%s HILFE" % binding_short("mechanics"),
+			"%s GRUPPE" % binding_short("party"),
+			"%s CHAT" % binding_short("chat")
+		]
+		for i in hud_labels.size():ui_button(hud_action_rect(i),str(hud_labels[i]))
 		for slot in 4:
 			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
 			var x := 694 + slot * 81
@@ -9267,8 +9289,9 @@ func draw_game_menu() -> void:
 	text_at(Vector2(215,389),"%s · Level %d" % [CLASS_NAMES[class_id],level],16,Color("d8e6dc"))
 	text_at(Vector2(215,425),region_name(region_at(player_pos)),14,Color("d8e6dc"))
 	text_at(Vector2(215,463),"Online: Welt läuft weiter" if network_mode!="offline" else "Spiel pausiert",12,Color("b8cbc5"))
-	var labels:Array=["WEITERSPIELEN","INVENTAR","FÄHIGKEITEN","QUESTBUCH","WELTKARTE","GRUPPE","EINSTELLUNGEN & TESTMODUS"]
-	for i in labels.size():ui_button(Rect2(540,155+i*51,410,42),labels[i])
+	var labels:Array=["WEITERSPIELEN","GRUPPE & ONLINE","EINSTELLUNGEN","TEST & REPARATUR"]
+	for i in labels.size():ui_button(Rect2(540,155+i*58,410,46),labels[i])
+	text_at(Vector2(540,402),"Inventar, Skills, Quests, Karte und Hilfe öffnest du direkt über die HUD-Buttons.",12,Color("b8cbc5"),HORIZONTAL_ALIGNMENT_LEFT,410)
 	ui_button(Rect2(190,485,300,36),"NEUE PATCHES")
 	ui_button(Rect2(540,512,410,42),"SPIEL SPEICHERN")
 	text_at(Vector2(540,578),pause_status,12,Color("ffe5ab"),HORIZONTAL_ALIGNMENT_LEFT,410)
