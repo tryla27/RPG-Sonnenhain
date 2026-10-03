@@ -49,7 +49,7 @@ assert len(re.findall(r'\"[^\"]+\"', block('DUNGEON_NAMES'))) == 3
 assert re.findall(r'\[(\d+), (\d+)\]', block('DUNGEON_ENEMIES')) == [('4', '5'), ('6', '7'), ('21', '22')]
 assert len(entries('PORTALS')) == 5
 assert len(re.findall(r'Vector2\(', block('WAYSTONES'))) == 12
-assert len(entries('ABILITIES')) == 43
+assert len(entries('ABILITIES')) == 44
 for connection in ['func enter_dungeon', 'func leave_dungeon', 'func dungeon_blocked', 'func draw_dungeon_world', 'func draw_dungeon_atmosphere', 'func draw_overworld_atmosphere', 'func draw_dungeon_minimap', 'func open_dungeon_chest', '"dungeon_chests_opened":dungeon_chests_opened']:
     assert connection in source, f'missing dungeon feature: {connection}'
 # The dense fog must be rendered before floating effects and the HUD.
@@ -152,7 +152,7 @@ for connection in ['func draw_region_tile', 'func draw_character_sprite', 'func 
 # Top-level function names must be unique.
 funcs = re.findall(r'^func\s+([A-Za-z0-9_]+)\s*\(', source, re.M)
 assert len(funcs) == len(set(funcs)), 'duplicate top-level function declaration'
-print('OK v27: 13 regions, 27 enemies, 25 quests, 34 skills, 3 dungeons, character creation, chat, co-op hooks, pixel-art atlases and audio')
+print('OK v27: 13 regions, 27 enemies, 25 quests, 44 abilities, 3 dungeons, character creation, chat, co-op hooks, pixel-art atlases and audio')
 
 # v27.2 mechanics/spawn regression checks
 assert 'func draw_mechanics_panel()' in source, 'missing mechanics overview panel'
