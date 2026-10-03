@@ -49,7 +49,7 @@ func run():
 	assert(not g.learned[19] and not g.buy_skill(19))
 	g.level=15
 	var jump_points_before:=g.skill_points
-	assert(g.buy_skill(19) and g.learned[19] and g.skill_levels[19]==1)
+	assert(g.ABILITIES[19]["name"]=="Rissnova");assert(g.buy_skill(19) and g.learned[19] and g.skill_levels[19]==1)
 	assert(g.skill_points<jump_points_before)
 	# Pip verleiht pro Spielstand genau eine klassenpassende Startwaffe.
 	g.inventory.clear();g.pip_loan_received=false;g.class_id=1
@@ -63,7 +63,7 @@ func run():
 	assert(g.add_item(g.class_relic_item(1)))
 	var mastery_points_before:int=g.skill_points
 	g.use_item(0)
-	assert(g.class_mastery_unlocked and g.arcane_step_learned and g.inventory.is_empty())
+	assert(g.class_mastery_unlocked and g.mage_rift_blink_unlocked() and g.inventory.is_empty())
 	assert(g.skill_points==mastery_points_before)
 	# Reservierung schützt die ersten 15 Sekunden nur die passende Klasse.
 	var reserved_drop:Dictionary={"reserved_class":2,"reserve_until_ms":Time.get_ticks_msec()+10000}
@@ -74,4 +74,4 @@ func run():
 	g.player_pos=Vector2(6000,1035)
 	g.class_id=2;g.class_mastery_unlocked=true;g.ranger_hunt_meter=90;g.ranger_hunt_buff=0;g.normal_attack();assert(g.ranger_hunt_buff==60 and g.ranger_hunt_meter==0);g.dodge();assert(g.ranger_stealth_timer>g.dodge_duration)
 	g.class_id=0;g.class_mastery_unlocked=true;g.warrior_rage=0;g.normal_attack();assert(g.warrior_rage>0)
-	print("BORIN_SKILL_SYSTEM_OK universal trees; learned-skill fusion offers; attack loadout; Map06/07/08 class relics; reservation; rage; arcane step; hunt rush; stealth roll");g.free();quit()
+	g.reset_class_skills();g.class_id=1;g.level=39;assert(g.ultimate_unlock_level()==40 and not g.learned[g.class_ultimate()]);g.set_creative_level(39);assert(not g.learned[g.class_ultimate()]);g.set_creative_level(40);assert(g.learned[g.class_ultimate()])\n\tprint("BORIN_SKILL_SYSTEM_OK universal trees; fusion; relic mastery; mage Risssprung on Space; mage ultimate level 40; rage; hunt rush; stealth roll");g.free();quit()
