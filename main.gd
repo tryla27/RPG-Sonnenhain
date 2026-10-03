@@ -4527,7 +4527,7 @@ func make_item(name: String, icon: String, rarity: int, power: int, value: int, 
 	var agility: int = bonus if icon == "bow" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
 	var intellect: int = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
 	var fair_value := value if icon == "potion" else 10 + ilvl * 4 + maxi(0, power) * (3 if icon in ["sword", "staff", "bow"] else 2) + rarity * rarity * 32 + (25 if element != "" else 0) + (strength + agility + intellect) * 5
-	var item := {"uid":next_uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4}
+	var item := {"uid":next_uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4, "locked":false}
 	if icon == "food":
 		item["value"] = value
 		item["design"] = maxi(0,FoodSystem.index_for(name))
@@ -4542,7 +4542,7 @@ func stack_limit(item: Dictionary) -> int:
 	return 1
 
 func stack_matches(a: Dictionary, b: Dictionary) -> bool:
-	return a.get("icon") == b.get("icon") and a.get("name") == b.get("name") and a.get("rarity") == b.get("rarity") and a.get("element", "") == b.get("element", "")
+	return a.get("icon") == b.get("icon") and a.get("name") == b.get("name") and a.get("rarity") == b.get("rarity") and a.get("element", "") == b.get("element", "") and bool(a.get("locked",false)) == bool(b.get("locked",false))
 
 func item_sale_value(item: Dictionary) -> int:
 	return int(item.get("stack_value", int(item.get("value", 0)) * int(item.get("count", 1))))
@@ -9810,14 +9810,17 @@ func draw_inventory_panel() -> void:
 		var row := cell / 5
 		var pos := Vector2(641 + col * 65, 200 + row * 55)
 		var is_equipped := i < inventory.size() and int(inventory[i]["uid"]) in equipped_item_uids()
-		draw_rect(Rect2(pos, Vector2(54, 48)), Color("ffdda0") if is_equipped else (Color("e3c78c") if i == selected_item else Color("16344b")))
-		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("16344b"))
+		var is_locked := i < inventory.size() and bool(inventory[i].get("locked",false))
+		draw_rect(Rect2(pos, Vector2(54, 48)), Color("ffdda0") if is_equipped else (Color("8d9492") if is_locked else (Color("e3c78c") if i == selected_item else Color("16344b"))))
+		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("27343a") if is_locked else Color("16344b"))
 		if i < inventory.size():
 			var item: Dictionary = inventory[i]
-			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 4)), RARITY_COLORS[int(item["rarity"])])
-			draw_item_icon(pos + Vector2(11, 9), String(item["icon"]), RARITY_COLORS[int(item["rarity"])], 0.88, weapon_visual_stage(item), item_design(item))
+			var rarity_color:=RARITY_COLORS[int(item["rarity"])]
+			var display_color:=Color("7d8582") if is_locked else rarity_color
+			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 4)), display_color)
+			draw_item_icon(pos + Vector2(11, 9), String(item["icon"]), display_color, 0.88, weapon_visual_stage(item), item_design(item))
 			draw_item_signature(pos + Vector2(11, 9), item)
-			if bool(item.get("locked",false)): text_at(pos+Vector2(38,14),"L",10,Color("ffd66e"))
+			if bool(item.get("locked",false)): text_at(pos+Vector2(29,14),"LOCK",8,Color("b8bebb"))
 			if int(item.get("count", 1)) > 1:
 				draw_rect(Rect2(pos + Vector2(19, 32), Vector2(32, 14)), Color("1d2d35"))
 				text_at(pos + Vector2(20, 44), "×%d" % int(item["count"]), 12, Color("fff2ce"))
@@ -9825,7 +9828,7 @@ func draw_inventory_panel() -> void:
 	if selected_item >= 0 and selected_item < inventory.size():
 		var item: Dictionary = inventory[selected_item]
 		text_at(Vector2(643, 491), String(item["name"]), 17, RARITY_COLORS[int(item["rarity"])], HORIZONTAL_ALIGNMENT_LEFT, 310)
-		var detail := "%s · %s · %d Gold" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), item_sale_value(item)]
+		var detail := "%s · %s · %s" % [RARITY_NAMES[int(item["rarity"])], item_type(String(item["icon"])), "UNVERKÄUFLICH" if bool(item.get("locked",false)) else "%d Gold" % item_sale_value(item)]
 		if item["icon"] in ["sword", "staff", "bow", "armor", "ring", "head"]: detail += " · +%d" % int(item["power"])
 		text_at(Vector2(643, 518), detail, 13, Color("e5eddd"), HORIZONTAL_ALIGNMENT_LEFT, 320)
 		var action_label := "MEISTERGABE NUTZEN" if bool(item.get("class_relic",false)) else ("ESSEN" if item["icon"] == "food" else "BENUTZEN")
