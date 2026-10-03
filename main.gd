@@ -4046,6 +4046,8 @@ func interact_interior_owner(name:String="") -> void:
 	match name:
 		"Alma": steinrose.open(self)
 		"Borin":
+			if pip_loan_received and level>pip_loan_level:
+				pip_dialogue()
 			panel="essence";essence.selected_tree=0;menu_scroll=0
 		"Pip":
 			pip_dialogue()
