@@ -39,13 +39,13 @@ func _initialize()->void:
 
 	var b=Builder.new()
 	var cell:=Vector2i(10,10)
-	b.layer="ground";b.material_id="grass_meadow";b.paint(cell)
+	b.layer="ground";b.selection_id="grass_meadow";b.paint(cell)
 	assert(str(b.cells["ground"].get(b.key(cell),""))=="grass_meadow")
 	b.undo();assert(not b.cells["ground"].has(b.key(cell)))
 	b.redo();assert(b.cells["ground"].has(b.key(cell)))
 
 	# Gate validator must reject a wall placed in a village gate approach.
-	b.layer="walls";b.material_id="wall_village_stone"
+	b.layer="walls";b.selection_id="wall_village_stone"
 	var gate_cell:=Vector2i(floori(g.VILLAGE_GATES[0].x/32),floori(g.VILLAGE_GATES[0].y/32))
 	b.paint(gate_cell)
 	assert(not b.validate(g).is_empty())
