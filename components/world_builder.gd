@@ -1,6 +1,6 @@
 extends RefCounted
 ## Ingame 32px world authoring tool. Builder data is isolated from character saves.
-const Palette=preload("res://components/world_material_palette_32.gd")
+const Palette=preload("res://components/world_material_palette_32.gd")\nconst Map0Plan=preload("res://components/map0_ground_plan_32.gd")\nconst Map0Runtime=preload("res://components/start_tilemap_32.gd")
 const TILE:=32
 const FILE_PATH:="user://sonnenhain_world_builder.json"
 const CANVAS:=Rect2(370,220,590,304)
@@ -30,7 +30,7 @@ var status:="32px-Raster · Builder-Daten sind vom Spielstand getrennt."
 var validation:Array=[]
 var dragging:=false
 var erase_drag:=false
-var last_painted:=Vector2i(-99999,-99999)
+var last_painted:=Vector2i(-99999,-99999)\nvar active_chunk:="NW"\nvar legacy_overlay:=true\nvar map0_seeded:=false
 
 func _init()->void:
 	reset_layers()
@@ -285,9 +285,9 @@ func click(g,pos:Vector2)->bool:
 		if Rect2(165+i*62,489,55,28).has_point(pos):
 			brush_size=[1,3,5][i]
 			return true
-	if Rect2(370,540,82,32).has_point(pos):undo();return true
+	if Rect2(165,521,185,27).has_point(pos):seed_map0_ground();return true\n\tif Rect2(165,552,88,27).has_point(pos):cycle_chunk(-1);return true\n\tif Rect2(258,552,92,27).has_point(pos):cycle_chunk(1);return true\n\tif Rect2(370,540,82,32).has_point(pos):undo();return true
 	if Rect2(458,540,82,32).has_point(pos):redo();return true
-	if Rect2(546,540,112,32).has_point(pos):validate(g);return true
+	if Rect2(546,540,112,32).has_point(pos):\n\t\tvalidate(g)\n\t\tif map0_seeded:validate_map0_ground()\n\t\treturn true
 	if Rect2(664,540,82,32).has_point(pos):load_file();return true
 	if Rect2(752,540,94,32).has_point(pos):save_file();return true
 	if Rect2(852,540,108,32).has_point(pos):active=false;g.panel="settings";return true
@@ -320,7 +320,7 @@ func input(g,event:InputEvent)->bool:
 				if event.ctrl_pressed:undo();return true
 			KEY_Y:
 				if event.ctrl_pressed:redo();return true
-			KEY_LEFT:
+			KEY_F5:\n\t		\tseed_map0_ground();return true\n\t		KEY_F6:\n\t		\tcycle_chunk(-1 if event.shift_pressed else 1);return true\n\t		KEY_LEFT:
 				camera_cell.x=maxi(0,camera_cell.x-4);return true
 			KEY_RIGHT:
 				camera_cell.x+=4;return true
