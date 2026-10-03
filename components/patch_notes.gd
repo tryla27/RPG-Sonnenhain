@@ -1,5 +1,5 @@
 extends RefCounted
-const VERSION="PATCH 01.10.2026"
+const VERSION="PATCH 03.10.2026"
 const NOTES=[
 ["Speichern", "Direkt im ersten Escape-Menü. Lokal- und Serverbestätigung werden getrennt angezeigt."],
 ["Spielstände", "Geprüfte lokale Schreibvorgänge, Rückfallkopie, Serverrevisionen und Wiederholungen."],
@@ -9,6 +9,8 @@ const NOTES=[
 ["Ausrüstung", "Kopfslot; zwei Magierringe nebeneinander und an beiden Händen; Arena-Basiswaffen."],
 ["Website", "Ein Passwortfeld für die gesamte Website; durchblätterbare Patch-Übersichten."],
 ["Spawn", "512px-Plattform auf 32px-Tiles, drei Stufen, breite Treppe und gemeinsamer Kollisionskern."],
+["Gebäude-Hotfix", "Map-0-Häuser und Borins Skillhaus benutzen jetzt ausschließlich native 32px-Tiles; der alte houses_192- und Vollhaus-Spritepfad ist aus dem Runtime-Code entfernt."],
+["Brunnen-Hotfix", "Der Dorfbrunnen wird ebenfalls über einen nativen 32px-Tile-Renderer gezeichnet und nutzt nicht mehr den alten Objekt-Spriteausschnitt."],
 ["In Arbeit", "Neue Waffenpassive, Rüstungsteile, Umhänge und universelles Ausrüsten."],
 ["Noch ausstehend", "Gemeinsame Boden-Drops mit 6 Minuten Lebensdauer und sicherer Händler-Tausch."]]
 static func draw(g)->void:
