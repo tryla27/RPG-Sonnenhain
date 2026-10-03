@@ -55,11 +55,23 @@ func _initialize() -> void:
 		check(not g.is_blocked(arrival,arrival),"Waystone arrival obstructed: %d at %s" % [i,arrival])
 	for role in 3:
 		g.class_id=role
-		g.arcane_step_learned=true
+		g.class_mastery_unlocked=role!=1
+		g.arcane_step_learned=false
 		g.facing=Vector2.RIGHT
+		g.dash_cooldown=0.0
 		g.dodge()
-		check(g.dash_timer>0 and g.dodge_duration>0,"Dodge did not start")
+		check(g.dash_timer>0 and g.dodge_duration>0,"Normal dodge did not start")
 		check(g.dash_dir.is_normalized(),"Dodge direction invalid")
+	g.class_id=1
+	g.class_mastery_unlocked=true
+	g.arcane_step_learned=true
+	g.energy=100.0
+	g.dash_cooldown=0.0
+	g.player_pos=Vector2(6000,1000)
+	g.facing=Vector2.RIGHT
+	var blink_origin:=g.player_pos
+	g.dodge()
+	check(g.player_pos.x>blink_origin.x+40.0 and g.dash_timer==0.0,"Mage rift blink did not teleport")
 	for look in [Vector2.UP,Vector2.DOWN,Vector2.LEFT,Vector2.RIGHT]: check(absf(g.weapon_hand_offset(look).x)>=22,"Weapon hand overlaps face")
 	g.free()
 	print("MAP_LOGIC_RESULT failures=",failures," · levels advisory, boss seals named and authoritative")
