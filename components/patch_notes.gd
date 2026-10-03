@@ -10,7 +10,8 @@ const NOTES=[
 ["Magier", "Risssprung auf Leertaste ersetzt Arkanen Schritt; Rissnova wird normaler Skill und Arkaner Sturm wird ab Level 40 freigeschaltet."],
 ["Menüs", "Login-Navigation per Tab/Shift+Tab; Spielmenü und Untermenüs erhalten konsistente Zurück-Navigation."],
 ["Audio", "Musik und Effekte erhalten eigene Mute-Schalter; eingestellte Lautstärken bleiben beim Stummschalten erhalten."],
-["Händler", "Neue Rolls bleiben zusammen mit den letzten drei Generationen erhalten; frische Ware ist teurer, ältere Angebote werden schrittweise günstiger."],\n["Patch-Ablauf", "Patch Notes sind ab jetzt Pflichtbestandteil jedes relevanten PRs; CI prüft, dass sie mit aktualisiert wurden."]]
+["Händler", "Neue Rolls bleiben zusammen mit den letzten drei Generationen erhalten; frische Ware ist teurer, ältere Angebote werden schrittweise günstiger."],
+["Almas Küche", "Wirkungen-Seite entfernt; Pfeil hoch/runter wechselt Rezepte, Enter lernt oder kocht. Alle bisherigen Sonnenhain-Beeren bleiben in Rezepten erhalten."],\n["Patch-Ablauf", "Patch Notes sind ab jetzt Pflichtbestandteil jedes relevanten PRs; CI prüft, dass sie mit aktualisiert wurden."]]
 static func draw(g)->void:
 	g.text_at(Vector2(170,135),VERSION,25,Color("ffe2aa"))
 	g.text_at(Vector2(170,166),"Alle Änderungen auf einer Seite · Stand und Planung",14,Color("b8cbc5"))
