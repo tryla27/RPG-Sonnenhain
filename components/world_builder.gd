@@ -1,6 +1,8 @@
 extends RefCounted
 ## Ingame 32px world authoring tool. Builder data is isolated from character saves.
 const Palette=preload("res://components/world_material_palette_32.gd")
+const Map0Plan=preload("res://components/map0_ground_plan_32.gd")
+const Map0Runtime=preload("res://components/start_tilemap_32.gd")
 const TILE:=32
 const FILE_PATH:="user://sonnenhain_world_builder.json"
 const CANVAS:=Rect2(370,220,590,304)
@@ -31,6 +33,8 @@ var validation:Array=[]
 var dragging:=false
 var erase_drag:=false
 var last_painted:=Vector2i(-99999,-99999)
+var active_chunk:="NW"
+var map0_seeded:=false
 
 func _init()->void:
 	reset_layers()
@@ -144,6 +148,63 @@ func redo()->void:
 	undo_stack.append(change)
 	status="Wiederholt."
 
+
+func seed_map0_ground()->void:
+	Map0Runtime.prepare(Callable())
+	var layer_cells:Dictionary=cells["ground"]
+	for x in Map0Plan.GRID.x:
+		for y in Map0Plan.GRID.y:
+			var cell:=Vector2i(x,y)
+			layer_cells[key(cell)]=Map0Runtime.material_at(Map0Plan.center(cell))
+	cells["ground"]=layer_cells
+	map0_seeded=true
+	undo_stack.clear()
+	redo_stack.clear()
+	status="MAP 0: %d 32px-Bodenzellen geladen."%layer_cells.size()
+
+func cycle_chunk(direction:int=1)->void:
+	var index:int=Map0Plan.CHUNK_ORDER.find(active_chunk)
+	index=posmod(index+direction,Map0Plan.CHUNK_ORDER.size())
+	active_chunk=str(Map0Plan.CHUNK_ORDER[index])
+	var rect:Rect2i=Map0Plan.CHUNKS[active_chunk]["cells"]
+	camera_cell=rect.position
+	status="Chunk %s · %s"%[active_chunk,str(Map0Plan.CHUNKS[active_chunk]["name"])]
+
+func chunk_completion(id:String)->Dictionary:
+	var summary:Dictionary=Map0Plan.chunk_summary(id)
+	if summary.is_empty():return {}
+	var rect:Rect2i=summary["rect"]
+	var filled:=0
+	for y in range(rect.position.y,rect.end.y):
+		for x in range(rect.position.x,rect.end.x):
+			if cells["ground"].has(key(Vector2i(x,y))):filled+=1
+	summary["filled"]=filled
+	summary["missing"]=int(summary["cells"])-filled
+	summary["complete"]=filled==int(summary["cells"])
+	return summary
+
+func validate_map0_ground()->Array:
+	var issues:Array=[]
+	for raw_id in Map0Plan.CHUNK_ORDER:
+		var id:String=str(raw_id)
+		var summary:Dictionary=chunk_completion(id)
+		if int(summary.get("missing",0))>0:
+			issues.append("Chunk %s: %d Bodenzellen fehlen"%[id,int(summary["missing"])])
+	for gate in [Map0Plan.EAST_GATE,Map0Plan.SOUTH_GATE]:
+		var gc:=Vector2i(floori(gate.x/TILE),floori(gate.y/TILE))
+		for dx in range(-4,5):
+			for dy in range(-4,5):
+				if cells["walls"].has(key(gc+Vector2i(dx,dy))):
+					issues.append("Map 0: Wand blockiert Torkorridor bei %s"%str(gc+Vector2i(dx,dy)))
+	if Map0Runtime.legacy_overlay_count()!=0:
+		issues.append("Map 0: Legacy-Bodenoverlay noch aktiv")
+	if issues.is_empty():
+		status="MAP 0 BODEN: 100% 32px Tiles · 0 Legacy-Flächen · Tore frei."
+	else:
+		status="MAP 0 BODEN: %d Problem(e)."%issues.size()
+	validation=issues
+	return issues
+
 func save_file()->bool:
 	var payload:Dictionary={"schema":2,"tile_size":TILE,"camera":[camera_cell.x,camera_cell.y],"cells":cells}
 	var file:=FileAccess.open(FILE_PATH,FileAccess.WRITE)
@@ -252,6 +313,12 @@ func draw(g)->void:
 		g.ui_button(Rect2(192,y,158,24),Palette.display_name(id) if layer in ["ground","walls"] else id.to_upper(),true,selection_id==id)
 	g.text_at(Vector2(165,476),"PINSEL",12,Color("ffe4ad"))
 	for i in 3:g.ui_button(Rect2(165+i*62,489,55,28),str([1,3,5][i]),true,brush_size==[1,3,5][i])
+	g.ui_button(Rect2(165,521,185,27),"MAP0 GRUNDIEREN")
+	g.ui_button(Rect2(165,552,88,27),"< "+active_chunk)
+	g.ui_button(Rect2(258,552,92,27),active_chunk+" >")
+	var chunk_info:Dictionary=chunk_completion(active_chunk)
+	if not chunk_info.is_empty():
+		g.text_at(Vector2(165,585),"%s · %d/%d Tiles"%[str(chunk_info["name"]),int(chunk_info["filled"]),int(chunk_info["cells"])],10,Color("b7c8c3"))
 	g.text_at(Vector2(165,548),"Kamera %d,%d · %s"%[camera_cell.x,camera_cell.y,str(LAYER_NAMES[layer])],11,Color("b7c8c3"))
 	g.ui_button(Rect2(370,540,82,32),"UNDO",not undo_stack.is_empty())
 	g.ui_button(Rect2(458,540,82,32),"REDO",not redo_stack.is_empty())
@@ -285,9 +352,15 @@ func click(g,pos:Vector2)->bool:
 		if Rect2(165+i*62,489,55,28).has_point(pos):
 			brush_size=[1,3,5][i]
 			return true
+	if Rect2(165,521,185,27).has_point(pos):seed_map0_ground();return true
+	if Rect2(165,552,88,27).has_point(pos):cycle_chunk(-1);return true
+	if Rect2(258,552,92,27).has_point(pos):cycle_chunk(1);return true
 	if Rect2(370,540,82,32).has_point(pos):undo();return true
 	if Rect2(458,540,82,32).has_point(pos):redo();return true
-	if Rect2(546,540,112,32).has_point(pos):validate(g);return true
+	if Rect2(546,540,112,32).has_point(pos):
+		validate(g)
+		if map0_seeded:validate_map0_ground()
+		return true
 	if Rect2(664,540,82,32).has_point(pos):load_file();return true
 	if Rect2(752,540,94,32).has_point(pos):save_file();return true
 	if Rect2(852,540,108,32).has_point(pos):active=false;g.panel="settings";return true
@@ -320,6 +393,10 @@ func input(g,event:InputEvent)->bool:
 				if event.ctrl_pressed:undo();return true
 			KEY_Y:
 				if event.ctrl_pressed:redo();return true
+			KEY_F5:
+				seed_map0_ground();return true
+			KEY_F6:
+				cycle_chunk(-1 if event.shift_pressed else 1);return true
 			KEY_LEFT:
 				camera_cell.x=maxi(0,camera_cell.x-4);return true
 			KEY_RIGHT:
