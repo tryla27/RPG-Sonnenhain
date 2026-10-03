@@ -367,7 +367,7 @@ var shop_timer := 0.0
 var shop_stock: Dictionary = {}
 var shop_roll_history: Dictionary = {"smith":[],"alchemy":[],"merchant":[]}
 const SHOP_ROLL_HISTORY_LIMIT := 4
-const SHOP_ROLL_DISCOUNTS := [1.00,0.94,0.88,0.82]
+const SHOP_ROLL_DISCOUNTS := [1.06,1.00,0.94,0.88]
 var previous_region := 0
 var discovered_regions: Array = [true, false, false, false, false, false, false, false, false, false, false, false, false]
 var opened_chests: Array = [false, false, false, false, false, false, false, false, false, false, false]
@@ -1718,6 +1718,7 @@ func _process(delta: float) -> void:
 		if shop_timer >= 420.0:
 			shop_timer = 0.0
 			refresh_shop_stock()
+			save_game()
 	attack_timer = maxf(0.0, attack_timer - delta)
 	swing_timer = maxf(0.0, swing_timer - delta)
 	dash_timer = maxf(0.0, dash_timer - delta)
@@ -5649,6 +5650,7 @@ func start_new_game() -> void:
 	last_waystone = 1
 	waystone_unlocked = [true, false, false, false, false, false, false, false, false, false, false, false]
 	shop_timer = 0.0
+	shop_roll_history={"smith":[],"alchemy":[],"merchant":[]}
 	refresh_shop_stock()
 	for i in bosses_defeated.size(): bosses_defeated[i] = false
 	enemies.clear()
@@ -6201,6 +6203,7 @@ func normalize_shop_offer(raw:Dictionary,age:int)->Dictionary:
 	var base_price:=maxi(0,int(offer.get("base_price",offer.get("price",0))))
 	offer["base_price"]=base_price
 	offer["roll_age"]=clampi(age,0,SHOP_ROLL_HISTORY_LIMIT-1)
+	offer["shop_roll"]=true
 	offer["price"]=maxi(1,roundi(float(base_price)*shop_roll_discount(age)))
 	return offer
 
@@ -9880,11 +9883,13 @@ func draw_shop_panel() -> void:
 		var stat_label := "Schaden" if item["icon"] in ["sword", "staff", "bow"] else ("Rüstung" if item["icon"] == "armor" else "Leben")
 		if int(item["power"]) > 0: text_at(pos + Vector2(58, 77), "+%d %s" % [item["power"], stat_label], 14, Color("d3eacb"))
 		if str(item.get("element", "")) != "": text_at(pos + Vector2(58, 96), "%s-Schaden" % str(item["element"]).capitalize(), 13, element_color(str(item["element"])))
-		var age:=clampi(int(item.get("roll_age",0)),0,SHOP_ROLL_HISTORY_LIMIT-1)
-		var age_label:=["NEU","1 ROLL ALT","2 ROLLS ALT","3 ROLLS ALT"][age]
-		var discount_pct:=roundi((1.0-shop_roll_discount(age))*100.0)
-		text_at(pos + Vector2(58, 101),age_label+(" · -%d%%"%discount_pct if age>0 else " · FRISCH"),11,Color("b9d6c7"))
-		text_at(pos + Vector2(58, 119),"%d Gold"%int(item["price"]),14,Color("f4d18c"))
+		if bool(item.get("shop_roll",false)):
+			var age:=clampi(int(item.get("roll_age",0)),0,SHOP_ROLL_HISTORY_LIMIT-1)
+			var age_label:=["NEU · +6%","1 ROLL ALT","2 ROLLS ALT · -6%","3 ROLLS ALT · -12%"][age]
+			text_at(pos + Vector2(58,101),age_label,11,Color("b9d6c7"))
+		else:
+			text_at(pos + Vector2(58,101),"DAUERANGEBOT",11,Color("b9d6c7"))
+		text_at(pos + Vector2(58,119),"%d Gold"%int(item["price"]),14,Color("f4d18c"))
 	text_at(Vector2(169, 378), "VERKAUFEN · Gegenstand wählen, dann rechts unten bestätigen", 17, Color("e8f2de"))
 	for i in inventory.size():
 		var col := i % 11
