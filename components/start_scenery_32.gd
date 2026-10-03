@@ -1,6 +1,5 @@
 extends RefCounted
 ## Individual transparent reference-style sprites, composed into the existing game world.
-const ReferenceHouse = preload("res://components/reference_house.gd")
 const VillageHouseTiles32 = preload("res://components/village_house_tiles_32.gd")
 static var objects:Texture2D
 static var props:Texture2D
