@@ -37,6 +37,10 @@ func run()->void:
 	assert(g.fusion_rank_from_network_state({"fusions":[["18:17",43,4]]},43)==0)
 	assert(g.fusion_rank_from_network_state({"fusions":[["17:18",42,4]]},43)==0)
 	assert(g.fusion_rank_from_network_state({},43)==0)
+	var sanitized:=g.sanitize_fusion_rows([["18:17",43,4],["17:18",43,3],["17:18",42,4],["0:16",40,2]])
+	assert(sanitized.size()==2)
+	assert(sanitized[0][0]=="17:18" and int(sanitized[0][1])==43)
+	assert(sanitized[1][0]=="0:16" and int(sanitized[1][1])==40)
 
 	# Alte fusion_history-Saves werden automatisch auf das neue Format migriert.
 	g.learned_fusions.clear()
@@ -48,7 +52,7 @@ func run()->void:
 	assert(int(g.skill_levels[43])==2)
 
 	# Falsche oder unbekannte Kombinationen dürfen nicht aus Saves eingeschleust werden.
-	g.restore_fusion_progress({"16:17":{"fusion_id":999,"rank":4}},[])
+	g.restore_fusion_progress({"17:18":{"fusion_id":999,"rank":4}},[])
 	assert(g.learned_fusions.is_empty())
 
 	print("FUSION_IDENTITY_OK normalized key; save migration; multiplayer key/id/rank validation")
