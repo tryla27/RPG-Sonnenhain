@@ -50,7 +50,17 @@ var boss_attack_sound_seen:Dictionary={}
 var boss_death_end_queue:Array=[]
 var boss_music_hold_timer:=0.0
 var boss_music_hold_theme:=""
-const INVENTORY_HUD_RECT:=Rect2(584,590,98,42)
+const INVENTORY_HUD_RECT:=Rect2(112,610,82,26)
+const QUEST_HUD_RECT:=Rect2(10,118,348,46)
+
+func hud_action_rect(index:int)->Rect2:
+	return Rect2(18+index*94,610,88,26)
+
+func hud_action_at(pos:Vector2)->String:
+	var actions:Array=["skills","inventory","journal","map","mechanics","party","chat"]
+	for i in actions.size():
+		if hud_action_rect(i).has_point(pos):return str(actions[i])
+	return ""
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
 const ItemStyle32=preload("res://components/item_style_32.gd")
@@ -175,9 +185,10 @@ const CLASS_ULTIMATES := [15, 24, 33]
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
 const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200},{"id":41,"a":1,"b":36,"gold":2200},{"id":42,"a":18,"b":37,"gold":4200}]
-const BORIN_HOUSE_POS := Vector2(1330,230)
-const BORIN_MAGIC_TREE_POS := Vector2(1620,520)
-const BORIN_CRYSTAL_POS := Vector2(1608,700)
+const BORIN_HOUSE_POS := Vector2(1248,320)
+const BORIN_MAGIC_TREE_POS := Vector2(1552,544)
+const BORIN_CRYSTAL_POS := Vector2(1512,736)
+const WORLD_CHARACTER_SCALE := 0.84
 const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14300,1200)] # Map 06 / 07 / 08
 const CLASS_BOSS_ARENA_RADIUS := 410.0
 const CLASS_BOSS_ARENA_CLEAR_RADIUS := 475.0
@@ -220,14 +231,14 @@ const BORIN_QUESTS := [
 	{"title":"Borins letzte Lehre","req":39,"target":25,"count":10,"skill_points":3,"item_rarity":3,"item_power":58}
 ]
 const NPCS := [
-	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1476, 1550), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 470), "color":Color("6783bd"), "kind":"quest"},
-	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1476, 1550), "color":Color("6bbba4"), "kind":"quest"},
-	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(276, 2030), "color":Color("ab6e60"), "kind":"smith"},
-	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(276, 1000), "color":Color("c080aa"), "kind":"stylist"},
-	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1126, 480), "color":Color("9f8bcc"), "kind":"apprentice"},
-	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(546, 1400), "color":Color("e2bc91"), "kind":"healer_alchemy"},
-	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1412, 2120), "color":Color("a48cbd"), "kind":"arena"}
+	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1376, 1268), "color":Color("a77ccb"), "kind":"quest"},
+	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1376, 560), "color":Color("6783bd"), "kind":"quest"},
+	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1376, 1268), "color":Color("6bbba4"), "kind":"quest"},
+	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(256, 2228), "color":Color("ab6e60"), "kind":"smith"},
+	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(256, 820), "color":Color("c080aa"), "kind":"stylist"},
+	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1376, 560), "color":Color("9f8bcc"), "kind":"apprentice"},
+	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(256, 1300), "color":Color("e2bc91"), "kind":"healer_alchemy"},
+	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1312, 2164), "color":Color("a48cbd"), "kind":"arena"}
 ]
 const SHOPS := {
 	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
@@ -243,7 +254,7 @@ const DUNGEON_CENTER := Vector2(8000, 4800)
 const DUNGEON_ENTRANCES := [2, 3, 8]
 const DUNGEON_NAMES := ["Turmgewölbe", "Kristallgruft", "Versunkene Krypta"]
 const DUNGEON_ENEMIES := [[4, 5], [6, 7], [21, 22]]
-const TAVERN_HOUSE := Vector2(560, 1420)
+const TAVERN_HOUSE := Vector2(160, 1568)
 const VILLAGE_REF_ORIGIN := Vector2(0, 550)
 const VILLAGE_REF_RECT := Rect2(0, 550, 1672, 840)
 const VILLAGE_REF_SOLIDS := [Rect2(-40, 548, 1752, 112), Rect2(15, 805, 310, 140), Rect2(305, 1025, 310, 145), Rect2(1295, 1015, 365, 145), Rect2(12, 1012, 95, 95), Rect2(325, 825, 345, 30), Rect2(995, 825, 350, 30), Rect2(890, 870, 105, 45), Rect2(1625, 950, 50, 250)]
@@ -268,7 +279,7 @@ const LANDMARKS := [
 	{"pos":Vector2(14400, 8710), "name":"Himmelskrone", "kind":"gate"}
 ]
 const TRAILS := [
-	[Vector2(900, 1050), Vector2(1270, 1110), Vector2(1460, 1210), Vector2(1680, 1210), Vector2(1780, 1120), Vector2(2250, 1280), Vector2(2600, 1740), Vector2(3150, 2350)],
+	[Vector2(900, 960), Vector2(1160, 960), Vector2(1450, 950), Vector2(1650, 1010), Vector2(1780, 1120), Vector2(2250, 1280), Vector2(2600, 1740), Vector2(3150, 2350)],
 	[Vector2(3150, 2350), Vector2(3300, 1900), Vector2(3800, 1520), Vector2(4450, 1390), Vector2(5000, 1250), Vector2(5600, 1380), Vector2(6300, 1660), Vector2(6700, 1950), Vector2(7150, 2200), Vector2(7870, 1790), Vector2(8500, 1900), Vector2(9200, 1750), Vector2(9700, 1850)],
 	[Vector2(3150, 2350), Vector2(2990, 2950), Vector2(2720, 3550), Vector2(2900, 4200), Vector2(3150, 4780), Vector2(3000, 5350), Vector2(3200, 6200), Vector2(3550, 6500), Vector2(4210, 6040), Vector2(5000, 6200), Vector2(5600, 5840), Vector2(6700, 6250), Vector2(7200, 6500), Vector2(7900, 6110), Vector2(8500, 6350)],
 	[Vector2(900, 1300), Vector2(875, 2600), Vector2(1040, 3300), Vector2(820, 3950), Vector2(1080, 4770), Vector2(790, 5430), Vector2(750, 6100), Vector2(1170, 5980), Vector2(1780, 6200), Vector2(2350, 5920), Vector2(3200, 6200)],
@@ -454,6 +465,8 @@ var event_states: Array = []
 var event_progress: Array = []
 var creative_mode := false
 var test_level_lock := 0
+var repair_targets:Dictionary={}
+var repair_dirty:Dictionary={}
 var pause_status := "Das Spiel ist angehalten."
 var touch_enabled := false
 var mobile_performance_mode := false
@@ -2739,9 +2752,6 @@ func handle_touch_event(event: InputEvent) -> bool:
 			queue_redraw()
 			return true
 
-		if INVENTORY_HUD_RECT.has_point(pos):
-			toggle_panel("inventory")
-			return true
 		if party_widget_rect().has_point(pos) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 			panel = "party"
 			play_sound("menu")
@@ -2982,12 +2992,19 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey: triggered = event.pressed and not event.echo
 	elif event is InputEventMouseButton: triggered = event.pressed
 	if not triggered: return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and INVENTORY_HUD_RECT.has_point(event.position):
-		toggle_panel("inventory")
-		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and Rect2(10,118,348,46).has_point(event.position):
-		quest_guide.open(self,quest_guide.current_id(self),"")
-		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "":
+		var hud_action:=hud_action_at(event.position)
+		if hud_action!="":
+			if hud_action=="chat":
+				chat_open=true;chat_input="";queue_redraw()
+			elif hud_action=="mechanics":
+				panel="mechanics";queue_redraw()
+			else:
+				toggle_panel(hud_action)
+			return
+		if QUEST_HUD_RECT.has_point(event.position):
+			quest_guide.open(self,quest_guide.current_id(self),"")
+			return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and party_widget_rect().has_point(event.position) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 		panel = "party"
 		play_sound("menu")
@@ -3033,7 +3050,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				break
 
 func near_borin() -> bool:
-	return (interior_id==VillageInteriors32.id_for_name("Borin")) or (interior_id < 0 and dungeon_id < 0 and arena_mode == "" and player_pos.distance_to(Vector2(1458,490)) < 150.0)
+	return (interior_id==VillageInteriors32.id_for_name("Borin")) or (interior_id < 0 and dungeon_id < 0 and arena_mode == "" and player_pos.distance_to(village_house_door(village_house("Borin"))-Vector2(0,70)) < 150.0)
 
 func toggle_panel(which: String) -> void:
 	if which == "skills" and panel != "skills" and not near_borin():
@@ -5142,6 +5159,9 @@ func handle_panel_click(mouse: Vector2) -> void:
 	if panel == "controller":
 		controller.click(self, mouse)
 		return
+	if panel=="repair":
+		click_repair_panel(mouse)
+		return
 	if panel == "pause" and Rect2(860,319,130,42).has_point(mouse):
 		panel = "controller"
 		return
@@ -5299,13 +5319,13 @@ func handle_panel_click(mouse: Vector2) -> void:
 			save_game()
 			play_sound("menu")
 			return
-		var destinations:Array=["","inventory","skills","journal","map","party","settings"]
+		var destinations:Array=["","party","settings","settings"]
 		for i in destinations.size():
-			if Rect2(540,155+i*51,410,42).has_point(mouse):
-				if destinations[i]=="skills" and not near_borin():
-					message("Skillwechsel nur bei Borin.")
-					return
+			if Rect2(540,155+i*58,410,46).has_point(mouse):
 				panel=destinations[i]
+				if i==3 and not creative_mode:
+					toggle_creative_mode()
+					panel="settings"
 				play_sound("menu")
 				return
 		if Rect2(190,540,300,44).has_point(mouse):
@@ -5353,12 +5373,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 				JavaScriptBridge.get_interface("window").location.assign("/")
 				return
 		elif creative_mode:
-			for index in 4:
-				if Rect2(300 + index * 113, 510, 105, 38).has_point(mouse):
-					set_creative_level(level + [-10, -1, 1, 10][index])
-					return
-			if Rect2(762, 510, 180, 38).has_point(mouse):
-				panel = "travel"
+			if Rect2(300,510,430,38).has_point(mouse):
+				panel="repair";queue_redraw();return
+			if Rect2(742,510,200,38).has_point(mouse):
+				panel="travel"
 		return
 	if panel == "controls":
 		if Rect2(965, 91, 41, 35).has_point(mouse):
@@ -5543,12 +5561,87 @@ func finish_intro() -> void:
 			rpc_player_presence.rpc_id(1, local_player_state())
 	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
 
-func apply_test_progress_to_normal(target_level:int,target_xp:int)->void:
+func begin_repair_session()->void:
+	repair_targets={
+		"level":level,
+		"xp":xp,
+		"gold":gold,
+		"skill_points":skill_points,
+		"position":[player_pos.x,player_pos.y],
+		"waystones":waystone_unlocked.duplicate(true)
+	}
+	repair_dirty.clear()
+
+func adjust_repair_value(key:String,delta:int,min_value:int,max_value:int)->void:
+	if not repair_targets.has(key):return
+	repair_targets[key]=clampi(int(repair_targets[key])+delta,min_value,max_value)
+	repair_dirty[key]=true
+	queue_redraw()
+
+func apply_repair_patch()->void:
+	if bool(repair_dirty.get("level",false)):level=clampi(int(repair_targets["level"]),1,40)
+	if bool(repair_dirty.get("xp",false)):xp=maxi(0,int(repair_targets["xp"]))
+	if bool(repair_dirty.get("gold",false)):gold=maxi(0,int(repair_targets["gold"]))
+	if bool(repair_dirty.get("skill_points",false)):skill_points=maxi(0,int(repair_targets["skill_points"]))
+	if bool(repair_dirty.get("waystones",false)):
+		waystone_unlocked=repair_targets["waystones"].duplicate(true)
+	if bool(repair_dirty.get("position",false)):
+		var p:Array=repair_targets["position"]
+		if p.size()>=2:player_pos=Vector2(float(p[0]),float(p[1])).clamp(Vector2(30,30),WORLD-Vector2(30,30))
 	test_level_lock=0
-	level=clampi(target_level,1,40)
-	xp=maxi(0,target_xp)
-	hp=max_hp()
-	energy=max_energy()
+	hp=max_hp();energy=max_energy()
+	mark_network_teleport()
+
+func draw_repair_panel()->void:
+	text_at(Vector2(190,135),"SPIELSTAND-REPARATUR",28,Color("ffe1a0"))
+	text_at(Vector2(190,170),"Nur bestätigte Werte werden in deinen normalen Spielstand geschrieben.",13,Color("d8e6dc"))
+	var rows:Array=[
+		["LEVEL","level",1,40,1,10],
+		["XP","xp",0,99999999,100,1000],
+		["GOLD","gold",0,99999999,100,1000],
+		["SKILLPUNKTE","skill_points",0,9999,1,10]
+	]
+	for i in rows.size():
+		var row:Array=rows[i];var y:=215+i*62
+		text_at(Vector2(205,y+27),str(row[0]),15,Color("ffe6b1"))
+		ui_button(Rect2(390,y,72,36),"-%d" % int(row[4]))
+		ui_button(Rect2(470,y,72,36),"-%d" % int(row[5]))
+		text_at(Vector2(555,y+26),str(repair_targets.get(str(row[1]),0)),17,Color("fff0ce"),HORIZONTAL_ALIGNMENT_CENTER,150)
+		ui_button(Rect2(715,y,72,36),"+%d" % int(row[4]))
+		ui_button(Rect2(795,y,72,36),"+%d" % int(row[5]))
+		if bool(repair_dirty.get(str(row[1]),false)):text_at(Vector2(885,y+25),"GEÄNDERT",10,Color("a9e0a1"))
+	ui_button(Rect2(205,470,260,38),"ALLE WEGSTEINE WIEDERHERSTELLEN")
+	ui_button(Rect2(480,470,220,38),"ZUM DORF SETZEN")
+	ui_button(Rect2(205,535,300,44),"ABBRECHEN")
+	ui_button(Rect2(535,535,400,44),"REPARATUR ÜBERNEHMEN & WEITERSPIELEN")
+	text_at(Vector2(205,520),"Testitems, Testgold und Testfortschritt werden nicht übernommen.",11,Color("c5d3ce"))
+
+func click_repair_panel(mouse:Vector2)->void:
+	var rows:Array=[
+		["level",1,40,1,10],
+		["xp",0,99999999,100,1000],
+		["gold",0,99999999,100,1000],
+		["skill_points",0,9999,1,10]
+	]
+	for i in rows.size():
+		var row:Array=rows[i];var y:=215+i*62
+		if Rect2(390,y,72,36).has_point(mouse):adjust_repair_value(str(row[0]),-int(row[3]),int(row[1]),int(row[2]));return
+		if Rect2(470,y,72,36).has_point(mouse):adjust_repair_value(str(row[0]),-int(row[4]),int(row[1]),int(row[2]));return
+		if Rect2(715,y,72,36).has_point(mouse):adjust_repair_value(str(row[0]),int(row[3]),int(row[1]),int(row[2]));return
+		if Rect2(795,y,72,36).has_point(mouse):adjust_repair_value(str(row[0]),int(row[4]),int(row[1]),int(row[2]));return
+	if Rect2(205,470,260,38).has_point(mouse):
+		repair_targets["waystones"]=[]
+		for i in waystone_unlocked.size():repair_targets["waystones"].append(true)
+		repair_dirty["waystones"]=true;queue_redraw();return
+	if Rect2(480,470,220,38).has_point(mouse):
+		repair_targets["position"]=[825.0,1020.0];repair_dirty["position"]=true;queue_redraw();return
+	if Rect2(205,535,300,44).has_point(mouse):
+		panel="settings";return
+	if Rect2(535,535,400,44).has_point(mouse):
+		toggle_creative_mode()
+		panel=""
+		message("Spielstand-Reparatur übernommen und gespeichert.")
+		return
 
 func toggle_creative_mode() -> void:
 	if not creative_mode:
@@ -5562,6 +5655,7 @@ func toggle_creative_mode() -> void:
 		copy.close()
 		creative_mode = true
 		load_game()
+		begin_repair_session()
 		test_level_lock = 0
 		gold = maxi(gold, 50000)
 		skill_points = maxi(skill_points, 60)
@@ -5569,8 +5663,6 @@ func toggle_creative_mode() -> void:
 		pause_status = "Testmodus aktiv · eigener Spielstand, alle Wege offen."
 		save_game()
 	else:
-		var carried_test_level:=clampi(level,1,40)
-		var carried_test_xp:=maxi(0,xp)
 		creative_mode = false
 		reset_class_skills()
 		for i in WORLD_EVENTS.size():
@@ -5579,7 +5671,7 @@ func toggle_creative_mode() -> void:
 		quests.clear()
 		for i in QUESTS.size(): quests.append({"state":0, "progress":0})
 		load_game()
-		apply_test_progress_to_normal(carried_test_level,carried_test_xp)
+		apply_repair_patch()
 		save_game()
 		enemies.clear()
 		drops.clear()
@@ -5597,7 +5689,8 @@ func toggle_creative_mode() -> void:
 		poison_blade_timer = 0.0
 		previous_region = region_at(player_pos)
 		camera_pos = (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW)
-		pause_status = "Normaler Spielstand wiederhergestellt · Level %d und %d XP übernommen." % [level,xp]
+		pause_status = "Normaler Spielstand repariert und auf Server-Speicherung vorgemerkt."
+		repair_targets.clear();repair_dirty.clear()
 
 func set_creative_level(target: int) -> void:
 	if not creative_mode: return
@@ -6642,7 +6735,7 @@ func npc_sprite_row(kind: String, name: String) -> int:
 		_: return 11
 
 func draw_npc_sprite(p: Vector2, kind: String, name: String) -> void:
-	ReferenceScenery.person(self,p,npc_sprite_row(kind,name),0,1 if name in ["Mira","Liora","Fenna","Elara"] else 0,Vector2.DOWN,0.0,1.0,-camera_pos)
+	ReferenceScenery.person(self,p,npc_sprite_row(kind,name),0,1 if name in ["Mira","Liora","Fenna","Elara"] else 0,Vector2.DOWN,0.0,WORLD_CHARACTER_SCALE,-camera_pos)
 
 func draw_weapon_world(p: Vector2, family: int, design: int, look: Vector2, scale_factor: float = 1.0, attack_progress: float = -1.0) -> void:
 	# Keep small polygons near zero: triangulation loses precision at 80k.
@@ -7612,7 +7705,27 @@ func draw_shell(p: Vector2) -> void:
 	draw_rect(Rect2(p + Vector2(14, 14), Vector2(4, 4)), Color('fff7e8'))
 
 func draw_village_ground() -> void:
-	return
+	# 32px-Grundstückskanten: flache Einfassung um Häuser, rein visuell.
+	var pads:Array=[
+		Rect2(128,608,288,320),
+		Rect2(128,1088,288,320),
+		Rect2(128,1536,320,352),
+		Rect2(128,2016,352,320),
+		Rect2(1216,288,352,352),
+		Rect2(1248,1056,288,352),
+		Rect2(1088,1872,448,352)
+	]
+	for pad:Rect2 in pads:
+		if not pad.grow(48).intersects(current_static_bounds()):continue
+		draw_rect(pad,Color("6f7d57",0.18))
+		draw_rect(pad.grow(-8),Color("8a7b5d",0.10))
+		draw_rect(pad,Color("a79b79",0.38),false,3)
+		for x in range(int(pad.position.x)+16,int(pad.end.x)-16,32):
+			draw_rect(Rect2(Vector2(x,pad.position.y-2),Vector2(18,4)),Color("b8ae8f",0.48))
+			draw_rect(Rect2(Vector2(x,pad.end.y-2),Vector2(18,4)),Color("756b55",0.38))
+		for y in range(int(pad.position.y)+16,int(pad.end.y)-16,32):
+			draw_rect(Rect2(Vector2(pad.position.x-2,y),Vector2(4,18)),Color("9f9679",0.42))
+			draw_rect(Rect2(Vector2(pad.end.x-2,y),Vector2(4,18)),Color("6c654f",0.34))
 
 func draw_village_ground_legacy() -> void:
 	for i in range(16):
@@ -8069,7 +8182,7 @@ func draw_player() -> void:
 		draw_line(dodge_start+Vector2(0,10),player_pos+Vector2(0,10),Color("a491e4",0.3),18)
 		for ring in 2:
 			draw_arc(player_pos+Vector2(0,10),25+ring*13,progress*TAU+ring*PI,progress*TAU+ring*PI+PI,16,Color("d9caff",0.8),3)
-	draw_hero(player_pos, 1.0, is_walking, facing, true)
+	draw_hero(player_pos, WORLD_CHARACTER_SCALE, is_walking, facing, true)
 	if swing_timer > 0 and class_id == 0:
 		var swing_progress := clampf(1.0 - swing_timer / maxf(0.01, swing_duration), 0.0, 1.0)
 		var arc_angle := facing.angle() - 0.88 + swing_progress * 1.76
@@ -8402,9 +8515,11 @@ func draw_hud() -> void:
 	if class_mastery_unlocked and class_id==0: text_at(Vector2(365,30),"WUT %.0f%%" % warrior_rage,12,Color("efaa75"))
 	elif class_mastery_unlocked and class_id==2: text_at(Vector2(365,30),"JAGD %.0f%%%s" % [ranger_hunt_meter," · %.0fs" % ranger_hunt_buff if ranger_hunt_buff>0 else ""],12,Color("f3d68e"))
 	elif class_mastery_unlocked and class_id==1: text_at(Vector2(365,30),"LEERTASTE · ARKANER SCHRITT",12,Color("cdbaff"))
-	draw_ref_panel(Rect2(10, 118, 348, 46))
-	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL · DETAILS ›", 13, Color("f0cf92"))
+	draw_ref_panel(QUEST_HUD_RECT)
+	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL · HOVER FÜR INFOS", 13, Color("f0cf92"))
 	text_at(Vector2(23, 155), tracked_quest().substr(0, 44), 14, Color("fff2d9"))
+	if not touch_enabled and QUEST_HUD_RECT.has_point(get_viewport().get_mouse_position()):
+		quest_guide.draw_hud_hover(self)
 	if food_system.meal_active():
 		var food_index:int=FoodSystem.index_for(food_system.active_food_name)
 		draw_ref_panel(Rect2(10,168,348,58))
@@ -8503,15 +8618,21 @@ func draw_hud() -> void:
 		else:
 			ui_box(Rect2(610, 549, 520, 36), Color("587767"))
 			text_at(Vector2(623, 573), nearest.replace("E  ·", "%s  ·" % binding_short("interact")), 15, Color("fff4ca"))
-	if not touch_enabled:
-		ui_button(INVENTORY_HUD_RECT,"INVENTAR")
 	if touch_enabled:
 		draw_touch_controls()
 	else:
 		draw_ref_panel(Rect2(9, 586, 1134, 53))
-		text_at(Vector2(22, 609), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 11, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 550)
-		text_at(Vector2(22, 626), controller.label(int(controller.bindings["pause"]))+": Einstellungen / Belegung" if controller.used else "%s Skills · %s Inventar · %s Quests · %s Karte · %s Chat · %s Hilfe · %s Gruppe" % [binding_short("skills"), binding_short("inventory"), binding_short("journal"), binding_short("map"), binding_short("chat"), binding_short("mechanics"), binding_short("party")], 11, Color("becfc6"), HORIZONTAL_ALIGNMENT_LEFT, 550)
-		ui_button(INVENTORY_HUD_RECT,"INVENTAR")
+		text_at(Vector2(22, 605), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 10, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 650)
+		var hud_labels:Array=[
+			"%s SKILLS" % binding_short("skills"),
+			"%s INVENTAR" % binding_short("inventory"),
+			"%s QUESTS" % binding_short("journal"),
+			"%s KARTE" % binding_short("map"),
+			"%s HILFE" % binding_short("mechanics"),
+			"%s GRUPPE" % binding_short("party"),
+			"%s CHAT" % binding_short("chat")
+		]
+		for i in hud_labels.size():ui_button(hud_action_rect(i),str(hud_labels[i]))
 		for slot in 4:
 			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
 			var x := 694 + slot * 81
@@ -8818,6 +8939,7 @@ func draw_panel() -> void:
 		"patches": preload("res://components/patch_notes.gd").draw(self)
 		"pause": draw_game_menu()
 		"settings": draw_pause_panel()
+		"repair": draw_repair_panel()
 		"controls": draw_controls_panel()
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
@@ -9188,8 +9310,9 @@ func draw_game_menu() -> void:
 	text_at(Vector2(215,389),"%s · Level %d" % [CLASS_NAMES[class_id],level],16,Color("d8e6dc"))
 	text_at(Vector2(215,425),region_name(region_at(player_pos)),14,Color("d8e6dc"))
 	text_at(Vector2(215,463),"Online: Welt läuft weiter" if network_mode!="offline" else "Spiel pausiert",12,Color("b8cbc5"))
-	var labels:Array=["WEITERSPIELEN","INVENTAR","FÄHIGKEITEN","QUESTBUCH","WELTKARTE","GRUPPE","EINSTELLUNGEN & TESTMODUS"]
-	for i in labels.size():ui_button(Rect2(540,155+i*51,410,42),labels[i])
+	var labels:Array=["WEITERSPIELEN","GRUPPE & ONLINE","EINSTELLUNGEN","TEST & REPARATUR"]
+	for i in labels.size():ui_button(Rect2(540,155+i*58,410,46),labels[i])
+	text_at(Vector2(540,402),"Inventar, Skills, Quests, Karte und Hilfe öffnest du direkt über die HUD-Buttons.",12,Color("b8cbc5"),HORIZONTAL_ALIGNMENT_LEFT,410)
 	ui_button(Rect2(190,485,300,36),"NEUE PATCHES")
 	ui_button(Rect2(540,512,410,42),"SPIEL SPEICHERN")
 	text_at(Vector2(540,578),pause_status,12,Color("ffe5ab"),HORIZONTAL_ALIGNMENT_LEFT,410)
@@ -9210,12 +9333,11 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
 		ui_button(Rect2(590, 480, 260, 38), "BACKUP IMPORT")
 	if creative_mode:
-		text_at(Vector2(302, 504), "LEVEL %d · %d XP · wird beim Verlassen übernommen" % [level, xp], 14, Color("fff0bd"))
-		for index in 4:
-			ui_button(Rect2(300 + index * 113, 510, 105, 38), ["-10", "-1", "+1", "+10"][index])
-		ui_button(Rect2(762, 510, 180, 38), "REISEN")
+		text_at(Vector2(302, 500), "TESTMODUS · Änderungen bleiben getrennt, bis du sie als Reparatur bestätigst.", 12, Color("fff0bd"))
+		ui_button(Rect2(300,510,430,38),"SPIELSTAND REPARIEREN")
+		ui_button(Rect2(742,510,200,38),"REISEN")
 	elif test_level_lock>0:
-		text_at(Vector2(302,504),"LEVEL %d FIXIERT · XP verändert das Level nicht." % test_level_lock,13,Color("ffd98a"))
+		text_at(Vector2(302,504),"ALTER LEVEL-LOCK AKTIV · wird beim nächsten XP-Gewinn aufgehoben.",13,Color("ffd98a"))
 	text_at(Vector2(302, 538 if not creative_mode else 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
 	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUR STARTSEITE" if is_web_platform() else "SPEICHERN & ZUM HAUPTMENÜ")
 
@@ -10972,8 +11094,8 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		draw_circle(rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
 		draw_arc(rp + Vector2(0, 10), 30.0, 0.0, TAU, 24, Color("8ee7ff", 0.82), 2.0)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
-		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)))
-		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
+		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, WORLD_CHARACTER_SCALE, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)))
+		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5*WORLD_CHARACTER_SCALE), cls, clampi(int(state.get("weapon",0)),0,11), rdir, WORLD_CHARACTER_SCALE)
 		combat_feedback.health(self,"peer:%d"%int(peer_id),rp+Vector2(0,-43),float(state.get("hp",1)),float(state.get("max_hp",1)),60,Color("79caa3"))
 		var party_peer_ids := local_party_peer_ids()
 		var name_color := Color("ffe0a1") if int(peer_id) in party_peer_ids else Color("bfe7ff")

@@ -15,8 +15,8 @@ func run() -> void:
 	if g.sprint_turn_retention(Vector2.RIGHT,Vector2.LEFT) >= 0.5: failures += 1
 	if g.sprint_turn_retention(Vector2.RIGHT,Vector2(1,0.15)) < 0.8: failures += 1
 	g.class_id=0
-	var warrior_drain:=g.sprint_drain_rate()
-	var warrior_accel:=g.sprint_acceleration()
+	var warrior_drain:float=float(g.sprint_drain_rate())
+	var warrior_accel:float=float(g.sprint_acceleration())
 	g.class_id=2
 	if g.sprint_drain_rate() <= warrior_drain: failures += 1
 	if g.sprint_acceleration() <= warrior_accel: failures += 1

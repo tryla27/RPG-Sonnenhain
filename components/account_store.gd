@@ -4,6 +4,7 @@ extends RefCounted
 
 const HASH_ROUNDS := 12000
 const MAX_CHARACTERS := 3
+const REMEMBER_TOKEN_DAYS := 30
 var directory := ""
 var sessions: Dictionary = {}
 
@@ -102,6 +103,30 @@ func register(peer:int,name:String,password:String)->Dictionary:
 	if err!=OK:return {"ok":false,"error":"disk_error"}
 	sessions[peer]={"key":key,"name":normalized}
 	return {"ok":true,"kind":"registered","name":account["display_name"],"characters":[]}
+
+func issue_remember_token(peer:int)->Dictionary:
+	if not sessions.has(peer):return {"ok":false,"error":"not_logged_in"}
+	var key:=str(sessions[peer].get("key",""))
+	var account:=read_account(key)
+	if account.is_empty():return {"ok":false,"error":"account_missing"}
+	var raw:=Crypto.new().generate_random_bytes(32).hex_encode()
+	account["remember_token_hash"]=raw.sha256_text()
+	account["remember_token_expires"]=int(Time.get_unix_time_from_system())+REMEMBER_TOKEN_DAYS*86400
+	account["updated_at"]=int(Time.get_unix_time_from_system())
+	if write_account(key,account)!=OK:return {"ok":false,"error":"disk_error"}
+	return {"ok":true,"remember_token":raw,"remember_expires":int(account["remember_token_expires"])}
+
+func login_with_token(peer:int,name:String,token:String)->Dictionary:
+	if peer<=0 or directory=="":return {"ok":false,"error":"unavailable"}
+	var normalized:=normalize_name(name)
+	if normalized=="" or token.length()!=64 or not token.is_valid_hex_number(false):return {"ok":false,"error":"invalid_login"}
+	var key:=account_key(normalized)
+	var account:=read_account(key)
+	if account.is_empty():return {"ok":false,"error":"invalid_login"}
+	if int(account.get("remember_token_expires",0))<int(Time.get_unix_time_from_system()):return {"ok":false,"error":"remember_expired"}
+	if token.sha256_text()!=str(account.get("remember_token_hash","")):return {"ok":false,"error":"invalid_login"}
+	sessions[peer]={"key":key,"name":normalized}
+	return {"ok":true,"kind":"login","name":str(account.get("display_name",name)),"characters":public_characters(account)}
 
 func login(peer:int,name:String,password:String)->Dictionary:
 	if peer<=0 or directory=="":return {"ok":false,"error":"unavailable"}

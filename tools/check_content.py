@@ -188,9 +188,51 @@ for connection in [
 village_layout = (root / 'components' / 'village_layout.gd').read_text(encoding='utf8')
 for resident in ['Mira','Liora','Arven','Torvald','Fenna','Pip','Elara','Alma','Borin']:
     assert f'"name":"{resident}"' in village_layout, f'missing village house: {resident}'
-assert '"name":"Borin","house":Vector2(1330,230)' in village_layout, 'Borin house anchor moved'
-assert 'const BORIN_MAGIC_TREE_POS := Vector2(1620,520)' in source, 'Borin magic tree anchor moved'
-assert 'const BORIN_CRYSTAL_POS := Vector2(1608,700)' in source, 'Borin fusion crystal anchor moved'
+assert '"name":"Borin","house":Vector2(1248,320)' in village_layout, 'Borin house anchor moved'
+assert 'const BORIN_MAGIC_TREE_POS := Vector2(1552,544)' in source, 'Borin magic tree anchor moved'
+assert 'const BORIN_CRYSTAL_POS := Vector2(1512,736)' in source, 'Borin fusion crystal anchor moved'
+
+# Map-0 village must remain fully inside the original wall rectangle and keep both
+# live gate approach corridors clear. Check actual rendered building footprints,
+# not only their anchor points.
+village_bounds = (0, 0, 1780, 2600)
+gate_corridors = [
+    (1536, 920, 244, 400),   # east gate at 1780 / 1120
+    (688, 2240, 374, 360),   # south gate at 875 / 2600
+]
+shop_rows = re.findall(r'\{"name":"([^"]+)","house":Vector2\((\d+),(\d+)\),"kind":"([^"]+)"[^\n]*\}', village_layout)
+seen_houses = set()
+for name, xs, ys, kind in shop_rows:
+    x, y = int(xs), int(ys)
+    key = (x, y)
+    if key in seen_houses:
+        continue
+    seen_houses.add(key)
+    if kind == 'arena':
+        rect = (x - 16, y - 32, 416, 304)
+    elif kind == 'borin':
+        rect = (x - 16, y - 64, 288, 320)
+    else:
+        rect = (x - 16, y - 64, 224, 256)
+    rx, ry, rw, rh = rect
+    assert rx >= village_bounds[0] and ry >= village_bounds[1], f'{name} footprint leaves north/west village wall: {rect}'
+    assert rx + rw <= village_bounds[2] and ry + rh <= village_bounds[3], f'{name} footprint leaves east/south village wall: {rect}'
+    for gx, gy, gw, gh in gate_corridors:
+        overlaps = rx < gx + gw and rx + rw > gx and ry < gy + gh and ry + rh > gy
+        assert not overlaps, f'{name} footprint blocks village gate approach: {rect}'
+
+tilemap32 = (root / 'components' / 'start_tilemap_32.gd').read_text(encoding='utf8')
+pads_block = tilemap32.split('const PROPERTY_PADS := [', 1)[1].split(']', 1)[0]
+pads = [(int(x), int(y), int(w), int(h)) for x, y, w, h in re.findall(r'Rect2\((\d+),(\d+),(\d+),(\d+)\)', pads_block)]
+assert len(pads) == 7, f'expected 7 village property pads, got {len(pads)}'
+for rect in pads:
+    rx, ry, rw, rh = rect
+    assert rx >= 0 and ry >= 0 and rx + rw <= 1780 and ry + rh <= 2600, f'property pad leaves village walls: {rect}'
+    for gx, gy, gw, gh in gate_corridors:
+        overlaps = rx < gx + gw and rx + rw > gx and ry < gy + gh and ry + rh > gy
+        assert not overlaps, f'property pad blocks village gate approach: {rect}'
+assert 'const EAST_EXIT := Vector2(1780,1120)' in tilemap32, 'east village gate moved'
+assert 'const SOUTH_EXIT := Vector2(875,2600)' in tilemap32, 'south village gate moved'
 
 
 # v27.5 visuals, weapons, roads, daylight, performance, chat, co-op and web preset checks.

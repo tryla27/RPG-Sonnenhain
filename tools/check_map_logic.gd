@@ -11,10 +11,16 @@ func _initialize() -> void:
 		check(g.region_rect(0).grow(-45).encloses(Rect2(h,Vector2(192,160))),"House outside village: %s"%h)
 		for x in [0,48,96,144,192]:
 			for y in [0,40,80,120,160]: check(g.distance_to_trail(h+Vector2(x,y))>65,"House on road: %s"%h)
-		var door_x:float=128.0 if h==g.BORIN_HOUSE_POS else (192.0 if h==Vector2(1220,1860) else 96.0)
-		var door_y:float=240.0 if h==g.BORIN_HOUSE_POS else (260.0 if h==Vector2(1220,1860) else 180.0)
-		check(g.is_blocked(h+Vector2(door_x,110),h+Vector2(door_x,190)),"House collider missing")
-		check(not g.is_blocked(h+Vector2(door_x,door_y),h+Vector2(door_x,door_y+10)),"Door approach obstructed: %s"%h)
+		var house_info:Dictionary={}
+		for candidate in g.VillageLayout.SHOPS:
+			if candidate["house"]==h and not candidate.has("shared_with"):
+				house_info=candidate
+				break
+		check(not house_info.is_empty(),"House metadata missing: %s"%h)
+		if not house_info.is_empty():
+			var door:Vector2=g.village_house_door(house_info)
+			check(g.is_blocked(door-Vector2(0,70),door),"House collider missing: %s"%h)
+			check(not g.is_blocked(door,door+Vector2(0,10)),"Door approach obstructed: %s"%h)
 	for n in g.NPCS:
 		check(not g.is_blocked(n["pos"],n["pos"]),"NPC inside collision: %s"%n["name"])
 		check(n["pos"].y>g.npc_position(n["name"]).y-1,"NPC lookup mismatch")

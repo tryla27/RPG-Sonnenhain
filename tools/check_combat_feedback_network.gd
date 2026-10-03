@@ -46,7 +46,7 @@ func run()->void:
 	for region in range(1,13):
 		var center:Vector2=server.region_rect(region).get_center()
 		left.player_pos=center;right.player_pos=center+Vector2(20,0)
-		server.remote_players={a:{"pos":[center.x,center.y],"context":"world","instance_id":"world","hp":1000,"level":40,"uuid":"feedback-left","class":0},b:{"pos":[center.x+20,center.y],"context":"world","instance_id":"world","hp":1000,"level":40,"uuid":"feedback-right","class":0}}
+		server.remote_players={a:{"pos":[center.x,center.y],"context":"world","instance_id":"world","hp":1000,"level":40,"uuid":"feedback-left","class":1},b:{"pos":[center.x+20,center.y],"context":"world","instance_id":"world","hp":1000,"level":40,"uuid":"feedback-right","class":1}}
 		var type:=0
 		for candidate in server.ENEMY_TYPES.size():
 			if int(server.ENEMY_TYPES[candidate]["region"])==region and candidate not in [12,13,14]:type=candidate;break
