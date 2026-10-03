@@ -1,16 +1,16 @@
 extends RefCounted
-const VERSION="PATCH 01.10.2026"
+const VERSION="PATCH 03.10.2026"
 const NOTES=[
-["Speichern", "Direkt im ersten Escape-Menü. Lokal- und Serverbestätigung werden getrennt angezeigt."],
-["Spielstände", "Geprüfte lokale Schreibvorgänge, Rückfallkopie, Serverrevisionen und Wiederholungen."],
-["Menüs", "3 animierte Fähigkeiten je Klasse; passende Vorschauwaffen; Spielmenü und Patch-Seite."],
-["Multiplayer", "Healthbars, Schadensfeedback, Teleport-Sprung und gemeinsame Weltgegner."],
-["Kampf", "Wandtreffer mit Effekten und Sound; Slime-/Käferbewegung; Turmboss mit zwei Wächtern."],
-["Ausrüstung", "Kopfslot; zwei Magierringe nebeneinander und an beiden Händen; Arena-Basiswaffen."],
-["Website", "Ein Passwortfeld für die gesamte Website; durchblätterbare Patch-Übersichten."],
-["Spawn", "512px-Plattform auf 32px-Tiles, drei Stufen, breite Treppe und gemeinsamer Kollisionskern."],
-["In Arbeit", "Neue Waffenpassive, Rüstungsteile, Umhänge und universelles Ausrüsten."],
-["Noch ausstehend", "Gemeinsame Boden-Drops mit 6 Minuten Lebensdauer und sicherer Händler-Tausch."]]
+["Speichern", "Hybrid-Saves mit lokalem Stand, Serverstand und Backups; Recovery-Auswahl schützt vor stillem Überschreiben."],
+["Accounts", "Account-Zuordnung und Sicherungen werden robuster; vorhandene Saves dürfen nicht mehr nur wegen fehlender Metadaten als leer gelten."],
+["World Builder", "32px-Editor mit Boden, Wänden, Objekten, NPCs, Spawns, Triggern, Ambiente, Undo/Redo, Export und Map-Prüfung."],
+["Map 0", "Die gesamte Bodenfläche wird als natives 32px-Tileraster aufgebaut; alte Grün-/Cobble-Overlays werden entfernt."],
+["Gebäude", "Map-0-Häuser, Borins Haus und Arena wechseln vom alten Vollbild-Hausatlas auf native 32px-Tile-Komposition."],
+["Fog of War", "Erkundung läuft über Regionsgrenzen hinweg; Gruppenmitglieder in derselben Weltinstanz teilen ihre Sicht."],
+["Magier", "Risssprung auf Leertaste ersetzt Arkanen Schritt; Rissnova wird normaler Skill und Arkaner Sturm wird ab Level 40 freigeschaltet."],
+["Menüs", "Login-Navigation per Tab/Shift+Tab; Spielmenü und Untermenüs erhalten konsistente Zurück-Navigation."],
+["Audio", "Musik und Effekte erhalten eigene Mute-Schalter; eingestellte Lautstärken bleiben beim Stummschalten erhalten."],
+["Patch-Ablauf", "Patch Notes sind ab jetzt Pflichtbestandteil jedes relevanten PRs; CI prüft, dass sie mit aktualisiert wurden."]]
 static func draw(g)->void:
 	g.text_at(Vector2(170,135),VERSION,25,Color("ffe2aa"))
 	g.text_at(Vector2(170,166),"Alle Änderungen auf einer Seite · Stand und Planung",14,Color("b8cbc5"))

@@ -1,10 +1,9 @@
 extends RefCounted
 ## Individual transparent reference-style sprites, composed into the existing game world.
-const ReferenceHouse = preload("res://components/reference_house.gd")
+const VillageHouseTiles32 = preload("res://components/village_house_tiles_32.gd")
 static var objects:Texture2D
 static var props:Texture2D
 static var terrain:Texture2D
-static var houses:Texture2D
 static var art_initialized := false
 static func init_art()->void:
 	if art_initialized: return
@@ -12,130 +11,23 @@ static func init_art()->void:
 	# Verified reference textures; procedural shapes remain a fallback.
 	if objects==null: objects=load("res://art/start32/objects-faithful.webp")
 	if props==null: props=load("res://art/start32/props-faithful.webp")
-	if houses==null: houses=load("res://art/houses_192.png")
 	if terrain==null: terrain=load("res://art/start32/terrain_32.webp")
 static func sprite(c:CanvasItem,texture:Texture2D,source:Rect2,target:Rect2)->void:
 	if texture == null: return
 	c.draw_texture_rect_region(texture,target,source,Color.WHITE,false,true)
 static func house(c:CanvasItem,p:Vector2,kind:int=0)->void:
-	init_art()
-	if objects != null:
-		sprite(c,objects,Rect2(kind*512+10,20,495,480),Rect2(p+Vector2(0,-32),Vector2(192,192)))
-		return
-	if houses != null:
-		# houses_192.png enthält die drei robust exportierbaren Hausvarianten.
-		c.draw_texture_rect_region(houses,Rect2(p,Vector2(192,160)),Rect2(kind*192,0,192,160),Color.WHITE,false,true)
-	else:
-		var roof: Color = [Color("a7422d"),Color("87563d"),Color("6f5540")][clampi(kind,0,2)]
-		ReferenceHouse.paint(c,p,roof,Color("ffd482"),false)
+	# Legacy API kept for callers outside Map 0, but village houses never use a full-house sprite.
+	var mapped:=["home","healer","innkeeper"][clampi(kind,0,2)]
+	VillageHouseTiles32.paint(c,p,mapped)
 
-# Themed village houses: same 32px-compatible base sprite, with profession-specific
-# roof/accent props so every resident has a readable home silhouette.
 static func themed_house(c:CanvasItem,p:Vector2,kind:String)->void:
-	var base_kind:=2 if kind=="innkeeper" else (1 if kind=="healer" else 0)
-	house(c,p,base_kind)
-	var accent:Color={
-		"research":Color("6f91ad"),"style":Color("b77aa6"),"healer":Color("6da987"),
-		"innkeeper":Color("b47755"),"elder":Color("8a78a4"),"apprentice":Color("897bb7"),
-		"smith":Color("a65e47"),"arena":Color("a15d4e")
-	}.get(kind,Color("8f765b"))
-	# Tile-sized trim and sign-like roof marks.
-	for i in 5:
-		c.draw_rect(Rect2(p+Vector2(16+i*32,20),Vector2(24,7)),accent if i%2==0 else accent.lightened(.18))
-	match kind:
-		"research":
-			c.draw_circle(p+Vector2(154,42),18,Color("415c67"))
-			c.draw_arc(p+Vector2(154,42),14,0,TAU,18,Color("b9e8ec"),3)
-			c.draw_line(p+Vector2(154,24),p+Vector2(170,5),Color("c7c0a1"),3)
-		"style":
-			c.draw_rect(Rect2(p+Vector2(19,113),Vector2(35,48)),Color("71566c"))
-			c.draw_rect(Rect2(p+Vector2(137,113),Vector2(35,48)),Color("71566c"))
-			for x in [33,151]: c.draw_circle(p+Vector2(x,104),6,Color("f0c8df"))
-		"healer":
-			c.draw_rect(Rect2(p+Vector2(146,105),Vector2(8,30)),Color("e7ead5"))
-			c.draw_rect(Rect2(p+Vector2(135,116),Vector2(30,8)),Color("e7ead5"))
-			for x in [25,52,79]: c.draw_circle(p+Vector2(x,153),6,Color("75a96c"))
-		"innkeeper":
-			c.draw_rect(Rect2(p+Vector2(18,140),Vector2(156,12)),Color("6f4d37"))
-			for x in [35,67,99,131]: c.draw_circle(p+Vector2(x,151),5,Color("d49a58"))
-		"elder":
-			c.draw_colored_polygon(PackedVector2Array([p+Vector2(96,18),p+Vector2(111,40),p+Vector2(96,34),p+Vector2(81,40)]),accent.lightened(.35))
-		"apprentice":
-			for x in [28,58,128,158]:
-				c.draw_colored_polygon(PackedVector2Array([p+Vector2(x,115),p+Vector2(x+6,103),p+Vector2(x+12,115),p+Vector2(x+6,128)]),Color("8bdfff"))
-		"smith":
-			c.draw_rect(Rect2(p+Vector2(143,34),Vector2(24,48)),Color("5b4b49"))
-			c.draw_circle(p+Vector2(155,27),11,Color("6d6b69",.55))
-			c.draw_line(p+Vector2(22,143),p+Vector2(54,115),Color("d2b06e"),5)
-		"arena":
-			for x in [34,152]:
-				c.draw_line(p+Vector2(x,145),p+Vector2(x+18,112),Color("d6d9cf"),4)
-				c.draw_line(p+Vector2(x-4,132),p+Vector2(x+17,138),Color("d4a85e"),3)
+	VillageHouseTiles32.paint(c,p,kind)
 
-# Borins Haus ist bewusst groesser als die normalen 192x160-Dorfhaeuser.
-# Der Anker bleibt links oben, damit Wege, NPC und Interaktion stabil positionierbar sind.
 static func borin_house(c:CanvasItem,p:Vector2)->void:
-	init_art()
-	if objects != null:
-		sprite(c,objects,Rect2(10,20,495,480),Rect2(p,Vector2(256,240)))
-	else:
-		ReferenceHouse.paint(c,p,Color("465e86"),Color("ffe0a1"),false)
-		ReferenceHouse.paint(c,p+Vector2(64,28),Color("3f577c"),Color("ffe0a1"),false)
-	c.draw_rect(Rect2(p+Vector2(18,205),Vector2(220,12)),Color("51483b"))
-	c.draw_rect(Rect2(p+Vector2(24,207),Vector2(208,5)),Color("b8aa87"))
-	for i in 5:
-		var q:=p+Vector2(30+i*43,220)
-		c.draw_circle(q,6,Color("7165ba",0.42))
-		c.draw_circle(q,3,Color("cfc5ff"))
-	# 32px-Pixelakzente machen Borins Haus als eigenes Skillhaus lesbar.
-	for x in [32,96,160]:
-		c.draw_rect(Rect2(p+Vector2(x,40),Vector2(32,8)),Color("685ca8"))
-		c.draw_rect(Rect2(p+Vector2(x+8,48),Vector2(16,8)),Color("a9dfff"))
-	c.draw_rect(Rect2(p+Vector2(80,176),Vector2(96,16)),Color("34313b"))
-	for x in [92,124,156]: c.draw_rect(Rect2(p+Vector2(x,180),Vector2(12,8)),Color("b8a7f0"))
+	VillageHouseTiles32.paint(c,p,"borin")
 
-
-# Arvens Arena ersetzt das normale Dorfhaus. 384x240 = exakt die dreifache
-# Grundfläche eines 192x160-Hauses und bleibt komplett auf dem 32px-Raster.
 static func arena_building(c:CanvasItem,p:Vector2)->void:
-	var stone_dark:=Color("4a4541")
-	var stone:=Color("776b5b")
-	var stone_light:=Color("a59372")
-	var roof:=Color("8f3f31")
-	var gold:=Color("d0a85f")
-	# Schatten und massiver Sockel.
-	c.draw_rect(Rect2(p+Vector2(16,208),Vector2(352,32)),Color("202b2a",0.28))
-	for tx in 12:
-		for ty in 5:
-			var q:=p+Vector2(tx*32,64+ty*32)
-			var col:=stone if (tx+ty)%2==0 else stone_dark
-			c.draw_rect(Rect2(q,Vector2(32,32)),col)
-			c.draw_rect(Rect2(q,Vector2(32,32)),Color("2b302f",0.28),false,2)
-	# Breites rotes Dach mit harten Pixelstufen.
-	for step in 6:
-		c.draw_rect(Rect2(p+Vector2(32+step*16,48-step*8),Vector2(320-step*32,16)),roof.lightened(step*0.025))
-	# Zwei Seitentürme.
-	for x in [0,320]:
-		c.draw_rect(Rect2(p+Vector2(x,72),Vector2(64,136)),stone_dark)
-		c.draw_rect(Rect2(p+Vector2(x+8,80),Vector2(48,120)),stone)
-		c.draw_rect(Rect2(p+Vector2(x-8,56),Vector2(80,24)),roof)
-		c.draw_rect(Rect2(p+Vector2(x,48),Vector2(64,8)),gold)
-	# Zentraler Torbogen und dunkler Eingang.
-	c.draw_rect(Rect2(p+Vector2(144,116),Vector2(96,92)),stone_dark)
-	c.draw_circle(p+Vector2(192,116),48,stone_light)
-	c.draw_circle(p+Vector2(192,122),34,Color("2a292a"))
-	c.draw_rect(Rect2(p+Vector2(158,122),Vector2(68,86)),Color("2a292a"))
-	c.draw_rect(Rect2(p+Vector2(184,128),Vector2(8,80)),Color("5d4634"))
-	c.draw_rect(Rect2(p+Vector2(200,128),Vector2(8,80)),Color("5d4634"))
-	# Banner, Waffen und ARENA-Schild.
-	for x in [82,286]:
-		c.draw_rect(Rect2(p+Vector2(x,94),Vector2(20,68)),Color("793d45"))
-		c.draw_colored_polygon(PackedVector2Array([p+Vector2(x,162),p+Vector2(x+10,178),p+Vector2(x+20,162)]),Color("793d45"))
-		c.draw_line(p+Vector2(x+2,100),p+Vector2(x+18,146),gold,3)
-	c.draw_rect(Rect2(p+Vector2(116,78),Vector2(152,26)),Color("302f2c"))
-	c.draw_rect(Rect2(p+Vector2(122,84),Vector2(140,14)),Color("70523d"))
-	for i in 5:
-		c.draw_rect(Rect2(p+Vector2(32+i*72,216),Vector2(40,8)),gold if i%2==0 else stone_light)
+	VillageHouseTiles32.paint(c,p,"arena")
 
 static func tree(c:CanvasItem,p:Vector2,_key:int)->void:
 	init_art()

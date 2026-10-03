@@ -399,7 +399,6 @@ var skill_sprites: Texture2D
 var npc_sprites: Texture2D
 var vfx_sprites: Texture2D
 var structure_tiles: Texture2D
-var house_tiles: Texture2D
 var village_bg: Texture2D
 var dungeon_chests_opened: Array = [false, false, false]
 var dungeon_chest_respawn_until: Array = [0.0,0.0,0.0]
@@ -763,7 +762,6 @@ func _ready() -> void:
 	npc_sprites = load("res://art/npcs_32.png")
 	vfx_sprites = load("res://art/vfx_16.png")
 	structure_tiles = load("res://art/structures_16.png")
-	house_tiles = load("res://art/houses_192.png")
 	load_bindings()
 	refresh_save_slot_labels()
 	refresh_shop_stock()
