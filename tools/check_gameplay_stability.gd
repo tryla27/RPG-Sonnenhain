@@ -9,7 +9,6 @@ class TestGame:
 	func save_game():saves+=1
 	func announce_multiplayer_context():pass
 	func play_sound(_name:String):pass
-	func queue_redraw():pass
 
 class FakeKitchenGame:
 	extends RefCounted
