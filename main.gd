@@ -2401,7 +2401,7 @@ func class_boss_arena_index_at(p:Vector2,extra:float=0.0) -> int:
 
 func class_boss_arena_walkable(p:Vector2,radius:float=0.0) -> bool:
 	var index:=class_boss_arena_index_at(p,0.0)
-	if index<0:return false
+	if index<0:return ""
 	var center:Vector2=CLASS_BOSS_SITES[index]
 	if p.distance_to(center)>CLASS_BOSS_ARENA_RADIUS-radius:return false
 	if region_at(p)!=6+index:return false
@@ -4968,7 +4968,7 @@ func pip_loan_item_index()->int:
 		if bool(inventory[i].get("loaned",false)):return i
 	return -1
 
-func pip_return_loan_weapon()->bool:
+func pip_return_loan_weapon()->String:
 	var index:=pip_loan_item_index()
 	if index<0:return false
 	var uid:=int(inventory[index].get("uid",-1))
@@ -4985,10 +4985,9 @@ func pip_return_loan_weapon()->bool:
 	validate_equipment_slots()
 	pip_loan_received=false
 	pip_loan_level=0
-	message("Pip: Danke. %s ist wieder bei mir." % item_name)
 	play_sound("pickup")
 	save_game()
-	return true
+	return item_name
 
 func pip_dialogue()->void:
 	if pip_loan_received:
@@ -5006,9 +5005,9 @@ func pip_dialogue()->void:
 				message(line+" ... Moment, du hast sie gar nicht mehr dabei. Bring sie mir zurück, sobald du sie wiederfindest.")
 				save_game()
 				return
-			message(line)
 			# Rückgabe geschieht im selben Gespräch nach der Forderung.
-			pip_return_loan_weapon()
+			var returned_name:=pip_return_loan_weapon()
+			message("%s · %s zurückgegeben." % [line,returned_name])
 			return
 		message("Pip: Die Leihwaffe hast du schon. Sammle erst etwas Erfahrung damit — nach deinem nächsten Level brauche ich sie zurück.")
 		return
