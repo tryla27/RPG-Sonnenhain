@@ -1,24 +1,27 @@
 extends RefCounted
 const H = preload("res://components/reference_house.gd")
+# 32px-Top-down-Dorf: Gebäude liegen in klaren Grundstücksblöcken um den
+# zentralen Platz. Die größeren Abstände orientieren sich am neuen World-Board,
+# ohne die bestehende Regionsgrenze oder Hausrenderer umzubauen.
 const SHOPS := [
-	{"name":"Liora","house":Vector2(1380,1370),"kind":"elder","sign":"RATSHALLE","cart":Vector2(1590,1650),"shared_with":"Mira"},
-	{"name":"Fenna","house":Vector2(180,820),"kind":"style","sign":"ATELIER","cart":Vector2(86,1110)},
-	{"name":"Elara","house":Vector2(450,1220),"kind":"healer","sign":"HEILHAUS","cart":Vector2(378,1510)},
-	{"name":"Alma","house":Vector2(560,1420),"kind":"innkeeper","sign":"STEINROSE","cart":Vector2(666,1708)},
-	{"name":"Mira","house":Vector2(1380,1370),"kind":"elder","sign":"RAT & QUESTS","cart":Vector2(1590,1650)},
-	{"name":"Pip","house":Vector2(1330,230),"kind":"apprentice","sign":"GEHILFE","cart":Vector2(1458,540),"shared_with":"Borin"},
-	{"name":"Torvald","house":Vector2(180,1850),"kind":"smith","sign":"SCHMIEDE","cart":Vector2(390,2135)},
-	{"name":"Arven","house":Vector2(1220,1860),"kind":"arena","sign":"ARENA","cart":Vector2(1430,2140),"large":true},
-	{"name":"Borin","house":Vector2(1330,230),"kind":"borin","sign":"BORINS SKILLHAUS","cart":Vector2(1458,540)}
+	{"name":"Liora","house":Vector2(1280,1088),"kind":"elder","sign":"RATSHALLE","cart":Vector2(1498,1376),"shared_with":"Mira"},
+	{"name":"Fenna","house":Vector2(160,640),"kind":"style","sign":"ATELIER","cart":Vector2(288,896)},
+	{"name":"Elara","house":Vector2(160,1120),"kind":"healer","sign":"HEILHAUS","cart":Vector2(288,1376)},
+	{"name":"Alma","house":Vector2(160,1568),"kind":"innkeeper","sign":"STEINROSE","cart":Vector2(288,1824)},
+	{"name":"Mira","house":Vector2(1280,1088),"kind":"elder","sign":"RAT & QUESTS","cart":Vector2(1498,1376)},
+	{"name":"Pip","house":Vector2(1248,320),"kind":"apprentice","sign":"GEHILFE","cart":Vector2(1440,608),"shared_with":"Borin"},
+	{"name":"Torvald","house":Vector2(160,2048),"kind":"smith","sign":"SCHMIEDE","cart":Vector2(384,2304)},
+	{"name":"Arven","house":Vector2(1120,1904),"kind":"arena","sign":"ARENA","cart":Vector2(1438,2224),"large":true},
+	{"name":"Borin","house":Vector2(1248,320),"kind":"borin","sign":"BORINS SKILLHAUS","cart":Vector2(1440,608)}
 ]
 static func plaza(c: CanvasItem) -> void:
-	c.draw_rect(Rect2(480,680,690,650),Color("697563"))
-	c.draw_rect(Rect2(490,690,670,630),Color("b2ae90"))
-	for row in 20:
-		for col in 20:
-			var x: int = 496+col*33+(15 if row%2 else 0)
-			if x>1130: continue
-			var y: int = 696+row*31
+	c.draw_rect(Rect2(384,608,896,832),Color("697563"))
+	c.draw_rect(Rect2(400,624,864,800),Color("b2ae90"))
+	for row in 26:
+		for col in 27:
+			var x: int = 406+col*32+(16 if row%2 else 0)
+			if x>1240: continue
+			var y: int = 630+row*31
 			var key: int = (row*13+col*7)%5
 			c.draw_rect(Rect2(x,y,30,28),Color(["a7ab8f","b4b69a","c1bda1","a1a58b","b8b398"][key]))
 			c.draw_rect(Rect2(x+1,y,28,2),Color("d4c9aa"))
