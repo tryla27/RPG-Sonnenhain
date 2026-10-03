@@ -3451,6 +3451,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	if id in [3,7,16,18,20,25,26,28,29,30,43]:
 		for shot in ability_projectiles(id,origin,dir,remote_class,power):
 			shot["owner_peer"]=sender
+			if id==43:shot["fusion_rank"]=rank
 			projectiles.append(shot)
 		return
 	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
@@ -3727,6 +3728,27 @@ func update_poison_clouds(delta: float) -> void:
 			if cloud["pos"].distance_to(enemies[e]["pos"]) < 86:
 				damage_enemy(e, int(cloud["damage"]), Vector2.ZERO, false, "gift")
 
+func iceball_chain(center:Vector2,damage:int,main_uid:int,jumps:int,stun_enabled:bool)->void:
+	var seen:Array=[main_uid]
+	var origin:=center
+	for jump in jumps:
+		var best:=-1
+		var nearest:=170.0
+		for e in enemies.size():
+			if int(enemies[e]["uid"]) in seen:continue
+			var distance:float=origin.distance_to(enemies[e]["pos"])
+			if distance<nearest:
+				best=e
+				nearest=distance
+		if best<0:break
+		var target:Vector2=enemies[best]["pos"]
+		seen.append(int(enemies[best]["uid"]))
+		lightning_lines.append({"from":origin,"to":target,"life":0.32})
+		damage_enemy(best,maxi(2,damage-jump*4),Vector2.ZERO,false,"")
+		if stun_enabled and best<enemies.size():
+			enemies[best]["stun"]=maxf(float(enemies[best].get("stun",0.0)),0.85)
+		origin=target
+
 func iceball_impact(center:Vector2,damage:int,main_uid:int,rank:int)->void:
 	rank=clampi(rank,1,4)
 	for enemy in enemies:
@@ -3734,7 +3756,7 @@ func iceball_impact(center:Vector2,damage:int,main_uid:int,rank:int)->void:
 			enemy["slow"]=maxf(float(enemy.get("slow",0.0)),3.0+rank*0.5)
 			break
 	if rank>=2:
-		chain_spell(center,maxi(3,roundi(damage*0.42)),main_uid,2)
+		iceball_chain(center,maxi(3,roundi(damage*0.42)),main_uid,2,rank>=3)
 	if rank>=3:
 		for enemy in enemies:
 			if int(enemy.get("uid",-1))==main_uid:
@@ -5371,7 +5393,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		var source_b:=int(entry.get("b",-1))
 		if output>=0 and output<learned.size():
 			learned[output]=true
-			skill_levels[output]=maxi(1,int(skill_levels[output]))
+			skill_levels[output]=maxi(maxi(1,int(entry.get("rank",1))),int(skill_levels[output]))
 		if source_a>=0 and source_a<learned.size():learned[source_a]=true;skill_levels[source_a]=maxi(1,int(skill_levels[source_a]))
 		if source_b>=0 and source_b<learned.size():learned[source_b]=true;skill_levels[source_b]=maxi(1,int(skill_levels[source_b]))
 	# Older multiplayer saves may contain completed boss quests but missing boss flags.
