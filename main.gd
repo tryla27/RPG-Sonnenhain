@@ -359,6 +359,8 @@ var shop_page := 0
 var quests: Array = []
 var borin_quests: Array = []
 var pip_loan_received := false
+var pip_loan_level := 0
+var pip_return_dialogue_index := 0
 var enemies: Array = []
 var drops: Array = []
 var effects: Array = []
@@ -4961,20 +4963,67 @@ func borin_quest_dialogue()->void:
 			next_req=int(BORIN_QUESTS[i]["req"]);break
 	message("Borin: Deine nächste Prüfung wartet ab Level %d." % next_req if next_req>0 else "Borin: Du hast alle drei Prüfungen gemeistert.")
 
+func pip_loan_item_index()->int:
+	for i in inventory.size():
+		if bool(inventory[i].get("loaned",false)):return i
+	return -1
+
+func pip_return_loan_weapon()->bool:
+	var index:=pip_loan_item_index()
+	if index<0:return false
+	var uid:=int(inventory[index].get("uid",-1))
+	if is_equipped_uid(uid):
+		if equipped_uid==uid:equipped_uid=-1
+		if equipped_armor_uid==uid:equipped_armor_uid=-1
+		if equipped_head_uid==uid:equipped_head_uid=-1
+		if equipped_ring_uid==uid:equipped_ring_uid=-1
+		if equipped_ring2_uid==uid:equipped_ring2_uid=-1
+		play_sound("unequip")
+	var item_name:=str(inventory[index].get("name","Leihwaffe"))
+	inventory.remove_at(index)
+	selected_item=-1
+	validate_equipment_slots()
+	pip_loan_received=false
+	pip_loan_level=0
+	message("Pip: Danke. %s ist wieder bei mir." % item_name)
+	play_sound("pickup")
+	save_game()
+	return true
+
 func pip_dialogue()->void:
 	if pip_loan_received:
-		message("Pip: Die Leihwaffe hast du schon. Bring sie gut durch deine ersten Kämpfe!")
+		if level>pip_loan_level:
+			var lines:Array[String]=[
+				"Pip: He, du bist stärker geworden! Zeit, dass meine Leihwaffe wieder zurückkommt.",
+				"Pip: Ein neues Level, hm? Dann hast du bewiesen, dass du allein klarkommst. Gib mir bitte die Leihwaffe zurück.",
+				"Pip: Borin sagt, Fortschritt macht selbstständig. Und selbstständig heißt: meine Waffe wieder her!",
+				"Pip: Sie hat dir gute Dienste geleistet. Jetzt brauche ich die Leihwaffe für den nächsten Anfänger.",
+				"Pip: Gratuliere zum Levelaufstieg! Feier später — zuerst hätte ich gern meine Leihwaffe zurück."
+			]
+			var line:=lines[pip_return_dialogue_index%lines.size()]
+			pip_return_dialogue_index=(pip_return_dialogue_index+1)%lines.size()
+			if pip_loan_item_index()<0:
+				message(line+" ... Moment, du hast sie gar nicht mehr dabei. Bring sie mir zurück, sobald du sie wiederfindest.")
+				save_game()
+				return
+			message(line)
+			# Rückgabe geschieht im selben Gespräch nach der Forderung.
+			pip_return_loan_weapon()
+			return
+		message("Pip: Die Leihwaffe hast du schon. Sammle erst etwas Erfahrung damit — nach deinem nächsten Level brauche ich sie zurück.")
 		return
 	var icon:=class_weapon_icon()
 	var weapon_names:=["Pips Leihschwert","Pips Leihstab","Pips Leihbogen"]
 	var loan:=make_item(weapon_names[class_id],icon,0,4,20,"",1)
 	loan["loaned"]=true
+	loan["locked"]=true
 	if not can_add_item(loan):
 		message("Pip: Mach einen Platz im Inventar frei, dann leihe ich dir deine Startwaffe.")
 		return
 	add_item(loan)
 	pip_loan_received=true
-	message("Pip: Für den Anfang leihe ich dir %s. Viel Glück!" % loan["name"])
+	pip_loan_level=level
+	message("Pip: Für den Anfang leihe ich dir %s. Nach deinem nächsten Level brauche ich sie zurück." % loan["name"])
 	play_sound("pickup");save_game()
 
 func quest_dialogue(npc_name: String) -> void:
@@ -5036,7 +5085,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5261,6 +5310,8 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		for i in mini(stored_borin_quests.size(),BORIN_QUESTS.size()):
 			if stored_borin_quests[i] is Dictionary: borin_quests[i]=stored_borin_quests[i]
 	pip_loan_received=bool(data.get("pip_loan_received",false))
+	pip_loan_level=maxi(0,int(data.get("pip_loan_level",level if pip_loan_received else 0)))
+	pip_return_dialogue_index=clampi(int(data.get("pip_return_dialogue_index",0)),0,4)
 	# Older multiplayer saves may contain completed boss quests but missing boss flags.
 	for q in mini(quests.size(),QUESTS.size()):
 		var target:int=int(QUESTS[q]["target"])
