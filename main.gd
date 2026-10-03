@@ -4980,7 +4980,7 @@ func draw_recovery_panel()->void:
 		text_at(sr.position+Vector2(12,52),str(save_slot_labels[slot-1]) if slot-1<save_slot_labels.size() else "LEER",12,Color("d8e6dc"))
 	if recovery_drag_index>=0 and recovery_drag_index<recovery_sources.size():
 		var mouse:=get_viewport().get_mouse_position()
-		ui_box(Rect2(mouse+Vector2(12,12),380,42),Color("627565",0.95))
+		ui_box(Rect2(mouse+Vector2(12,12),Vector2(380,42)),Color("627565",0.95))
 		text_at(mouse+Vector2(24,39),recovery_source_label(recovery_sources[recovery_drag_index]),11,Color("fff0ce"),HORIZONTAL_ALIGNMENT_LEFT,355)
 	if recovery_confirm and not recovery_pending.is_empty():
 		ui_box(Rect2(620,510,350,78),Color("5a4a3f"))
