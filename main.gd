@@ -341,6 +341,7 @@ var ranger_ultimate_speed_mult := 1.0
 var ranger_stealth_timer := 0.0
 var ranger_falcon_rune := false
 var robotics_overclock_timer := 0.0
+var arcane_resonance := 0
 const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
 var equipped_ring2_uid := -1
@@ -821,6 +822,7 @@ func _ready() -> void:
 		konflux.enter(self)
 
 func reset_class_skills() -> void:
+	arcane_resonance = 0
 	arcane_step_learned = false
 	class_mastery_unlocked = false
 	warrior_rage = 0.0
@@ -1182,6 +1184,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
 		"essence_magic_unstable":clampi(int(state.get("essence_magic_unstable",0)),0,4),
+		"essence_magic_element":clampi(int(state.get("essence_magic_element",0)),0,4),
 		"mage_rift_blink":bool(state.get("mage_rift_blink",false)) and clampi(int(state.get("class",0)),0,2)==1,
 		"ranger_falcon_rune":bool(state.get("ranger_falcon_rune",false)),
 		"race":clampi(int(state.get("race",0)),0,2),
@@ -3373,6 +3376,9 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 			enemy["falcon_mark"]=4.0
 	if float(enemy.get("marked", 0.0)) > 0.0:
 		amount = int(amount * 1.22)
+	if element!="":
+		var element_rank:=essence.rank(2,1) if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("essence_magic_element",0)),0,4)
+		amount=maxi(1,roundi(float(amount)*(1.0+0.05*element_rank)))
 	match element:
 		"feuer":
 			amount += 5
@@ -3480,7 +3486,15 @@ func use_ability(slot: int) -> void:
 	energy -= float(ability["cost"])
 	var rank: int = int(skill_levels[id])
 	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1))
-	var power := ability_cast_power(id,rank)
+	var power := maxi(1,roundi(float(ability_cast_power(id,rank))*essence.ability_power_mult()))
+	var resonance_rank:=essence.resonance_rank()
+	if resonance_rank>0:
+		if arcane_resonance>=4:
+			power=maxi(1,roundi(float(power)*[1.0,1.12,1.18,1.25,1.35][resonance_rank]))
+			arcane_resonance=0
+			effect(player_pos+Vector2(0,-58),"ARKANE RESONANZ",Color("d8c5ff"),0.8)
+		else:
+			arcane_resonance=mini(4,arcane_resonance+1)
 	var cast_pos := player_pos
 	var cast_dir := facing
 	if uses_server_world():
@@ -3555,26 +3569,26 @@ func use_ability(slot: int) -> void:
 			shield_timer=5.0;effect(player_pos,"ENERGIESCHILD",Color("8edcff"),0.8)
 		37:
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<185.0: damage_enemy(i,power+14,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+				if enemies[i]["pos"].distance_to(player_pos)<185.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+14)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"TESLAWELLE",Color("fff0a5"),0.9)
 		38:
 			robotics_overclock_timer=8.0;effect(player_pos,"ZIELMATRIX",Color("9de9ff"),0.8)
 		39:
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<175.0: enemies[i]["stun"]=maxf(float(enemies[i].get("stun",0.0)),1.8);damage_enemy(i,power,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+				if enemies[i]["pos"].distance_to(player_pos)<175.0*essence.aoe_radius_mult(): enemies[i]["stun"]=maxf(float(enemies[i].get("stun",0.0)),1.8);damage_enemy(i,roundi(power*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"EMP",Color("b7e9ff"),0.9)
 		40:
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<190.0: damage_enemy(i,power+30,(enemies[i]["pos"]-player_pos).normalized(),false,"feuer")
+				if enemies[i]["pos"].distance_to(player_pos)<190.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+30)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"feuer")
 			effect(player_pos,"FLAMMENWIRBEL",Color("ff9858"),1.0)
 		41:
 			shield_timer=7.0
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<150.0: damage_enemy(i,power+12,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+				if enemies[i]["pos"].distance_to(player_pos)<150.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+12)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"REAKTORWALL",Color("8fdcff"),1.0)
 		42:
 			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<230.0: damage_enemy(i,power+24,(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
+				if enemies[i]["pos"].distance_to(player_pos)<230.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+24)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"BLITZKERN",Color("fff0a5"),1.0)
 		15:
 			shield_timer = 5.0 + rank
@@ -3584,7 +3598,7 @@ func use_ability(slot: int) -> void:
 			effect(player_pos, ABILITIES[id]["name"], Color("ffdc8a"), 1.6)
 		24:
 			for wave in 3:
-				impact_zones.append({"pos":player_pos, "delay":0.25 + wave * 0.38, "radius":130.0 + wave * 95.0, "damage":power + 20, "element":["eis", "blitz", "gift"][wave], "kind":id})
+				impact_zones.append({"pos":player_pos, "delay":0.25 + wave * 0.38, "radius":(130.0 + wave * 95.0)*essence.aoe_radius_mult(), "damage":roundi((power + 20)*essence.aoe_damage_mult()), "element":["eis", "blitz", "gift"][wave], "kind":id})
 		33:
 			var agility:=primary_attribute()
 			ranger_ultimate_speed_timer=10.0+rank*2.0+agility*0.10
@@ -3607,16 +3621,16 @@ func use_ability(slot: int) -> void:
 					damage_enemy(i, int(power * 0.72) + 5, delta_pos.normalized(), true, "eis")
 		23:
 			for wave in 3:
-				impact_zones.append({"pos":player_pos, "delay":0.12 + wave * 0.22, "radius":110.0 + wave * 47.0, "damage":int(power * 0.47), "element":["eis", "blitz", "feuer"][wave], "kind":id})
+				impact_zones.append({"pos":player_pos, "delay":0.12 + wave * 0.22, "radius":(110.0 + wave * 47.0)*essence.aoe_radius_mult(), "damage":roundi(int(power * 0.47)*essence.aoe_damage_mult()), "element":["eis", "blitz", "feuer"][wave], "kind":id})
 		22, 31:
 			for wave in 4:
 				var point := player_pos + facing * (185.0 if id == 22 else 245.0) + Vector2.RIGHT.rotated(float(wave) * 2.0) * (30.0 + (wave % 2) * 65.0)
-				impact_zones.append({"pos":point, "delay":0.35 + wave * 0.25, "radius":105.0 if id == 22 else 85.0, "damage":power + (22 if id == 22 else 7), "element":"feuer" if id == 22 else "", "kind":id})
+				impact_zones.append({"pos":point, "delay":0.35 + wave * 0.25, "radius":(105.0 if id == 22 else 85.0)*essence.aoe_radius_mult(), "damage":roundi((power + (22 if id == 22 else 7))*essence.aoe_damage_mult()), "element":"feuer" if id == 22 else "", "kind":id})
 		19:
 			for i in range(enemies.size()-1,-1,-1):
 				var offset:Vector2=enemies[i]["pos"]-player_pos
-				if offset.length()<185.0+rank*10.0:
-					damage_enemy(i,int(power*0.82)+10,offset.normalized(),false,"blitz")
+				if offset.length()<(185.0+rank*10.0)*essence.aoe_radius_mult():
+					damage_enemy(i,roundi((int(power*0.82)+10)*essence.aoe_damage_mult()),offset.normalized(),false,"blitz")
 			effect(player_pos,"RISSNOVA",Color("c7b5ff"),0.9)
 		27:
 			var destination := player_pos - facing * (210 + (rank - 1) * 15)
@@ -9622,8 +9636,8 @@ func click_essence(mouse:Vector2)->void:
 
 func mage_unstable_explosion(pos:Vector2,rank:int,base_damage:int,element:String="",source_peer:int=0)->void:
 	rank=clampi(rank,1,4)
-	var radius:float=[0.0,70.0,82.0,94.0,108.0][rank]
-	var mult:float=[0.0,0.60,0.75,0.90,1.00][rank]
+	var radius:float=[0.0,70.0,82.0,94.0,108.0][rank]*essence.aoe_radius_mult()
+	var mult:float=[0.0,0.60,0.75,0.90,1.00][rank]*essence.aoe_damage_mult()
 	var damage:=maxi(1,roundi(float(base_damage)*mult))
 	for i in range(enemies.size()-1,-1,-1):
 		if i>=enemies.size():continue
@@ -11819,7 +11833,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
