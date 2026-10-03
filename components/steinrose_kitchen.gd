@@ -68,7 +68,7 @@ func learned_indices() -> Array[int]:
 	return result
 
 func visible_recipe_indices() -> Array[int]:
-	if tab==3:return learned_indices()
+	if tab==2:return learned_indices()
 	var result:Array[int]=[]
 	for i in RECIPES.size():result.append(i)
 	return result
@@ -148,8 +148,8 @@ func open(g) -> void:
 	g.queue_redraw()
 
 func set_tab(g,index:int)->void:
-	tab=clampi(index,0,3)
-	if tab==3 and not bool(learned[selected]):
+	tab=clampi(index,0,2)
+	if tab==2 and not bool(learned[selected]):
 		var known:=learned_indices()
 		if not known.is_empty():selected=known[0]
 	g.play_sound("menu")
@@ -157,8 +157,8 @@ func set_tab(g,index:int)->void:
 
 func keyboard_input(g,event:InputEvent)->bool:
 	if g.panel!="steinrose" or not (event is InputEventKey) or not event.pressed or event.echo:return false
-	if tab!=3:return false
-	var shown:=learned_indices()
+	if tab not in [0,2]:return false
+	var shown:=visible_recipe_indices()
 	if shown.is_empty():return false
 	var current:=shown.find(selected)
 	if current<0:current=0
@@ -167,17 +167,18 @@ func keyboard_input(g,event:InputEvent)->bool:
 	elif event.keycode==KEY_DOWN:
 		selected=shown[(current+1)%shown.size()]
 	elif event.keycode==KEY_ENTER or event.keycode==KEY_KP_ENTER:
-		cook(g,selected)
+		if tab==0:learn_recipe(g,selected)
+		else:cook(g,selected)
 	else:return false
 	g.play_sound("menu")
 	g.queue_redraw()
 	return true
 
 func click(g, mouse: Vector2) -> void:
-	for i in 4:
+	for i in 3:
 		if Rect2(165,170+i*48,220,40).has_point(mouse):
 			set_tab(g,i);return
-	if tab in [0,3]:
+	if tab in [0,2]:
 		var shown:=visible_recipe_indices()
 		for row_index in shown.size():
 			if Rect2(410,190+row_index*27,300,24).has_point(mouse):
@@ -185,7 +186,7 @@ func click(g, mouse: Vector2) -> void:
 				g.play_sound("menu");g.queue_redraw();return
 	if tab==0 and Rect2(410,548,180,38).has_point(mouse):
 		learn_recipe(g);return
-	if tab==3 and Rect2(610,548,180,38).has_point(mouse):
+	if tab==2 and Rect2(610,548,180,38).has_point(mouse):
 		cook(g);return
 	if Rect2(810,548,170,38).has_point(mouse) or Rect2(965,91,41,35).has_point(mouse):
 		g.panel="";g.queue_redraw()
@@ -298,20 +299,19 @@ func draw_cook_page(g) -> void:
 
 func draw(g) -> void:
 	g.text_at(Vector2(165,138),"ALMA · KUECHE DER STEINROSE",29,Color("ffe1a0"))
-	g.text_at(Vector2(165,160),"Besondere Beeren + 1 Kraut · Alma nimmt nur einen kleinen Aufwand",12,Color("b9cbc3"))
-	var labels:=["REZEPTE","BEEREN & VORRAT","WIRKUNGEN","KOCHEN"]
+	g.text_at(Vector2(165,160),"Alle Sonnenhain-Beeren bleiben in Almas Rezepten erhalten.",12,Color("b9cbc3"))
+	var labels:=["REZEPTE","BEEREN & VORRAT","KOCHEN"]
 	for i in labels.size():g.ui_button(Rect2(165,170+i*48,220,40),labels[i],true,tab==i)
 	g.ui_box(Rect2(165,380,220,150),Color("253b3d"))
 	g.text_at(Vector2(178,405),"Alma",17,Color("ffe2aa"))
 	g.text_at(Vector2(178,430),"Wirtin der Steinrose.",12,Color("d8e6dc"))
 	g.text_at(Vector2(178,452),"Bring mir deine Fruechte,",12,Color("d8e6dc"))
 	g.text_at(Vector2(178,470),"ich uebernehme den Rest.",12,Color("d8e6dc"))
-	g.text_at(Vector2(178,500),"Langzeitgerichte wirken 6 Minuten.",11,Color("aebfb9"))
+	g.text_at(Vector2(178,500),"Pfeil hoch/runter wechselt das Rezept.",11,Color("aebfb9"))
 	match tab:
 		0:draw_recipe_page(g)
 		1:draw_berries_page(g)
-		2:draw_effects_page(g)
-		3:draw_cook_page(g)
+		2:draw_cook_page(g)
 	if tab==0:g.ui_button(Rect2(410,548,180,38),"REZEPT LERNEN",not learned[selected])
-	if tab==3:g.ui_button(Rect2(610,548,180,38),"KOCHEN",can_cook(g))
+	if tab==2:g.ui_button(Rect2(610,548,180,38),"KOCHEN",can_cook(g))
 	g.ui_button(Rect2(810,548,170,38),"SCHLIESSEN")
