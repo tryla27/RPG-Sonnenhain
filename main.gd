@@ -55,7 +55,6 @@ var boss_attack_sound_seen:Dictionary={}
 var boss_death_end_queue:Array=[]
 var boss_music_hold_timer:=0.0
 var boss_music_hold_theme:=""
-const INVENTORY_HUD_RECT:=Rect2(112,610,82,26)
 const QUEST_HUD_RECT:=Rect2(10,118,348,46)
 
 func hud_action_rect(index:int)->Rect2:
@@ -2884,6 +2883,9 @@ func open_mobile_chat() -> void:
 	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		var hud_hovered:=panel=="" and (hud_action_at(event.position)!="" or QUEST_HUD_RECT.has_point(event.position))
+		Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if hud_hovered else Input.CURSOR_ARROW)
 	if server_save.loading: return
 	if world_builder.active and world_builder.input(self,event):return
 	if controller.handle(self, event): return
