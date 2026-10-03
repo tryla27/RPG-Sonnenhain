@@ -15,7 +15,7 @@ const PROPERTY_PADS := [
 	Rect2(128,1536,320,352),
 	Rect2(128,2016,352,320),
 	Rect2(1216,288,352,352),
-	Rect2(1248,1056,320,352),
+	Rect2(1248,1056,288,352),
 	Rect2(1088,1872,448,352)
 ]
 # Exact live exits: east -> meadow, south -> coast. Do not snap gate coordinates.
