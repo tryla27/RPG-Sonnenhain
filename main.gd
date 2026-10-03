@@ -185,9 +185,10 @@ const CLASS_ULTIMATES := [15, 24, 33]
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
 const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200},{"id":41,"a":1,"b":36,"gold":2200},{"id":42,"a":18,"b":37,"gold":4200}]
-const BORIN_HOUSE_POS := Vector2(1330,230)
-const BORIN_MAGIC_TREE_POS := Vector2(1620,520)
-const BORIN_CRYSTAL_POS := Vector2(1608,700)
+const BORIN_HOUSE_POS := Vector2(1248,320)
+const BORIN_MAGIC_TREE_POS := Vector2(1552,544)
+const BORIN_CRYSTAL_POS := Vector2(1512,736)
+const WORLD_CHARACTER_SCALE := 0.84
 const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14300,1200)] # Map 06 / 07 / 08
 const CLASS_BOSS_ARENA_RADIUS := 410.0
 const CLASS_BOSS_ARENA_CLEAR_RADIUS := 475.0
@@ -230,14 +231,14 @@ const BORIN_QUESTS := [
 	{"title":"Borins letzte Lehre","req":39,"target":25,"count":10,"skill_points":3,"item_rarity":3,"item_power":58}
 ]
 const NPCS := [
-	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1476, 1550), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1458, 470), "color":Color("6783bd"), "kind":"quest"},
-	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1476, 1550), "color":Color("6bbba4"), "kind":"quest"},
-	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(276, 2030), "color":Color("ab6e60"), "kind":"smith"},
-	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(276, 1000), "color":Color("c080aa"), "kind":"stylist"},
-	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1126, 480), "color":Color("9f8bcc"), "kind":"apprentice"},
-	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(546, 1400), "color":Color("e2bc91"), "kind":"healer_alchemy"},
-	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1412, 2120), "color":Color("a48cbd"), "kind":"arena"}
+	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1376, 1268), "color":Color("a77ccb"), "kind":"quest"},
+	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1376, 560), "color":Color("6783bd"), "kind":"quest"},
+	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1376, 1268), "color":Color("6bbba4"), "kind":"quest"},
+	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(256, 2228), "color":Color("ab6e60"), "kind":"smith"},
+	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(256, 820), "color":Color("c080aa"), "kind":"stylist"},
+	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1376, 560), "color":Color("9f8bcc"), "kind":"apprentice"},
+	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(256, 1300), "color":Color("e2bc91"), "kind":"healer_alchemy"},
+	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1312, 2164), "color":Color("a48cbd"), "kind":"arena"}
 ]
 const SHOPS := {
 	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
@@ -253,7 +254,7 @@ const DUNGEON_CENTER := Vector2(8000, 4800)
 const DUNGEON_ENTRANCES := [2, 3, 8]
 const DUNGEON_NAMES := ["Turmgewölbe", "Kristallgruft", "Versunkene Krypta"]
 const DUNGEON_ENEMIES := [[4, 5], [6, 7], [21, 22]]
-const TAVERN_HOUSE := Vector2(560, 1420)
+const TAVERN_HOUSE := Vector2(160, 1568)
 const VILLAGE_REF_ORIGIN := Vector2(0, 550)
 const VILLAGE_REF_RECT := Rect2(0, 550, 1672, 840)
 const VILLAGE_REF_SOLIDS := [Rect2(-40, 548, 1752, 112), Rect2(15, 805, 310, 140), Rect2(305, 1025, 310, 145), Rect2(1295, 1015, 365, 145), Rect2(12, 1012, 95, 95), Rect2(325, 825, 345, 30), Rect2(995, 825, 350, 30), Rect2(890, 870, 105, 45), Rect2(1625, 950, 50, 250)]
@@ -6734,7 +6735,7 @@ func npc_sprite_row(kind: String, name: String) -> int:
 		_: return 11
 
 func draw_npc_sprite(p: Vector2, kind: String, name: String) -> void:
-	ReferenceScenery.person(self,p,npc_sprite_row(kind,name),0,1 if name in ["Mira","Liora","Fenna","Elara"] else 0,Vector2.DOWN,0.0,1.0,-camera_pos)
+	ReferenceScenery.person(self,p,npc_sprite_row(kind,name),0,1 if name in ["Mira","Liora","Fenna","Elara"] else 0,Vector2.DOWN,0.0,WORLD_CHARACTER_SCALE,-camera_pos)
 
 func draw_weapon_world(p: Vector2, family: int, design: int, look: Vector2, scale_factor: float = 1.0, attack_progress: float = -1.0) -> void:
 	# Keep small polygons near zero: triangulation loses precision at 80k.
@@ -8161,7 +8162,7 @@ func draw_player() -> void:
 		draw_line(dodge_start+Vector2(0,10),player_pos+Vector2(0,10),Color("a491e4",0.3),18)
 		for ring in 2:
 			draw_arc(player_pos+Vector2(0,10),25+ring*13,progress*TAU+ring*PI,progress*TAU+ring*PI+PI,16,Color("d9caff",0.8),3)
-	draw_hero(player_pos, 1.0, is_walking, facing, true)
+	draw_hero(player_pos, WORLD_CHARACTER_SCALE, is_walking, facing, true)
 	if swing_timer > 0 and class_id == 0:
 		var swing_progress := clampf(1.0 - swing_timer / maxf(0.01, swing_duration), 0.0, 1.0)
 		var arc_angle := facing.angle() - 0.88 + swing_progress * 1.76
@@ -11073,8 +11074,8 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		draw_circle(rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
 		draw_arc(rp + Vector2(0, 10), 30.0, 0.0, TAU, 24, Color("8ee7ff", 0.82), 2.0)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
-		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, 1.0, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)))
-		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5), cls, clampi(int(state.get("weapon",0)),0,11), rdir, 1.0)
+		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, WORLD_CHARACTER_SCALE, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)))
+		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5*WORLD_CHARACTER_SCALE), cls, clampi(int(state.get("weapon",0)),0,11), rdir, WORLD_CHARACTER_SCALE)
 		combat_feedback.health(self,"peer:%d"%int(peer_id),rp+Vector2(0,-43),float(state.get("hp",1)),float(state.get("max_hp",1)),60,Color("79caa3"))
 		var party_peer_ids := local_party_peer_ids()
 		var name_color := Color("ffe0a1") if int(peer_id) in party_peer_ids else Color("bfe7ff")
