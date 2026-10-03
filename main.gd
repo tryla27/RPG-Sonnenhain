@@ -2403,7 +2403,7 @@ func class_boss_arena_index_at(p:Vector2,extra:float=0.0) -> int:
 
 func class_boss_arena_walkable(p:Vector2,radius:float=0.0) -> bool:
 	var index:=class_boss_arena_index_at(p,0.0)
-	if index<0:return ""
+	if index<0:return false
 	var center:Vector2=CLASS_BOSS_SITES[index]
 	if p.distance_to(center)>CLASS_BOSS_ARENA_RADIUS-radius:return false
 	if region_at(p)!=6+index:return false
@@ -5043,7 +5043,7 @@ func pip_loan_item_index()->int:
 
 func pip_return_loan_weapon()->String:
 	var index:=pip_loan_item_index()
-	if index<0:return false
+	if index<0:return ""
 	var uid:=int(inventory[index].get("uid",-1))
 	if is_equipped_uid(uid):
 		if equipped_uid==uid:equipped_uid=-1
@@ -9773,7 +9773,7 @@ func draw_essence_panel() -> void:
 	for tree in EssenceSystem.TREE_COUNT:
 		var x:=165+tree*162
 		ui_button(Rect2(x,148,152,36),EssenceSystem.TREE_NAMES[tree],true,essence.selected_tree==tree)
-	var selected:=essence.selected_tree
+	var selected:int=essence.selected_tree
 	text_at(Vector2(165,214),"%s · Ursprung: %s · %d/%d" % [EssenceSystem.TREE_NAMES[selected],EssenceSystem.TREE_ORIGINS[selected],essence.tree_spent(selected),EssenceSystem.TREE_CAP],16,Color("ffe2aa"))
 	for talent in EssenceSystem.TALENTS_PER_TREE:
 		var info:Dictionary=EssenceSystem.TALENTS[selected][talent]
@@ -9981,8 +9981,8 @@ func draw_inventory_panel() -> void:
 		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 42)), Color("27343a") if is_locked else Color("16344b"))
 		if i < inventory.size():
 			var item: Dictionary = inventory[i]
-			var rarity_color:=RARITY_COLORS[int(item["rarity"])]
-			var display_color:=Color("7d8582") if is_locked else rarity_color
+			var rarity_color:Color=RARITY_COLORS[int(item["rarity"])]
+			var display_color:Color=Color("7d8582") if is_locked else rarity_color
 			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(48, 4)), display_color)
 			draw_item_icon(pos + Vector2(11, 9), String(item["icon"]), display_color, 0.88, weapon_visual_stage(item), item_design(item))
 			draw_item_signature(pos + Vector2(11, 9), item)
