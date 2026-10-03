@@ -11809,8 +11809,17 @@ func item_icon_for_uid(uid: int) -> String:
 			return str(item.get("icon",""))
 	return ""
 
+func equipped_head_allowed() -> bool:
+	if equipped_head_uid < 0: return true
+	for item in inventory:
+		if int(item.get("uid",-1)) != equipped_head_uid: continue
+		if str(item.get("icon","")) != "head": return false
+		# Boss-Kopfrüstungen sind Trophäen und dürfen klassenübergreifend getragen werden.
+		return bool(item.get("boss_hat",false)) or int(item.get("head_class",-1)) == class_id
+	return false
+
 func validate_equipment_slots() -> void:
-	if head_visual()!=class_id:equipped_head_uid=-1
+	if not equipped_head_allowed():equipped_head_uid=-1
 	var weapon_icon := item_icon_for_uid(equipped_uid)
 	if equipped_uid >= 0 and (weapon_icon == "" or weapon_icon != class_weapon_icon()):
 		equipped_uid = -1
@@ -11849,7 +11858,7 @@ func toggle_equipment_item(index: int) -> bool:
 	var uid := int(item.get("uid",-1))
 	var icon := str(item.get("icon",""))
 	if icon=="head":
-		if int(item.get("head_class",-1))!=class_id:
+		if not bool(item.get("boss_hat",false)) and int(item.get("head_class",-1))!=class_id:
 			message("Diese Kopfbedeckung gehört einer anderen Klasse.")
 			return true
 		var removing:=equipped_head_uid==uid
