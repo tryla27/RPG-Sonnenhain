@@ -218,11 +218,28 @@ func input(g,event:InputEvent)->bool:
 		g.queue_redraw();return true
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
-			KEY_ESCAPE: active=false;g.panel="settings";return true
-			KEY_Z: if event.ctrl_pressed:undo();return true
-			KEY_Y: if event.ctrl_pressed:redo();return true
-			KEY_LEFT:camera_cell.x=maxi(0,camera_cell.x-4);return true
-			KEY_RIGHT:camera_cell.x+=4;return true
-			KEY_UP:camera_cell.y=maxi(0,camera_cell.y-4);return true
-			KEY_DOWN:camera_cell.y+=4;return true
+			KEY_ESCAPE:
+				active=false
+				g.panel="settings"
+				return true
+			KEY_Z:
+				if event.ctrl_pressed:
+					undo()
+					return true
+			KEY_Y:
+				if event.ctrl_pressed:
+					redo()
+					return true
+			KEY_LEFT:
+				camera_cell.x=maxi(0,camera_cell.x-4)
+				return true
+			KEY_RIGHT:
+				camera_cell.x+=4
+				return true
+			KEY_UP:
+				camera_cell.y=maxi(0,camera_cell.y-4)
+				return true
+			KEY_DOWN:
+				camera_cell.y+=4
+				return true
 	return false
