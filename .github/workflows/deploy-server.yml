@@ -39,6 +39,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Stamp production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          short="${GITHUB_SHA:0:7}"
+          cat > components/build_info.gd <<EOF
+          extends RefCounted
+          const COMMIT="${GITHUB_SHA}"
+          const SHORT="${short}"
+          EOF
+
       - name: Install Godot and templates
         shell: bash
         run: |
