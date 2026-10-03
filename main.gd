@@ -182,14 +182,15 @@ const ABILITIES := [
 	{"name":"EMP-Stoß", "desc":"Betäubt Gegner im Umkreis", "cost":42, "cd":18.0, "req":23, "kind":39},
 	{"name":"Flammenwirbel", "desc":"Fusion aus Wirbelhieb und Feuerball", "cost":42, "cd":12.0, "req":15, "kind":40},
 	{"name":"Reaktorwall", "desc":"Fusion aus Schildwall und Energieschild", "cost":38, "cd":20.0, "req":15, "kind":41},
-	{"name":"Blitzkern", "desc":"Fusion aus Blitzlanze und Teslawelle", "cost":48, "cd":16.0, "req":23, "kind":42}
+	{"name":"Blitzkern", "desc":"Fusion aus Blitzlanze und Teslawelle", "cost":48, "cd":16.0, "req":23, "kind":42},
+	{"name":"Eisball", "desc":"Fusion aus Frostnova und Blitzlanze · 4 Entwicklungsstufen", "cost":40, "cd":10.0, "req":12, "kind":43}
 ]
 const CLASS_NAMES := ["Krieger", "Magier", "Bogenschütze"]
 const CLASS_SKILLS := [[0, 1, 2, 3, 5, 7, 12, 13, 14], [16, 17, 18, 19, 20, 21, 22, 23], [25, 26, 27, 28, 29, 30, 31, 32]]
 const CLASS_ULTIMATES := [15, 24, 33]
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
-const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200},{"id":41,"a":1,"b":36,"gold":2200},{"id":42,"a":18,"b":37,"gold":4200}]
+const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200,"max_rank":4},{"id":41,"a":1,"b":36,"gold":2200,"max_rank":4},{"id":42,"a":18,"b":37,"gold":4200,"max_rank":4},{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}]
 const BORIN_HOUSE_POS := Vector2(1248,320)
 const BORIN_MAGIC_TREE_POS := Vector2(1552,544)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
@@ -3447,7 +3448,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
-	if id in [3,7,16,18,20,25,26,28,29,30]:
+	if id in [3,7,16,18,20,25,26,28,29,30,43]:
 		for shot in ability_projectiles(id,origin,dir,remote_class,power):
 			shot["owner_peer"]=sender
 			projectiles.append(shot)
@@ -3599,6 +3600,8 @@ func use_ability(slot: int) -> void:
 			for i in range(enemies.size()-1,-1,-1):
 				if enemies[i]["pos"].distance_to(player_pos)<230.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+24)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"BLITZKERN",Color("fff0a5"),1.0)
+		43:
+			projectiles.append({"pos":player_pos,"dir":facing,"speed":535.0,"life":1.45,"damage":power+18,"kind":2,"element":"eis","spell_id":43,"fusion_rank":rank,"pierce":false,"hits":[],"trail":[]})
 		15:
 			shield_timer = 5.0 + rank
 			for i in range(enemies.size() - 1, -1, -1):
@@ -3699,6 +3702,7 @@ func update_projectiles(delta: float) -> void:
 					28: create_poison_cloud(impact, int(p["damage"]))
 					29: frost_burst(impact, int(p["damage"] * 0.32), uid)
 					30: chain_spell(impact, int(p["damage"] * 0.55), uid, 2)
+					43: iceball_impact(impact,int(p["damage"]),uid,clampi(int(p.get("fusion_rank",1)),1,4))
 					18: spell_visuals.append({"kind":18, "pos":impact, "end":impact, "dir":p["dir"], "rank":1, "life":0.28, "max":0.28})
 				if not bool(p.get("pierce", false)):
 					if spell_id == 16: explode_fireball(p)
@@ -3722,6 +3726,33 @@ func update_poison_clouds(delta: float) -> void:
 		for e in range(enemies.size() - 1, -1, -1):
 			if cloud["pos"].distance_to(enemies[e]["pos"]) < 86:
 				damage_enemy(e, int(cloud["damage"]), Vector2.ZERO, false, "gift")
+
+func iceball_impact(center:Vector2,damage:int,main_uid:int,rank:int)->void:
+	rank=clampi(rank,1,4)
+	for enemy in enemies:
+		if int(enemy.get("uid",-1))==main_uid:
+			enemy["slow"]=maxf(float(enemy.get("slow",0.0)),3.0+rank*0.5)
+			break
+	if rank>=2:
+		chain_spell(center,maxi(3,roundi(damage*0.42)),main_uid,2)
+	if rank>=3:
+		for enemy in enemies:
+			if int(enemy.get("uid",-1))==main_uid:
+				enemy["stun"]=maxf(float(enemy.get("stun",0.0)),1.15)
+				effect(enemy["pos"]+Vector2(0,-50),"BLITZSTUN",Color("fff0a5"),0.75)
+				break
+	if rank>=4:
+		for i in range(enemies.size()-1,-1,-1):
+			if i>=enemies.size():continue
+			var delta:Vector2=center-enemies[i]["pos"]
+			var distance:=delta.length()
+			if distance>118.0 or distance<1.0:continue
+			move_enemy_with_collision(enemies[i],delta.normalized()*minf(34.0,distance*0.28))
+			damage_enemy(i,maxi(2,roundi(damage*0.18)),Vector2.ZERO,false,"eis")
+		spell_visuals.append({"kind":23,"pos":center,"end":center,"dir":Vector2.RIGHT,"rank":4,"life":0.8,"max":0.8})
+		effect(center+Vector2(0,-42),"EISWIRBEL",Color("b8eaff"),0.8)
+	else:
+		spell_visuals.append({"kind":17,"pos":center,"end":center,"dir":Vector2.RIGHT,"rank":rank,"life":0.5,"max":0.5})
 
 func frost_burst(center: Vector2, damage: int, main_uid: int) -> void:
 	for e in range(enemies.size() - 1, -1, -1):
@@ -5980,24 +6011,16 @@ func fusion_source_skills()->Array:
 	return out
 
 func available_fusions()->Array:
-	var sources:=fusion_source_skills()
-	var free_outputs:Array=[]
+	var offers:Array=[]
 	for fusion in FUSIONS:
 		var output:=int(fusion["id"])
-		if output<learned.size() and not learned[output]:free_outputs.append(fusion)
-	var offers:Array=[]
-	if sources.size()<2:return offers
-	var pair_index:=0
-	for template in free_outputs:
-		if pair_index+1>=sources.size():pair_index=0
-		var a:=int(sources[pair_index])
-		var b:=int(sources[(pair_index+1)%sources.size()])
-		if a==b:break
-		var offer:Dictionary=template.duplicate(true)
-		offer["a"]=a;offer["b"]=b
-		offers.append(offer)
-		pair_index+=2
-		if offers.size()>=3:break
+		var source_a:=int(fusion["a"])
+		var source_b:=int(fusion["b"])
+		var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
+		if output>=learned.size() or source_a>=learned.size() or source_b>=learned.size():continue
+		if not learned[source_a] or not learned[source_b]:continue
+		if learned[output] and int(skill_levels[output])>=max_rank:continue
+		offers.append(fusion.duplicate(true))
 	return offers
 
 func fusion_skill_cost(fusion:Dictionary) -> int:
@@ -6006,7 +6029,8 @@ func fusion_skill_cost(fusion:Dictionary) -> int:
 
 func can_fuse(fusion:Dictionary) -> bool:
 	var a:=int(fusion["a"]);var b:=int(fusion["b"]);var id:=int(fusion["id"])
-	return a!=b and not learned[id] and learned[a] and learned[b] and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
+	var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
+	return a!=b and learned[a] and learned[b] and int(skill_levels[id])<max_rank and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
 
 func buy_fusion(index:int) -> bool:
 	var offers:=available_fusions()
@@ -6031,7 +6055,7 @@ func buy_fusion(index:int) -> bool:
 	skill_levels[a]=maxi(1,int(skill_levels[a]))
 	skill_levels[b]=maxi(1,int(skill_levels[b]))
 	learned[id]=true
-	skill_levels[id]=maxi(1,int(skill_levels[id]))
+	skill_levels[id]=clampi(int(skill_levels[id])+1,1,clampi(int(fusion.get("max_rank",4)),1,4))
 
 	if not learned[id] or not learned[a] or not learned[b]:
 		learned=learned_before
@@ -6043,8 +6067,8 @@ func buy_fusion(index:int) -> bool:
 		return false
 
 	gold-=price
-	fusion_history.append({"id":id,"a":a,"b":b,"gold":price,"at":int(Time.get_unix_time_from_system())})
-	message("%s + %s → %s · -%d Gold · Ausgangsattacken bleiben erhalten" % [ABILITIES[a]["name"],ABILITIES[b]["name"],ABILITIES[id]["name"],price])
+	fusion_history.append({"id":id,"a":a,"b":b,"rank":int(skill_levels[id]),"gold":price,"at":int(Time.get_unix_time_from_system())})
+	message("%s + %s → %s · STUFE %d/4 · -%d Gold · Ausgangsattacken bleiben erhalten" % [ABILITIES[a]["name"],ABILITIES[b]["name"],ABILITIES[id]["name"],int(skill_levels[id]),price])
 	save_game()
 	return true
 
@@ -9888,7 +9912,7 @@ func draw_fusion_panel() -> void:
 		text_at(Vector2(185,225),"Lerne mindestens zwei aktive Attacken. Bereits erschaffene Fusionen bleiben erhalten.",15,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,760)
 	for i in offers.size():
 		var f:Dictionary=offers[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
-		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Gold · Quellen bleiben gelernt" % int(f["gold"]),13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),"VERSCHMELZEN" if can_fuse(f) else "GESPERRT",can_fuse(f))
+		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Gold · Stufe %d/4 · Quellen bleiben gelernt" % [int(f["gold"]),int(skill_levels[id])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),("VERSTÄRKEN" if learned[id] else "VERSCHMELZEN") if can_fuse(f) else "GESPERRT",can_fuse(f))
 
 func click_fusion(mouse:Vector2) -> void:
 	var offers:=available_fusions()
@@ -12515,9 +12539,9 @@ func ability_projectiles(id:int,origin:Vector2,dir:Vector2,cls:int,power:int)->A
 	var result:Array=[]
 	var count:int=3 if id in [7,20,26] else 1
 	for n in count:
-		var speed:float=650 if id==3 else (700 if id==7 else (920 if id in [18,25] else (390 if id==20 else (570 if id in [16,29] else 720))))
+		var speed:float=535 if id==43 else (650 if id==3 else (700 if id==7 else (920 if id in [18,25] else (390 if id==20 else (570 if id in [16,29] else 720)))))
 		var damage:int=power+15 if id==3 else (power+10 if id==7 else int(power*(.72 if id in [20,26] else (.68 if id==16 else 1.0)))+(22 if id in [18,25] else 7))
-		result.append({"pos":origin,"dir":dir.rotated((n-(count-1)*.5)*.24),"speed":speed,"life":.9 if id==3 else (.8 if id==7 else (1.65 if id==20 else 1.25)),"damage":damage,"kind":0 if id==3 else (1 if id==7 else (3 if cls==2 else 2)),"element":"gift" if id==28 else ("eis" if id==29 else ("blitz" if id in [18,30] else ("feuer" if id==16 else ""))),"spell_id":id,"pierce":id in [3,18,25],"hits":[],"trail":[]})
+		result.append({"pos":origin,"dir":dir.rotated((n-(count-1)*.5)*.24),"speed":speed,"life":.9 if id==3 else (.8 if id==7 else (1.65 if id==20 else 1.25)),"damage":damage,"kind":0 if id==3 else (1 if id==7 else (3 if cls==2 else 2)),"element":"gift" if id==28 else ("eis" if id in [29,43] else ("blitz" if id in [18,30] else ("feuer" if id==16 else ""))),"spell_id":id,"pierce":id in [3,18,25],"hits":[],"trail":[]})
 	return result
 
 func steer_homing_shot(shot:Dictionary,delta:float)->void:
