@@ -122,6 +122,21 @@ func run():
 	assert(g.level>before_level)
 	assert(g.test_level_lock==0)
 
+	# Save repair workshop applies only explicitly marked repair fields.
+	g.level=7;g.xp=345;g.gold=120;g.skill_points=4
+	g.player_pos=Vector2(1200,1200)
+	g.waystone_unlocked=[true,false,false,false,false,false,false,false,false,false,false,false]
+	g.begin_repair_session()
+	assert(int(g.repair_targets["level"])==7 and int(g.repair_targets["xp"])==345)
+	g.adjust_repair_value("level",5,1,40)
+	g.adjust_repair_value("gold",880,0,99999999)
+	g.level=39;g.xp=999999;g.gold=50000;g.skill_points=60 # simulate unrelated creative changes
+	g.level=7;g.xp=345;g.gold=120;g.skill_points=4 # simulate reloaded normal save before patch
+	g.apply_repair_patch()
+	assert(g.level==12)
+	assert(g.gold==1000)
+	assert(g.xp==345 and g.skill_points==4)
+
 	# Bosses have long pursuit ranges compared with ordinary mobs.
 	for boss_type in [12,13,14]:
 		var p:=MobCombat.profile(boss_type,g.ENEMY_TYPES[boss_type],40,int(g.ENEMY_TYPES[boss_type]["damage"]))
@@ -139,6 +154,6 @@ func run():
 	assert(kitchen.keyboard_input(fake,up))
 	assert(kitchen.selected==0)
 
-	print("GAMEPLAY_STABILITY_OK inventory lock/drop/sort; warrior crit; test level+xp carryover; boss loot; falcon rune; auto waystone; dungeon loop reset; fusion gate; boss leash; kitchen keys")
+	print("GAMEPLAY_STABILITY_OK inventory lock/drop/sort; warrior crit; transactional save repair; boss loot; falcon rune; auto waystone; dungeon loop reset; fusion gate; boss leash; kitchen keys")
 	g.free()
 	quit()
