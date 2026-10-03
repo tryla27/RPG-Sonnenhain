@@ -568,6 +568,10 @@ const FoodSystem = preload("res://components/food_system.gd")
 var food_system = FoodSystem.new()
 const SteinroseKitchen = preload("res://components/steinrose_kitchen.gd")
 var steinrose = SteinroseKitchen.new()
+const WorldBuilder = preload("res://components/world_builder.gd")
+var world_builder = WorldBuilder.new()
+const WorldFog = preload("res://components/world_fog.gd")
+var world_fog = WorldFog.new()
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -745,6 +749,7 @@ func _ready() -> void:
 		start_websocket_server()
 		return
 	font = ThemeDB.fallback_font
+	world_fog.configure(WORLD)
 	touch_enabled = detect_touch_capability()
 	mobile_performance_mode = touch_enabled and is_web_platform()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -1652,6 +1657,7 @@ func _process(delta: float) -> void:
 	if not dedicated_server_mode: food_system.tick(self,delta)
 	update_connection_health(delta)
 	server_save.update(self)
+	if not dedicated_server_mode and character_created:world_fog.update_from_game(self)
 	if not dedicated_server_mode: controller.update(self, delta)
 	if death_timer > 0.0:
 		death_timer = maxf(0.0,death_timer-delta)
@@ -2855,6 +2861,7 @@ func open_mobile_chat() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if server_save.loading: return
+	if world_builder.active and world_builder.input(self,event):return
 	if controller.handle(self, event): return
 	if event is InputEventMouseMotion: controller.used = false
 	if panel == "controller" and event is InputEventKey and event.pressed and event.keycode == KEY_DELETE and controller.awaiting != "":
@@ -4921,6 +4928,7 @@ func capture_save_data() -> Dictionary:
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
+	data["world_fog"] = world_fog.snapshot()
 	return data.duplicate(true)
 
 func save_game() -> void:
@@ -5010,6 +5018,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if not from_server and not creative_mode: server_save.restore(data)
 	food_system.restore(data.get("food_state",{}))
 	steinrose.restore(data.get("steinrose_state",{}))
+	world_fog.restore(data.get("world_fog",[]),WORLD)
 	var stored_recent: Variant = data.get("recent_players",[])
 	recent_players = stored_recent if stored_recent is Array else []
 	while recent_players.size() > 12: recent_players.pop_back()
@@ -5153,6 +5162,10 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	validate_equipment_slots()
 
 func handle_panel_click(mouse: Vector2) -> void:
+	if panel=="world_builder":
+		world_builder.click(self,mouse)
+		queue_redraw()
+		return
 	if panel == "steinrose":
 		steinrose.click(self,mouse)
 		return
@@ -5373,10 +5386,14 @@ func handle_panel_click(mouse: Vector2) -> void:
 				JavaScriptBridge.get_interface("window").location.assign("/")
 				return
 		elif creative_mode:
-			if Rect2(300,510,430,38).has_point(mouse):
+			if Rect2(300,510,280,38).has_point(mouse):
 				panel="repair";queue_redraw();return
-			if Rect2(742,510,200,38).has_point(mouse):
-				panel="travel"
+			if Rect2(590,510,170,38).has_point(mouse):
+				panel="travel";return
+			if Rect2(770,510,180,38).has_point(mouse):
+				world_builder.active=true
+				panel="world_builder"
+				queue_redraw();return
 		return
 	if panel == "controls":
 		if Rect2(965, 91, 41, 35).has_point(mouse):
@@ -8940,6 +8957,7 @@ func draw_panel() -> void:
 		"pause": draw_game_menu()
 		"settings": draw_pause_panel()
 		"repair": draw_repair_panel()
+		"world_builder": world_builder.draw(self)
 		"controls": draw_controls_panel()
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
@@ -9872,6 +9890,9 @@ func draw_world_atlas(rect: Rect2) -> void:
 		var available := region_available(region)
 		text_at(plaque.position + Vector2(3, 18), region_name(region), 12 if region in [0, 6] else 13, Color("fff0cf"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
 		text_at(plaque.position + Vector2(3, 36), "EMPF. LV %d · %s" % [region_level(region), "OFFEN" if available else "BOSS-GESPERRT"], 10, Color("f6d48f") if available else Color("ffaca7"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
+	# Persistent Fog-of-War spans the complete WORLD grid, independent of region borders.
+	world_fog.draw_overlay(self,inset,map_scale)
+	world_fog.draw_live_party_vision(self,inset,map_scale)
 	for i in WAYSTONES.size():
 		var point: Vector2 = inset.position + WAYSTONES[i] * map_scale
 		draw_rect(Rect2(point - Vector2(4, 4), Vector2(8, 8)), Color("1d3540"))
