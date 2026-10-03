@@ -14,6 +14,7 @@ const NOTES=[
 ["Inventar", "Unverkäuflich markierte Items bleiben über Speichern/Login hinweg geschützt, werden nicht mit verkäuflichen Stapeln vermischt und im Inventar ausgegraut dargestellt."],
 ["Pip", "Pips Leihwaffe wird jetzt auf dem Ausleih-Level gespeichert. Nach dem nächsten Levelaufstieg fordert Pip sie mit fünf wechselnden Sprüchen zurück und nimmt ausschließlich sein eigenes Leih-Item."],
 ["Pip", "Wenn eine Rückgabe fällig ist, meldet sich Pip automatisch beim Ansprechen von Borin, da er direkt daneben steht; danach öffnet sich Borins Essenzlehre."],
+["Anmeldung", "Zu kurze Passwörter werden jetzt direkt im Formular rot markiert und mit Mindestlänge sowie aktuellem Zeichenstand angezeigt."],
 ["Fog of War", "Erkundung läuft über Regionsgrenzen hinweg; Gruppenmitglieder in derselben Weltinstanz teilen ihre Sicht."],
 ["Magier", "Risssprung auf Leertaste ersetzt Arkanen Schritt; Rissnova wird normaler Skill und Arkaner Sturm wird ab Level 40 freigeschaltet."],
 ["Menüs", "Login-Navigation per Tab/Shift+Tab; Spielmenü und Untermenüs erhalten konsistente Zurück-Navigation."],
