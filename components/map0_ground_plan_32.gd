@@ -36,7 +36,12 @@ const EAST_GATE:=Vector2(1780,1120)
 const SOUTH_GATE:=Vector2(875,2600)
 
 static func center(cell:Vector2i)->Vector2:
-	return Vector2(cell*TILE)+Vector2.ONE*16
+	# Edge cells are clipped by the non-multiple-of-32 Map-0 bounds.
+	# Use the center of the visible cell fragment so the final row/column
+	# remain inside BOUNDS instead of producing sample points outside the map.
+	var tile_rect:Rect2=Rect2(Vector2(cell*TILE),Vector2.ONE*TILE)
+	var clipped:Rect2=tile_rect.intersection(BOUNDS)
+	return clipped.get_center() if clipped.has_area() else tile_rect.get_center()
 
 static func chunk_id(cell:Vector2i)->String:
 	for id in CHUNK_ORDER:

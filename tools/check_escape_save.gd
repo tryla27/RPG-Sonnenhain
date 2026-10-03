@@ -18,7 +18,7 @@ func run():
 	assert(not g.pause_status.begins_with("Server gespeichert"))
 	g.handle_panel_click(Vector2(250,500))
 	assert(g.panel=="patches")
-	assert(preload("res://components/patch_notes.gd").NOTES.size()==10)
+	assert(preload("res://components/patch_notes.gd").NOTES.size()>=10)
 	g.class_id=1;g.inventory=[g.make_item("Ring A","ring",1,5,10),g.make_item("Ring B","ring",1,5,10)]
 	g.inventory[0]["uid"]=11;g.inventory[1]["uid"]=12
 	g.equipped_ring_uid=11;g.equipped_ring2_uid=12

@@ -14,6 +14,13 @@ func run():
 		g.inventory=[hat];g.toggle_equipment_item(0)
 		assert(g.head_visual()==cls and g.primary_attribute()>=22)
 		g.class_id=(cls+1)%3;g.validate_equipment_slots();assert(g.equipped_head_uid==-1)
+		# Boss-Kopfrüstungen sind Trophäen und bleiben für jede Klasse tragbar.
+		g.class_id=cls;g.inventory.clear();g.equipped_head_uid=-1
+		var boss_hat:Dictionary=g.class_boss_hat_item((cls+1)%3)
+		g.inventory=[boss_hat];g.toggle_equipment_item(0)
+		assert(g.equipped_head_uid==int(boss_hat["uid"]))
+		assert(g.head_visual()==int(boss_hat["head_class"]))
+		g.class_id=(cls+2)%3;g.validate_equipment_slots();assert(g.equipped_head_uid==int(boss_hat["uid"]))
 		g.class_id=cls
 		var found:Dictionary={}
 		for i in 1000:
@@ -40,5 +47,5 @@ func run():
 	g.creation_name="Test";g.creation_class_selected=false;g.panel="creation"
 	g.review_character_creation();assert(g.panel=="creation")
 	g.creation_class_selected=true;g.review_character_creation();assert(g.panel=="creation_review")
-	print("HEADGEAR_ARENA_CHOICES_OK class boosts; 15 weapons; chances; full-inventory stable roll; single reward; Borin direct purchase; creation guard")
+	print("HEADGEAR_ARENA_CHOICES_OK class heads stay class-bound; boss hats universal; 15 weapons; chances; full-inventory stable roll; single reward; Borin direct purchase; creation guard")
 	g.free();quit()

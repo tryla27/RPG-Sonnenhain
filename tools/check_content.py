@@ -13,6 +13,21 @@ func_names = re.findall(r'^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(', source, re.M)
 duplicates = sorted({name for name in func_names if func_names.count(name) > 1})
 assert not duplicates, f'duplicate functions: {duplicates}'
 
+# HUD navigation is intentionally outside the ESC menu: mouse and keyboard share
+# the same actions, while hovering the tracked quest reveals its live details.
+for token in [
+    'const QUEST_HUD_RECT:=Rect2(10,118,348,46)',
+    'var actions:Array=["skills","inventory","journal","map","mechanics","party","chat"]',
+    'var hud_action:=hud_action_at(event.position)',
+    'quest_guide.draw_hud_hover(self)',
+    'Input.CURSOR_POINTING_HAND if hud_hovered else Input.CURSOR_ARROW',
+]:
+    assert token in source, f'missing clickable HUD/quest-hover behavior: {token}'
+pause_menu = source.split('func draw_game_menu() -> void:', 1)[1].split('func draw_pause_panel() -> void:', 1)[0]
+for legacy_entry in ['"INVENTAR"', '"FÄHIGKEITEN"', '"QUESTBUCH"', '"WELTKARTE"']:
+    assert legacy_entry not in pause_menu, f'gameplay panel leaked back into ESC menu: {legacy_entry}'
+assert 'INVENTORY_HUD_RECT' not in source, 'legacy standalone inventory HUD button returned'
+
 def block(name):
     match = re.search(rf'^const {name} := \[', source, re.M)
     assert match, f'{name} missing'
@@ -49,7 +64,7 @@ assert len(re.findall(r'\"[^\"]+\"', block('DUNGEON_NAMES'))) == 3
 assert re.findall(r'\[(\d+), (\d+)\]', block('DUNGEON_ENEMIES')) == [('4', '5'), ('6', '7'), ('21', '22')]
 assert len(entries('PORTALS')) == 5
 assert len(re.findall(r'Vector2\(', block('WAYSTONES'))) == 12
-assert len(entries('ABILITIES')) == 43
+assert len(entries('ABILITIES')) == 44
 for connection in ['func enter_dungeon', 'func leave_dungeon', 'func dungeon_blocked', 'func draw_dungeon_world', 'func draw_dungeon_atmosphere', 'func draw_overworld_atmosphere', 'func draw_dungeon_minimap', 'func open_dungeon_chest', '"dungeon_chests_opened":dungeon_chests_opened']:
     assert connection in source, f'missing dungeon feature: {connection}'
 # The dense fog must be rendered before floating effects and the HUD.
@@ -86,8 +101,9 @@ for index in (1, 17, 26):
     assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":8, "kind":{index}\}}', source)
 for index in (2, 18, 27):
     assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":12, "kind":{index}\}}', source)
-for index in (15, 24, 33):
+for index in (15, 33):
     assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":20, "kind":{index}\}}', source)
+assert re.search(r'\{"name":"[^"]+"[^\n]+"req":40, "kind":24\}', source), 'mage ultimate must unlock at level 40'
 assert 'slots = [-1, -1, -1]' in source
 assert '"waystone_unlocked":waystone_unlocked' in source
 assert '"shop_stock":shop_stock' in source
@@ -152,7 +168,7 @@ for connection in ['func draw_region_tile', 'func draw_character_sprite', 'func 
 # Top-level function names must be unique.
 funcs = re.findall(r'^func\s+([A-Za-z0-9_]+)\s*\(', source, re.M)
 assert len(funcs) == len(set(funcs)), 'duplicate top-level function declaration'
-print('OK v27: 13 regions, 27 enemies, 25 quests, 34 skills, 3 dungeons, character creation, chat, co-op hooks, pixel-art atlases and audio')
+print('OK v27: 13 regions, 27 enemies, 25 quests, 44 abilities, 3 dungeons, character creation, chat, co-op hooks, pixel-art atlases and audio')
 
 # v27.2 mechanics/spawn regression checks
 assert 'func draw_mechanics_panel()' in source, 'missing mechanics overview panel'

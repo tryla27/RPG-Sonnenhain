@@ -18,7 +18,7 @@ static func sprite(c:CanvasItem,texture:Texture2D,source:Rect2,target:Rect2)->vo
 	c.draw_texture_rect_region(texture,target,source,Color.WHITE,false,true)
 static func house(c:CanvasItem,p:Vector2,kind:int=0)->void:
 	# Legacy API kept for callers outside Map 0, but village houses never use a full-house sprite.
-	var mapped:=["home","healer","innkeeper"][clampi(kind,0,2)]
+	var mapped:String=["home","healer","innkeeper"][clampi(kind,0,2)]
 	VillageHouseTiles32.paint(c,p,mapped)
 
 static func themed_house(c:CanvasItem,p:Vector2,kind:String)->void:

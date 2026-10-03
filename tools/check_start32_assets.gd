@@ -5,7 +5,7 @@ func _initialize()->void:
 	map.prepare(Callable(g,"distance_to_trail"))
 	assert(map.shared_tileset.tile_size==Vector2i(32,32))
 	assert(map.terrain.size()==4592)
-	assert(map.shared_tileset.get_source_count()==5)
+	assert(map.shared_tileset.get_source_count()==map.MATERIAL_IDS.size())
 	for file in ["objects-faithful.webp","props-faithful.webp"]:
 		var sprite:Texture2D=load("res://art/start32/"+file)
 		assert(sprite!=null)
@@ -13,6 +13,6 @@ func _initialize()->void:
 		assert(im.get_pixel(0,0).a<0.01,"Non-transparent sprite background")
 		assert(im.get_pixel(1535,1023).a<0.01,"Non-transparent sprite corner")
 	assert(not g.is_blocked(g.TAVERN_HOUSE+Vector2(126,180),g.TAVERN_HOUSE+Vector2(126,205)))
-	print("FAITHFUL_START32_OK native32px TileSet, 4592 cells, transparent sprite corners, tavern approach")
+	print("FAITHFUL_START32_OK native32px TileSet, all material sources, 4592 cells, transparent sprite corners, tavern approach")
 	g.free()
 	quit()

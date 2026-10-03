@@ -35,7 +35,7 @@ func run() -> void:
 
 	assert(g.normal_mob_count() == 264)
 	for region in range(1,13):
-		var count := g.server_region_normal_mob_count(region)
+		var count:int=g.server_region_normal_mob_count(region)
 		assert(count == 22)
 		for enemy in g.enemies:
 			if g.region_at(Vector2(enemy["pos"])) != region: continue
@@ -45,10 +45,10 @@ func run() -> void:
 		print("MULTIREGION_SPAWN_OK region=",region," count=",count)
 
 	# Inactive legacy and misplaced mobs must no longer block spawn capacity.
-	var legacy := g.make_enemy(0,g.region_rect(1).get_center())
+	var legacy:Dictionary=g.make_enemy(0,g.region_rect(1).get_center())
 	legacy["context"]="world"
 	legacy["instance_id"]="world"
-	var wrong := g.make_enemy(0,g.region_rect(2).get_center())
+	var wrong:Dictionary=g.make_enemy(0,g.region_rect(2).get_center())
 	wrong["context"]="world"
 	wrong["instance_id"]="world"
 	wrong["spawned_at_ms"]=Time.get_ticks_msec()
@@ -58,7 +58,7 @@ func run() -> void:
 	# Region 1 becomes inactive; region 2 remains active.
 	var filtered := {}
 	for id in g.remote_players.keys():
-		var pos := g.network_player_position(int(id))
+		var pos:Vector2=g.network_player_position(int(id))
 		if g.region_at(pos) != 1:
 			filtered[id] = g.remote_players[id]
 	g.remote_players = filtered
@@ -67,7 +67,7 @@ func run() -> void:
 	for enemy in g.enemies:
 		var type := int(enemy.get("type",-1))
 		if type in [12,13,14] or bool(enemy.get("small_guardian",false)) or bool(enemy.get("invasion",false)): continue
-		var region := g.region_at(Vector2(enemy["pos"]))
+		var region:int=g.region_at(Vector2(enemy["pos"]))
 		assert(int(g.ENEMY_TYPES[type]["region"]) == region)
 		if region == 1:
 			assert(enemy.has("spawned_at_ms"))
