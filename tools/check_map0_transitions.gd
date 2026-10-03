@@ -21,15 +21,20 @@ func _initialize():
 	for gate in game.VILLAGE_GATES:
 		var inside:Vector2=gate-Vector2(1,0) if gate.x==1780 else gate-Vector2(0,1)
 		var cell:=Vector2i(floori(inside.x/32),floori(inside.y/32))
-		assert(int(map.terrain[cell])==1,"Gate path must be grass")
+		assert(map.material_at(inside) in ["village_stone","earth_path"],"Gate path must use native road material")
+		assert(int(map.terrain[cell])>0,"Gate path must remain traversable")
 		assert(reached.has(cell),"Exit has no continuous path from spawn")
 	for home in game.house_positions():
-		var door:Vector2=home+Vector2(96,180)
-		if home==game.BORIN_HOUSE_POS: door=home+Vector2(128,240)
-		elif home==Vector2(1220,1860): door=home+Vector2(192,260)
+		var house:Dictionary={}
+		for candidate in game.VillageLayout.SHOPS:
+			if Vector2(candidate["house"])==Vector2(home):
+				house=candidate
+				break
+		assert(not house.is_empty(),"Missing village house metadata: "+str(home))
+		var door:Vector2=game.village_house_door(house)
 		var cell:=Vector2i(floori(door.x/32),floori(door.y/32))
 		assert(reached.has(cell),"Disconnected live house path: "+str(home))
 	assert(map.terrain.size()==56*82)
 	game.free()
-	print("MAP0_TRANSITIONS_OK unchanged exits, meadow/coast regions, continuous spawn routes and all live houses including Borin")
+	print("MAP0_TRANSITIONS_OK unchanged exits, native gate roads, continuous spawn routes and all live houses including Borin")
 	quit()
