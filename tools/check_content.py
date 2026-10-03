@@ -86,8 +86,9 @@ for index in (1, 17, 26):
     assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":8, "kind":{index}\}}', source)
 for index in (2, 18, 27):
     assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":12, "kind":{index}\}}', source)
-for index in (15, 24, 33):
+for index in (15, 33):
     assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":20, "kind":{index}\}}', source)
+assert re.search(r'\{"name":"[^"]+"[^\n]+"req":40, "kind":24\}', source), 'mage ultimate must unlock at level 40'
 assert 'slots = [-1, -1, -1]' in source
 assert '"waystone_unlocked":waystone_unlocked' in source
 assert '"shop_stock":shop_stock' in source
