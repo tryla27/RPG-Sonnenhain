@@ -454,6 +454,8 @@ var event_states: Array = []
 var event_progress: Array = []
 var creative_mode := false
 var test_level_lock := 0
+var repair_targets:Dictionary={}
+var repair_dirty:Dictionary={}
 var pause_status := "Das Spiel ist angehalten."
 var touch_enabled := false
 var mobile_performance_mode := false
@@ -5142,6 +5144,9 @@ func handle_panel_click(mouse: Vector2) -> void:
 	if panel == "controller":
 		controller.click(self, mouse)
 		return
+	if panel=="repair":
+		click_repair_panel(mouse)
+		return
 	if panel == "pause" and Rect2(860,319,130,42).has_point(mouse):
 		panel = "controller"
 		return
@@ -5353,12 +5358,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 				JavaScriptBridge.get_interface("window").location.assign("/")
 				return
 		elif creative_mode:
-			for index in 4:
-				if Rect2(300 + index * 113, 510, 105, 38).has_point(mouse):
-					set_creative_level(level + [-10, -1, 1, 10][index])
-					return
-			if Rect2(762, 510, 180, 38).has_point(mouse):
-				panel = "travel"
+			if Rect2(300,510,430,38).has_point(mouse):
+				panel="repair";queue_redraw();return
+			if Rect2(742,510,200,38).has_point(mouse):
+				panel="travel"
 		return
 	if panel == "controls":
 		if Rect2(965, 91, 41, 35).has_point(mouse):
@@ -5543,12 +5546,87 @@ func finish_intro() -> void:
 			rpc_player_presence.rpc_id(1, local_player_state())
 	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
 
-func apply_test_progress_to_normal(target_level:int,target_xp:int)->void:
+func begin_repair_session()->void:
+	repair_targets={
+		"level":level,
+		"xp":xp,
+		"gold":gold,
+		"skill_points":skill_points,
+		"position":[player_pos.x,player_pos.y],
+		"waystones":waystone_unlocked.duplicate(true)
+	}
+	repair_dirty.clear()
+
+func adjust_repair_value(key:String,delta:int,min_value:int,max_value:int)->void:
+	if not repair_targets.has(key):return
+	repair_targets[key]=clampi(int(repair_targets[key])+delta,min_value,max_value)
+	repair_dirty[key]=true
+	queue_redraw()
+
+func apply_repair_patch()->void:
+	if bool(repair_dirty.get("level",false)):level=clampi(int(repair_targets["level"]),1,40)
+	if bool(repair_dirty.get("xp",false)):xp=maxi(0,int(repair_targets["xp"]))
+	if bool(repair_dirty.get("gold",false)):gold=maxi(0,int(repair_targets["gold"]))
+	if bool(repair_dirty.get("skill_points",false)):skill_points=maxi(0,int(repair_targets["skill_points"]))
+	if bool(repair_dirty.get("waystones",false)):
+		waystone_unlocked=repair_targets["waystones"].duplicate(true)
+	if bool(repair_dirty.get("position",false)):
+		var p:Array=repair_targets["position"]
+		if p.size()>=2:player_pos=Vector2(float(p[0]),float(p[1])).clamp(Vector2(30,30),WORLD-Vector2(30,30))
 	test_level_lock=0
-	level=clampi(target_level,1,40)
-	xp=maxi(0,target_xp)
-	hp=max_hp()
-	energy=max_energy()
+	hp=max_hp();energy=max_energy()
+	mark_network_teleport()
+
+func draw_repair_panel()->void:
+	text_at(Vector2(190,135),"SPIELSTAND-REPARATUR",28,Color("ffe1a0"))
+	text_at(Vector2(190,170),"Nur bestätigte Werte werden in deinen normalen Spielstand geschrieben.",13,Color("d8e6dc"))
+	var rows:Array=[
+		["LEVEL","level",1,40,1,10],
+		["XP","xp",0,99999999,100,1000],
+		["GOLD","gold",0,99999999,100,1000],
+		["SKILLPUNKTE","skill_points",0,9999,1,10]
+	]
+	for i in rows.size():
+		var row:Array=rows[i];var y:=215+i*62
+		text_at(Vector2(205,y+27),str(row[0]),15,Color("ffe6b1"))
+		ui_button(Rect2(390,y,72,36),"-%d" % int(row[4]))
+		ui_button(Rect2(470,y,72,36),"-%d" % int(row[5]))
+		text_at(Vector2(555,y+26),str(repair_targets.get(str(row[1]),0)),17,Color("fff0ce"),HORIZONTAL_ALIGNMENT_CENTER,150)
+		ui_button(Rect2(715,y,72,36),"+%d" % int(row[4]))
+		ui_button(Rect2(795,y,72,36),"+%d" % int(row[5]))
+		if bool(repair_dirty.get(str(row[1]),false)):text_at(Vector2(885,y+25),"GEÄNDERT",10,Color("a9e0a1"))
+	ui_button(Rect2(205,470,260,38),"ALLE WEGSTEINE WIEDERHERSTELLEN")
+	ui_button(Rect2(480,470,220,38),"ZUM DORF SETZEN")
+	ui_button(Rect2(205,535,300,44),"ABBRECHEN")
+	ui_button(Rect2(535,535,400,44),"REPARATUR ÜBERNEHMEN & WEITERSPIELEN")
+	text_at(Vector2(205,520),"Testitems, Testgold und Testfortschritt werden nicht übernommen.",11,Color("c5d3ce"))
+
+func click_repair_panel(mouse:Vector2)->void:
+	var rows:Array=[
+		["level",1,40,1,10],
+		["xp",0,99999999,100,1000],
+		["gold",0,99999999,100,1000],
+		["skill_points",0,9999,1,10]
+	]
+	for i in rows.size():
+		var row:Array=rows[i];var y:=215+i*62
+		if Rect2(390,y,72,36).has_point(mouse):adjust_repair_value(str(row[0]),-int(row[3]),int(row[1]),int(row[2]));return
+		if Rect2(470,y,72,36).has_point(mouse):adjust_repair_value(str(row[0]),-int(row[4]),int(row[1]),int(row[2]));return
+		if Rect2(715,y,72,36).has_point(mouse):adjust_repair_value(str(row[0]),int(row[3]),int(row[1]),int(row[2]));return
+		if Rect2(795,y,72,36).has_point(mouse):adjust_repair_value(str(row[0]),int(row[4]),int(row[1]),int(row[2]));return
+	if Rect2(205,470,260,38).has_point(mouse):
+		repair_targets["waystones"]=[]
+		for i in waystone_unlocked.size():repair_targets["waystones"].append(true)
+		repair_dirty["waystones"]=true;queue_redraw();return
+	if Rect2(480,470,220,38).has_point(mouse):
+		repair_targets["position"]=[825.0,1020.0];repair_dirty["position"]=true;queue_redraw();return
+	if Rect2(205,535,300,44).has_point(mouse):
+		panel="settings";return
+	if Rect2(535,535,400,44).has_point(mouse):
+		toggle_creative_mode()
+		panel=""
+		message("Spielstand-Reparatur übernommen und gespeichert.")
+		return
 
 func toggle_creative_mode() -> void:
 	if not creative_mode:
@@ -5562,6 +5640,7 @@ func toggle_creative_mode() -> void:
 		copy.close()
 		creative_mode = true
 		load_game()
+		begin_repair_session()
 		test_level_lock = 0
 		gold = maxi(gold, 50000)
 		skill_points = maxi(skill_points, 60)
@@ -5569,8 +5648,6 @@ func toggle_creative_mode() -> void:
 		pause_status = "Testmodus aktiv · eigener Spielstand, alle Wege offen."
 		save_game()
 	else:
-		var carried_test_level:=clampi(level,1,40)
-		var carried_test_xp:=maxi(0,xp)
 		creative_mode = false
 		reset_class_skills()
 		for i in WORLD_EVENTS.size():
@@ -5579,7 +5656,7 @@ func toggle_creative_mode() -> void:
 		quests.clear()
 		for i in QUESTS.size(): quests.append({"state":0, "progress":0})
 		load_game()
-		apply_test_progress_to_normal(carried_test_level,carried_test_xp)
+		apply_repair_patch()
 		save_game()
 		enemies.clear()
 		drops.clear()
@@ -5597,7 +5674,8 @@ func toggle_creative_mode() -> void:
 		poison_blade_timer = 0.0
 		previous_region = region_at(player_pos)
 		camera_pos = (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW)
-		pause_status = "Normaler Spielstand wiederhergestellt · Level %d und %d XP übernommen." % [level,xp]
+		pause_status = "Normaler Spielstand repariert und auf Server-Speicherung vorgemerkt."
+		repair_targets.clear();repair_dirty.clear()
 
 func set_creative_level(target: int) -> void:
 	if not creative_mode: return
@@ -8818,6 +8896,7 @@ func draw_panel() -> void:
 		"patches": preload("res://components/patch_notes.gd").draw(self)
 		"pause": draw_game_menu()
 		"settings": draw_pause_panel()
+		"repair": draw_repair_panel()
 		"controls": draw_controls_panel()
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
@@ -9210,12 +9289,11 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
 		ui_button(Rect2(590, 480, 260, 38), "BACKUP IMPORT")
 	if creative_mode:
-		text_at(Vector2(302, 504), "LEVEL %d · %d XP · wird beim Verlassen übernommen" % [level, xp], 14, Color("fff0bd"))
-		for index in 4:
-			ui_button(Rect2(300 + index * 113, 510, 105, 38), ["-10", "-1", "+1", "+10"][index])
-		ui_button(Rect2(762, 510, 180, 38), "REISEN")
+		text_at(Vector2(302, 500), "TESTMODUS · Änderungen bleiben getrennt, bis du sie als Reparatur bestätigst.", 12, Color("fff0bd"))
+		ui_button(Rect2(300,510,430,38),"SPIELSTAND REPARIEREN")
+		ui_button(Rect2(742,510,200,38),"REISEN")
 	elif test_level_lock>0:
-		text_at(Vector2(302,504),"LEVEL %d FIXIERT · XP verändert das Level nicht." % test_level_lock,13,Color("ffd98a"))
+		text_at(Vector2(302,504),"ALTER LEVEL-LOCK AKTIV · wird beim nächsten XP-Gewinn aufgehoben.",13,Color("ffd98a"))
 	text_at(Vector2(302, 538 if not creative_mode else 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
 	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUR STARTSEITE" if is_web_platform() else "SPEICHERN & ZUM HAUPTMENÜ")
 
