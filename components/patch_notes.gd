@@ -19,6 +19,7 @@ const NOTES=[
 ["Alma", "Bei bereits gelernten Rezepten wird der funktionslose Lern-Button nicht mehr angezeigt; der Lernstatus bleibt nur als Kennzeichnung in der Liste sichtbar."],
 ["Verschmelzung", "Frostnova + Blitzlanze ergibt jetzt den Eisball. Er besitzt vier Kristallstufen: Slow; Slow + Blitzkette; zusätzlich Blitzstun; auf Stufe 4 zusätzlich ein kleiner Eiswirbelsturm. Fusionsrezepte sind feste Kombinationen und Quellen bleiben erhalten."],
 ["Verschmelzung", "Fusionen besitzen jetzt eine stabile, reihenfolgeunabhängige Identität aus ihren beiden Quell-Skills. Fortschritt wird normalisiert gespeichert, alte fusion_history-Saves werden migriert und Multiplayer-Casts serverseitig gegen Fusion-Key und Rang geprüft."],
+["Verschmelzung", "Sekundäre Fusionswirkungen entstehen jetzt am tatsächlichen Schadentrefferpunkt: Flammenwirbel folgt dem Feuerball-Impact, Blitzkern der Blitzlanze und Eisball bleibt impactgebunden. Reaktorwall ist als Schutzfusion die PLAYER_POSITION-Ausnahme."],
 ["Kopfrüstung", "Boss-Helme und Boss-Hüte sind jetzt klassenübergreifende Trophäen und können von jedem Charakter getragen werden; normale Klassen-Kopfbedeckungen bleiben weiterhin klassengebunden."],
 ["Fog of War", "Erkundung läuft über Regionsgrenzen hinweg; Gruppenmitglieder in derselben Weltinstanz teilen ihre Sicht."],
 ["Magier", "Risssprung auf Leertaste ersetzt Arkanen Schritt; Rissnova wird normaler Skill und Arkaner Sturm wird ab Level 40 freigeschaltet."],
