@@ -36,9 +36,7 @@ func derive_password(password:String,salt:String)->String:
 		value=(value+":"+salt).sha256_text()
 	return value
 
-func read_account(key:String)->Dictionary:
-	if key=="" or directory=="":return {}
-	var path:=account_path(key)
+func read_account_file(path:String)->Dictionary:
 	if not FileAccess.file_exists(path):return {}
 	var file:=FileAccess.open(path,FileAccess.READ)
 	if file==null or file.get_length()>131072:return {}
@@ -48,6 +46,13 @@ func read_account(key:String)->Dictionary:
 	var data:Dictionary=parsed
 	if int(data.get("schema",0))!=1:return {}
 	return data
+
+func read_account(key:String)->Dictionary:
+	if key=="" or directory=="":return {}
+	var path:=account_path(key)
+	var primary:=read_account_file(path)
+	if not primary.is_empty():return primary
+	return read_account_file(path+".bak")
 
 func write_account(key:String,data:Dictionary)->Error:
 	var path:=account_path(key)
@@ -59,8 +64,17 @@ func write_account(key:String,data:Dictionary)->Error:
 	var err:=file.get_error()
 	file.close()
 	if err!=OK:return err
+	var verify:=read_account_file(temp)
+	if verify.is_empty():return ERR_FILE_CORRUPT
+	if FileAccess.file_exists(path):
+		var current:=read_account_file(path)
+		if not current.is_empty():
+			err=DirAccess.copy_absolute(path,path+".bak")
+			if err!=OK:return err
 	err=DirAccess.rename_absolute(temp,path)
-	if err==OK and OS.has_feature("linux"):FileAccess.set_unix_permissions(path,384)
+	if err==OK and OS.has_feature("linux"):
+		FileAccess.set_unix_permissions(path,384)
+		if FileAccess.file_exists(path+".bak"):FileAccess.set_unix_permissions(path+".bak",384)
 	return err
 
 func public_characters(account:Dictionary)->Array:
