@@ -52,12 +52,8 @@ func reveal(pos:Vector2,radius:float=REVEAL_RADIUS)->void:
 
 func party_positions(g)->Array:
 	var out:Array=[g.player_pos]
-	var local_context:="world"
-	var local_instance:="world"
-	if g.has_method("current_network_context"):
-		var context:Dictionary=g.current_network_context()
-		local_context=str(context.get("context","world"))
-		local_instance=str(context.get("instance_id","world"))
+	var local_context:=str(g.multiplayer_context()) if g.has_method("multiplayer_context") else "world"
+	var local_instance:=str(g.multiplayer_instance_id()) if g.has_method("multiplayer_instance_id") else "world"
 	for raw in (g.party_state.get("members",[]) as Array):
 		if not raw is Dictionary:continue
 		var row:Dictionary=raw
