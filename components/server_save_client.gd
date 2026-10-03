@@ -128,12 +128,17 @@ func reply(g, response: Dictionary) -> void:
 		var acknowledged: bool = last_request != "" and str(response.get("request","")) == last_request
 		var keep_local: bool = dirty and (server_revision == revision or acknowledged)
 		if not remote.is_empty() and not keep_local:
-			if dirty:
-				g.preserve_save_conflict(decorate(latest))
-				g.message("Neuerer Serverstand geladen. Lokaler Stand als Konfliktkopie gesichert.")
-			g.apply_save_data(remote,true)
-			latest = g.capture_save_data()
-			dirty = false
+			# Never choose between divergent local/server progress silently.
+			# Preserve the local generation and let the player explicitly recover.
+			if dirty:g.preserve_save_conflict(decorate(latest))
+			revision = server_revision
+			inflight.clear()
+			ready = true
+			loading = false
+			status = "Speicherkonflikt · Auswahl erforderlich"
+			g.pause_status=status
+			g.open_save_recovery(remote)
+			return
 		else:
 			if remote.is_empty(): dirty = true
 			elif acknowledged and digest(latest) == submitted_hash: dirty = false
