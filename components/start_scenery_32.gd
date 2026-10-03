@@ -1,6 +1,7 @@
 extends RefCounted
 ## Individual transparent reference-style sprites, composed into the existing game world.
 const VillageHouseTiles32 = preload("res://components/village_house_tiles_32.gd")
+const VillageWellTiles32 = preload("res://components/village_well_tiles_32.gd")
 static var objects:Texture2D
 static var props:Texture2D
 static var terrain:Texture2D
@@ -62,15 +63,8 @@ static func magic_tree(c:CanvasItem,p:Vector2)->void:
 	c.draw_arc(p+Vector2(0,8),31,0,TAU,24,Color("91e7ff"),3)
 
 static func well(c:CanvasItem,p:Vector2)->void:
-	init_art()
-	if objects != null:
-		sprite(c,objects,Rect2(565,520,430,470),Rect2(p+Vector2(-64,-96),Vector2(128,144)))
-		return
-	c.draw_circle(p+Vector2(0,12),42,Color("6b6659"))
-	c.draw_circle(p+Vector2(0,7),31,Color("26383c"))
-	c.draw_rect(Rect2(p+Vector2(-48,-48),Vector2(10,62)),Color("6a5038"))
-	c.draw_rect(Rect2(p+Vector2(38,-48),Vector2(10,62)),Color("6a5038"))
-	c.draw_rect(Rect2(p+Vector2(-50,-54),Vector2(100,9)),Color("9a7650"))
+	VillageWellTiles32.paint(c,p)
+
 static func bush(c:CanvasItem,p:Vector2,_key:int)->void:
 	init_art()
 	if props != null:
