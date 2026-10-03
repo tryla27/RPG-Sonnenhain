@@ -1185,6 +1185,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"class":clampi(int(state.get("class",0)),0,2),
 		"essence_magic_unstable":clampi(int(state.get("essence_magic_unstable",0)),0,4),
 		"essence_magic_element":clampi(int(state.get("essence_magic_element",0)),0,4),
+		"essence_magic_aoe":clampi(int(state.get("essence_magic_aoe",0)),0,4),
 		"mage_rift_blink":bool(state.get("mage_rift_blink",false)) and clampi(int(state.get("class",0)),0,2)==1,
 		"ranger_falcon_rune":bool(state.get("ranger_falcon_rune",false)),
 		"race":clampi(int(state.get("race",0)),0,2),
@@ -3448,7 +3449,9 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
 	var radial_ids := [0,5,17,19,22,23,24,31,33,37,39,40,41,42]
 	if id in radial_ids:
-		var radius := 165.0 + rank * 12.0
+		var aoe_rank:=clampi(int(state.get("essence_magic_aoe",0)),0,4)
+		var radius := (165.0 + rank * 12.0)*(1.0+(0.05 if aoe_rank>=3 else 0.0)+(0.05 if aoe_rank>=4 else 0.0))
+		power=roundi(float(power)*(1.0+0.05*aoe_rank))
 		for i in range(enemies.size()-1,-1,-1):
 			if enemies[i]["pos"].distance_to(origin) <= radius: damage_enemy(i,power+10,dir,false,"",sender)
 	else:
@@ -9634,10 +9637,13 @@ func click_essence(mouse:Vector2)->void:
 			queue_redraw()
 			return
 
-func mage_unstable_explosion(pos:Vector2,rank:int,base_damage:int,element:String="",source_peer:int=0)->void:
+func mage_unstable_explosion(pos:Vector2,rank:int,base_damage:int,element:String="",source_peer:int=0,aoe_rank:int=-1)->void:
 	rank=clampi(rank,1,4)
-	var radius:float=[0.0,70.0,82.0,94.0,108.0][rank]*essence.aoe_radius_mult()
-	var mult:float=[0.0,0.60,0.75,0.90,1.00][rank]*essence.aoe_damage_mult()
+	var effective_aoe:=essence.rank(2,2) if aoe_rank<0 else clampi(aoe_rank,0,4)
+	var radius_mult:=1.0+(0.05 if effective_aoe>=3 else 0.0)+(0.05 if effective_aoe>=4 else 0.0)
+	var damage_mult:=1.0+0.05*effective_aoe
+	var radius:float=[0.0,70.0,82.0,94.0,108.0][rank]*radius_mult
+	var mult:float=[0.0,0.60,0.75,0.90,1.00][rank]*damage_mult
 	var damage:=maxi(1,roundi(float(base_damage)*mult))
 	for i in range(enemies.size()-1,-1,-1):
 		if i>=enemies.size():continue
@@ -9692,7 +9698,7 @@ func rpc_mage_auto_detonate(pos_data:Array)->void:
 		var damage:=int(shot.get("damage",1))
 		var element:=str(shot.get("element",""))
 		projectiles.remove_at(i)
-		mage_unstable_explosion(pos,rank,damage,element,sender)
+		mage_unstable_explosion(pos,rank,damage,element,sender,clampi(int(state.get("essence_magic_aoe",0)),0,4))
 		return
 
 func draw_skills_panel() -> void:
@@ -11833,7 +11839,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
