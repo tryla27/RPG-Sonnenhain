@@ -69,7 +69,7 @@ func _initialize() -> void:
 	g.dash_cooldown=0.0
 	g.player_pos=Vector2(6000,1000)
 	g.facing=Vector2.RIGHT
-	var blink_origin:=g.player_pos
+	var blink_origin:Vector2=g.player_pos
 	g.dodge()
 	check(g.player_pos.x>blink_origin.x+40.0 and g.dash_timer==0.0,"Mage rift blink did not teleport")
 	for look in [Vector2.UP,Vector2.DOWN,Vector2.LEFT,Vector2.RIGHT]: check(absf(g.weapon_hand_offset(look).x)>=22,"Weapon hand overlaps face")
