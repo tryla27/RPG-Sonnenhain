@@ -9297,8 +9297,11 @@ func draw_account_form(registering:bool)->void:
 	var nr:=Rect2(300,255 if registering else 275,550,48);draw_rect(nr,Color("22363c"));draw_rect(nr,Color("ffe2aa") if account_focus==0 else Color("8ba49c"),false,2)
 	text_at(nr.position+Vector2(14,31),account_name if account_name!="" else "Name eingeben …",19,Color("fff0cf") if account_name!="" else Color("9fb4ac"))
 	text_at(Vector2(300,330 if registering else 350),"PASSWORT",14,Color("e9cc90"))
-	var pr:=Rect2(300,345 if registering else 365,550,48);draw_rect(pr,Color("22363c"));draw_rect(pr,Color("ffe2aa") if account_focus==1 else Color("8ba49c"),false,2)
+	var password_too_short:=account_password!="" and account_password.length()<8
+	var pr:=Rect2(300,345 if registering else 365,550,48);draw_rect(pr,Color("22363c"));draw_rect(pr,Color("b96f68") if password_too_short else (Color("ffe2aa") if account_focus==1 else Color("8ba49c")),false,2)
 	text_at(pr.position+Vector2(14,31),masked_password() if account_password!="" else "Passwort eingeben …",19,Color("fff0cf") if account_password!="" else Color("9fb4ac"))
+	if password_too_short:
+		text_at(Vector2(300,408 if registering else 428),"PASSWORT ZU KURZ · mindestens 8 Zeichen (%d/8)" % account_password.length(),12,Color("e7a09a"))
 	if registering:
 		text_at(Vector2(300,420),"PASSWORT WIEDERHOLEN",14,Color("e9cc90"))
 		var cr:=Rect2(300,435,550,48);draw_rect(cr,Color("22363c"));draw_rect(cr,Color("ffe2aa") if account_focus==2 else (Color("b96f68") if account_password_confirm!="" and account_password_confirm!=account_password else Color("8ba49c")),false,2)
