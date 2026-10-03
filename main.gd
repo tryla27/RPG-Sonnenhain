@@ -3050,7 +3050,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				break
 
 func near_borin() -> bool:
-	return (interior_id==VillageInteriors32.id_for_name("Borin")) or (interior_id < 0 and dungeon_id < 0 and arena_mode == "" and player_pos.distance_to(Vector2(1458,490)) < 150.0)
+	return (interior_id==VillageInteriors32.id_for_name("Borin")) or (interior_id < 0 and dungeon_id < 0 and arena_mode == "" and player_pos.distance_to(village_house_door(village_house("Borin"))-Vector2(0,70)) < 150.0)
 
 func toggle_panel(which: String) -> void:
 	if which == "skills" and panel != "skills" and not near_borin():
