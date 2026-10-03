@@ -10,6 +10,10 @@ const ControllerControls = preload("res://components/controller_controls.gd")
 var controller = ControllerControls.new()
 const QuestGuide = preload("res://components/quest_guide.gd")
 var quest_guide = QuestGuide.new()
+const EssenceSystem = preload("res://components/essence_system.gd")
+const BookSystem = preload("res://components/book_system.gd")
+var essence = EssenceSystem.new()
+var book_system = BookSystem.new()
 const ServerSaveStore = preload("res://components/server_save_store.gd")
 const ServerSaveClient = preload("res://components/server_save_client.gd")
 const AccountStore = preload("res://components/account_store.gd")
@@ -1177,6 +1181,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
+		"essence_magic_unstable":clampi(int(state.get("essence_magic_unstable",0)),0,4),
 		"mage_rift_blink":bool(state.get("mage_rift_blink",false)) and clampi(int(state.get("class",0)),0,2)==1,
 		"ranger_falcon_rune":bool(state.get("ranger_falcon_rune",false)),
 		"race":clampi(int(state.get("race",0)),0,2),
@@ -2774,6 +2779,9 @@ func handle_touch_event(event: InputEvent) -> bool:
 		if action != "":
 			if action == "attack":
 				begin_touch_aim(touch_event.index, pos)
+				if detonate_mage_autoattack():
+					queue_redraw()
+					return true
 				if attack_timer <= 0.0: normal_attack()
 				queue_redraw()
 				return true
@@ -3004,6 +3012,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey: triggered = event.pressed and not event.echo
 	elif event is InputEventMouseButton: triggered = event.pressed
 	if not triggered: return
+	if panel=="" and event_matches_binding(event,"attack") and detonate_mage_autoattack():
+		queue_redraw()
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "":
 		var hud_action:=hud_action_at(event.position)
 		if hud_action!="":
@@ -3273,12 +3284,12 @@ func normal_attack() -> void:
 	if uses_server_world():
 		rpc_client_normal_attack.rpc_id(1, [player_pos.x,player_pos.y], [facing.x,facing.y], class_id, design, power, weapon_element())
 		if class_id != 0:
-			projectiles.append({"pos":player_pos,"dir":facing,"speed":790.0 if variant=="crossbow" else (650.0 if class_id==2 else 520.0),"life":1.2,"damage":0,"kind":3 if class_id==2 else 2,"element":weapon_element(),"hits":[],"network_visual":true})
+			projectiles.append({"pos":player_pos,"dir":facing,"speed":790.0 if variant=="crossbow" else (650.0 if class_id==2 else 520.0),"life":1.2,"damage":0,"kind":3 if class_id==2 else 2,"element":weapon_element(),"hits":[],"network_visual":true,"mage_auto":class_id==1 and essence.unstable_projectile_rank()>0})
 		return
 	if class_id == 0:
 		hit_arc(player_pos, facing, 116.0 if variant == "axe" else 100.0, 0.08 if variant == "axe" else 0.13, power, false, "gift" if poison_blade_timer > 0 else weapon_element())
 	else:
-		projectiles.append({"pos":player_pos, "dir":facing, "speed":790.0 if variant == "crossbow" else (650.0 if class_id == 2 else 520.0), "life":1.2, "damage":power, "kind":3 if class_id == 2 else 2, "element":weapon_element(), "hits":[]})
+		projectiles.append({"pos":player_pos, "dir":facing, "speed":790.0 if variant == "crossbow" else (650.0 if class_id == 2 else 520.0), "life":1.2, "damage":power, "kind":3 if class_id == 2 else 2, "element":weapon_element(), "hits":[],"mage_auto":class_id==1 and essence.unstable_projectile_rank()>0})
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class: int, design: int, power: int, element: String) -> void:
@@ -3307,7 +3318,7 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 		hit_arc(origin,dir,116.0 if axe else 100.0,0.08 if axe else 0.13,power,false,element,sender)
 	else:
 		var crossbow := remote_class == 2 and design % 4 == 3
-		projectiles.append({"pos":origin,"dir":dir,"speed":790.0 if crossbow else (650.0 if remote_class==2 else 520.0),"life":1.2,"damage":power,"kind":3 if remote_class==2 else 2,"element":element,"hits":[],"owner_peer":sender})
+		projectiles.append({"pos":origin,"dir":dir,"speed":790.0 if crossbow else (650.0 if remote_class==2 else 520.0),"life":1.2,"damage":power,"kind":3 if remote_class==2 else 2,"element":element,"hits":[],"owner_peer":sender,"mage_auto":remote_class==1 and int(state.get("essence_magic_unstable",0))>0})
 
 func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float, damage: int, stun: bool, element: String = "", source_peer: int = 0) -> void:
 	for i in range(enemies.size() - 1, -1, -1):
@@ -4013,7 +4024,7 @@ func interact_interior_owner(name:String="") -> void:
 	match name:
 		"Alma": steinrose.open(self)
 		"Borin":
-			panel="skills";skill_tree_tab=0;menu_scroll=0
+			panel="essence";essence.selected_tree=0;menu_scroll=0
 		"Pip":
 			pip_dialogue()
 		"Elara": open_elara_alchemy()
@@ -4474,15 +4485,16 @@ func gain_xp(amount: int) -> void:
 	while xp >= xp_required():
 		xp -= xp_required()
 		level += 1
-		var earned_point := level % 2 == 0 or level in [3, 8, 12]
-		if earned_point: skill_points += 1
+		var earned_point := false
+		# Essenz ist das Level-Fortschrittssystem: XP bleibt unangetastet,
+		# jeder Charakter besitzt auf Level N insgesamt N Essenz (max. 40).
 		var ultimate_level:=ultimate_unlock_level()
 		if level >= ultimate_level:
 			learned[class_ultimate()] = true
 			skill_levels[class_ultimate()] = mini(5,1+int((level-ultimate_level)/5.0))
 		hp = max_hp()
 		energy = max_energy()
-		message("LEVEL %d! %s" % [level, "+1 Skillpunkt · öffne K." if earned_point else "Neue Stärke und Gesundheit."])
+		message("LEVEL %d! +1 ESSENZ · %d/%d frei" % [level,essence.available(level),essence.total_for_level(level)])
 		play_sound("level")
 
 func skill_rank_level(index: int, rank: int) -> int:
@@ -5014,6 +5026,8 @@ func capture_save_data() -> Dictionary:
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
+	data["essence_state"] = essence.snapshot()
+	data["book_state"] = book_system.snapshot()
 	data["world_fog"] = world_fog.snapshot()
 	return data.duplicate(true)
 
@@ -5125,6 +5139,8 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		player_pos = Vector2(825, 1020)
 	mark_network_teleport()
 	level = maxi(1, int(data.get("level", 1)))
+	essence.restore(data.get("essence_state",{}))
+	book_system.restore(data.get("book_state",{}),level)
 	xp = maxi(0, int(data.get("xp", 0)))
 	gold = maxi(0, int(data.get("gold", 55)))
 	music_enabled = bool(data.get("music_enabled", true))
@@ -5526,6 +5542,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		pending_purchase = -1
 		return
 	match panel:
+		"essence": click_essence(mouse)
 		"skills": click_skills(mouse)
 		"skill_loadout": click_skill_loadout(mouse)
 		"fusion": click_fusion(mouse)
@@ -5614,6 +5631,9 @@ func start_new_game() -> void:
 	xp = 0
 	gold = 55
 	skill_points = 0
+	essence.reset()
+	book_system.learned.clear()
+	book_system.active.clear()
 	reset_class_skills()
 	selected_slot = 0
 	inventory_page = 0
@@ -9051,6 +9071,7 @@ func draw_panel() -> void:
 		"controls": draw_controls_panel()
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
+		"essence": draw_essence_panel()
 		"skill_loadout": draw_skill_loadout_panel()
 		"fusion": draw_fusion_panel()
 		"appearance": draw_appearance_panel()
@@ -9559,6 +9580,106 @@ func draw_intro_panel() -> void:
 	text_at(Vector2(230, 337), String(lines[page][1]), 18, Color("e4eadb"))
 	draw_rect(Rect2(230, 365, 675, 3), Color("c3a673"))
 	text_at(Vector2(230, 413), binding_short("interact")+" / Leertaste / Klick: Überspringen", 15, Color("c7d4ca"))
+
+func draw_essence_panel() -> void:
+	text_at(Vector2(165,124),"BORIN · ESSENZLEHRE",25,Color("ffeda9"))
+	text_at(Vector2(700,124),"LV %d · ESSENZ %d/%d" % [level,essence.available(level),essence.total_for_level(level)],15,Color("f6dc9a"))
+	for tree in EssenceSystem.TREE_COUNT:
+		var x:=165+tree*162
+		ui_button(Rect2(x,148,152,36),EssenceSystem.TREE_NAMES[tree],true,essence.selected_tree==tree)
+	var selected:=essence.selected_tree
+	text_at(Vector2(165,214),"%s · Ursprung: %s · %d/%d" % [EssenceSystem.TREE_NAMES[selected],EssenceSystem.TREE_ORIGINS[selected],essence.tree_spent(selected),EssenceSystem.TREE_CAP],16,Color("ffe2aa"))
+	for talent in EssenceSystem.TALENTS_PER_TREE:
+		var info:Dictionary=EssenceSystem.TALENTS[selected][talent]
+		var rank:=essence.rank(selected,talent)
+		var y:=242+talent*62
+		ui_box(Rect2(165,y,700,54),Color("314b54") if rank>0 else Color("243944"))
+		text_at(Vector2(178,y+20),str(info["name"]),15,Color("fff1bc"))
+		text_at(Vector2(178,y+41),str(info["desc"]),11,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,520)
+		var label:="%d/4" % rank
+		if rank<4:label+=" · +1 ESSENZ"
+		ui_button(Rect2(875,y+8,105,38),label,essence.can_invest(level,selected,talent),false)
+	text_at(Vector2(165,570),"Jeder Baum: 5 Talente × 4 Ränge = 20 · Level 40: maximal 40 von 100 Essenz.",12,Color("b9d9cf"))
+
+func click_essence(mouse:Vector2)->void:
+	for tree in EssenceSystem.TREE_COUNT:
+		if Rect2(165+tree*162,148,152,36).has_point(mouse):
+			essence.selected_tree=tree
+			play_sound("menu")
+			queue_redraw()
+			return
+	for talent in EssenceSystem.TALENTS_PER_TREE:
+		if Rect2(875,250+talent*62,105,38).has_point(mouse):
+			if essence.invest(level,essence.selected_tree,talent):
+				var info:Dictionary=EssenceSystem.TALENTS[essence.selected_tree][talent]
+				message("%s · Rang %d/4" % [info["name"],essence.rank(essence.selected_tree,talent)])
+				play_sound("level")
+				save_game()
+			else:
+				message("Dafür fehlt freie Essenz oder mehr Bindung an diesen Baum.")
+			queue_redraw()
+			return
+
+func mage_unstable_explosion(pos:Vector2,rank:int,base_damage:int,element:String="",source_peer:int=0)->void:
+	rank=clampi(rank,1,4)
+	var radius:float=[0.0,70.0,82.0,94.0,108.0][rank]
+	var mult:float=[0.0,0.60,0.75,0.90,1.00][rank]
+	var damage:=maxi(1,roundi(float(base_damage)*mult))
+	for i in range(enemies.size()-1,-1,-1):
+		if i>=enemies.size():continue
+		var offset:Vector2=enemies[i]["pos"]-pos
+		if offset.length()>radius:continue
+		var local_damage:=damage
+		if rank>=2 and offset.length()<=radius*0.35:local_damage=maxi(local_damage,base_damage)
+		damage_enemy(i,local_damage,offset.normalized() if offset.length_squared()>.01 else Vector2.ZERO,false,element,source_peer)
+		if rank>=4 and i<enemies.size():
+			move_enemy_with_collision(enemies[i],(pos-enemies[i]["pos"]).normalized()*18.0)
+	effect(pos+Vector2(0,-24),"ARKANE DETONATION",Color("c9b6ff"),0.75)
+	spell_visuals.append({"kind":19,"pos":pos,"end":pos,"dir":Vector2.RIGHT,"rank":rank,"life":0.55,"max":0.55})
+	play_sound("skill_19")
+
+func detonate_mage_autoattack()->bool:
+	if class_id!=1:return false
+	var rank:=essence.unstable_projectile_rank()
+	if rank<=0:return false
+	for i in range(projectiles.size()-1,-1,-1):
+		var shot:Dictionary=projectiles[i]
+		if not bool(shot.get("mage_auto",false)):continue
+		var pos:Vector2=shot["pos"]
+		var element:=str(shot.get("element",""))
+		var damage:=int(shot.get("damage",normal_attack_power()))
+		projectiles.remove_at(i)
+		if uses_server_world() and network_mode=="client":
+			rpc_mage_auto_detonate.rpc_id(1,[pos.x,pos.y])
+			effect(pos+Vector2(0,-24),"DETONATION",Color("c9b6ff"),0.55)
+		else:
+			mage_unstable_explosion(pos,rank,damage,element)
+		attack_timer=maxf(attack_timer,0.12)
+		return true
+	return false
+
+@rpc("any_peer","call_remote","reliable")
+func rpc_mage_auto_detonate(pos_data:Array)->void:
+	if network_mode!="host" or pos_data.size()<2:return
+	var sender:=multiplayer.get_remote_sender_id()
+	if sender<=0 or not remote_players.has(sender):return
+	if not server_action_allowed(sender,"mage_auto_detonate",120):return
+	var state:Dictionary=remote_players[sender]
+	if int(state.get("class",-1))!=1:return
+	var rank:=clampi(int(state.get("essence_magic_unstable",0)),0,4)
+	if rank<=0:return
+	var requested:=Vector2(float(pos_data[0]),float(pos_data[1]))
+	if not requested.is_finite():return
+	for i in range(projectiles.size()-1,-1,-1):
+		var shot:Dictionary=projectiles[i]
+		if int(shot.get("owner_peer",0))!=sender or not bool(shot.get("mage_auto",false)):continue
+		var pos:Vector2=shot["pos"]
+		if pos.distance_to(requested)>90.0:return
+		var damage:=int(shot.get("damage",1))
+		var element:=str(shot.get("element",""))
+		projectiles.remove_at(i)
+		mage_unstable_explosion(pos,rank,damage,element,sender)
+		return
 
 func draw_skills_panel() -> void:
 	text_at(Vector2(165,125),"BORIN · SKILLZAUBERER",25,Color("ffeda9"))
@@ -11698,7 +11819,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
