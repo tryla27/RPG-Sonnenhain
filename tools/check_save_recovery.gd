@@ -16,7 +16,7 @@ func snapshot(uuid:String,name:String,level:int,xp:int)->Dictionary:
 
 func wipe(path:String)->void:
 	for suffix in ["",".bak",".prev",".tmp"]:
-		var p:=path+suffix
+		var p:String=path+suffix
 		if FileAccess.file_exists(p):DirAccess.remove_absolute(p)
 
 func _initialize()->void:
@@ -56,7 +56,7 @@ func _initialize()->void:
 	var name:="recoveraccount"
 	var key:=accounts.account_key(name)
 	for suffix in ["",".bak",".tmp"]:
-		var ap:=accounts.account_path(key)+suffix
+		var ap:String=accounts.account_path(key)+suffix
 		if FileAccess.file_exists(ap):DirAccess.remove_absolute(ap)
 	var reg:=accounts.register(21,name,"recovery-password")
 	assert(bool(reg.get("ok",false)))
