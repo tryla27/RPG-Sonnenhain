@@ -10,6 +10,7 @@ const NOTES=[
 ["Essenz", "Borin lehrt jetzt fünf universelle Essenzbäume: Kampf, Durchhalten, Magie, Intelligenz und Elektro. Level 40 liefert maximal 40 von 100 möglichen Punkten; XP wird beim Skillen nicht verbraucht."],
 ["Magie", "Instabile Geschosse lässt Magier-Autoattacks ab Rang 1 im Flug erneut auslösen und kontrolliert detonieren; vier Ränge steigern Radius und Explosionswirkung."],
 ["Bücher", "Charaktergebundene Buchfortschritte sind als getrenntes System vorbereitet: Bücher können bis Rang 4 gelernt werden, aktive Buchplätze skalieren von 2 bis maximal 6 auf Level 40."],
+["Audio", "Anziehbare Gegenstände spielen jetzt beim Ausrüsten und Ausziehen ein eigenes Ausrüstgeräusch; gilt für Waffen, Rüstung, Helme und Ringe."],
 ["Fog of War", "Erkundung läuft über Regionsgrenzen hinweg; Gruppenmitglieder in derselben Weltinstanz teilen ihre Sicht."],
 ["Magier", "Risssprung auf Leertaste ersetzt Arkanen Schritt; Rissnova wird normaler Skill und Arkaner Sturm wird ab Level 40 freigeschaltet."],
 ["Menüs", "Login-Navigation per Tab/Shift+Tab; Spielmenü und Untermenüs erhalten konsistente Zurück-Navigation."],
