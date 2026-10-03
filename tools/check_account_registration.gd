@@ -20,6 +20,27 @@ func run()->void:
 	if g.account_form_valid(true):failures+=1
 	if not g.account_form_valid(false):failures+=1
 
+	# Keyboard focus must cycle through every interactive account control.
+	g.account_focus=0
+	g.account_step_focus(false,false)
+	if g.account_focus!=1:failures+=1
+	g.account_step_focus(false,false)
+	if g.account_focus!=2:failures+=1
+	g.account_step_focus(false,false)
+	if g.account_focus!=3:failures+=1
+	g.account_step_focus(false,false)
+	if g.account_focus!=0:failures+=1
+	g.account_step_focus(false,true)
+	if g.account_focus!=3:failures+=1
+	g.account_focus=0
+	for expected in [1,2,3,4,0]:
+		g.account_step_focus(true,false)
+		if g.account_focus!=expected:failures+=1
+	g.account_step_focus(true,true)
+	if g.account_focus!=4:failures+=1
+	if g.account_submit_focus(false)!=2 or g.account_back_focus(false)!=3:failures+=1
+	if g.account_submit_focus(true)!=3 or g.account_back_focus(true)!=4:failures+=1
+
 	var store=AccountStore.new()
 	var dir:="user://account-registration-check"
 	DirAccess.make_dir_recursive_absolute(dir)
@@ -44,5 +65,5 @@ func run()->void:
 	if chars.size()!=1:failures+=1
 	elif str(chars[0].get("name",""))!="Held Neu" or int(chars[0].get("level",0))!=17:failures+=1
 
-	print("ACCOUNT_REGISTRATION_CHECK failures=",failures," · confirmation / exact password / account autosave metadata / case-normalized name")
+	print("ACCOUNT_REGISTRATION_CHECK failures=",failures," · confirmation / Tab+Shift-Tab focus / exact password / account autosave metadata / case-normalized name")
 	quit(1 if failures else 0)

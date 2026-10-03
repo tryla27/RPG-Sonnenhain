@@ -407,6 +407,14 @@ var battle_zones: Array = []
 var active_save_slot := 1
 var selected_save_slot := 1
 var save_slot_labels: Array = []
+var recovery_sources:Array=[]
+var recovery_server_source:Dictionary={}
+var recovery_drag_index:=-1
+var recovery_drag_origin:=Vector2.ZERO
+var recovery_target_slot:=-1
+var recovery_pending:Dictionary={}
+var recovery_confirm:=false
+var recovery_status:=""
 var rescue_state := 0 # 0: unbekannt, 1: Angriff, 2: gerettet, 3: Belohnung abgeholt
 var rescue_kills := 0
 var rescue_intro_timer := 0.0
@@ -2869,6 +2877,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		online_list_open = event.pressed
 		queue_redraw()
 		return
+	if handle_recovery_drag(event):return
 	if handle_touch_event(event): return
 	# Mobile Browser senden nach einem Touch oft noch einen künstlichen
 	# Mausklick. Den nur kurz nach echtem Touch unterdrücken, damit Buttons
@@ -2911,17 +2920,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if panel in ["account_login","account_register"] and event is InputEventKey and event.pressed and not event.echo:
 		var registering:=panel=="account_register"
-		var focus_count:=3 if registering else 2
 		if event.keycode==KEY_TAB:
-			account_focus=(account_focus+1)%focus_count
+			account_step_focus(registering,event.shift_pressed)
 		elif event.keycode==KEY_ESCAPE:
-			panel="account_gate";account_password="";account_password_confirm="";account_status=""
+			panel="account_gate";account_password="";account_password_confirm="";account_status="";account_focus=0
 		elif event.keycode==KEY_BACKSPACE:
 			if account_focus==0 and account_name.length()>0:account_name=account_name.left(account_name.length()-1)
 			elif account_focus==1 and account_password.length()>0:account_password=account_password.left(account_password.length()-1)
 			elif registering and account_focus==2 and account_password_confirm.length()>0:account_password_confirm=account_password_confirm.left(account_password_confirm.length()-1)
 		elif event.keycode==KEY_ENTER:
-			if account_form_valid(registering):request_account(registering)
+			if account_focus==account_back_focus(registering):
+				panel="account_gate";account_password="";account_password_confirm="";account_status="";account_focus=0
+			elif account_form_valid(registering):
+				request_account(registering)
 		elif event.unicode>=32:
 			var typed:=String.chr(event.unicode)
 			if account_focus==0 and account_name.length()<24 and "abcdefghijklmnopqrstuvwxyzäöüß0123456789_-".contains(typed.to_lower()):account_name+=typed
@@ -4908,6 +4919,139 @@ func refresh_save_slot_labels() -> void:
 			save_slot_labels.append("%s · LV %d · %s" % [str(data.get("hero_name", "Held")), int(data.get("level", 1)), CLASS_NAMES[id]])
 		else: save_slot_labels.append("BESCHÄDIGT")
 
+func refresh_recovery_sources()->void:
+	recovery_sources.clear()
+	var LocalStore=preload("res://components/local_save_store.gd")
+	for slot in range(1,4):
+		for raw in LocalStore.recovery_candidates(slot_save_path(slot)):
+			var row:Dictionary=raw.duplicate(true)
+			row["slot"]=slot
+			recovery_sources.append(row)
+	if not recovery_server_source.is_empty():
+		var server_row:Dictionary=recovery_server_source.duplicate(true)
+		server_row["source"]="server"
+		server_row["slot"]=clampi(int(server_row.get("slot",active_save_slot)),1,3)
+		recovery_sources.append(server_row)
+
+func open_save_recovery(server_data:Dictionary={})->void:
+	if not server_data.is_empty():
+		recovery_server_source={
+			"data":server_data.duplicate(true),
+			"uuid":str(server_data.get("player_uuid","")),
+			"name":str(server_data.get("hero_name","Held")),
+			"level":maxi(1,int(server_data.get("level",1))),
+			"xp":maxi(0,int(server_data.get("xp",0))),
+			"gold":maxi(0,int(server_data.get("gold",0))),
+			"saved_at":maxi(0,int(server_data.get("saved_at",0))),
+			"generation":maxi(0,int(server_data.get("save_generation",0))),
+			"slot":active_save_slot
+		}
+	refresh_recovery_sources()
+	recovery_drag_index=-1
+	recovery_target_slot=-1
+	recovery_pending.clear()
+	recovery_confirm=false
+	recovery_status=""
+	panel="recovery"
+	queue_redraw()
+
+func recovery_source_rect(index:int)->Rect2:
+	return Rect2(180,185+index*78,430,66)
+
+func recovery_slot_rect(slot:int)->Rect2:
+	return Rect2(680,205+(slot-1)*105,270,78)
+
+func recovery_source_label(row:Dictionary)->String:
+	var source:=str(row.get("source","local")).to_upper()
+	return "%s · %s · LV %d · %d XP · %d Gold" % [source,str(row.get("name","Held")),int(row.get("level",1)),int(row.get("xp",0)),int(row.get("gold",0))]
+
+func draw_recovery_panel()->void:
+	text_at(Vector2(175,132),"SPIELSTAND WIEDERHERSTELLEN",27,Color("ffe1a0"))
+	text_at(Vector2(175,160),"Quelle ziehen → Zielslot ablegen → ausdrücklich bestätigen.",13,Color("d8e6dc"))
+	var shown:=mini(recovery_sources.size(),5)
+	for i in shown:
+		var row:Dictionary=recovery_sources[i]
+		var r:=recovery_source_rect(i)
+		ui_box(r,Color("3b5354") if recovery_drag_index!=i else Color("617765"))
+		text_at(r.position+Vector2(12,24),recovery_source_label(row),13,Color("fff0ce"),HORIZONTAL_ALIGNMENT_LEFT,405)
+		text_at(r.position+Vector2(12,47),"Generation %d · Ursprung Slot %d" % [int(row.get("generation",0)),int(row.get("slot",0))],11,Color("b8cbc5"))
+	for slot in range(1,4):
+		var sr:=recovery_slot_rect(slot)
+		ui_box(sr,Color("5f715f") if recovery_target_slot==slot else Color("2d454b"))
+		text_at(sr.position+Vector2(12,27),"SPIELSTAND %d" % slot,16,Color("ffe2aa"))
+		text_at(sr.position+Vector2(12,52),str(save_slot_labels[slot-1]) if slot-1<save_slot_labels.size() else "LEER",12,Color("d8e6dc"))
+	if recovery_drag_index>=0 and recovery_drag_index<recovery_sources.size():
+		var mouse:=get_viewport().get_mouse_position()
+		ui_box(Rect2(mouse+Vector2(12,12),Vector2(380,42)),Color("627565",0.95))
+		text_at(mouse+Vector2(24,39),recovery_source_label(recovery_sources[recovery_drag_index]),11,Color("fff0ce"),HORIZONTAL_ALIGNMENT_LEFT,355)
+	if recovery_confirm and not recovery_pending.is_empty():
+		ui_box(Rect2(620,510,350,78),Color("5a4a3f"))
+		text_at(Vector2(635,535),"Slot %d mit %s ersetzen?" % [recovery_target_slot,str(recovery_pending.get("name","Held"))],14,Color("fff0ce"))
+		ui_button(Rect2(635,548,145,30),"ABBRECHEN")
+		ui_button(Rect2(795,548,160,30),"BESTÄTIGEN")
+	else:
+		ui_button(Rect2(680,548,270,36),"ZURÜCK")
+	if recovery_status!="":text_at(Vector2(180,585),recovery_status,11,Color("ffd9a6"),HORIZONTAL_ALIGNMENT_LEFT,420)
+
+func confirm_save_recovery()->void:
+	if recovery_target_slot<1 or recovery_target_slot>3 or recovery_pending.is_empty():return
+	var data:Dictionary=recovery_pending.get("data",{})
+	if data.is_empty():return
+	var source:=str(recovery_pending.get("source","recovery"))
+	var result:Error=preload("res://components/local_save_store.gd").restore_to(slot_save_path(recovery_target_slot),data,"recovery_"+source)
+	if result!=OK:
+		recovery_status="Wiederherstellung fehlgeschlagen · vorhandene Generation bleibt erhalten."
+		recovery_confirm=false
+		return
+	active_save_slot=recovery_target_slot
+	selected_save_slot=recovery_target_slot
+	refresh_save_slot_labels()
+	var restored:Dictionary=preload("res://components/local_save_store.gd").read(slot_save_path(active_save_slot))
+	if restored.is_empty():
+		recovery_status="Wiederhergestellter Save konnte nicht erneut validiert werden."
+		return
+	apply_save_data(restored)
+	if account_logged_in and network_mode=="client":
+		claim_local_save(active_save_slot)
+	elif server_save.connected(self):
+		server_save.begin(self)
+	recovery_status="Wiederhergestellt · lokal verifiziert · Serverabgleich wird angefordert."
+	recovery_confirm=false
+	recovery_pending.clear()
+	recovery_server_source.clear()
+	save_game()
+	panel="start"
+
+func handle_recovery_drag(event:InputEvent)->bool:
+	if panel!="recovery" or not event is InputEventMouseButton or event.button_index!=MOUSE_BUTTON_LEFT:return false
+	if event.pressed:
+		for i in mini(recovery_sources.size(),5):
+			if recovery_source_rect(i).has_point(event.position):
+				recovery_drag_index=i
+				recovery_drag_origin=event.position
+				return true
+		return false
+	if recovery_drag_index>=0:
+		for slot in range(1,4):
+			if recovery_slot_rect(slot).has_point(event.position):
+				recovery_target_slot=slot
+				recovery_pending=recovery_sources[recovery_drag_index].duplicate(true)
+				recovery_confirm=true
+				break
+		recovery_drag_index=-1
+		queue_redraw()
+		return true
+	return false
+
+func click_recovery_panel(mouse:Vector2)->void:
+	if recovery_confirm:
+		if Rect2(635,548,145,30).has_point(mouse):
+			recovery_confirm=false;recovery_pending.clear();recovery_target_slot=-1;return
+		if Rect2(795,548,160,30).has_point(mouse):
+			confirm_save_recovery();return
+	elif Rect2(680,548,270,36).has_point(mouse):
+		panel="start";return
+
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
@@ -5153,6 +5297,9 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	validate_equipment_slots()
 
 func handle_panel_click(mouse: Vector2) -> void:
+	if panel=="recovery":
+		click_recovery_panel(mouse)
+		return
 	if panel == "steinrose":
 		steinrose.click(self,mouse)
 		return
@@ -5176,10 +5323,12 @@ func handle_panel_click(mouse: Vector2) -> void:
 		if Rect2(300,275,550,48).has_point(mouse):account_focus=0
 		elif Rect2(300,365,550,48).has_point(mouse):account_focus=1
 		elif registering and Rect2(300,455,550,48).has_point(mouse):account_focus=2
-		elif Rect2(300,545 if registering else 455,550,52).has_point(mouse) and account_form_valid(registering):
-			request_account(registering)
+		elif Rect2(300,545 if registering else 455,550,52).has_point(mouse):
+			account_focus=account_submit_focus(registering)
+			if account_form_valid(registering):request_account(registering)
 		elif Rect2(300,615 if registering else 525,180,42).has_point(mouse):
-			panel="account_gate";account_password="";account_password_confirm="";account_status=""
+			account_focus=account_back_focus(registering)
+			panel="account_gate";account_password="";account_password_confirm="";account_status="";account_focus=0
 		queue_redraw()
 		return
 	if panel=="account_migrate":
@@ -5204,6 +5353,9 @@ func handle_panel_click(mouse: Vector2) -> void:
 			return
 		return
 	if panel == "start":
+		if Rect2(740,448,110,54).has_point(mouse):
+			open_save_recovery()
+			return
 		for candidate in 3:
 			if Rect2(168 + candidate * 273, 530, 260, 57).has_point(mouse):
 				selected_save_slot = candidate + 1
@@ -5213,8 +5365,8 @@ func handle_panel_click(mouse: Vector2) -> void:
 			play_sound("menu")
 			active_save_slot = selected_save_slot
 			begin_character_creation()
-		elif Rect2(300, 448, 550, 54).has_point(mouse):
-			if not FileAccess.file_exists(slot_save_path(selected_save_slot)):
+		elif Rect2(300, 448, 430, 54).has_point(mouse):
+			if preload("res://components/local_save_store.gd").read(slot_save_path(selected_save_slot)).is_empty():
 				message("Noch kein Spielstand vorhanden. Wähle eine Klasse und starte ein neues Spiel.")
 				return
 			play_sound("menu")
@@ -8932,6 +9084,7 @@ func draw_panel() -> void:
 		"account_migrate": draw_account_migrate()
 		"account_characters": draw_account_characters()
 		"start": draw_start_panel()
+		"recovery": draw_recovery_panel()
 		"creation": draw_creation_panel()
 		"creation_review": draw_creation_review_panel()
 		"multiplayer": draw_multiplayer_panel()
@@ -9089,6 +9242,19 @@ func account_form_valid(registering:bool)->bool:
 	if registering and (account_password_confirm.length()<8 or account_password!=account_password_confirm):return false
 	return account_pending_action==""
 
+func account_focus_count(registering:bool)->int:
+	return 5 if registering else 4
+
+func account_submit_focus(registering:bool)->int:
+	return 3 if registering else 2
+
+func account_back_focus(registering:bool)->int:
+	return 4 if registering else 3
+
+func account_step_focus(registering:bool,backwards:bool=false)->void:
+	var count:=account_focus_count(registering)
+	account_focus=(account_focus-1+count)%count if backwards else (account_focus+1)%count
+
 func draw_account_form(registering:bool)->void:
 	text_at(Vector2(300,145 if registering else 165),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",31,Color("ffe2aa"))
 	text_at(Vector2(300,188 if registering else 208),"Name und Passwort%s." % (" zweimal" if registering else ""),15,Color("d8e6dc"))
@@ -9104,8 +9270,10 @@ func draw_account_form(registering:bool)->void:
 		text_at(cr.position+Vector2(14,31),masked_password(account_password_confirm) if account_password_confirm!="" else "Passwort erneut eingeben …",19,Color("fff0cf") if account_password_confirm!="" else Color("9fb4ac"))
 		if account_password_confirm!="" and account_password_confirm==account_password:
 			text_at(Vector2(865,466),"OK",14,Color("9de6c2"))
-	ui_button(Rect2(300,545 if registering else 455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_form_valid(registering))
-	ui_button(Rect2(300,615 if registering else 525,180,42),"ZURÜCK")
+	var submit_focus:=account_submit_focus(registering)
+	var back_focus:=account_back_focus(registering)
+	ui_button(Rect2(300,545 if registering else 455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_form_valid(registering),account_focus==submit_focus)
+	ui_button(Rect2(300,615 if registering else 525,180,42),"ZURÜCK",true,account_focus==back_focus)
 	if account_status!="":text_at(Vector2(500,642 if registering else 552),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,350)
 
 func local_migration_slots()->Array:
@@ -9211,7 +9379,8 @@ func draw_start_panel() -> void:
 	text_at(Vector2(300, 320), "Lade deinen Spielstand oder erschaffe einen neuen Charakter.", 16, Color("dce7d8"), HORIZONTAL_ALIGNMENT_LEFT, 550)
 	if account_logged_in:text_at(Vector2(300,286),"Angemeldet als %s" % account_name,13,Color("9fd9c4"))
 	ui_button(Rect2(300, 378, 550, 54), "NEUEN CHARAKTER ERSTELLEN")
-	ui_button(Rect2(300, 448, 550, 54), "SPIELSTAND LADEN", FileAccess.file_exists(slot_save_path(selected_save_slot)))
+	ui_button(Rect2(300, 448, 430, 54), "SPIELSTAND LADEN", not preload("res://components/local_save_store.gd").read(slot_save_path(selected_save_slot)).is_empty())
+	ui_button(Rect2(740,448,110,54),"RETTEN")
 	text_at(Vector2(168, 521), "SPEICHERPLATZ WÄHLEN", 14, Color("f6dfa9"))
 	for index in 3:
 		var card := Rect2(168 + index * 273, 530, 260, 57)
