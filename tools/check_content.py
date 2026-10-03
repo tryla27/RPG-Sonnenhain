@@ -262,8 +262,12 @@ assert 'run/max_fps=60' in (root / 'project.godot').read_text(encoding='utf8'), 
 sprite_builder = (root / 'tools' / 'build_v27_pixel_art.py').read_text(encoding='utf8')
 assert 'if direction==0:' in sprite_builder and 'elif direction==1:' in sprite_builder and 'elif direction==2:' in sprite_builder and 'else:' in sprite_builder, 'directional face animation missing'
 assert 'hair_dark' in sprite_builder and 'geschichteten Helm' in sprite_builder, 'female hair or warrior helmet redesign missing'
-assert 'var house_tiles: Texture2D' in source and 'house_tiles = load("res://art/houses_192.png")' in source, 'detailed house atlas not loaded'
-assert 'func draw_house(p: Vector2) -> void:' in source and 'StartScenery32.themed_house(self,p,kind)' in source and 'StartScenery32.borin_house(self,p)' in source, 'start village does not use the themed pixel houses'
+start_scenery = (root / 'components' / 'start_scenery_32.gd').read_text(encoding='utf8')
+house_tiles32 = (root / 'components' / 'village_house_tiles_32.gd').read_text(encoding='utf8')
+assert 'houses_192.png' not in source and 'houses_192.png' not in start_scenery, 'legacy full-house atlas is still referenced at runtime'
+assert 'objects-faithful.webp' in start_scenery, 'shared scenery atlas unexpectedly removed'
+assert 'VillageHouseTiles32.paint(c,p,kind)' in start_scenery and 'VillageHouseTiles32.paint(c,p,"borin")' in start_scenery and 'VillageHouseTiles32.paint(c,p,"arena")' in start_scenery, 'Map 0 houses do not route through native tile renderer'
+assert 'const TILE:=32' in house_tiles32 and 'static func normal_house' in house_tiles32 and 'static func borin_house' in house_tiles32 and 'static func arena_building' in house_tiles32, 'native 32px house renderer incomplete'
 assert 'var fade_alpha := 1.0 if chat_open else clampf(chat_fade / 1.25, 0.0, 1.0)' in source, 'chat inactivity fade missing'
 assert 'func start_coop_world() -> void:' in source and 'WELT STARTEN' in source and 'WELT BEITRETEN' in source, 'co-op world start/join flow missing'
 assert 'func is_web_platform() -> bool:' in source and 'OS.has_feature("web")' in source, 'browser networking guard missing'
