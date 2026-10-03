@@ -590,6 +590,7 @@ const WorldBuilder = preload("res://components/world_builder.gd")
 var world_builder = WorldBuilder.new()
 const WorldFog = preload("res://components/world_fog.gd")
 var world_fog = WorldFog.new()
+const FusionRules = preload("res://components/fusion_rules.gd")
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -6078,6 +6079,9 @@ func fusion_impact_profile(fusion_id:int)->Dictionary:
 func fusion_spawn_rule(fusion_id:int)->String:
 	return str(fusion_impact_profile(fusion_id).get("spawn",""))
 
+func fusion_pair_template(source_a:int,source_b:int)->Dictionary:
+	return FusionRules.template_for_pair(source_a,source_b)
+
 func apply_fusion_impact(fusion_id:int,center:Vector2,damage:int,main_uid:int,rank:int,source_peer:int=0)->void:
 	var profile:=fusion_impact_profile(fusion_id)
 	if profile.is_empty():return
@@ -6202,8 +6206,8 @@ func fusion_source_skills()->Array:
 	var out:Array=[]
 	for id in range(0,40):
 		if id>=learned.size() or not learned[id]:continue
-		if id in CLASS_ULTIMATES or id in [9,10,11]:continue
-		# Nur aktiv nutzbare Fähigkeiten anbieten; passive Werte gehören nicht in den Kristall.
+		if not FusionRules.is_fusible(id):continue
+		# Nur aktiv nutzbare Fähigkeiten anbieten; passive/Ultimates/reine Bewegung/Fusionsoutputs sind ausgeschlossen.
 		if float(ABILITIES[id].get("cd",0.0))<=0.0:continue
 		out.append(id)
 	return out
@@ -9491,7 +9495,7 @@ func draw_mechanics_panel() -> void:
 		text_at(Vector2(190,250), "Skillpunkte bleiben beim normalen Leveln unverändert. Skills werden gezielt bei Borin gekauft.", 13, Color('e5ecd9'))
 		text_at(Vector2(190,282), "Drei aktive Slots werden nur bei Borin kostenlos umbelegt. Taste 4 bleibt die Klassen-Ultimate.", 13, Color('e5ecd9'))
 		text_at(Vector2(190,328), "KRISTALL DER VERSCHMELZUNG", 17, Color('d9c8ff'))
-		text_at(Vector2(190,356), "Neben Borin: zwei gelernte Skills + viel Gold + doppelte Grund-SP-Kosten → Fusionsskill.", 13, Color('cbd9da'))
+		text_at(Vector2(190,356), "Neben Borin: zwei gelernte aktive Skills + Gold → Fusionsskill. Keine Skillpunkte werden verbraucht.", 13, Color('cbd9da'))
 		text_at(Vector2(190,405), "MEISTERGABE NACH DEM FINALE", 17, Color('ffe0a1'))
 		text_at(Vector2(190,434), "Krieger: Wut · Magier: Arkaner Schritt · Bogenschütze: Jagdrausch + Schattenrolle.", 13, Color('e5ecd9'))
 		text_at(Vector2(190,468), "Bogenschütze: volle Jagdleiste = 60 Sek. +25% Angriffstempo; Rolle tarnt bis 0,4 Sek. danach.", 12, Color('aebfb9'))
