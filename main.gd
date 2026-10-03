@@ -7705,7 +7705,27 @@ func draw_shell(p: Vector2) -> void:
 	draw_rect(Rect2(p + Vector2(14, 14), Vector2(4, 4)), Color('fff7e8'))
 
 func draw_village_ground() -> void:
-	return
+	# 32px-Grundstückskanten: flache Einfassung um Häuser, rein visuell.
+	var pads:Array=[
+		Rect2(128,608,288,320),
+		Rect2(128,1088,288,320),
+		Rect2(128,1536,320,352),
+		Rect2(128,2016,352,320),
+		Rect2(1216,288,352,352),
+		Rect2(1248,1056,320,352),
+		Rect2(1088,1872,448,352)
+	]
+	for pad:Rect2 in pads:
+		if not pad.grow(48).intersects(current_static_bounds()):continue
+		draw_rect(pad,Color("6f7d57",0.18))
+		draw_rect(pad.grow(-8),Color("8a7b5d",0.10))
+		draw_rect(pad,Color("a79b79",0.38),false,3)
+		for x in range(int(pad.position.x)+16,int(pad.end.x)-16,32):
+			draw_rect(Rect2(Vector2(x,pad.position.y-2),Vector2(18,4)),Color("b8ae8f",0.48))
+			draw_rect(Rect2(Vector2(x,pad.end.y-2),Vector2(18,4)),Color("756b55",0.38))
+		for y in range(int(pad.position.y)+16,int(pad.end.y)-16,32):
+			draw_rect(Rect2(Vector2(pad.position.x-2,y),Vector2(4,18)),Color("9f9679",0.42))
+			draw_rect(Rect2(Vector2(pad.end.x-2,y),Vector2(4,18)),Color("6c654f",0.34))
 
 func draw_village_ground_legacy() -> void:
 	for i in range(16):
