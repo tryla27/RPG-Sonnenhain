@@ -2920,17 +2920,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if panel in ["account_login","account_register"] and event is InputEventKey and event.pressed and not event.echo:
 		var registering:=panel=="account_register"
-		var focus_count:=3 if registering else 2
 		if event.keycode==KEY_TAB:
-			account_focus=(account_focus+1)%focus_count
+			account_step_focus(registering,event.shift_pressed)
 		elif event.keycode==KEY_ESCAPE:
-			panel="account_gate";account_password="";account_password_confirm="";account_status=""
+			panel="account_gate";account_password="";account_password_confirm="";account_status="";account_focus=0
 		elif event.keycode==KEY_BACKSPACE:
 			if account_focus==0 and account_name.length()>0:account_name=account_name.left(account_name.length()-1)
 			elif account_focus==1 and account_password.length()>0:account_password=account_password.left(account_password.length()-1)
 			elif registering and account_focus==2 and account_password_confirm.length()>0:account_password_confirm=account_password_confirm.left(account_password_confirm.length()-1)
 		elif event.keycode==KEY_ENTER:
-			if account_form_valid(registering):request_account(registering)
+			if account_focus==account_back_focus(registering):
+				panel="account_gate";account_password="";account_password_confirm="";account_status="";account_focus=0
+			elif account_form_valid(registering):
+				request_account(registering)
 		elif event.unicode>=32:
 			var typed:=String.chr(event.unicode)
 			if account_focus==0 and account_name.length()<24 and "abcdefghijklmnopqrstuvwxyzäöüß0123456789_-".contains(typed.to_lower()):account_name+=typed
@@ -5321,10 +5323,12 @@ func handle_panel_click(mouse: Vector2) -> void:
 		if Rect2(300,275,550,48).has_point(mouse):account_focus=0
 		elif Rect2(300,365,550,48).has_point(mouse):account_focus=1
 		elif registering and Rect2(300,455,550,48).has_point(mouse):account_focus=2
-		elif Rect2(300,545 if registering else 455,550,52).has_point(mouse) and account_form_valid(registering):
-			request_account(registering)
+		elif Rect2(300,545 if registering else 455,550,52).has_point(mouse):
+			account_focus=account_submit_focus(registering)
+			if account_form_valid(registering):request_account(registering)
 		elif Rect2(300,615 if registering else 525,180,42).has_point(mouse):
-			panel="account_gate";account_password="";account_password_confirm="";account_status=""
+			account_focus=account_back_focus(registering)
+			panel="account_gate";account_password="";account_password_confirm="";account_status="";account_focus=0
 		queue_redraw()
 		return
 	if panel=="account_migrate":
@@ -9238,6 +9242,19 @@ func account_form_valid(registering:bool)->bool:
 	if registering and (account_password_confirm.length()<8 or account_password!=account_password_confirm):return false
 	return account_pending_action==""
 
+func account_focus_count(registering:bool)->int:
+	return 5 if registering else 4
+
+func account_submit_focus(registering:bool)->int:
+	return 3 if registering else 2
+
+func account_back_focus(registering:bool)->int:
+	return 4 if registering else 3
+
+func account_step_focus(registering:bool,backwards:bool=false)->void:
+	var count:=account_focus_count(registering)
+	account_focus=(account_focus-1+count)%count if backwards else (account_focus+1)%count
+
 func draw_account_form(registering:bool)->void:
 	text_at(Vector2(300,145 if registering else 165),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",31,Color("ffe2aa"))
 	text_at(Vector2(300,188 if registering else 208),"Name und Passwort%s." % (" zweimal" if registering else ""),15,Color("d8e6dc"))
@@ -9253,8 +9270,10 @@ func draw_account_form(registering:bool)->void:
 		text_at(cr.position+Vector2(14,31),masked_password(account_password_confirm) if account_password_confirm!="" else "Passwort erneut eingeben …",19,Color("fff0cf") if account_password_confirm!="" else Color("9fb4ac"))
 		if account_password_confirm!="" and account_password_confirm==account_password:
 			text_at(Vector2(865,466),"OK",14,Color("9de6c2"))
-	ui_button(Rect2(300,545 if registering else 455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_form_valid(registering))
-	ui_button(Rect2(300,615 if registering else 525,180,42),"ZURÜCK")
+	var submit_focus:=account_submit_focus(registering)
+	var back_focus:=account_back_focus(registering)
+	ui_button(Rect2(300,545 if registering else 455,550,52),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",account_form_valid(registering),account_focus==submit_focus)
+	ui_button(Rect2(300,615 if registering else 525,180,42),"ZURÜCK",true,account_focus==back_focus)
 	if account_status!="":text_at(Vector2(500,642 if registering else 552),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,350)
 
 func local_migration_slots()->Array:
