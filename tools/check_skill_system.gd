@@ -21,7 +21,7 @@ func run():
 	assert(float(g.enemies[0]["hp"])<hp_before,"Magier-Kampfskill verursacht keinen Schaden")
 	g.enemies.clear()
 	g.reset_class_skills();g.level=40;g.skill_points=30;g.gold=20000
-	assert(g.buy_skill(16));assert(g.buy_skill(20));assert(g.buy_skill(18))
+	assert(g.buy_skill(16));assert(g.buy_skill(20));assert(g.buy_skill(17));assert(g.buy_skill(18))
 	var offers:Array=g.available_fusions()
 	assert(not offers.is_empty(),"Gelernte Attacken müssen als Verschmelzungsangebote erscheinen")
 	var f:Dictionary=offers[0]
