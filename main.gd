@@ -40,6 +40,7 @@ const VillageLayout = preload("res://components/village_layout.gd")
 const StartScenery32 = preload("res://components/start_scenery_32.gd")
 const VillageInteriors32 = preload("res://components/village_interiors_32.gd")
 const DoorSfx = preload("res://components/door_sfx.gd")
+const EquipmentSfx = preload("res://components/equipment_sfx.gd")
 const CombatFeedback=preload("res://components/combat_feedback.gd")
 var combat_feedback=CombatFeedback.new()
 var creation_class_selected:=false
@@ -796,6 +797,8 @@ func _ready() -> void:
 	sound_streams["door_close"] = DoorSfx.make(false)
 	sound_streams["arrow_break"]=CombatFeedback.break_sound(true)
 	sound_streams["magic_break"]=CombatFeedback.break_sound(false)
+	sound_streams["equip"]=EquipmentSfx.make(true)
+	sound_streams["unequip"]=EquipmentSfx.make(false)
 	for i in 8:
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -15.0
@@ -11660,7 +11663,9 @@ func toggle_equipment_item(index: int) -> bool:
 		if int(item.get("head_class",-1))!=class_id:
 			message("Diese Kopfbedeckung gehört einer anderen Klasse.")
 			return true
-		equipped_head_uid=-1 if equipped_head_uid==uid else uid
+		var removing:=equipped_head_uid==uid
+		equipped_head_uid=-1 if removing else uid
+		play_sound("unequip" if removing else "equip")
 		validate_equipment_slots()
 		save_game()
 		announce_multiplayer_context()
@@ -11671,9 +11676,11 @@ func toggle_equipment_item(index: int) -> bool:
 			return true
 		if equipped_uid == uid:
 			equipped_uid = -1
+			play_sound("unequip")
 			message("Ausgezogen: %s" % str(item.get("name","Waffe")))
 		else:
 			equipped_uid = uid
+			play_sound("equip")
 			message("Ausgerüstet: %s (+%d Schaden)" % [str(item.get("name","Waffe")),int(item.get("power",0))])
 		save_game()
 		announce_multiplayer_context()
@@ -11681,9 +11688,11 @@ func toggle_equipment_item(index: int) -> bool:
 	if icon == "armor":
 		if equipped_armor_uid == uid:
 			equipped_armor_uid = -1
+			play_sound("unequip")
 			message("Ausgezogen: %s" % str(item.get("name","Rüstung")))
 		else:
 			equipped_armor_uid = uid
+			play_sound("equip")
 			message("Ausgerüstet: %s (%d Schutz)" % [str(item.get("name","Rüstung")),int(item.get("power",0))])
 		save_game()
 		announce_multiplayer_context()
@@ -11698,6 +11707,7 @@ func toggle_equipment_item(index: int) -> bool:
 		else: equipped_ring_uid = uid
 		validate_equipment_slots()
 		hp = minf(max_hp(),hp+maxf(0,max_hp()-old_max))
+		play_sound("unequip" if removing else "equip")
 		message(("Ausgezogen: " if removing else "Ausgerüstet: ")+str(item.get("name","Ring")))
 		save_game()
 		announce_multiplayer_context()
