@@ -45,14 +45,14 @@ func draw_hud_hover(g) -> void:
 		return
 	g.text_at(Vector2(390,143),title(g,id),19,Color("fff0ce"),HORIZONTAL_ALIGNMENT_LEFT,425)
 	if id==STORY:
-		var status:=["Zum Dorf folgen","Aktiv","Abgabebereit","Abgeschlossen"][g.rescue_state]
+		var status:String=str(["Zum Dorf folgen","Aktiv","Abgabebereit","Abgeschlossen"][g.rescue_state])
 		g.text_at(Vector2(390,174),"Status: %s" % status,14,Color("d8e6dc"))
 		g.text_at(Vector2(390,198),"Fortschritt: %d / %d Dornenwesen" % [g.rescue_kills,g.RESCUE_GOAL],14,Color("d8e6dc"))
 		g.text_at(Vector2(390,222),"Belohnung: 160 XP · 80 Gold",14,Color("ffe4a8"))
 	else:
 		var data:Dictionary=g.QUESTS[id]
 		var state:=int(g.quests[id]["state"])
-		var status:=["Verfügbar","Aktiv","Abgabebereit","Erledigt"][state]
+		var status:String=str(["Verfügbar","Aktiv","Abgabebereit","Erledigt"][state])
 		g.text_at(Vector2(390,174),"Status: %s · bei %s" % [status,str(data["npc"])],14,Color("d8e6dc"))
 		g.text_at(Vector2(390,198),"Fortschritt: %d / %d %s" % [int(g.quests[id]["progress"]),int(data["count"]),str(g.ENEMY_TYPES[int(data["target"])]["name"])],14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,425)
 		g.text_at(Vector2(390,222),"Belohnung: %d XP · %d Gold · %s" % [int(data["xp"]),int(data["gold"]),str(data["reward"])],13,Color("ffe4a8"),HORIZONTAL_ALIGNMENT_LEFT,425)
