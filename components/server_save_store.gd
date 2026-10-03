@@ -135,6 +135,10 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 			if int(item["uid"])==int(data["equipped_head_uid"]) and (item["icon"]!="head" or int(item.get("head_class",-1))!=int(data["class_id"])):return false
 	for field in ["learned","skill_levels","slots","quests","event_states","event_progress","opened_chests","chest_respawn_until","dungeon_chests_opened","dungeon_chest_respawn_until","bosses_defeated","waystone_unlocked","discovered_regions","processed_server_transactions","recent_players","village_gates","arena_leaderboard"]:
 		if not data.get(field,[]) is Array or data.get(field,[]).size() > (256 if field == "processed_server_transactions" else 100): return false
+	var fog:Variant=data.get("world_fog",[])
+	if not fog is Array or fog.size()>512:return false
+	for fog_byte in fog:
+		if not (fog_byte is int or fog_byte is float) or int(fog_byte)<0 or int(fog_byte)>255:return false
 	# Skilldaten sind dauerhaft und dürfen nicht durch manipulierte Clients beliebig
 	# zusammengesetzt werden. Drei Slots, keine Doppelbelegung, nur gelernte Skills.
 	var learned:Array=data.get("learned",[])
