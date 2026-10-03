@@ -188,9 +188,9 @@ for connection in [
 village_layout = (root / 'components' / 'village_layout.gd').read_text(encoding='utf8')
 for resident in ['Mira','Liora','Arven','Torvald','Fenna','Pip','Elara','Alma','Borin']:
     assert f'"name":"{resident}"' in village_layout, f'missing village house: {resident}'
-assert '"name":"Borin","house":Vector2(1330,230)' in village_layout, 'Borin house anchor moved'
-assert 'const BORIN_MAGIC_TREE_POS := Vector2(1620,520)' in source, 'Borin magic tree anchor moved'
-assert 'const BORIN_CRYSTAL_POS := Vector2(1608,700)' in source, 'Borin fusion crystal anchor moved'
+assert '"name":"Borin","house":Vector2(1248,320)' in village_layout, 'Borin house anchor moved'
+assert 'const BORIN_MAGIC_TREE_POS := Vector2(1552,544)' in source, 'Borin magic tree anchor moved'
+assert 'const BORIN_CRYSTAL_POS := Vector2(1512,736)' in source, 'Borin fusion crystal anchor moved'
 
 
 # v27.5 visuals, weapons, roads, daylight, performance, chat, co-op and web preset checks.
