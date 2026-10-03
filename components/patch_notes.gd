@@ -1,6 +1,13 @@
 extends RefCounted
-const VERSION="PATCH 03.10.2026"
+const VERSION="PATCH 04.10.2026"
 const NOTES=[
+["NEU · Verschmelzung", "Sekundäreffekte von Damage-Fusionen entstehen am tatsächlichen Trefferpunkt. Flammenwirbel folgt dem Feuerball, Blitzkern der Blitzlanze und Eisball bleibt impactgebunden."],
+["NEU · Fusionssystem", "Stabile Fusion-Keys, Save-Migration und serverseitige Multiplayer-Prüfung sind aktiv. Die universelle Regelbasis klassifiziert alle zulässigen Ausgangsskills."],
+["NEU · Fusionsregeln", "Damage → DAMAGE_IMPACT_POSITION; Ziel/Markierung → TARGET_POSITION; Sprung → LANDING_POSITION; Schutz/Heilung → PLAYER_POSITION; Reaktion → ATTACKER_POSITION."],
+["NEU · Fusionsränge", "Vier feste Stufen: Grundfusion; Signatur A; Signatur B; auf Rang 4 genau eine einzigartige Fusionsreaktion."],
+["NEU · Kosten", "Verschmelzungen kosten nur Gold. Skillpunkte werden beim Verschmelzen nicht verbraucht; Ausgangsattacken bleiben erhalten."],
+["NEU · Kopfrüstung", "Boss-Helme und Boss-Hüte sind klassenübergreifende Trophäen. Normale Klassen-Kopfbedeckungen bleiben klassengebunden."],
+["NEU · Eisball", "Frostnova + Blitzlanze = Eisball: Slow; Blitzkette; Blitzstun; Rang 4 zusätzlich Eiswirbel."],
 ["Speichern", "Hybrid-Saves mit lokalem Stand, Serverstand und Backups; Recovery-Auswahl schützt vor stillem Überschreiben."],
 ["Accounts", "Account-Zuordnung und Sicherungen werden robuster; vorhandene Saves dürfen nicht mehr nur wegen fehlender Metadaten als leer gelten."],
 ["World Builder", "32px-Editor mit Boden, Wänden, Objekten, NPCs, Spawns, Triggern, Ambiente, Undo/Redo, Export und Map-Prüfung."],
@@ -17,19 +24,19 @@ const NOTES=[
 ["Pip", "Pip ist jetzt Borins Arkanhändler und verkauft Stäbe, Elementstäbe, Arkanroben, Fokusringe, Kristallreife und Arkankerne; seine Leihwaffen-Rolle bleibt erhalten."],
 ["Anmeldung", "Zu kurze Passwörter werden jetzt direkt im Formular rot markiert und mit Mindestlänge sowie aktuellem Zeichenstand angezeigt."],
 ["Alma", "Bei bereits gelernten Rezepten wird der funktionslose Lern-Button nicht mehr angezeigt; der Lernstatus bleibt nur als Kennzeichnung in der Liste sichtbar."],
-["Verschmelzung", "Frostnova + Blitzlanze ergibt jetzt den Eisball. Er besitzt vier Kristallstufen: Slow; Slow + Blitzkette; zusätzlich Blitzstun; auf Stufe 4 zusätzlich ein kleiner Eiswirbelsturm. Fusionsrezepte sind feste Kombinationen und Quellen bleiben erhalten."],
-["Verschmelzung", "Fusionen besitzen jetzt eine stabile, reihenfolgeunabhängige Identität aus ihren beiden Quell-Skills. Fortschritt wird normalisiert gespeichert, alte fusion_history-Saves werden migriert und Multiplayer-Casts serverseitig gegen Fusion-Key und Rang geprüft."],
-["Verschmelzung", "Sekundäre Fusionswirkungen entstehen jetzt am tatsächlichen Schadentrefferpunkt: Flammenwirbel folgt dem Feuerball-Impact, Blitzkern der Blitzlanze und Eisball bleibt impactgebunden. Reaktorwall ist als Schutzfusion die PLAYER_POSITION-Ausnahme."],
-["Kopfrüstung", "Boss-Helme und Boss-Hüte sind jetzt klassenübergreifende Trophäen und können von jedem Charakter getragen werden; normale Klassen-Kopfbedeckungen bleiben weiterhin klassengebunden."],
 ["Fog of War", "Erkundung läuft über Regionsgrenzen hinweg; Gruppenmitglieder in derselben Weltinstanz teilen ihre Sicht."],
 ["Magier", "Risssprung auf Leertaste ersetzt Arkanen Schritt; Rissnova wird normaler Skill und Arkaner Sturm wird ab Level 40 freigeschaltet."],
 ["Menüs", "Login-Navigation per Tab/Shift+Tab; Spielmenü und Untermenüs erhalten konsistente Zurück-Navigation."],
 ["Audio", "Musik und Effekte erhalten eigene Mute-Schalter; eingestellte Lautstärken bleiben beim Stummschalten erhalten."],
 ["Patch-Ablauf", "Patch Notes sind ab jetzt Pflichtbestandteil jedes relevanten PRs; CI prüft, dass sie mit aktualisiert wurden."]]
 static func draw(g)->void:
+	var BuildInfo=preload("res://components/build_info.gd")
 	g.text_at(Vector2(170,135),VERSION,25,Color("ffe2aa"))
-	g.text_at(Vector2(170,166),"Alle Änderungen auf einer Seite · Stand und Planung",14,Color("b8cbc5"))
-	for i in NOTES.size():
-		var y:float=198+i*40
-		g.text_at(Vector2(170,y),NOTES[i][0],14,Color("ffe2aa"))
-		g.text_at(Vector2(330,y),NOTES[i][1],12,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,640)
+	g.text_at(Vector2(760,135),"BUILD "+str(BuildInfo.SHORT),13,Color("b8cbc5"),HORIZONTAL_ALIGNMENT_RIGHT,210)
+	g.text_at(Vector2(170,166),"Neueste Änderungen zuerst · Production-Build sichtbar",14,Color("b8cbc5"))
+	var visible_count:=mini(10,NOTES.size())
+	for i in visible_count:
+		var y:float=198+i*38
+		g.text_at(Vector2(170,y),NOTES[i][0],13,Color("ffe2aa"))
+		g.text_at(Vector2(330,y),NOTES[i][1],11,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,640)
+	g.text_at(Vector2(170,590),"%d weitere ältere Einträge im Patch-Verlauf." % maxi(0,NOTES.size()-visible_count),11,Color("9fb4ac"))
