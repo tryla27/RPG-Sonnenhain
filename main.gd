@@ -190,6 +190,14 @@ const CLASS_ULTIMATES := [15, 24, 33]
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
 const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200,"max_rank":4},{"id":41,"a":1,"b":36,"gold":2200,"max_rank":4},{"id":42,"a":18,"b":37,"gold":4200,"max_rank":4},{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}]
+# Zentrale Regel: Damage-Fusionen lösen ihren Sekundäreffekt am tatsächlichen Trefferpunkt aus.
+# Reine Schutz-/Buff-Fusionen bleiben als ON_CAST-Ausnahme am Spieler.
+const FUSION_IMPACT_PROFILES := {
+	40:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":16,"secondary":0,"effect":"fire_whirl","radius":112.0,"damage_mult":0.34},
+	41:{"trigger":"ON_CAST","spawn":"PLAYER_POSITION","carrier":1,"secondary":36,"effect":"reactor_wall","radius":150.0,"damage_mult":0.22},
+	42:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":18,"secondary":37,"effect":"tesla_wave","radius":145.0,"damage_mult":0.38},
+	43:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":18,"secondary":17,"effect":"iceball","radius":118.0,"damage_mult":0.42}
+}
 const BORIN_HOUSE_POS := Vector2(1248,320)
 const BORIN_MAGIC_TREE_POS := Vector2(1552,544)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
@@ -3481,14 +3489,17 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
-	if id in [3,7,16,18,20,25,26,28,29,30,43]:
+	if id in [3,7,16,18,20,25,26,28,29,30,40,42,43]:
 		for shot in ability_projectiles(id,origin,dir,remote_class,power):
 			shot["owner_peer"]=sender
-			if id==43:shot["fusion_rank"]=rank
+			if not fusion_definition.is_empty():shot["fusion_rank"]=rank
 			projectiles.append(shot)
 		return
+	if id==41:
+		apply_fusion_impact(41,origin,power+12,-1,rank,sender)
+		return
 	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
-	var radial_ids := [0,5,17,19,22,23,24,31,33,37,39,40,41,42]
+	var radial_ids := [0,5,17,19,22,23,24,31,33,37,39]
 	if id in radial_ids:
 		var aoe_rank:=clampi(int(state.get("essence_magic_aoe",0)),0,4)
 		var radius := (165.0 + rank * 12.0)*(1.0+(0.05 if aoe_rank>=3 else 0.0)+(0.05 if aoe_rank>=4 else 0.0))
@@ -3621,21 +3632,12 @@ func use_ability(slot: int) -> void:
 			for i in range(enemies.size()-1,-1,-1):
 				if enemies[i]["pos"].distance_to(player_pos)<175.0*essence.aoe_radius_mult(): enemies[i]["stun"]=maxf(float(enemies[i].get("stun",0.0)),1.8);damage_enemy(i,roundi(power*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
 			effect(player_pos,"EMP",Color("b7e9ff"),0.9)
-		40:
-			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<190.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+30)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"feuer")
-			effect(player_pos,"FLAMMENWIRBEL",Color("ff9858"),1.0)
+		40,42,43:
+			for shot in ability_projectiles(id,player_pos,facing,class_id,power):
+				shot["fusion_rank"]=rank
+				projectiles.append(shot)
 		41:
-			shield_timer=7.0
-			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<150.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+12)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
-			effect(player_pos,"REAKTORWALL",Color("8fdcff"),1.0)
-		42:
-			for i in range(enemies.size()-1,-1,-1):
-				if enemies[i]["pos"].distance_to(player_pos)<230.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+24)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
-			effect(player_pos,"BLITZKERN",Color("fff0a5"),1.0)
-		43:
-			projectiles.append({"pos":player_pos,"dir":facing,"speed":535.0,"life":1.45,"damage":power+18,"kind":2,"element":"eis","spell_id":43,"fusion_rank":rank,"pierce":false,"hits":[],"trail":[]})
+			apply_fusion_impact(41,player_pos,power+12,-1,rank)
 		15:
 			shield_timer = 5.0 + rank
 			for i in range(enemies.size() - 1, -1, -1):
@@ -3727,8 +3729,13 @@ func update_projectiles(delta: float) -> void:
 			if MobCombat.shot_hits(previous,p["pos"],enemies[e]["pos"],mob_hit_radius(enemies[e])+4):
 				p["hits"].append(uid)
 				var impact: Vector2 = enemies[e]["pos"]
-				if not bool(p.get("network_visual",false)):damage_enemy(e, int(p["damage"]), p["dir"], false, str(p.get("element", "")))
-				match (-1 if bool(p.get("network_visual",false)) else spell_id):
+				var network_visual:=bool(p.get("network_visual",false))
+				var source_peer:=int(p.get("owner_peer",0))
+				if not network_visual:
+					damage_enemy(e,int(p["damage"]),p["dir"],false,str(p.get("element","")),source_peer)
+					if not fusion_impact_profile(spell_id).is_empty():
+						apply_fusion_impact(spell_id,impact,int(p["damage"]),uid,clampi(int(p.get("fusion_rank",1)),1,4),source_peer)
+				match (-1 if network_visual else spell_id):
 					25:
 						for survivor in enemies:
 							if int(survivor["uid"]) == uid: survivor["marked"] = 5.0
@@ -3736,7 +3743,6 @@ func update_projectiles(delta: float) -> void:
 					28: create_poison_cloud(impact, int(p["damage"]))
 					29: frost_burst(impact, int(p["damage"] * 0.32), uid)
 					30: chain_spell(impact, int(p["damage"] * 0.55), uid, 2)
-					43: iceball_impact(impact,int(p["damage"]),uid,clampi(int(p.get("fusion_rank",1)),1,4))
 					18: spell_visuals.append({"kind":18, "pos":impact, "end":impact, "dir":p["dir"], "rank":1, "life":0.28, "max":0.28})
 				if not bool(p.get("pierce", false)):
 					if spell_id == 16: explode_fireball(p)
@@ -3761,7 +3767,7 @@ func update_poison_clouds(delta: float) -> void:
 			if cloud["pos"].distance_to(enemies[e]["pos"]) < 86:
 				damage_enemy(e, int(cloud["damage"]), Vector2.ZERO, false, "gift")
 
-func iceball_chain(center:Vector2,damage:int,main_uid:int,jumps:int,stun_enabled:bool)->void:
+func iceball_chain(center:Vector2,damage:int,main_uid:int,jumps:int,stun_enabled:bool,source_peer:int=0)->void:
 	var seen:Array=[main_uid]
 	var origin:=center
 	for jump in jumps:
@@ -3777,19 +3783,19 @@ func iceball_chain(center:Vector2,damage:int,main_uid:int,jumps:int,stun_enabled
 		var target:Vector2=enemies[best]["pos"]
 		seen.append(int(enemies[best]["uid"]))
 		lightning_lines.append({"from":origin,"to":target,"life":0.32})
-		damage_enemy(best,maxi(2,damage-jump*4),Vector2.ZERO,false,"")
+		damage_enemy(best,maxi(2,damage-jump*4),Vector2.ZERO,false,"",source_peer)
 		if stun_enabled and best<enemies.size():
 			enemies[best]["stun"]=maxf(float(enemies[best].get("stun",0.0)),0.85)
 		origin=target
 
-func iceball_impact(center:Vector2,damage:int,main_uid:int,rank:int)->void:
+func iceball_impact(center:Vector2,damage:int,main_uid:int,rank:int,source_peer:int=0)->void:
 	rank=clampi(rank,1,4)
 	for enemy in enemies:
 		if int(enemy.get("uid",-1))==main_uid:
 			enemy["slow"]=maxf(float(enemy.get("slow",0.0)),3.0+rank*0.5)
 			break
 	if rank>=2:
-		iceball_chain(center,maxi(3,roundi(damage*0.42)),main_uid,2,rank>=3)
+		iceball_chain(center,maxi(3,roundi(damage*0.42)),main_uid,2,rank>=3,source_peer)
 	if rank>=3:
 		for enemy in enemies:
 			if int(enemy.get("uid",-1))==main_uid:
@@ -3803,7 +3809,7 @@ func iceball_impact(center:Vector2,damage:int,main_uid:int,rank:int)->void:
 			var distance:=delta.length()
 			if distance>118.0 or distance<1.0:continue
 			move_enemy_with_collision(enemies[i],delta.normalized()*minf(34.0,distance*0.28))
-			damage_enemy(i,maxi(2,roundi(damage*0.18)),Vector2.ZERO,false,"eis")
+			damage_enemy(i,maxi(2,roundi(damage*0.18)),Vector2.ZERO,false,"eis",source_peer)
 		spell_visuals.append({"kind":23,"pos":center,"end":center,"dir":Vector2.RIGHT,"rank":4,"life":0.8,"max":0.8})
 		effect(center+Vector2(0,-42),"EISWIRBEL",Color("b8eaff"),0.8)
 	else:
@@ -6064,6 +6070,48 @@ func fusion_definition_by_id(fusion_id:int)->Dictionary:
 		if int(fusion["id"])==fusion_id:
 			return fusion
 	return {}
+
+func fusion_impact_profile(fusion_id:int)->Dictionary:
+	var raw:Variant=FUSION_IMPACT_PROFILES.get(fusion_id,{})
+	return raw.duplicate(true) if raw is Dictionary else {}
+
+func fusion_spawn_rule(fusion_id:int)->String:
+	return str(fusion_impact_profile(fusion_id).get("spawn",""))
+
+func apply_fusion_impact(fusion_id:int,center:Vector2,damage:int,main_uid:int,rank:int,source_peer:int=0)->void:
+	var profile:=fusion_impact_profile(fusion_id)
+	if profile.is_empty():return
+	rank=clampi(rank,1,4)
+	var effect_kind:=str(profile.get("effect",""))
+	var radius:=float(profile.get("radius",96.0))*(1.0+0.06*float(rank-1))
+	var secondary_damage:=maxi(2,roundi(float(damage)*float(profile.get("damage_mult",0.30))*(1.0+0.08*float(rank-1))))
+	match effect_kind:
+		"fire_whirl":
+			for e in range(enemies.size()-1,-1,-1):
+				if e>=enemies.size():continue
+				var offset:Vector2=enemies[e]["pos"]-center
+				if offset.length()>radius:continue
+				damage_enemy(e,secondary_damage,offset.normalized() if offset.length()>0.01 else Vector2.ZERO,false,"feuer",source_peer)
+			spell_visuals.append({"kind":40,"pos":center,"end":center,"dir":Vector2.RIGHT,"rank":rank,"life":0.75,"max":0.75})
+			create_burning_ground(center,maxi(2,roundi(secondary_damage*0.35)),2.4+rank*0.35)
+		"reactor_wall":
+			if source_peer<=0:shield_timer=maxf(shield_timer,6.0+rank*0.5)
+			for e in range(enemies.size()-1,-1,-1):
+				if e>=enemies.size():continue
+				var offset:Vector2=enemies[e]["pos"]-center
+				if offset.length()>radius:continue
+				damage_enemy(e,secondary_damage,offset.normalized() if offset.length()>0.01 else Vector2.ZERO,false,"blitz",source_peer)
+			spell_visuals.append({"kind":41,"pos":center,"end":center,"dir":Vector2.RIGHT,"rank":rank,"life":0.72,"max":0.72})
+		"tesla_wave":
+			for e in range(enemies.size()-1,-1,-1):
+				if e>=enemies.size():continue
+				var offset:Vector2=enemies[e]["pos"]-center
+				if offset.length()>radius:continue
+				lightning_lines.append({"from":center,"to":enemies[e]["pos"],"life":0.26})
+				damage_enemy(e,secondary_damage,Vector2.ZERO,false,"blitz",source_peer)
+			spell_visuals.append({"kind":42,"pos":center,"end":center,"dir":Vector2.RIGHT,"rank":rank,"life":0.62,"max":0.62})
+		"iceball":
+			iceball_impact(center,damage,main_uid,rank,source_peer)
 
 func fusion_progress_snapshot()->Dictionary:
 	var out:Dictionary={}
@@ -12720,9 +12768,41 @@ func ability_projectiles(id:int,origin:Vector2,dir:Vector2,cls:int,power:int)->A
 	var result:Array=[]
 	var count:int=3 if id in [7,20,26] else 1
 	for n in count:
-		var speed:float=535 if id==43 else (650 if id==3 else (700 if id==7 else (920 if id in [18,25] else (390 if id==20 else (570 if id in [16,29] else 720)))))
-		var damage:int=power+15 if id==3 else (power+10 if id==7 else int(power*(.72 if id in [20,26] else (.68 if id==16 else 1.0)))+(22 if id in [18,25] else 7))
-		result.append({"pos":origin,"dir":dir.rotated((n-(count-1)*.5)*.24),"speed":speed,"life":.9 if id==3 else (.8 if id==7 else (1.65 if id==20 else 1.25)),"damage":damage,"kind":0 if id==3 else (1 if id==7 else (3 if cls==2 else 2)),"element":"gift" if id==28 else ("eis" if id in [29,43] else ("blitz" if id in [18,30] else ("feuer" if id==16 else ""))),"spell_id":id,"pierce":id in [3,18,25],"hits":[],"trail":[]})
+		var speed:float=720.0
+		var life:float=1.25
+		var damage:int=power+7
+		var kind:int=3 if cls==2 else 2
+		var element:String=""
+		var pierce:bool=false
+		match id:
+			3:
+				speed=650.0;life=0.9;damage=power+15;kind=0;pierce=true
+			7:
+				speed=700.0;life=0.8;damage=power+10;kind=1
+			16:
+				speed=570.0;damage=int(power*0.68)+7;element="feuer"
+			18:
+				speed=920.0;damage=power+22;element="blitz";pierce=true
+			20:
+				speed=390.0;life=1.65;damage=int(power*0.72)+7
+			25:
+				speed=920.0;damage=power+22;pierce=true
+			26:
+				damage=int(power*0.72)+7
+			28:
+				element="gift"
+			29:
+				speed=570.0;element="eis"
+			30:
+				element="blitz"
+			40:
+				speed=570.0;life=1.35;damage=power+24;element="feuer"
+			42:
+				speed=920.0;life=1.10;damage=power+22;element="blitz";pierce=true
+			43:
+				speed=535.0;life=1.45;damage=power+18;element="eis"
+		var angle:float=(float(n)-float(count-1)*0.5)*0.24
+		result.append({"pos":origin,"dir":dir.rotated(angle),"speed":speed,"life":life,"damage":damage,"kind":kind,"element":element,"spell_id":id,"pierce":pierce,"hits":[],"trail":[]})
 	return result
 
 func steer_homing_shot(shot:Dictionary,delta:float)->void:
