@@ -827,7 +827,23 @@ func _ready() -> void:
 		arcane_step_learned=true
 		konflux.enter(self)
 
+func ensure_skill_state_size() -> void:
+	var target_size:int=ABILITIES.size()
+	var learned_old:int=learned.size()
+	var levels_old:int=skill_levels.size()
+	var cooldowns_old:int=cooldowns.size()
+	if learned_old<target_size:
+		learned.resize(target_size)
+		for i in range(learned_old,target_size):learned[i]=false
+	if levels_old<target_size:
+		skill_levels.resize(target_size)
+		for i in range(levels_old,target_size):skill_levels[i]=0
+	if cooldowns_old<target_size:
+		cooldowns.resize(target_size)
+		for i in range(cooldowns_old,target_size):cooldowns[i]=0.0
+
 func reset_class_skills() -> void:
+	ensure_skill_state_size()
 	arcane_resonance = 0
 	arcane_step_learned = false
 	class_mastery_unlocked = false
@@ -6035,6 +6051,7 @@ func fusion_source_skills()->Array:
 	return out
 
 func available_fusions()->Array:
+	ensure_skill_state_size()
 	var offers:Array=[]
 	for fusion in FUSIONS:
 		var output:=int(fusion["id"])
@@ -6052,6 +6069,7 @@ func fusion_skill_cost(fusion:Dictionary) -> int:
 	return maxi(1,ceili(float(skill_point_cost(a)+skill_point_cost(b))*0.75))
 
 func can_fuse(fusion:Dictionary) -> bool:
+	ensure_skill_state_size()
 	var a:=int(fusion["a"]);var b:=int(fusion["b"]);var id:=int(fusion["id"])
 	var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
 	return a!=b and learned[a] and learned[b] and int(skill_levels[id])<max_rank and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
