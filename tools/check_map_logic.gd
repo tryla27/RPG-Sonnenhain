@@ -1,3 +1,4 @@
+# Production deploy marker: save repair + HUD + 32px village pass.
 extends SceneTree
 var failures := 0
 func check(ok: bool,label: String) -> void:
