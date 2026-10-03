@@ -4003,10 +4003,23 @@ func sanitize_role_shop_stock() -> void:
 		shop_stock["alchemy"]=(shop_stock["alchemy"] as Array).filter(func(item): return str(item.get("icon","")) in ["potion","herb","essence"])
 	if shop_stock.has("smith"):
 		shop_stock["smith"]=(shop_stock["smith"] as Array).filter(func(item): return str(item.get("icon","")) in ["sword","armor","head"])
+	if shop_stock.has("arcane"):
+		shop_stock["arcane"]=(shop_stock["arcane"] as Array).filter(func(item): return str(item.get("icon","")) in ["staff","armor","ring","head","essence"])
 
 func open_elara_alchemy() -> void:
 	sanitize_role_shop_stock()
 	merchant_kind="alchemy"
+	shop_page=0
+	panel="shop"
+	selected_item=-1
+	menu_scroll=0
+	sell_all_confirm=false
+	pending_purchase=-1
+	pending_purchase_item={}
+
+func open_pip_arcane_shop() -> void:
+	sanitize_role_shop_stock()
+	merchant_kind="arcane"
 	shop_page=0
 	panel="shop"
 	selected_item=-1
@@ -4025,7 +4038,7 @@ func interior_actors() -> Array:
 	if room_name=="Borin":
 		return [
 			{"name":"Borin","role":"Skillzauberer · Fähigkeiten & Prüfungen","pos":INTERIOR_CENTER+Vector2(-120,-90),"color":Color("6783bd"),"kind":"quest"},
-			{"name":"Pip","role":"Borins Gehilfe · Leihwaffen","pos":INTERIOR_CENTER+Vector2(130,-65),"color":Color("9f8bcc"),"kind":"apprentice"}
+			{"name":"Pip","role":"Arkanhändler · Stäbe & Magie","pos":INTERIOR_CENTER+Vector2(130,-65),"color":Color("9f8bcc"),"kind":"arcane_merchant"}
 		]
 	var pos:=INTERIOR_CENTER+Vector2(0,-95)
 	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-215,-42)
@@ -4051,7 +4064,9 @@ func interact_interior_owner(name:String="") -> void:
 				pip_dialogue()
 			panel="essence";essence.selected_tree=0;menu_scroll=0
 		"Pip":
-			pip_dialogue()
+			if not pip_loan_received or level>pip_loan_level:
+				pip_dialogue()
+			open_pip_arcane_shop()
 		"Elara": open_elara_alchemy()
 		"Fenna": panel="appearance"
 		"Torvald":
@@ -4757,7 +4772,9 @@ func interact() -> void:
 	elif closest["kind"] == "stylist":
 		panel="appearance"
 	elif closest["kind"] == "apprentice":
-		message("Pip: Ich bin Borins Lehrling. Komm mit Fragen zu Fähigkeiten gern in unsere Häuser.")
+		message("Pip: Meine magischen Waren findest du bei Borin im Haus.")
+	elif closest["kind"] == "arcane_merchant":
+		open_pip_arcane_shop()
 	elif closest["kind"] == "arena":
 		panel = "arena_entry"
 	else:
@@ -6331,6 +6348,13 @@ func refresh_shop_stock() -> void:
 			{"name":"Heiltrank", "icon":"potion", "power":0, "price":35, "rarity":1},
 			{"name":"Großer Heiltrank", "icon":"potion", "power":0, "price":85, "rarity":1},
 			{"name":"Manatrank" if class_id == 1 else "Energietrank", "icon":"potion", "power":0, "price":45, "rarity":1}],
+		"arcane":[
+			{"name":"Runenstab %s" % suffix, "icon":"staff", "power":6 + tier * 2, "price":110 + tier * 24, "rarity":rarity, "level":tier},
+			{"name":"Elementstab · %s" % shop_element.capitalize(), "icon":"staff", "power":9 + tier * 2, "price":175 + tier * 30, "rarity":mini(3,rarity+1), "level":tier, "element":shop_element},
+			{"name":"Arkanrobe %s" % suffix, "icon":"armor", "power":4 + int(tier / 3.0), "price":210 + tier * 26, "rarity":rarity, "level":tier},
+			{"name":"Fokusring %s" % suffix, "icon":"ring", "power":10 + tier * 2, "price":160 + tier * 22, "rarity":rarity, "level":tier},
+			{"name":"Kristallreif %s" % suffix, "icon":"head", "power":5 + int(tier / 2.0), "price":260 + tier * 31, "rarity":mini(3,rarity+1), "level":tier},
+			{"name":"Arkankern · %s" % shop_element.capitalize(), "icon":"essence", "power":0, "price":240 + tier * 20, "rarity":mini(3,rarity+1), "level":tier, "element":shop_element}],
 		"merchant":[
 			{"name":"Reisendenring %s" % suffix, "icon":"ring", "power":8 + tier * 2, "price":80 + tier * 19, "rarity":rarity, "level":tier},
 			{"name":"Umhang %s" % suffix, "icon":"armor", "power":1 + int(tier / 4.0), "price":65 + tier * 14, "rarity":rarity, "level":tier},
@@ -10046,7 +10070,7 @@ func draw_skill_icon(p: Vector2, id: int, size: float) -> void:
 	draw_rect(box, Color(border,0.35), false, 1)
 
 func draw_shop_panel() -> void:
-	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else "HÄNDLER")
+	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else ("PIP (ARKANHANDEL)" if merchant_kind == "arcane" else "HÄNDLER"))
 	text_at(Vector2(165, 125), shop_name, 25, Color("ffeda9"))
 	text_at(Vector2(804, 126), "%d GOLD" % gold, 17, Color("f9dba0"))
 	text_at(Vector2(169, 174), "KAUFEN · Neues Angebot in %d:%02d" % [int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 17, Color("e8f2de"))
