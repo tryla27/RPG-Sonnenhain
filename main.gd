@@ -9351,9 +9351,10 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
 		ui_button(Rect2(590, 480, 260, 38), "BACKUP IMPORT")
 	if creative_mode:
-		text_at(Vector2(302, 500), "TESTMODUS · Änderungen bleiben getrennt, bis du sie als Reparatur bestätigst.", 12, Color("fff0bd"))
-		ui_button(Rect2(300,510,430,38),"SPIELSTAND REPARIEREN")
-		ui_button(Rect2(742,510,200,38),"REISEN")
+		text_at(Vector2(302, 500), "TESTMODUS · Reparatur, Reisen und World Builder sind getrennte Werkzeuge.", 12, Color("fff0bd"))
+		ui_button(Rect2(300,510,280,38),"SPIELSTAND REPARIEREN")
+		ui_button(Rect2(590,510,170,38),"REISEN")
+		ui_button(Rect2(770,510,180,38),"WORLD BUILDER")
 	elif test_level_lock>0:
 		text_at(Vector2(302,504),"ALTER LEVEL-LOCK AKTIV · wird beim nächsten XP-Gewinn aufgehoben.",13,Color("ffd98a"))
 	text_at(Vector2(302, 538 if not creative_mode else 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
