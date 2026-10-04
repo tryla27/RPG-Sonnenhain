@@ -20,9 +20,9 @@ const TALENTS:=[
 	],
 	[
 		{"name":"Trollblut","desc":"Lebensregeneration, später auch im Kampf."},
-		{"name":"Anker","desc":"Weniger Rückstoß und mehr Standfestigkeit."},
+		{"name":"Anker","desc":"Treffer bremsen deinen Sprint weniger stark ab."},
 		{"name":"Überlebensinstinkt","desc":"Unter 19% HP startet ein stärkerer Notfallmodus."},
-		{"name":"Unerschütterlich","desc":"Verringert Dauer gegnerischer Kontrolleffekte."},
+		{"name":"Unerschütterlich","desc":"Verkürzt die Sprintunterbrechung durch gegnerische Treffer."},
 		{"name":"Zweiter Atem","desc":"Verstärkt eingehende Heilung und Schutzpuffer."}
 	],
 	[
@@ -148,3 +148,19 @@ func unstable_projectile_radius()->float:
 
 func resonance_rank()->int:
 	return rank(2,4)
+
+func cooldown_mult()->float:
+	return 1.0-0.05*rank(3,0)
+
+func movement_mult()->float:
+	return 1.0+0.04*rank(3,1)
+
+func healing_mult()->float:
+	return 1.0+0.08*rank(1,4)
+
+func energy_mult()->float:
+	return 1.0+0.10*rank(4,0)
+
+func regeneration_rate(in_combat:bool)->float:
+	var r:=rank(1,0)
+	return float(r)*(0.5 if in_combat and r>=3 else (0.0 if in_combat else 1.0))

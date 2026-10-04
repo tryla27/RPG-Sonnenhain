@@ -63,6 +63,26 @@ func run()->void:
 	invalid[0][0]=99
 	assert(actor.EssenceSystem.network_ranks(invalid,40).is_empty())
 	assert(actor.EssenceSystem.network_ranks(actor.essence.ranks,1).is_empty())
+	# Synchronized ranks must affect real authoritative damage and return healing
+	# and resonance exclusively to the attacking client.
+	actor.essence.reset();actor.class_id=1;actor.hp=100.0;actor.arcane_resonance=0
+	for i in 2:
+		assert(actor.essence.invest(40,0,1))
+		assert(actor.essence.invest(40,3,2))
+	assert(actor.essence.invest(40,2,4))
+	actor.rpc_player_state.rpc_id(1,actor.local_player_state())
+	await wait_frames(12)
+	server.enemies.clear()
+	var enemy:Dictionary=server.make_enemy(0,actor.player_pos+Vector2(60,0))
+	enemy["hp"]=1000.0;enemy["max_hp"]=1000.0;enemy["target_peer"]=actor_id;enemy["facing"]=Vector2.LEFT
+	server.enemies.append(enemy)
+	var host_hp:float=server.hp
+	var observer_hp:float=observer.hp
+	server.damage_enemy(0,100,Vector2.ZERO,false,"eis",actor_id)
+	await wait_frames(12)
+	assert(is_equal_approx(float(enemy["hp"]),882.0)) # precision + frost
+	assert(is_equal_approx(actor.hp,104.72) and actor.arcane_resonance==1)
+	assert(server.hp==host_hp and observer.hp==observer_hp)
 	print("RUNES_NETWORK_OK all five rune trees: 18 class/race/gender combinations, real WebSocket authority and observer; bounded ranks and level budget")
 	host.close();actor_peer.close();observer_peer.close()
 	for game in [server,actor,observer]:

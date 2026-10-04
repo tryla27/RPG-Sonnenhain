@@ -355,6 +355,12 @@ var ranger_stealth_timer := 0.0
 var ranger_falcon_rune := false
 var robotics_overclock_timer := 0.0
 var arcane_resonance := 0
+var rune_overload := 0
+var rune_attack_count := 0
+var rune_counter_ready := false
+var rune_emergency_timer := 0.0
+var rune_emergency_cooldown := 0.0
+var rune_auto_shield_cooldown := 0.0
 const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
 var equipped_ring2_uid := -1
@@ -861,6 +867,12 @@ func ensure_skill_state_size() -> void:
 func reset_class_skills() -> void:
 	ensure_skill_state_size()
 	arcane_resonance = 0
+	rune_overload = 0
+	rune_attack_count = 0
+	rune_counter_ready = false
+	rune_emergency_timer = 0.0
+	rune_emergency_cooldown = 0.0
+	rune_auto_shield_cooldown = 0.0
 	arcane_step_learned = false
 	class_mastery_unlocked = false
 	warrior_rage = 0.0
@@ -1572,7 +1584,7 @@ func max_hp() -> float:
 	return 100.0 + float(level - 1) * 8.0 + float(skill_levels[10]) * 25.0 + equipment_power(equipped_ring_uid) + (equipment_power(equipped_ring2_uid) if class_id == 1 and equipped_ring2_uid != equipped_ring_uid else 0) + item_attribute("str") * (2 if class_id == 0 else 1)
 
 func max_energy() -> float:
-	return 100.0 + float(skill_levels[11]) * 25.0
+	return (100.0 + float(skill_levels[11]) * 25.0)*essence.energy_mult()
 
 func max_stamina() -> float:
 	# Rasse prägt die Grundkondition, Klasse verschiebt sie nur moderat.
@@ -1594,7 +1606,7 @@ func stamina_regen_rate() -> float:
 
 func sprint_acceleration() -> float:
 	# Rund 0.8-1.2 Sekunden bis zum vollen Sprint; Schütze zieht am schnellsten an.
-	return [1.02,0.92,1.34][clampi(class_id,0,2)] * [1.0,0.92,1.08][clampi(hero_race,0,2)]
+	return [1.02,0.92,1.34][clampi(class_id,0,2)] * [1.0,0.92,1.08][clampi(hero_race,0,2)] * essence.movement_mult()
 
 func sprint_speed_curve(blend:float)->float:
 	var t:=clampf(blend,0.0,1.0)
@@ -1794,7 +1806,8 @@ func _process(delta: float) -> void:
 	for i in boss_cooldowns.size():
 		boss_cooldowns[i] = maxf(0.0, float(boss_cooldowns[i]) - delta)
 	if panel == "":
-		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * food_system.energy_regen_mult() * delta)
+		update_rune_effects(delta)
+		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * food_system.energy_regen_mult() * essence.energy_mult() * delta)
 		update_player(delta)
 		update_waystone_activation()
 		if arena_mode == "" and dungeon_id < 0 and interior_id < 0: update_rescue()
@@ -1989,10 +2002,10 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 			if str(state.get("context","world"))!="world" or bool(state.get("konflux",false)) or bool(state.get("stealth",false)) or konflux.fighter_stats.has(peer) or float(state.get("hp",1.0))<=0:continue
 			var pos:=network_player_position(int(peer))
 			if region_at(pos)==0 or region_at(pos)!=region_at(enemy["pos"]) or waystone_safe_at(pos):continue
-			result.append({"id":int(peer),"pos":pos,"hp":float(state.get("hp",1.0)),"max_hp":float(state.get("max_hp",1.0))})
+			result.append({"id":int(peer),"pos":pos,"hp":float(state.get("hp",1.0)),"max_hp":float(state.get("max_hp",1.0)),"detection_mult":1.0-.08*rune_rank(3,3,int(peer))})
 	elif hp>0 and death_timer<=0 and ranger_stealth_timer<=0.0 and (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)!=0):
 		if (arena_mode!="" or dungeon_id>=0 or region_at(player_pos)==region_at(enemy["pos"])) and not waystone_safe_at(player_pos):
-			result.append({"id":0,"pos":player_pos,"hp":hp,"max_hp":maxf(1.0,hp)})
+			result.append({"id":0,"pos":player_pos,"hp":hp,"max_hp":maxf(1.0,hp),"detection_mult":1.0-.08*essence.rank(3,3)})
 	return result
 
 func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
@@ -2280,7 +2293,7 @@ func update_player(delta: float) -> void:
 		walk_phase += delta*anim_rate
 	var run_mult:=lerpf(1.0,sprint_speed_mult(),sprint_speed_curve(sprint_blend))
 	var ultimate_move_mult := ranger_ultimate_speed_mult if class_id == 2 and ranger_ultimate_speed_timer > 0.0 else 1.0
-	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult() * ultimate_move_mult)*delta
+	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult() * ultimate_move_mult * essence.movement_mult())*delta
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
@@ -3311,7 +3324,78 @@ func normal_attack_power() -> int:
 	# Grundtreffer bleiben schwächer als Fähigkeiten, brauchen aber keine zähen Serien.
 	var base := 7.0 + level * 1.6 + weapon_power() * 0.86 + int(skill_levels[9]) * 4.0
 	var mastery_mult := 1.0 + (0.30 * warrior_rage / 100.0 if class_id == 0 and class_mastery_unlocked else 0.0)
-	return maxi(1, int(base * (1.0 + primary_attribute() * (0.015 if class_id == 0 else 0.019)) * food_system.damage_mult() * mastery_mult))
+	return maxi(1, int(base * (1.0 + primary_attribute() * (0.015 if class_id == 0 else 0.019)) * food_system.damage_mult() * mastery_mult * (1.0+0.06*essence.rank(0,2))))
+
+# Remote combat always reads the attacker's synchronized ranks, never the host's build.
+func rune_rank(tree:int,talent:int,source_peer:int=0)->int:
+	if source_peer<=0:return essence.rank(tree,talent)
+	var rows:Array=remote_players.get(source_peer,{}).get("rune_ranks",[])
+	return clampi(int(rows[tree][talent]),0,4) if rows.size()==5 else 0
+
+func heal_player(amount:float,magical:bool=false)->void:
+	if amount<=0.0 or hp<=0.0 or death_timer>0.0:return
+	hp=minf(max_hp(),hp+maxf(0.0,amount)*essence.healing_mult()*(essence.ability_power_mult() if magical else 1.0))
+
+func update_rune_effects(delta:float)->void:
+	rune_emergency_timer=maxf(0.0,rune_emergency_timer-delta)
+	rune_emergency_cooldown=maxf(0.0,rune_emergency_cooldown-delta)
+	rune_auto_shield_cooldown=maxf(0.0,rune_auto_shield_cooldown-delta)
+	if hp<=0.0 or death_timer>0.0 or konflux.active:return
+	heal_player(essence.regeneration_rate(stamina_in_combat())*delta)
+	if hp/max_hp()<0.19 and essence.rank(1,2)>0 and rune_emergency_cooldown<=0.0:
+		rune_emergency_timer=3.0+essence.rank(1,2)
+		rune_emergency_cooldown=30.0
+		effect(player_pos,"ÜBERLEBENSINSTINKT",Color("b6f5c5"),0.8)
+	if hp/max_hp()<0.30 and essence.rank(4,3)>0 and rune_auto_shield_cooldown<=0.0:
+		shield_timer=maxf(shield_timer,(1.0+essence.rank(4,3)*0.6)*essence.healing_mult())
+		rune_auto_shield_cooldown=25.0
+		effect(player_pos,"AUTOMATISCHER SCHILD",Color("8edcff"),0.8)
+
+func rune_hit_reward(amount:float,magical:bool)->void:
+	heal_player(amount)
+	if magical and essence.resonance_rank()>0:arcane_resonance=mini(4,arcane_resonance+1)
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_rune_hit_reward(amount:float,magical:bool)->void:
+	if network_mode=="client":rune_hit_reward(amount,magical)
+
+func rune_damage_mult(enemy:Dictionary,source_peer:int=0)->float:
+	var state:Dictionary=remote_players.get(source_peer,{}) if source_peer>0 else {}
+	var attacker_hp:float=float(state.get("hp",hp))
+	var attacker_max:float=maxf(1.0,float(state.get("max_hp",max_hp())))
+	var mult:=1.0
+	if attacker_hp/attacker_max<0.35:mult+=0.08*rune_rank(0,4,source_peer)
+	if float(enemy["hp"])>=float(enemy.get("max_hp",enemy["hp"]))*.90:mult+=0.06*rune_rank(3,2,source_peer)
+	if int(enemy.get("target_peer",-1))<0:mult+=0.08*rune_rank(3,3,source_peer)
+	if rune_hit_from_behind(enemy,source_peer):mult+=0.07*rune_rank(3,4,source_peer)
+	return mult
+
+func rune_hit_from_behind(enemy:Dictionary,source_peer:int=0)->bool:
+	var origin:Vector2=network_player_position(source_peer) if source_peer>0 else player_pos
+	var behind:Vector2=origin-Vector2(enemy["pos"])
+	var enemy_facing:Vector2=enemy.get("facing",Vector2.DOWN)
+	return behind.length_squared()>0.01 and enemy_facing.dot(behind.normalized())<-.5
+
+func rune_chain_hit(center:Vector2,amount:int,main_uid:int,source_peer:int)->void:
+	var jumps:=rune_rank(4,2,source_peer)
+	# Unskilled lightning keeps its existing single, seven-damage bounce.
+	var chain_damage:=maxi(1,roundi(amount*.25)) if jumps>0 else 7
+	jumps=maxi(1,jumps)
+	var origin:=center
+	var visited:Array=[main_uid]
+	for jump in jumps:
+		var best:=-1
+		var distance:=150.0 if rune_rank(4,2,source_peer)>0 else 105.0
+		for i in enemies.size():
+			if int(enemies[i].get("uid",0)) in visited or float(enemies[i]["hp"])<=0:continue
+			var d:float=origin.distance_to(enemies[i]["pos"])
+			if d<distance:best=i;distance=d
+		if best<0:break
+		var target:Vector2=enemies[best]["pos"]
+		visited.append(int(enemies[best].get("uid",0)))
+		lightning_lines.append({"from":origin,"to":target,"life":0.25})
+		damage_enemy(best,chain_damage,Vector2.ZERO,false,"",source_peer,false)
+		origin=target
 
 func weapon_element() -> String:
 	for item in inventory:
@@ -3345,6 +3429,11 @@ func normal_attack() -> void:
 	attack_anim = swing_timer
 	play_sound("swing")
 	var power := normal_attack_power()
+	rune_attack_count+=1
+	if essence.rank(0,2)==4 and rune_attack_count%4==0:power=roundi(power*1.30)
+	if rune_counter_ready:
+		power=roundi(power*(1.0+0.10*essence.rank(0,3)))
+		rune_counter_ready=false
 	if variant == "axe": power = int(power * 1.18)
 	elif variant == "crossbow": power = int(power * 1.25)
 	if rage_timer > 0: power = int(power * 1.45)
@@ -3411,7 +3500,7 @@ func move_enemy_with_collision(enemy: Dictionary, displacement: Vector2) -> void
 		if not valid: break
 		enemy["pos"]=next
 
-func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0) -> void:
+func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0, apply_runes:bool=true) -> void:
 	if index < 0 or index >= enemies.size(): return
 	play_sound("hit")
 	var enemy: Dictionary = enemies[index]
@@ -3429,22 +3518,25 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 		return
 	var attacker_class:=class_id if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("class",-1)),0,2)
 	var attacker_level:=level if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("level",1)),1,99)
-	var critical:=attacker_class==0 and randf()<warrior_crit_chance(attacker_level)
+	if apply_runes:amount=maxi(1,roundi(amount*rune_damage_mult(enemy,source_peer)))
+	var crit_chance:float=(warrior_crit_chance(attacker_level) if attacker_class==0 else 0.0)+(0.03*rune_rank(0,0,source_peer) if apply_runes else 0.0)
+	var critical:=apply_runes and randf()<crit_chance
 	if critical:
-		amount=maxi(1,roundi(float(amount)*warrior_crit_multiplier()))
+		amount=maxi(1,roundi(float(amount)*(warrior_crit_multiplier()+(.25 if apply_runes and rune_rank(0,0,source_peer)==4 else 0.0))))
 		effect(enemy["pos"]+Vector2(0,-48),"KRIT!",Color("ffd36f"),0.7)
 	var falcon_active:=ranger_falcon_rune if source_peer<=0 else bool(remote_players.get(source_peer,{}).get("ranger_falcon_rune",false))
-	if falcon_active and (class_id==2 or source_peer>0):
+	if apply_runes and falcon_active and (class_id==2 or source_peer>0):
 		if float(enemy.get("falcon_mark",0.0))>0.0:
 			amount=int(amount*1.22)
 			enemy["falcon_mark"]=0.0
 		else:
 			enemy["falcon_mark"]=4.0
-	if float(enemy.get("marked", 0.0)) > 0.0:
+	if apply_runes and float(enemy.get("marked", 0.0)) > 0.0:
 		amount = int(amount * 1.22)
 	if element!="":
 		var element_rank:=essence.rank(2,1) if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("essence_magic_element",0)),0,4)
 		amount=maxi(1,roundi(float(amount)*(1.0+0.05*element_rank)))
+		if element=="blitz" and apply_runes:amount=roundi(amount*(1.0+.08*rune_rank(4,1,source_peer)))
 	match element:
 		"feuer":
 			amount += 5
@@ -3457,13 +3549,6 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 			enemy["stun"] = 0.45
 			amount += 10
 			lightning_lines.append({"from":player_pos, "to":enemy["pos"], "life":0.25})
-			# Blitzwaffen treffen zusätzlich einen Gegner in der Nähe.
-			for j in enemies.size():
-				if j != index and enemies[j]["pos"].distance_to(enemy["pos"]) < 105:
-					enemies[j]["hp"] = float(enemies[j]["hp"]) - 7
-					if source_peer > 0: enemies[j]["last_hit_peer"] = source_peer
-					lightning_lines.append({"from":enemy["pos"], "to":enemies[j]["pos"], "life":0.25})
-					break
 		"gift":
 			enemy["poison"] = 5.0
 			enemy["poison_tick"] = 1.0
@@ -3475,9 +3560,17 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 		server_broadcast_hit_confirm(source_peer,enemy,amount)
 	move_enemy_with_collision(enemy,push*18.0)
 	if stun: enemy["stun"] = 1.2
+	if apply_runes and rune_rank(3,4,source_peer)==4 and rune_hit_from_behind(enemy,source_peer):
+		enemy["stun"]=maxf(float(enemy.get("stun",0)),0.35)
 	effect(enemy["pos"] + Vector2(0, -25), str(amount), Color("fff1a1"), 0.75)
-	if drain_timer > 0: hp = minf(max_hp(), hp + minf(8.0, amount * 0.2))
+	if apply_runes and source_peer<=0 and drain_timer>0:heal_player(minf(8.0,amount*.2))
+	if apply_runes:
+		var stolen:float=minf(float(amount),maxf(0.0,float(enemy["hp"])+amount))*.02*rune_rank(0,1,source_peer)
+		if source_peer>0:
+			if stolen>0.0 or (element!="" and rune_rank(2,4,source_peer)>0):rpc_rune_hit_reward.rpc_id(source_peer,stolen,element!="")
+		else:rune_hit_reward(stolen,element!="")
 	if enemy["hp"] <= 0: defeat_enemy(index, int(enemy.get("last_hit_peer", source_peer)))
+	if apply_runes and element=="blitz":rune_chain_hit(enemy["pos"],amount,int(enemy.get("uid",0)),source_peer)
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, rank: int) -> void:
@@ -3485,8 +3578,6 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var sender := multiplayer.get_remote_sender_id()
 	if sender <= 0 or not remote_players.has(sender): return
 	if id < 0 or id >= ABILITIES.size(): return
-	var server_cd_ms := maxi(250, int(float(ABILITIES[id]["cd"]) * 850.0))
-	if not server_action_allowed(sender, "ability_%d" % id, server_cd_ms): return
 	var state: Dictionary = remote_players[sender]
 	if str(state.get("context","world")) != "world": return
 	var state_pos: Array = state.get("pos", [])
@@ -3512,6 +3603,8 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 		var server_skill_rank:=skill_rank_from_network_state(state,id)
 		if server_skill_rank<=0:return
 		rank=server_skill_rank
+	var server_cd_ms:=maxi(250,int(float(ABILITIES[id]["cd"])*(1.0-.06*(rank-1))*(1.0-.05*rune_rank(3,0,sender))*850.0))
+	if not server_action_allowed(sender,"ability_%d" % id,server_cd_ms):return
 	var visual_payload:Dictionary={"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))}
 	if fusion_key_value!="":
 		visual_payload["fusion_key"]=fusion_key_value
@@ -3520,7 +3613,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
-	if id in [3,7,16,18,20,25,26,28,29,30,40,42,43]:
+	if id in [3,7,16,18,20,25,26,28,29,30,34,40,42,43]:
 		for shot in ability_projectiles(id,origin,dir,remote_class,power):
 			shot["owner_peer"]=sender
 			if not fusion_definition.is_empty():shot["fusion_rank"]=rank
@@ -3536,7 +3629,8 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 		var radius := (165.0 + rank * 12.0)*(1.0+(0.05 if aoe_rank>=3 else 0.0)+(0.05 if aoe_rank>=4 else 0.0))
 		power=roundi(float(power)*(1.0+0.05*aoe_rank))
 		for i in range(enemies.size()-1,-1,-1):
-			if enemies[i]["pos"].distance_to(origin) <= radius: damage_enemy(i,power+10,dir,false,"",sender)
+			if i>=enemies.size():continue
+			if enemies[i]["pos"].distance_to(origin) <= radius: damage_enemy(i,power+10,dir,false,"blitz" if id in [37,39] else "",sender)
 	else:
 		hit_arc(origin,dir,190.0,-0.15,power+8,false,"",sender)
 
@@ -3563,7 +3657,7 @@ func use_ability(slot: int) -> void:
 			message("Keine Angriffe im geschützten Spawnkreis.")
 			return
 		energy -= float(ability["cost"])
-		cooldowns[id] = float(ability["cd"])
+		cooldowns[id] = float(ability["cd"])*essence.cooldown_mult()
 		konflux.attack(self,id)
 		return
 	if waystone_safe_at(player_pos):
@@ -3571,7 +3665,7 @@ func use_ability(slot: int) -> void:
 		return
 	energy -= float(ability["cost"])
 	var rank: int = int(skill_levels[id])
-	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1))
+	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1)) * essence.cooldown_mult()
 	var power := maxi(1,roundi(float(ability_cast_power(id,rank))*essence.ability_power_mult()))
 	var resonance_rank:=essence.resonance_rank()
 	if resonance_rank>0:
@@ -3579,8 +3673,12 @@ func use_ability(slot: int) -> void:
 			power=maxi(1,roundi(float(power)*[1.0,1.12,1.18,1.25,1.35][resonance_rank]))
 			arcane_resonance=0
 			effect(player_pos+Vector2(0,-58),"ARKANE RESONANZ",Color("d8c5ff"),0.8)
-		else:
-			arcane_resonance=mini(4,arcane_resonance+1)
+	if essence.rank(4,4)>0:
+		if rune_overload>=3:
+			power=roundi(power*(1.0+.10*essence.rank(4,4)))
+			rune_overload=0
+			effect(player_pos,"ÜBERLADUNG",Color("8edcff"),0.8)
+		else:rune_overload+=1
 	var cast_pos := player_pos
 	var cast_dir := facing
 	if uses_server_world():
@@ -3592,7 +3690,7 @@ func use_ability(slot: int) -> void:
 				if direction.length() < 155: damage_enemy(i, power + 13, direction.normalized(), false)
 			effect(player_pos, "WIRBELHIEB", Color("fff6aa"), 0.8)
 		1:
-			shield_timer = 3.0 + (rank - 1) * 0.7
+			shield_timer = (3.0 + (rank - 1) * 0.7)*essence.healing_mult()
 			battle_zones.append({"kind":"banner", "pos":player_pos, "radius":180.0 + rank * 12.0, "life":6.0 + rank, "max":6.0 + rank, "tick":0.0, "damage":0})
 			effect(player_pos, "SCHILDWALL", Color("b5e6fb"), 0.8)
 		2:
@@ -3616,8 +3714,8 @@ func use_ability(slot: int) -> void:
 				projectiles.append({"pos":player_pos, "dir":facing.rotated(angle), "speed":700.0, "life":0.8, "damage":power + 10, "kind":1, "hits":[]})
 		8:
 			var healing := 55 + (rank - 1) * 18
-			hp = minf(max_hp(), hp + healing)
-			shield_timer = 5.0 + (rank - 1) * 0.6
+			heal_player(healing,true)
+			shield_timer = (5.0 + (rank - 1) * 0.6)*essence.healing_mult()
 			effect(player_pos, "+%d LEBEN" % healing, Color("b6f5c5"), 0.9)
 		12:
 			hit_arc(player_pos, facing, 165, -0.1, power + 14, false, "eis")
@@ -3629,17 +3727,17 @@ func use_ability(slot: int) -> void:
 				var best := -1
 				var best_distance := 255.0 if jump == 0 else 190.0
 				for i in enemies.size():
-					if i in hit_ids: continue
+					if int(enemies[i]["uid"]) in hit_ids: continue
 					var dist: float = origin.distance_to(enemies[i]["pos"])
 					if dist < best_distance:
 						best = i
 						best_distance = dist
 				if best < 0: break
-				hit_ids.append(best)
+				hit_ids.append(int(enemies[best]["uid"]))
 				var target: Vector2 = enemies[best]["pos"]
 				lightning_lines.append({"from":origin, "to":target, "life":0.35})
 				enemies[best]["stun"] = 0.8
-				enemies[best]["hp"] = float(enemies[best]["hp"]) - (power + 14 - jump * 5)
+				damage_enemy(best,power+14-jump*5,Vector2.ZERO,false,"blitz")
 				effect(target + Vector2(0, -35), "BLITZ", Color("fff09d"), 0.7)
 				origin = target
 			for i in range(enemies.size() - 1, -1, -1):
@@ -3650,9 +3748,9 @@ func use_ability(slot: int) -> void:
 		34:
 			projectiles.append({"pos":player_pos,"dir":facing,"speed":760.0,"life":1.0,"damage":power+12,"kind":2,"element":"blitz","hits":[]})
 		35:
-			hp=minf(max_hp(),hp+55.0);effect(player_pos,"REPARATUR +55",Color("8ee8d0"),0.8)
+			heal_player(55.0,true);effect(player_pos,"REPARATUR",Color("8ee8d0"),0.8)
 		36:
-			shield_timer=5.0;effect(player_pos,"ENERGIESCHILD",Color("8edcff"),0.8)
+			shield_timer=5.0*essence.healing_mult();effect(player_pos,"ENERGIESCHILD",Color("8edcff"),0.8)
 		37:
 			for i in range(enemies.size()-1,-1,-1):
 				if enemies[i]["pos"].distance_to(player_pos)<185.0*essence.aoe_radius_mult(): damage_enemy(i,roundi((power+14)*essence.aoe_damage_mult()),(enemies[i]["pos"]-player_pos).normalized(),false,"blitz")
@@ -4434,7 +4532,13 @@ func update_enemies(delta:float)->void:
 
 func apply_player_damage(raw: int) -> void:
 	if creative_mode or death_timer > 0.0: return
+	if essence.rank(0,3)>0 and randf()<.04*essence.rank(0,3):
+		rune_counter_ready=true
+		effect(player_pos,"BLOCK",Color("b5e6fb"),0.6)
+		return
+	update_rune_effects(0.0)
 	var dealt := maxi(1, int((raw - equipment_power(equipped_armor_uid)) * food_system.damage_taken_mult()))
+	if rune_emergency_timer>0.0:dealt=maxi(1,roundi(dealt*(1.0-.10*essence.rank(1,2))))
 	if shield_timer > 0: dealt = maxi(1, int(dealt * 0.35))
 	if class_id == 0 and standing_in_battle_zone(): dealt = maxi(1, int(dealt * 0.78))
 	if class_id == 1 and shield_timer > 0 and learned[21]:
@@ -4443,8 +4547,8 @@ func apply_player_damage(raw: int) -> void:
 				enemy["slow"] = 3.5
 				enemy["stun"] = 0.4
 	hp -= dealt
-	stop_sprint(0.25)
-	sprint_blend*=0.35
+	stop_sprint(0.25*(1.0-.15*essence.rank(1,3)))
+	sprint_blend*=0.35+.12*essence.rank(1,1)
 	hurt_until=combat_feedback.clock+.18
 	invulnerable = 0.5
 	effect(player_pos + Vector2(0, -30), "-%d" % dealt, Color("ff888d"), 0.75)
@@ -6672,7 +6776,7 @@ func use_item(index: int) -> void:
 		play_sound("level");save_game();return
 	if item["icon"] == "potion":
 		if name in ["Energietrank", "Manatrank"]: energy = minf(max_energy(), energy + 65)
-		else: hp = minf(max_hp(), hp + max_hp() * (0.8 if name == "Großer Heiltrank" else 0.5))
+		else: heal_player(max_hp() * (0.8 if name == "Großer Heiltrank" else 0.5))
 		if int(item.get("count", 1)) > 1:
 			item["count"] = int(item["count"]) - 1
 			item["stack_value"] = maxi(0, item_sale_value(item) - int(item.get("value", 0)))
@@ -12968,6 +13072,8 @@ func ability_projectiles(id:int,origin:Vector2,dir:Vector2,cls:int,power:int)->A
 				speed=570.0;element="eis"
 			30:
 				element="blitz"
+			34:
+				speed=760.0;life=1.0;damage=power+12;kind=2;element="blitz"
 			40:
 				speed=570.0;life=1.35;damage=power+24;element="feuer"
 			42:

@@ -8,7 +8,7 @@ class TestGame:
 	func save_game()->void: pass
 	func announce_multiplayer_context()->void: pass
 	func play_sound(_name:String)->void: pass
-	func damage_enemy(index:int,amount:int,push:Vector2,stun:bool=false,element:String="",source_peer:int=0)->void:
+	func damage_enemy(index:int,amount:int,push:Vector2,stun:bool=false,element:String="",source_peer:int=0,_apply_runes:bool=true)->void:
 		if index<0 or index>=enemies.size():return
 		recorded_hits.append({"uid":int(enemies[index]["uid"]),"pos":Vector2(enemies[index]["pos"]),"amount":amount,"element":element,"peer":source_peer})
 

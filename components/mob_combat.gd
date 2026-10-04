@@ -90,6 +90,7 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 	for candidate in targets:
 		var distance=position.distance_to(candidate["pos"])
 		var limit=float(config["leash_range"]) if int(candidate["id"])==remembered else float(config["aggro_range"])
+		if int(candidate["id"])!=remembered:limit*=float(candidate.get("detection_mult",1.0))
 		if distance>=limit or home.distance_to(candidate["pos"])>=float(config["leash_range"]):continue
 		var score:float=distance
 		# Klassenbosse wechseln intelligent auf verwundbare Ziele statt stumpf

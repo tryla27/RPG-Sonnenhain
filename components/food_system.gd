@@ -227,7 +227,7 @@ func eat(g,index:int)->bool:
  elif instant_hp:
   g.hp=g.max_hp()
  else:
-  g.hp=minf(g.max_hp(),g.hp+float(info.get("heal",0)))
+  g.heal_player(float(info.get("heal",0)))
  if bool(info.get("meal",false)):
   clear_meal()
   active_food_name=str(info["name"])
@@ -262,9 +262,9 @@ func tick(g,delta:float)->void:
  if regen_until<=now:
   regen_rate=0
  elif g.hp>0 and g.character_created and not g.server_save.loading and g.death_timer<=0 and not g.konflux.active and g.arena_mode=="":
-  g.hp=minf(g.max_hp(),g.hp+regen_rate*maxf(0,delta))
+  g.heal_player(regen_rate*maxf(0,delta))
  if meal_active() and g.hp>0 and g.character_created and not g.server_save.loading and g.death_timer<=0 and not g.konflux.active and g.arena_mode=="":
-  if meal_hp_regen>0:g.hp=minf(g.max_hp(),g.hp+meal_hp_regen*maxf(0,delta))
+  if meal_hp_regen>0:g.heal_player(meal_hp_regen*maxf(0,delta))
   if meal_mana_regen>0:g.energy=minf(g.max_energy(),g.energy+meal_mana_regen*maxf(0,delta))
 
 func buff_active(kind:String="")->bool:
