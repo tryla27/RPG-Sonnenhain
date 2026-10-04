@@ -172,9 +172,9 @@ func set_tab(g,index:int)->void:
 func keyboard_input(g,event:InputEvent)->bool:
 	if g.panel!="steinrose" or not (event is InputEventKey) or not event.pressed or event.echo:return false
 	if tab!=3:return false
-	if event.keycode in [KEY_LEFT,KEY_A]:
+	if event.keycode in [KEY_LEFT,KEY_A,KEY_UP]:
 		select_relative(g,-1)
-	elif event.keycode in [KEY_RIGHT,KEY_D]:
+	elif event.keycode in [KEY_RIGHT,KEY_D,KEY_DOWN]:
 		select_relative(g,1)
 	elif event.keycode in [KEY_ENTER,KEY_KP_ENTER,KEY_E]:
 		cook(g,selected)
