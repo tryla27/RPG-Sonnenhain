@@ -1524,7 +1524,7 @@ func play_sound(name: String) -> void:
 	player.play()
 
 func desired_music_theme() -> String:
-	if konflux.active:return "dorf" if KonfluxMap.safe(player_pos,konflux.room) else "konflux-pvp"
+	if konflux.active:return "dorf"
 	var region:int=region_at(player_pos)
 	if interior_id>=0:return "taverne"
 	if panel=="start":return "dorf"
@@ -2517,7 +2517,7 @@ func music_path_for_theme(theme:String)->String:
 		var custom:="res://music/%s.ogg" % theme
 		if ResourceLoader.exists(custom):return custom
 		return "res://audio/boss.wav"
-	return "res://music/%s.ogg" % theme if (theme in CUSTOM_MUSIC_THEMES or theme=="konflux-pvp") else "res://audio/%s.wav" % theme
+	return "res://music/%s.ogg" % theme if theme in CUSTOM_MUSIC_THEMES else "res://audio/%s.wav" % theme
 
 func obstacle_in_cell(cx: int, cy: int) -> Dictionary:
 	var cell := Vector2i(cx, cy)
@@ -6937,7 +6937,7 @@ func _draw() -> void:
 	if arena_mode=="" and dungeon_id<0 and interior_id<0 and visible_world(BORIN_CRYSTAL_POS,90): draw_fusion_crystal()
 	if arena_mode=="" and dungeon_id<0 and interior_id<0 and visible_world(KonfluxMap.ENTRANCE,260):
 		StartScenery32.gate(self,KonfluxMap.ENTRANCE,false,camera_pos)
-		var konflux_gate_text := "E · KONFLUX · PvP-Welt · LV %d" % KONFLUX_MIN_LEVEL
+		var konflux_gate_text := "KONFLUX · entfernt"
 		text_at(KonfluxMap.ENTRANCE+Vector2(-230,55),konflux_gate_text,20,Color("ffe2a3") if can_enter_konflux() else Color("c89b8d"),HORIZONTAL_ALIGNMENT_CENTER,460)
 	for drop in drops:
 		if visible_world(drop["pos"], 45):
@@ -10683,7 +10683,6 @@ func draw_map_panel() -> void:
 	if konflux.active:
 		text_at(Vector2(165,125),"KONFLUX · ARENAKARTE",24,Color("ffe0a4"))
 		konflux.draw_map(self,Rect2(170,148,420,420),true)
-		text_at(Vector2(610,175),"80.000 × 80.000 · vier Biome",17,Color("ffe0a4"))
 		text_at(Vector2(610,205),"Cyan: geschützter Spawn",14,Color("a8f0dc"))
 		text_at(Vector2(610,230),"Gold: betretbare Gebäude",14,Color("ffe4ad"))
 		text_at(Vector2(610,255),"Orange: aktive Runenpunkte",14,Color("ffbe67"))
@@ -12804,7 +12803,7 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 		rpc_server_party_progress.rpc_id(member,{"tx":party_tx,"xp":member_xp,"gold":gold_reward if is_boss else 0})
 
 func can_enter_konflux() -> bool:
-	return creative_mode or level >= KONFLUX_MIN_LEVEL
+	return false
 
 func safe_world_teleport_destination(base: Vector2, expected_region: int = -1) -> Vector2:
 	var region := expected_region if expected_region >= 0 else region_at(base)
