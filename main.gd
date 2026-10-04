@@ -1808,6 +1808,7 @@ func _process(delta: float) -> void:
 	if panel == "":
 		update_rune_effects(delta)
 		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * food_system.energy_regen_mult() * essence.energy_mult() * delta)
+		update_elara_healing_field(delta)
 		update_player(delta)
 		update_waystone_activation()
 		if arena_mode == "" and dungeon_id < 0 and interior_id < 0: update_rescue()
@@ -2358,7 +2359,7 @@ func hero_collision_radius() -> float:
 func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	if konflux.active: return KonfluxMap.blocked(pos,player_pos if from_pos.x<0 else from_pos,konflux.room,hero_collision_radius())
 	if arena_mode != "": return pos.distance_to(ARENA_CENTER) > ARENA_RADIUS - 22.0
-	if interior_id >= 0: return VillageInteriors32.blocked(pos,INTERIOR_CENTER)
+	if interior_id >= 0: return VillageInteriors32.blocked(pos,INTERIOR_CENTER,interior_id)
 	if dungeon_id >= 0: return dungeon_blocked(pos)
 	if pos.x < 26 or pos.y < 26 or pos.x > WORLD.x - 26 or pos.y > WORLD.y - 26:
 		return true
@@ -4263,6 +4264,7 @@ func interior_actors() -> Array:
 		]
 	var pos:=INTERIOR_CENTER+Vector2(0,-95)
 	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-215,-42)
+	elif room_name=="Elara": pos=INTERIOR_CENTER+Vector2(-235,-55)
 	var npc_kind:="innkeeper" if room_name=="Alma" else ("smith" if room_name=="Torvald" else ("stylist" if room_name=="Fenna" else ("apprentice" if room_name=="Pip" else ("healer_alchemy" if room_name=="Elara" else ("arena" if room_name=="Arven" else "quest")))))
 	return [{"name":room_name,"role":VillageInteriors32.role_for_id(interior_id),"pos":pos,"color":Color("c9b58a"),"kind":npc_kind}]
 
@@ -4275,6 +4277,21 @@ func nearby_interior_actor(max_distance:float=145.0)->Dictionary:
 			best=actor
 			best_distance=distance
 	return best
+
+func elara_healing_field_pos()->Vector2:
+	return VillageInteriors32.healing_field_pos(INTERIOR_CENTER,interior_id)
+
+func in_elara_healing_field(radius:float=60.0)->bool:
+	return VillageInteriors32.name_for_id(interior_id)=="Elara" and player_pos.distance_to(elara_healing_field_pos())<=radius
+
+func update_elara_healing_field(delta:float)->void:
+	if not in_elara_healing_field():return
+	var hp_before:=hp
+	var energy_before:=energy
+	hp=minf(max_hp(),hp+max_hp()*0.22*delta)
+	energy=minf(max_energy(),energy+max_energy()*0.30*delta)
+	if (hp>hp_before or energy>energy_before) and int(world_time*2.0)!=int((world_time-delta)*2.0):
+		effect(player_pos+Vector2(0,-42),"HEILUNG",Color("a7f3d8"),0.55)
 
 func interact_interior_owner(name:String="") -> void:
 	if name=="": name=VillageInteriors32.name_for_id(interior_id)
@@ -4933,6 +4950,13 @@ func interact() -> void:
 	if interior_id >= 0:
 		if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 215)) < 100:
 			leave_village_house()
+		elif in_elara_healing_field(72.0):
+			hp=max_hp()
+			energy=max_energy()
+			play_sound("level")
+			effect(player_pos+Vector2(0,-48),"VOLLSTÄNDIG GEHEILT",Color("b7f7de"),1.2)
+			message("Elaras Heilungsfeld füllt Leben und Energie vollständig auf.")
+			save_game()
 		else:
 			var actor:=nearby_interior_actor()
 			if not actor.is_empty(): interact_interior_owner(str(actor["name"]))
@@ -9380,8 +9404,11 @@ func draw_hud() -> void:
 		nearest = "E  ·  Gewölbe verlassen" if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110 else ("E  ·  Versiegelte Truhe" if player_pos.distance_to(DUNGEON_CENTER + Vector2(555, 0)) < 105 and dungeon_chest_ready(dungeon_id) else "")
 	elif interior_id >= 0:
 		nearest = "E  ·  Gebäude verlassen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95 else ""
-		var interior_actor:=nearby_interior_actor(150.0)
-		if not interior_actor.is_empty(): nearest="E  ·  %s ansprechen" % interior_actor["name"]
+		if in_elara_healing_field(92.0):
+			nearest="E  ·  Heilungsfeld am Altar · HP & Energie auffüllen"
+		else:
+			var interior_actor:=nearby_interior_actor(150.0)
+			if not interior_actor.is_empty(): nearest="E  ·  %s ansprechen" % interior_actor["name"]
 	else:
 		if player_pos.distance_to(TAVERN_HOUSE + Vector2(126, 157)) < 112: nearest = "E  ·  Zur Steinrose betreten"
 		for index in DUNGEON_ENTRANCES.size():
