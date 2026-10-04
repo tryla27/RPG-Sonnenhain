@@ -30,7 +30,7 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	# animation/equipment states deliberately fall back to the proven renderer.
 	if role==0 and race==0 and gender==0 and phase==0.0 and not running and roll<0.0 and death<0.0 and armor<0 and head<0:
 		var tint:=Color("fff3de").lerp(Color.WHITE,1.0-clampf(hurt,0.0,1.0)*0.45)
-		if GoldenSprites.draw_direction_strip(c,GOLDEN_HUMAN_WARRIOR_IDLE,p+offset,heading,Vector2(96,96),79.0,s,tint):
+		if GoldenSprites.draw_direction_strip(c,GOLDEN_HUMAN_WARRIOR_IDLE,p+offset,heading,Vector2(24,24),20.0,s*4.0,tint):
 			hurt_flash=0.0
 			return
 	look=Vector2(sin(heading*PI/4.0),cos(heading*PI/4.0))
