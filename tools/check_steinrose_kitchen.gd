@@ -61,6 +61,15 @@ func run() -> void:
 	g.steinrose.set_tab(g,1);assert(g.steinrose.tab==1)
 	g.steinrose.set_tab(g,2);assert(g.steinrose.tab==2)
 	g.steinrose.set_tab(g,3);assert(g.steinrose.tab==3)
+	assert(g.steinrose.visible_recipe_indices().size()==Kitchen.RECIPES.size())
+	assert(g.steinrose.table_window_indices().size()==7)
+	g.steinrose.selected=0
+	var nav:=InputEventKey.new();nav.pressed=true;nav.keycode=KEY_D
+	assert(g.steinrose.keyboard_input(g,nav) and g.steinrose.selected==1)
+	nav=InputEventKey.new();nav.pressed=true;nav.keycode=KEY_LEFT
+	assert(g.steinrose.keyboard_input(g,nav) and g.steinrose.selected==0)
+	nav=InputEventKey.new();nav.pressed=true;nav.keycode=KEY_A
+	assert(g.steinrose.keyboard_input(g,nav) and g.steinrose.selected==Kitchen.RECIPES.size()-1)
 	g.steinrose.set_tab(g,0)
 	g.panel=""
 
