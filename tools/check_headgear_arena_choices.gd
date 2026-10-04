@@ -41,11 +41,15 @@ func run():
 	g.claim_arena_chest();assert(g.inventory.size()==1)
 	g.reset_class_skills();g.skill_points=2;g.class_id=0;g.level=3;g.skill_tree_tab=0
 	var offers:Array=g.skill_choices();assert(not offers.is_empty() and offers==g.skill_choices())
-	var pick:int=offers[0];var cost:int=g.skill_point_cost(pick);g.upgrade_skill(pick);assert(g.skill_points==2-cost and g.learned[pick])
+	var pick:int=offers[0];var cost:int=g.skill_point_cost(pick);assert(g.buy_skill(pick));assert(g.skill_points==2-cost and g.learned[pick] and int(g.skill_levels[pick])==1)
 	assert(pick not in g.skill_choices())
-	g.upgrade_skill(pick);assert(g.skill_points==2-cost)
+	# Verbessern ist jetzt getrennt vom Lernen und folgt dem 4-Stufen-Levelgate.
+	var points_after_learning:=g.skill_points
+	assert(not g.upgrade_skill(pick));assert(g.skill_points==points_after_learning and int(g.skill_levels[pick])==1)
+	g.level=g.skill_rank_level(pick,2)
+	assert(g.upgrade_skill(pick));assert(g.skill_points==points_after_learning-1 and int(g.skill_levels[pick])==2)
 	g.creation_name="Test";g.creation_class_selected=false;g.panel="creation"
 	g.review_character_creation();assert(g.panel=="creation")
 	g.creation_class_selected=true;g.review_character_creation();assert(g.panel=="creation_review")
-	print("HEADGEAR_ARENA_CHOICES_OK class heads stay class-bound; boss hats universal; 15 weapons; chances; full-inventory stable roll; single reward; Borin direct purchase; creation guard")
+	print("HEADGEAR_ARENA_CHOICES_OK class heads stay class-bound; boss hats universal; 15 weapons; chances; full-inventory stable roll; single reward; Borin learn+rank upgrade; creation guard")
 	g.free();quit()
