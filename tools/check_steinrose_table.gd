@@ -45,7 +45,7 @@ func run()->void:
 	var source:=FileAccess.get_file_as_string("res://components/steinrose_kitchen.gd")
 	assert(source.find("func draw_recipe_table")>=0)
 	assert(source.find('Color("ffd86f",pulse)')>=0)
-	assert(source.find("KEY_RIGHT,KEY_D")>=0)
+	assert(source.find("KEY_RIGHT")>=0 and source.find("KEY_D")>=0 and source.find("KEY_LEFT")>=0 and source.find("KEY_A")>=0)
 	print("STEINROSE_TABLE_OK A/D + arrows navigate; cookable state drives glowing table cards")
 	g.queue_free()
 	quit()
