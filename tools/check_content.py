@@ -142,7 +142,7 @@ for name in [n for n in sfx if n not in procedural_sfx] + ['nebel', 'bernstein',
 assert 'DoorSfx.make(true)' in source and 'DoorSfx.make(false)' in source, 'procedural village door sounds not wired'
 atlas = (root / 'art' / 'sonnenhain_tiles.png').read_bytes()
 assert atlas[:8] == b'\x89PNG\r\n\x1a\n' and int.from_bytes(atlas[16:20], 'big') == 128 and int.from_bytes(atlas[20:24], 'big') == 64
-for connection in ['func draw_pixel_tile', 'func draw_tavern_world', 'func tavern_blocked', 'func draw_village_interior', 'func enter_village_house', 'func leave_village_house', 'func enter_tavern', 'func leave_tavern', 'VillageInteriors32.blocked(pos,INTERIOR_CENTER)', 'interior_return_pos if interior_id >= 0 else player_pos', '"res://art/sonnenhain_tiles.png"']:
+for connection in ['func draw_pixel_tile', 'func draw_tavern_world', 'func tavern_blocked', 'func draw_village_interior', 'func enter_village_house', 'func leave_village_house', 'func enter_tavern', 'func leave_tavern', 'VillageInteriors32.blocked(pos,INTERIOR_CENTER,interior_id)', 'interior_return_pos if interior_id >= 0 else player_pos', '"res://art/sonnenhain_tiles.png"']:
     assert connection in source, f'missing pixel-art scene connection: {connection}'
 assert source.count('draw_pixel_tile(') > 15
 for connection in ['func load_bindings', 'func save_bindings', 'func reset_bindings', 'func draw_controls_panel', 'func movement_vector', 'binding_pressed("attack")', 'binding_short("ability_%d" % (slot + 1))']:
@@ -207,6 +207,26 @@ for resident in ['Mira','Liora','Arven','Torvald','Fenna','Pip','Elara','Alma','
 assert '"name":"Borin","house":Vector2(1248,320)' in village_layout, 'Borin house anchor moved'
 assert 'const BORIN_MAGIC_TREE_POS := Vector2(1552,544)' in source, 'Borin magic tree anchor moved'
 assert 'const BORIN_CRYSTAL_POS := Vector2(1512,736)' in source, 'Borin fusion crystal anchor moved'
+interiors32 = (root / 'components' / 'village_interiors_32.gd').read_text(encoding='utf8')
+for chapel_token in [
+    'const ELARA_ID := 7',
+    'ELARA_CONCEPT := "res://art/concepts/map0/elara_church_interior_32px.webp"',
+    'static func healing_field_pos',
+    'Kapelle: Altar/Podest oben, Lager rechts',
+    'Heilungsfeld direkt vor dem Altar',
+    'Zwei Kirchenbank-Reihen',
+]:
+    assert chapel_token in interiors32, f'missing Elara chapel feature: {chapel_token}'
+for runtime_token in [
+    'func elara_healing_field_pos()',
+    'func in_elara_healing_field',
+    'func update_elara_healing_field',
+    'VOLLSTÄNDIG GEHEILT',
+    'Heilungsfeld am Altar · HP & Energie auffüllen',
+    'elif room_name=="Elara": pos=INTERIOR_CENTER+Vector2(-235,-55)',
+]:
+    assert runtime_token in source, f'missing Elara healing runtime: {runtime_token}'
+assert (root / 'art' / 'concepts' / 'map0' / 'elara_church_interior_32px.webp').exists(), 'Elara chapel concept asset missing'
 
 # Map-0 village must remain fully inside the original wall rectangle and keep both
 # live gate approach corridors clear. Check actual rendered building footprints,
