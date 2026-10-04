@@ -49,15 +49,14 @@ static func autumnize_natural_texture(source:Texture2D)->Texture2D:
 			if col.a<=0.01:continue
 			# Replace green-dominant vegetation pixels instead of merely tinting
 			# them. Neutral stone/soil pixels remain untouched.
-			if col.g>col.r*1.04 and col.g>col.b*1.08:
+			if col.g>0.20 and col.g>col.b*1.05 and col.g>col.r*0.92:
 				var light:=clampf(maxf(col.r,maxf(col.g,col.b)),0.0,1.0)
-				var warm:=Color(
+				col=Color(
 					0.36+0.42*light,
 					0.16+0.34*light,
 					0.055+0.13*light,
 					col.a
 				)
-				col=col.lerp(warm,0.96)
 				image.set_pixel(x,y,col)
 	return ImageTexture.create_from_image(image)
 
