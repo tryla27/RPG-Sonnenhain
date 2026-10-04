@@ -65,6 +65,20 @@ func run():
 	g.use_item(0)
 	assert(g.class_mastery_unlocked and g.mage_rift_blink_unlocked() and g.inventory.is_empty())
 	assert(g.skill_points==mastery_points_before)
+	# Arkankern · Blitz behaves like an attack-skill item and teaches Blitzlanze.
+	g.reset_class_skills();g.level=40;g.skill_points=7;g.inventory.clear()
+	var core:=g.make_item("Arkankern · Blitz","essence",3,0,443,"blitz",30)
+	g.inventory.append(core)
+	var core_points_before:=g.skill_points
+	assert(not g.learned[18] and g.item_skill_unlock_id(core)==18)
+	g.use_item(0)
+	assert(g.learned[18] and int(g.skill_levels[18])==1)
+	assert(g.inventory.is_empty() and g.skill_points==core_points_before)
+	# Already learned skills do not consume a duplicate core.
+	g.inventory.append(g.make_item("Arkankern · Blitz","essence",3,0,443,"blitz",30))
+	g.use_item(0)
+	assert(g.inventory.size()==1 and g.learned[18])
+	g.inventory.clear()
 	# Reservierung schützt die ersten 15 Sekunden nur die passende Klasse.
 	var reserved_drop:Dictionary={"reserved_class":2,"reserve_until_ms":Time.get_ticks_msec()+10000}
 	assert(g.class_relic_locked_for_player(reserved_drop,0))
