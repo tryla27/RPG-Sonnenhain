@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 04.10.2026"
 const NOTES=[
+["Map 0 · Ambiente", "Die komplette natürliche Bodenfläche von Sonnenhain nutzt jetzt die warmen orange-/rostfarbenen Ambiente-Sprites statt der bisherigen grünen Gras-, Moos- und Waldbodendarstellung. Wege und Pflaster bleiben unverändert."],
 ["Release · Produktion", "Golden-Sprite-Pilot und die Bereinigung der früheren separaten PvP-Großwelt sind für den Produktionsbuild freigegeben."],
 ["Grafik · Sprite-Pilot", "Menschlicher Krieger und Waldschleim nutzen erstmals echte 8-Richtungs-Idle-Sprites. Fehlende Bewegungs- und Kampfanimationen fallen weiterhin sicher auf den bisherigen Renderer zurück."],
 ["Welt · Bereinigung", "Die frühere separate PvP-Großkarte samt Weltgrafiken, Musik, Galerie und Spezialtests wurde entfernt; normale Oberwelt, Dungeons, Koop und Dorf-Arena bleiben erhalten."],
