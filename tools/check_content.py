@@ -290,3 +290,40 @@ assert 'func is_web_platform() -> bool:' in source and 'OS.has_feature("web")' i
 assert (root / 'export_presets.cfg').exists() and 'platform="Web"' in (root / 'export_presets.cfg').read_text(encoding='utf8'), 'web export preset missing'
 assert (root / 'WEB_EXPORT.md').exists(), 'web hosting guide missing'
 print('OK v27.5: detailed enemy and player models, fantasy weapons, house atlas, chat fade, co-op world launch, continuous roads, day/night and Web preset')
+
+# Golden sprite pilot and removed legacy PvP world.
+def png_size(path):
+    raw = path.read_bytes()
+    assert raw[:8] == b'\x89PNG\r\n\x1a\n', f'invalid png: {path}'
+    return (int.from_bytes(raw[16:20], 'big'), int.from_bytes(raw[20:24], 'big'))
+
+warrior_idle = root / 'art' / 'sprites' / 'characters' / 'golden_human_warrior' / 'idle_8dir.png'
+slime_idle = root / 'art' / 'sprites' / 'mobs' / 'golden_forest_slime' / 'idle_8dir.png'
+assert png_size(warrior_idle) == (192, 24), 'golden warrior strip must be 8 x 24px'
+assert png_size(slime_idle) == (256, 32), 'golden forest slime strip must be 8 x 32px'
+hero_renderer = (root / 'components' / 'rpg_hero.gd').read_text(encoding='utf8')
+mob_renderer = (root / 'components' / 'monster_design_32.gd').read_text(encoding='utf8')
+golden_runtime = (root / 'components' / 'golden_sprite_runtime.gd').read_text(encoding='utf8')
+assert 'GOLDEN_HUMAN_WARRIOR_IDLE' in hero_renderer and 'draw_direction_strip' in hero_renderer
+assert 'GOLDEN_FOREST_SLIME_IDLE' in mob_renderer and 'draw_direction_strip' in mob_renderer
+assert 'posmod(direction, 8)' in golden_runtime, 'golden sprite runtime must preserve eight-direction indexing'
+for removed in [
+    root / 'art' / 'konflux',
+    root / 'website' / 'konflux-gallery',
+    root / 'music' / 'konflux-pvp.ogg',
+    root / 'tools' / 'check_konflux.gd',
+    root / 'tools' / 'konflux_visual.gd',
+    root / 'tools' / 'konflux_net_test.gd',
+]:
+    assert not removed.exists(), f'removed PvP world artifact still exists: {removed}'
+for text_path in [
+    root / 'main.gd',
+    root / 'project.godot',
+    root / 'export_presets.cfg',
+    root / '.github' / 'workflows' / 'deploy-pages.yml',
+]:
+    text_data = text_path.read_text(encoding='utf8')
+    for forbidden in ['80000', '80.000', 'konflux-pvp', 'PvP-Welt', 'art/konflux', 'konflux-gallery']:
+        assert forbidden not in text_data, f'legacy PvP world reference {forbidden!r} remains in {text_path}'
+print('OK golden sprite pilot + legacy PvP world cleanup')
+
