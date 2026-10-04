@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 04.10.2026"
 const NOTES=[
+["Spells", "K/HUD öffnet Fähigkeiten wieder überall: Lernen und Stufe 2–4 mit Skillpunkten. Borin ist dafür nicht erforderlich; gelernte Spells und Belegung bleiben erhalten."],
+["Runen", "Borins Runenlehre ist getrennt von Spells und nutzt Essenzpunkte. Alle fünf Runenbäume werden für jede Klasse und Rasse vollständig im Multiplayer übertragen."],
 ["Bosshelme", "Alle drei Boss-Kopfbedeckungen sind für jede Klasse ausrüstbar; Inventarbutton und Server-Speichern nutzen dieselbe Regel. Alte Trophäen werden erkannt."],
 ["Händler", "Zehn vorbereitete Sortimente wechseln alle sieben Minuten ohne Wiederholung bis zum Umlaufende. Rotation und Restzeit bleiben gespeichert; Pip zeigt den Stand an."],
 ["NEU · Skillpunkte", "Jedes Level-Up vergibt jetzt +1 Skillpunkt zusätzlich zur Essenz. Bestehende Charaktere bekommen ihre bisherigen Level-Up-Punkte einmalig rückwirkend nachgetragen."],

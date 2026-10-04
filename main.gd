@@ -1207,7 +1207,9 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 	var clean_facing := Vector2(float(facing_data[0]), float(facing_data[1]))
 	if not clean_facing.is_finite() or clean_facing.length_squared() < 0.01: clean_facing = Vector2.DOWN
 	clean_facing = clean_facing.normalized()
+	var clean_runes:=EssenceSystem.network_ranks(state.get("rune_ranks",[]),clampi(int(state.get("level",1)),1,99))
 	var clean := {
+		"rune_ranks":clean_runes,
 		"protocol":NETWORK_PROTOCOL_VERSION,
 		"uuid":str(state.get("uuid","")).strip_edges().substr(0,64),
 		"context":context,
@@ -1222,9 +1224,9 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
-		"essence_magic_unstable":clampi(int(state.get("essence_magic_unstable",0)),0,4),
-		"essence_magic_element":clampi(int(state.get("essence_magic_element",0)),0,4),
-		"essence_magic_aoe":clampi(int(state.get("essence_magic_aoe",0)),0,4),
+		"essence_magic_unstable":int(clean_runes[2][3]) if clean_runes.size()==5 else clampi(int(state.get("essence_magic_unstable",0)),0,4),
+		"essence_magic_element":int(clean_runes[2][1]) if clean_runes.size()==5 else clampi(int(state.get("essence_magic_element",0)),0,4),
+		"essence_magic_aoe":int(clean_runes[2][2]) if clean_runes.size()==5 else clampi(int(state.get("essence_magic_aoe",0)),0,4),
 		"mage_rift_blink":bool(state.get("mage_rift_blink",false)) and clampi(int(state.get("class",0)),0,2)==1,
 		"ranger_falcon_rune":bool(state.get("ranger_falcon_rune",false)),
 		"race":clampi(int(state.get("race",0)),0,2),
@@ -3123,10 +3125,8 @@ func near_borin() -> bool:
 	return (interior_id==VillageInteriors32.id_for_name("Borin")) or (interior_id < 0 and dungeon_id < 0 and arena_mode == "" and player_pos.distance_to(village_house_door(village_house("Borin"))-Vector2(0,70)) < 150.0)
 
 func toggle_panel(which: String) -> void:
-	if which == "skills" and panel != "skills" and not near_borin():
-		message("Fähigkeiten kannst du nur beim Skillzauberer Borin ändern.")
-		return
 	panel = "" if panel == which else which
+	if which=="skills":skill_tree_tab=class_id
 	menu_scroll = 0
 	selected_item = -1
 	inventory_page = 0
@@ -4888,7 +4888,7 @@ func interact() -> void:
 		return
 	play_sound("menu")
 	if closest["kind"] == "quest":
-		if String(closest["name"])=="Borin": panel="skills";skill_tree_tab=0;menu_scroll=0
+		if String(closest["name"])=="Borin": panel="essence";essence.selected_tree=0;menu_scroll=0
 		else: quest_dialogue(String(closest["name"]))
 	elif closest["kind"] == "healer_alchemy":
 		open_elara_alchemy()
@@ -6349,7 +6349,10 @@ func buy_fusion(index:int) -> bool:
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
 		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("menu");return
-	if Rect2(718,145,118,38).has_point(mouse): borin_quest_dialogue();return
+	if Rect2(718,145,118,38).has_point(mouse):
+		if near_borin():borin_quest_dialogue()
+		else:message("Borins Prüfungen besprichst du bei Borin; Spells kannst du hier überall skillen.")
+		return
 	if Rect2(848,145,118,38).has_point(mouse): panel="skill_loadout";menu_scroll=0;play_sound("menu");return
 	for slot in 3:
 		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
@@ -9225,7 +9228,7 @@ func draw_hud() -> void:
 		draw_ref_panel(Rect2(9, 586, 1134, 53))
 		text_at(Vector2(22, 605), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 10, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 650)
 		var hud_labels:Array=[
-			"%s SKILLS" % binding_short("skills"),
+			"%s SPELLS" % binding_short("skills"),
 			"%s INVENTAR" % binding_short("inventory"),
 			"%s QUESTS" % binding_short("journal"),
 			"%s KARTE" % binding_short("map"),
@@ -9604,7 +9607,7 @@ func draw_mechanics_panel() -> void:
 		text_at(Vector2(190,405), "MEISTERGABE NACH DEM FINALE", 17, Color('ffe0a1'))
 		text_at(Vector2(190,434), "Krieger: Wut · Magier: Arkaner Schritt · Bogenschütze: Jagdrausch + Schattenrolle.", 13, Color('e5ecd9'))
 		text_at(Vector2(190,468), "Bogenschütze: volle Jagdleiste = 60 Sek. +25% Angriffstempo; Rolle tarnt bis 0,4 Sek. danach.", 12, Color('aebfb9'))
-		text_at(Vector2(190,575), "Freie Skillpunkte: %d · Lernen und Build ändern: bei Borin" % skill_points, 13, Color('ffe0a1'))
+		text_at(Vector2(190,575), "Freie Skillpunkte: %d · Spells lernen und verbessern: K, überall" % skill_points, 13, Color('ffe0a1'))
 	else:
 		text_at(Vector2(190,211), "Online: Gruppen mit bis zu 10 Spielern · Browser und Desktop verbinden sich mit dem gemeinsamen Live-Server.", 16, Color('e9cc90'))
 		text_at(Vector2(190,250), "Status: %s" % network_status, 14, Color('bfe7d4'), HORIZONTAL_ALIGNMENT_LEFT, 750)
@@ -10059,13 +10062,13 @@ func draw_intro_panel() -> void:
 	text_at(Vector2(230, 413), binding_short("interact")+" / Leertaste / Klick: Überspringen", 15, Color("c7d4ca"))
 
 func draw_essence_panel() -> void:
-	text_at(Vector2(165,124),"BORIN · ESSENZLEHRE",25,Color("ffeda9"))
-	text_at(Vector2(700,124),"LV %d · ESSENZ %d/%d" % [level,essence.available(level),essence.total_for_level(level)],15,Color("f6dc9a"))
+	text_at(Vector2(165,124),"BORIN · RUNENLEHRE",25,Color("ffeda9"))
+	text_at(Vector2(700,124),"LV %d · RUNEN %d/%d" % [level,essence.available(level),essence.total_for_level(level)],15,Color("f6dc9a"))
 	for tree in EssenceSystem.TREE_COUNT:
 		var x:=165+tree*162
 		ui_button(Rect2(x,148,152,36),EssenceSystem.TREE_NAMES[tree],true,essence.selected_tree==tree)
 	var selected:int=essence.selected_tree
-	text_at(Vector2(165,214),"%s · Ursprung: %s · %d/%d" % [EssenceSystem.TREE_NAMES[selected],EssenceSystem.TREE_ORIGINS[selected],essence.tree_spent(selected),EssenceSystem.TREE_CAP],16,Color("ffe2aa"))
+	text_at(Vector2(165,214),"%s · Alle Klassen und Rassen · %d/%d" % [EssenceSystem.TREE_NAMES[selected],essence.tree_spent(selected),EssenceSystem.TREE_CAP],16,Color("ffe2aa"))
 	for talent in EssenceSystem.TALENTS_PER_TREE:
 		var info:Dictionary=EssenceSystem.TALENTS[selected][talent]
 		var rank:=essence.rank(selected,talent)
@@ -10074,9 +10077,9 @@ func draw_essence_panel() -> void:
 		text_at(Vector2(178,y+20),str(info["name"]),15,Color("fff1bc"))
 		text_at(Vector2(178,y+41),str(info["desc"]),11,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,520)
 		var label:="%d/4" % rank
-		if rank<4:label+=" · +1 ESSENZ"
+		if rank<4:label+=" · +1 RUNE"
 		ui_button(Rect2(875,y+8,105,38),label,essence.can_invest(level,selected,talent),false)
-	text_at(Vector2(165,570),"Jeder Baum: 5 Talente × 4 Ränge = 20 · Level 40: maximal 40 von 100 Essenz.",12,Color("b9d9cf"))
+	text_at(Vector2(165,570),"Runen nutzen Essenzpunkte bei Borin. Spells nutzen eigene Skillpunkte: K, überall.",12,Color("b9d9cf"))
 
 func click_essence(mouse:Vector2)->void:
 	for tree in EssenceSystem.TREE_COUNT:
@@ -10162,10 +10165,10 @@ func rpc_mage_auto_detonate(pos_data:Array)->void:
 		return
 
 func draw_skills_panel() -> void:
-	text_at(Vector2(165,125),"BORIN · SKILLZAUBERER",25,Color("ffeda9"))
+	text_at(Vector2(165,125),"SPELLS · FÄHIGKEITEN",25,Color("ffeda9"))
 	text_at(Vector2(650,124),"LV %d · %d SP · %d GOLD" % [level,skill_points,gold],16,Color("f6dc9a"))
 	for tab in 3: ui_button(Rect2(165+tab*180,145,168,38),SKILL_TREE_NAMES[tab],true,skill_tree_tab==tab)
-	ui_button(Rect2(718,145,118,38),"PRÜFUNGEN");ui_button(Rect2(848,145,118,38),"BELEGUNG")
+	ui_button(Rect2(718,145,118,38),"PRÜFUNGEN",near_borin());ui_button(Rect2(848,145,118,38),"BELEGUNG")
 	for slot in 3:
 		var sid:int=slots[slot];ui_button(Rect2(165+slot*204,190,193,40),"%d · %s" % [slot+1,"FREI" if sid<0 else ABILITIES[sid]["name"]],true,selected_slot==slot)
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -10188,7 +10191,7 @@ func draw_skills_panel() -> void:
 		else:
 			var price:=skill_point_cost(id)
 			text_at(Vector2(x+12,y+88),"LERNEN · %d SP" % price if level>=req else "GESPERRT · LV %d" % req,12,Color("f4d49b") if level>=req else Color("c98d84"))
-	text_at(Vector2(165,530),"Jedes Level-Up: +1 Skillpunkt · gelernte Fähigkeiten bis STUFE 4 verbessern.",13,Color("d9e6d5"))
+	text_at(Vector2(165,530),"Überall skillen: +1 Skillpunkt pro Level · Spells bis STUFE 4 · Runen separat bei Borin.",13,Color("d9e6d5"))
 	text_at(Vector2(165,554),"Skillkarte anklicken = Slot belegen · +STUFE verbessert · Fusionen am Kristall.",13,Color("b9d9cf"))
 	var mastery:String=str(["Wut: %.0f/100" % warrior_rage,"Risssprung (LEER): %s" % ("bereit" if mage_rift_blink_unlocked() else "gesperrt"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id])
 	if not class_mastery_unlocked:
@@ -12338,7 +12341,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "rune_ranks":essence.ranks.duplicate(true), "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:

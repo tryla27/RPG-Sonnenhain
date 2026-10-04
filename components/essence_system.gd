@@ -99,6 +99,20 @@ func invest(level:int,tree:int,talent:int)->bool:
 func snapshot()->Dictionary:
 	return {"ranks":ranks.duplicate(true),"selected_tree":selected_tree}
 
+static func network_ranks(raw:Variant,level:int)->Array:
+	# All five universal rune trees travel together; class/race never filters them.
+	if not raw is Array or raw.size()!=TREE_COUNT:return []
+	var clean:Array=[]
+	var total:=0
+	for row in raw:
+		if not row is Array or row.size()!=TALENTS_PER_TREE:return []
+		var values:Array=[]
+		for value in row:
+			if not (value is int or value is float) or not is_finite(float(value)) or float(value)!=floorf(float(value)) or int(value)<0 or int(value)>MAX_RANK:return []
+			values.append(int(value));total+=int(value)
+		clean.append(values)
+	return clean if total<=clampi(level,1,MAX_LEVEL) else []
+
 func restore(raw:Variant)->void:
 	reset()
 	if raw is not Dictionary:return
