@@ -8,12 +8,14 @@ const EAST_EXIT:=Plan.EAST_GATE
 const SOUTH_EXIT:=Plan.SOUTH_GATE
 const ATLAS_PATH:="res://art/start32/terrain_32.webp"
 const MATERIAL_IDS:=["grass_meadow","grass_moss","forest_floor","earth_path","village_stone","old_cobble","arcane_floor"]
-# Map 0 uses the warm/orange ambience treatment across every natural ground
-# sprite. Roads, stone plazas and arcane accents keep their original palette.
+# Map 0 uses a real autumnized natural-ground texture plus warm per-material
+# modulation. This avoids the old green highlights that survived a plain tint.
+# Roads, stone plazas and arcane accents keep their original palette.
+const NATURAL_MATERIALS:=["grass_meadow","grass_moss","forest_floor"]
 const MATERIAL_TINTS:={
-	"grass_meadow":Color(1.00,0.58,0.24),
-	"grass_moss":Color(0.96,0.43,0.16),
-	"forest_floor":Color(1.00,0.68,0.34),
+	"grass_meadow":Color(1.00,0.93,0.74),
+	"grass_moss":Color(0.93,0.68,0.43),
+	"forest_floor":Color(0.86,0.58,0.34),
 	"earth_path":Color(0.86,0.72,0.58),
 	"village_stone":Color(0.84,0.86,0.82),
 	"old_cobble":Color(0.70,0.74,0.70),
@@ -27,6 +29,7 @@ static var material_cells:Dictionary={}
 static var flower_cells:Dictionary={}
 static var ground_cells:Dictionary={}
 static var ground_sources:Dictionary={}
+static var ground_materials:Dictionary={}
 static var cell_sources:Dictionary={}
 var world_bounds:=BOUNDS
 var road_distance:Callable
@@ -37,14 +40,36 @@ var decoration:TileMapLayer
 static func seed_at(cell:Vector2i)->int:
 	return Plan.seed_at(cell)
 
+static func autumnize_natural_texture(source:Texture2D)->Texture2D:
+	var image:=source.get_image()
+	image.convert(Image.FORMAT_RGBA8)
+	for y in image.get_height():
+		for x in image.get_width():
+			var col:=image.get_pixel(x,y)
+			if col.a<=0.01:continue
+			# Replace green-dominant vegetation pixels instead of merely tinting
+			# them. Neutral stone/soil pixels remain untouched.
+			if col.g>col.r*1.04 and col.g>col.b*1.08:
+				var light:=clampf(maxf(col.r,maxf(col.g,col.b)),0.0,1.0)
+				var warm:=Color(
+					0.36+0.42*light,
+					0.16+0.34*light,
+					0.055+0.13*light,
+					col.a
+				)
+				col=col.lerp(warm,0.96)
+				image.set_pixel(x,y,col)
+	return ImageTexture.create_from_image(image)
+
 static func prepare(_distance:Callable)->void:
 	if shared_tileset!=null:return
 	shared_tileset=TileSet.new()
 	shared_tileset.tile_size=Vector2i(TILE,TILE)
 	var texture:Texture2D=load(ATLAS_PATH)
+	var autumn_texture:=autumnize_natural_texture(texture)
 	for material_id in MATERIAL_IDS:
 		var atlas:=TileSetAtlasSource.new()
-		atlas.texture=texture
+		atlas.texture=autumn_texture if material_id in NATURAL_MATERIALS else texture
 		atlas.texture_region_size=Vector2i(TILE,TILE)
 		for y in 12:
 			for x in 24:
@@ -88,6 +113,7 @@ static func prepare(_distance:Callable)->void:
 			elif tone< -0.18:base_material="grass_moss"
 			ground_cells[cell]=Vector2i(posmod(x,4),posmod(y,4))
 			ground_sources[cell]=source_ids[base_material]
+			ground_materials[cell]=base_material
 			if material in ["grass_meadow","grass_moss","forest_floor"]:
 				terrain[cell]=0
 				cell_sources[cell]=source_ids[material]
@@ -142,8 +168,9 @@ static func paint(c:CanvasItem,bounds:Rect2,distance:Callable)->void:
 			var target:=Rect2(position,Vector2.ONE*TILE).intersection(BOUNDS)
 			var base_id:int=int(ground_sources.get(cell,0))
 			var base_source:=shared_tileset.get_source(base_id) as TileSetAtlasSource
+			var base_material:=str(ground_materials.get(cell,"grass_meadow"))
 			var source:=Rect2(Vector2(grass_coord(cell)*TILE),target.size)
-			c.draw_texture_rect_region(base_source.texture,target,source,MATERIAL_TINTS["grass_meadow"])
+			c.draw_texture_rect_region(base_source.texture,target,source,MATERIAL_TINTS.get(base_material,Color.WHITE))
 			if int(terrain[cell])>0:
 				var atlas:Vector2i=cells[cell]
 				var mat:String=str(material_cells[cell])
