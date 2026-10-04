@@ -24,6 +24,9 @@ const NOTES=[
 ["Magier", "Risssprung auf Leertaste ersetzt Arkanen Schritt; Rissnova wird normaler Skill und Arkaner Sturm wird ab Level 40 freigeschaltet."],
 ["Menüs", "Login-Navigation per Tab/Shift+Tab; Spielmenü und Untermenüs erhalten konsistente Zurück-Navigation."],
 ["Audio", "Musik und Effekte erhalten eigene Mute-Schalter; eingestellte Lautstärken bleiben beim Stummschalten erhalten."],
+["Arena", "Spells auf den Tasten 1–4 bleiben in der Arena aktiv; beim Eintritt und zu jeder neuen Welle werden Energie, Ausdauer und Ability-Cooldowns kampfbereit gesetzt."],
+["Alma", "Die Kochseite zeigt jetzt einen Pixelart-Tisch mit sieben sichtbaren Gerichten. A/D und Links/Rechts wechseln die Auswahl; kochbare Gerichte leuchten abhängig vom aktuellen Inventar."],
+["Verschmelzung", "Der Kristall besitzt einen vollständigen Codex aller paarweisen aktiven Skill-Kombinationen mit Pseudo-3D-Vorschau. Implementierte Fusionsrezepte bleiben direkt herstellbar und save-/serverkompatibel."],
 ["Patch-Ablauf", "Patch Notes sind ab jetzt Pflichtbestandteil jedes relevanten PRs; CI prüft, dass sie mit aktualisiert wurden."]]
 static func draw(g)->void:
 	g.text_at(Vector2(170,135),VERSION,25,Color("ffe2aa"))
