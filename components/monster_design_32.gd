@@ -61,7 +61,7 @@ static func paint_waldschleim(c:CanvasItem,p:Vector2,look:Vector2,base:Color,pha
 	var heading:=Hero.direction_index(look)
 	# Authored Golden-Mob idle. Moving/attacking states remain on the native
 	# renderer until their production strips exist, so gameplay never loses art.
-	if absf(phase)<0.0001 and attack<0.0 and stretch.is_equal_approx(Vector2.ONE):
+	if absf(phase)<0.0001 and attack<0.0:
 		if GoldenSprites.draw_direction_strip(c,GOLDEN_FOREST_SLIME_IDLE,p,heading,Vector2(32,32),26.0,scale_factor*4.0):
 			return
 	var back:=heading in [3,4,5]
