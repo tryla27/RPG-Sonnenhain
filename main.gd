@@ -6672,7 +6672,7 @@ func use_item(index: int) -> void:
 		play_sound("level");save_game();return
 	if item["icon"] == "potion":
 		if name in ["Energietrank", "Manatrank"]: energy = minf(max_energy(), energy + 65)
-		else: hp = minf(max_hp(), hp + (90 if name == "Großer Heiltrank" else 45))
+		else: hp = minf(max_hp(), hp + max_hp() * (0.8 if name == "Großer Heiltrank" else 0.5))
 		if int(item.get("count", 1)) > 1:
 			item["count"] = int(item["count"]) - 1
 			item["stack_value"] = maxi(0, item_sale_value(item) - int(item.get("value", 0)))
@@ -10382,10 +10382,12 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var stat_name := "Schaden" if icon in ["sword", "staff", "bow"] else ("Schutz" if icon == "armor" else "Leben")
 		text_at(pos + Vector2(14, 93), "%s %d   %s%d" % [stat_name, int(item["power"]), "▲ +" if diff > 0 else ("▼ " if diff < 0 else "= "), diff], 14, color)
 	if icon in ["potion", "gem", "herb", "essence", "food"]:
-		var effect_name: String = "%s +65" % ("Mana" if class_id == 1 else "Energie") if String(item["name"]) in ["Energietrank", "Manatrank"] else ("HP +90" if String(item["name"]) == "Großer Heiltrank" else ("HP +45" if icon == "potion" else "Wertvolles Material"))
+		var effect_name: String = "%s +65" % ("Mana" if class_id == 1 else "Energie") if String(item["name"]) in ["Energietrank", "Manatrank"] else ("+80% maximale HP" if String(item["name"]) == "Großer Heiltrank" else ("+50% maximale HP" if icon == "potion" else "Wertvolles Material"))
 		if icon == "food":
 			var nutrition := FoodSystem.by_name(str(item["name"]))
 			effect_name = "+%d HP, %.1f HP/s (%ds)" % [nutrition.get("heal",0),nutrition.get("regen",0),nutrition.get("duration",0)]
+			if bool(nutrition.get("instant_hp_full",false)):effect_name="100% HP sofort wiederherstellen"
+			elif bool(nutrition.get("instant_mana_full",false)):effect_name="100% Mana sofort wiederherstellen"
 		text_at(pos + Vector2(14, 120), effect_name, 14, Color("bfe4d8"))
 		text_at(pos + Vector2(14, 145), "Im Stapel: %d / %s" % [int(item.get("count", 1)), "30" if icon == "food" else ("16" if icon == "potion" else "∞")], 13, Color("dfdcc3"))
 	else:
