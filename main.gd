@@ -469,6 +469,9 @@ var pending_purchase_item: Dictionary = {}
 var merchant_kind := ""
 var menu_scroll := 0
 var attack_anim := 0.0
+var warrior_jump_timer := 0.0
+var warrior_jump_duration := 0.56
+var warrior_jump_direction := Vector2.DOWN
 var swing_duration := 0.24
 var world_time := 0.0
 var walk_phase := 0.0
@@ -1800,6 +1803,7 @@ func _process(delta: float) -> void:
 	rescue_banner_timer = maxf(0.0, rescue_banner_timer - delta)
 	reward_scene_timer = maxf(0.0, reward_scene_timer - delta)
 	attack_anim = maxf(0.0, attack_anim - delta)
+	warrior_jump_timer = maxf(0.0, warrior_jump_timer - delta)
 	step_timer = maxf(0.0, step_timer - delta)
 	for i in cooldowns.size():
 		cooldowns[i] = maxf(0.0, float(cooldowns[i]) - delta * food_system.cooldown_recovery_mult())
@@ -3228,6 +3232,10 @@ func dodge() -> void:
 	dodge_start = player_pos
 	dodge_duration = 0.24 if class_id == 0 else 0.22
 	dash_timer = dodge_duration
+	if class_id == 0:
+		warrior_jump_duration = 0.56
+		warrior_jump_timer = warrior_jump_duration
+		warrior_jump_direction = dash_dir
 	dash_cooldown = 1.25
 	invulnerable = 0.38
 	if class_id == 2 and class_mastery_unlocked: ranger_stealth_timer = dodge_duration + 0.4
@@ -3695,6 +3703,9 @@ func use_ability(slot: int) -> void:
 			battle_zones.append({"kind":"banner", "pos":player_pos, "radius":180.0 + rank * 12.0, "life":6.0 + rank, "max":6.0 + rank, "tick":0.0, "damage":0})
 			effect(player_pos, "SCHILDWALL", Color("b5e6fb"), 0.8)
 		2:
+			warrior_jump_duration = 0.72
+			warrior_jump_timer = warrior_jump_duration
+			warrior_jump_direction = facing
 			var destination := player_pos + facing * (215 + (rank - 1) * 25)
 			move_with_collision(destination-player_pos)
 			invulnerable = 0.5
@@ -7453,7 +7464,7 @@ func armor_visual() -> int:
 	return -1
 
 func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2,rings_override:int=-2,running_override:bool=false) -> void:
-	var local := race_override < 0 or (p == player_pos and scale_factor == 1.0)
+	var local := p.is_equal_approx(player_pos) and panel not in ["creation","creation_review"]
 	var roll := 1.0-dash_timer/dodge_duration if local and dash_timer > 0 else -1.0
 	var death := 1.0-death_timer/DEATH_DURATION if local and death_timer > 0 else death_override
 	var outfit := armor_visual() if armor_override == -2 else armor_override
@@ -7462,7 +7473,11 @@ func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: V
 	if panel in ["creation","creation_review"]:head=-1
 	var rings:int=ring_visual() if rings_override==-2 else rings_override
 	if panel in ["creation","creation_review"]:rings=0
-	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override))
+	var jump_progress:float=-1.0
+	if local and visual_class==0 and warrior_jump_timer>0.0:
+		jump_progress=1.0-warrior_jump_timer/maxf(warrior_jump_duration,0.01)
+		look=warrior_jump_direction
+	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override),jump_progress)
 
 func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2, scale_factor: float, race: int, gender: int) -> void:
 	var accent: Color = [Color('e5bd77'),Color('8fcde6'),Color('91c787')][clampi(visual_class,0,2)]
@@ -9001,6 +9016,7 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	var use_gender := pending_gender if panel == "creation" and preview_class >= 0 else hero_gender
 	var attack_now := swing_timer > 0.0 and preview_class < 0
 	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender,-2,-1.0,0.0,-2,-2,is_sprinting if preview_class<0 else false)
+	if in_world and preview_class < 0 and class_id == 0 and hero_race == 0 and hero_gender == 0 and warrior_jump_timer > 0.0: return
 	if in_world and (death_timer > 0 or (dash_timer > 0 and class_id != 1)): return
 	# Arm, Hand und Waffe folgen während des Angriffs derselben Bewegung.
 	var design := equipped_weapon_design() if preview_class < 0 else visual_class * 4

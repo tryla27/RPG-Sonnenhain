@@ -319,13 +319,17 @@ def png_size(path):
     return (int.from_bytes(raw[16:20], 'big'), int.from_bytes(raw[20:24], 'big'))
 
 warrior_idle = root / 'art' / 'sprites' / 'characters' / 'golden_human_warrior' / 'idle_8dir.png'
+warrior_jump_dir = root / 'art' / 'sprites' / 'characters' / 'golden_human_warrior' / 'jump'
 slime_idle = root / 'art' / 'sprites' / 'mobs' / 'golden_forest_slime' / 'idle_8dir.png'
 assert png_size(warrior_idle) == (192, 24), 'golden warrior strip must be 8 x 24px'
+for jump_name in ['south','south-west','west','north-west','north','north-east','east','south-east']:
+    assert png_size(warrior_jump_dir / f'jump-{jump_name}-8f-v1.png') == (2172, 724), f'golden warrior jump strip invalid: {jump_name}'
 assert png_size(slime_idle) == (256, 32), 'golden forest slime strip must be 8 x 32px'
 hero_renderer = (root / 'components' / 'rpg_hero.gd').read_text(encoding='utf8')
 mob_renderer = (root / 'components' / 'monster_design_32.gd').read_text(encoding='utf8')
 golden_runtime = (root / 'components' / 'golden_sprite_runtime.gd').read_text(encoding='utf8')
 assert 'GOLDEN_HUMAN_WARRIOR_IDLE' in hero_renderer and 'draw_direction_strip' in hero_renderer
+assert 'GOLDEN_HUMAN_WARRIOR_JUMP' in hero_renderer and 'draw_animation_strip' in hero_renderer
 assert 'GOLDEN_FOREST_SLIME_IDLE' in mob_renderer and 'draw_direction_strip' in mob_renderer
 assert 'posmod(direction, 8)' in golden_runtime, 'golden sprite runtime must preserve eight-direction indexing'
 for removed in [

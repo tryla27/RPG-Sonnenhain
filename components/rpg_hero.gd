@@ -3,6 +3,16 @@ extends RefCounted
 const H = preload("res://components/reference_house.gd")
 const GoldenSprites = preload("res://components/golden_sprite_runtime.gd")
 const GOLDEN_HUMAN_WARRIOR_IDLE := "res://art/sprites/characters/golden_human_warrior/idle_8dir.png"
+const GOLDEN_HUMAN_WARRIOR_JUMP := [
+	"res://art/sprites/characters/golden_human_warrior/jump/jump-south-8f-v1.png",
+	"res://art/sprites/characters/golden_human_warrior/jump/jump-south-west-8f-v1.png",
+	"res://art/sprites/characters/golden_human_warrior/jump/jump-west-8f-v1.png",
+	"res://art/sprites/characters/golden_human_warrior/jump/jump-north-west-8f-v1.png",
+	"res://art/sprites/characters/golden_human_warrior/jump/jump-north-8f-v1.png",
+	"res://art/sprites/characters/golden_human_warrior/jump/jump-north-east-8f-v1.png",
+	"res://art/sprites/characters/golden_human_warrior/jump/jump-east-8f-v1.png",
+	"res://art/sprites/characters/golden_human_warrior/jump/jump-south-east-8f-v1.png"
+]
 const TILE_SIZE := 32
 const PIXEL_STEP := 2.0
 static var hurt_flash:=0.0
@@ -22,10 +32,16 @@ static func direction_index(look:Vector2)->int:
 	if look.length_squared()<0.0001:return 0
 	return posmod(roundi(atan2(look.x,look.y)/(PI/4.0)),8)
 
-static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0,hurt:float=0.0,head:int=-1,rings:int=0,running:bool=false) -> void:
+static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0,hurt:float=0.0,head:int=-1,rings:int=0,running:bool=false,jump_progress:float=-1.0) -> void:
 	hurt_flash=clampf(hurt,0,1)
 	var female := gender == 1
 	var heading:=direction_index(look)
+	if role==0 and race==0 and gender==0 and jump_progress>=0.0 and death<0.0:
+		var frame:=clampi(floori(clampf(jump_progress,0.0,0.9999)*8.0),0,7)
+		var tint:=Color("fff3de").lerp(Color.WHITE,1.0-clampf(hurt,0.0,1.0)*0.45)
+		if GoldenSprites.draw_animation_strip(c,GOLDEN_HUMAN_WARRIOR_JUMP[heading],p+offset,frame,8,Vector2(96,96),75.0,s,tint):
+			hurt_flash=0.0
+			return
 	# Golden pilot: authored idle strip for the base human warrior. Incomplete
 	# animation/equipment states deliberately fall back to the proven renderer.
 	if role==0 and race==0 and gender==0 and phase==0.0 and not running and roll<0.0 and death<0.0 and armor<0 and head<0:

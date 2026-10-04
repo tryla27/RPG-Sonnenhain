@@ -23,3 +23,14 @@ static func draw_direction_strip(c: CanvasItem, path: String, foot: Vector2, dir
 	var top_left := foot - Vector2(frame_size.x * 0.5, anchor_y) * scale_factor
 	c.draw_texture_rect_region(tex, Rect2(top_left, size), src, modulate)
 	return true
+
+static func draw_animation_strip(c: CanvasItem, path: String, foot: Vector2, frame: int, frame_count: int, destination_size: Vector2, anchor_y: float, scale_factor: float=1.0, modulate: Color=Color.WHITE) -> bool:
+	var tex := texture(path)
+	if tex == null or frame_count <= 0:
+		return false
+	var frame_width := tex.get_width() / float(frame_count)
+	var src := Rect2(Vector2(frame_width * clampi(frame, 0, frame_count - 1), 0.0), Vector2(frame_width, tex.get_height()))
+	var size := destination_size * scale_factor
+	var top_left := foot - Vector2(destination_size.x * 0.5, anchor_y) * scale_factor
+	c.draw_texture_rect_region(tex, Rect2(top_left, size), src, modulate)
+	return true
