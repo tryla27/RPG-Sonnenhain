@@ -15,6 +15,7 @@ func run()->void:
 	var g:=TestGame.new()
 	root.add_child(g)
 	g.class_id=1
+	g.bindings=g.DEFAULT_BINDINGS.duplicate()
 	g.reset_class_skills()
 	g.interior_id=0
 	g.arena_mode="survival"
