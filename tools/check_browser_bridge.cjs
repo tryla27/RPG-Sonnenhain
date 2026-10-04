@@ -9,8 +9,9 @@ assert(!game.includes('JavaScriptBridge.eval('), 'Browser calls must work withou
 assert(!shell.includes("'unsafe-eval'"), 'Do not loosen JavaScript CSP for the bridge');
 const script = shell.match(/browser_bridge = """([\s\S]*?)"""/)[1].replace(/^<script[^>]*>\s*/, '').replace(/\s*<\/script>$/, '');
 const blobs = [], links = [], timers = [], revoked = [];
+const listeners = [];
 const context = {
-  window: {SONNENHAIN_CONTROL_MODE: 'desktop', matchMedia: () => ({matches: true})},
+  window: {SONNENHAIN_CONTROL_MODE: 'desktop', matchMedia: () => ({matches: true}), addEventListener: (name, fn, capture) => listeners.push({name, fn, capture})},
   navigator: {userAgent: 'Android', maxTouchPoints: 5},
   document: {
     body: {appendChild: link => links.push(link)},
@@ -23,6 +24,13 @@ const context = {
 vm.createContext(context, {codeGeneration: {strings: false, wasm: false}});
 vm.runInContext(script, context);
 const bridge = context.window.SonnenhainBrowser;
+assert.equal(listeners[0].name, 'keydown');
+assert.equal(listeners[0].capture, true);
+for (const [key, id, expected] of [['Tab', 'canvas', true], ['Tab', 'password', false], ['Shift', 'canvas', false], ['A', 'canvas', false]]) {
+  let prevented = false;
+  listeners[0].fn({key, target: {id}, preventDefault() {prevented = true}});
+  assert.equal(prevented, expected, 'Only canvas Tab navigation prevents browser focus escape');
+}
 assert.equal(bridge.touchCapability(), false, 'Desktop override wins over touch detection');
 context.window.SONNENHAIN_CONTROL_MODE = 'mobile';
 assert.equal(bridge.touchCapability(), true);

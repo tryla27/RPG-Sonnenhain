@@ -12,6 +12,9 @@ security_meta = """		<meta name="referrer" content="no-referrer">
 
 
 browser_bridge = """<script id="sonnenhain-browser-bridge">
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Tab' && event.target && event.target.id === 'canvas') event.preventDefault();
+}, true);
 window.SonnenhainBrowser = Object.freeze({
   touchCapability() {
     if (window.SONNENHAIN_CONTROL_MODE === 'mobile') return true;

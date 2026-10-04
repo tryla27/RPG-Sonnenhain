@@ -24,6 +24,7 @@ var account_name := ""
 var account_password := ""
 var account_password_confirm := ""
 var account_focus := 0
+var account_shift_tap_pending := false
 var account_status := ""
 var account_characters: Array = []
 var account_logged_in := false
@@ -2918,6 +2919,51 @@ func open_mobile_chat() -> void:
 		DisplayServer.virtual_keyboard_show(chat_input)
 	queue_redraw()
 
+func _input(event:InputEvent)->void:
+	if panel not in ["account_login","account_register"]:
+		account_shift_tap_pending=false
+		return
+	if event is InputEventMouseButton and event.pressed:account_shift_tap_pending=false
+	if event is InputEventKey:
+		handle_account_key(event)
+		get_viewport().set_input_as_handled()
+
+func handle_account_key(event:InputEventKey)->void:
+	var key:=event.keycode if event.keycode!=KEY_NONE else event.physical_keycode
+	if key==KEY_SHIFT:
+		if event.echo:return
+		if event.pressed:account_shift_tap_pending=true
+		else:
+			if account_shift_tap_pending:account_focus=(account_focus+1)%(3 if panel=="account_register" else 2)
+			account_shift_tap_pending=false
+			queue_redraw()
+		return
+	if not event.pressed or event.echo:return
+	account_shift_tap_pending=false
+	var registering:=panel=="account_register"
+	var focus_count:=3 if registering else 2
+	if key==KEY_TAB:
+		account_focus=posmod(account_focus+(-1 if event.shift_pressed else 1),focus_count)
+	elif key==KEY_ESCAPE:
+		panel="account_gate";account_password="";account_password_confirm="";account_status=""
+	elif key==KEY_BACKSPACE:
+		if account_focus==0 and account_name.length()>0:account_name=account_name.left(account_name.length()-1)
+		elif account_focus==1 and account_password.length()>0:account_password=account_password.left(account_password.length()-1)
+		elif registering and account_focus==2 and account_password_confirm.length()>0:account_password_confirm=account_password_confirm.left(account_password_confirm.length()-1)
+	elif key==KEY_ENTER:
+		if account_form_valid(registering):request_account(registering)
+	elif event.unicode>=32:
+		var typed:=String.chr(event.unicode)
+		if account_focus==0 and account_name.length()<24 and "abcdefghijklmnopqrstuvwxyzäöüß0123456789_-".contains(typed.to_lower()):account_name+=typed
+		elif account_focus==1 and account_password.length()<72:account_password+=typed
+		elif registering and account_focus==2 and account_password_confirm.length()<72:account_password_confirm+=typed
+	if registering and account_password_confirm!="" and account_password!=account_password_confirm:
+		account_status="Die Passwörter stimmen nicht überein."
+	elif account_status=="Die Passwörter stimmen nicht überein.":
+		account_status=""
+	queue_redraw()
+	return
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		var hud_hovered:=panel=="" and (hud_action_at(event.position)!="" or QUEST_HUD_RECT.has_point(event.position))
@@ -2976,30 +3022,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.unicode >= 32 and join_code.length() < 28:
 			var code_char := String.chr(event.unicode).to_upper()
 			if "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-".find(code_char) >= 0: join_code += code_char
-		queue_redraw()
-		return
-	if panel in ["account_login","account_register"] and event is InputEventKey and event.pressed and not event.echo:
-		var registering:=panel=="account_register"
-		var focus_count:=3 if registering else 2
-		if event.keycode==KEY_TAB:
-			account_focus=(account_focus+1)%focus_count
-		elif event.keycode==KEY_ESCAPE:
-			panel="account_gate";account_password="";account_password_confirm="";account_status=""
-		elif event.keycode==KEY_BACKSPACE:
-			if account_focus==0 and account_name.length()>0:account_name=account_name.left(account_name.length()-1)
-			elif account_focus==1 and account_password.length()>0:account_password=account_password.left(account_password.length()-1)
-			elif registering and account_focus==2 and account_password_confirm.length()>0:account_password_confirm=account_password_confirm.left(account_password_confirm.length()-1)
-		elif event.keycode==KEY_ENTER:
-			if account_form_valid(registering):request_account(registering)
-		elif event.unicode>=32:
-			var typed:=String.chr(event.unicode)
-			if account_focus==0 and account_name.length()<24 and "abcdefghijklmnopqrstuvwxyzäöüß0123456789_-".contains(typed.to_lower()):account_name+=typed
-			elif account_focus==1 and account_password.length()<72:account_password+=typed
-			elif registering and account_focus==2 and account_password_confirm.length()<72:account_password_confirm+=typed
-		if registering and account_password_confirm!="" and account_password!=account_password_confirm:
-			account_status="Die Passwörter stimmen nicht überein."
-		elif account_status=="Die Passwörter stimmen nicht überein.":
-			account_status=""
 		queue_redraw()
 		return
 	# Texteingabe für einmalige Charaktererstellung.
@@ -5513,9 +5535,9 @@ func handle_panel_click(mouse: Vector2) -> void:
 		return
 	if panel in ["account_login","account_register"]:
 		var registering:=panel=="account_register"
-		if Rect2(300,275,550,48).has_point(mouse):account_focus=0
-		elif Rect2(300,365,550,48).has_point(mouse):account_focus=1
-		elif registering and Rect2(300,455,550,48).has_point(mouse):account_focus=2
+		if Rect2(300,255 if registering else 275,550,48).has_point(mouse):account_focus=0
+		elif Rect2(300,345 if registering else 365,550,48).has_point(mouse):account_focus=1
+		elif registering and Rect2(300,435,550,48).has_point(mouse):account_focus=2
 		elif Rect2(300,545 if registering else 455,550,52).has_point(mouse) and account_form_valid(registering):
 			request_account(registering)
 		elif Rect2(300,615 if registering else 525,180,42).has_point(mouse):
@@ -9715,6 +9737,7 @@ func account_form_valid(registering:bool)->bool:
 func draw_account_form(registering:bool)->void:
 	text_at(Vector2(300,145 if registering else 165),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",31,Color("ffe2aa"))
 	text_at(Vector2(300,188 if registering else 208),"Name und Passwort%s." % (" zweimal" if registering else ""),15,Color("d8e6dc"))
+	text_at(Vector2(300,216 if registering else 236),"Tab / Umschalt: Feld wechseln · Umschalt+Tab: zurück",11,Color("9fb4ac"))
 	text_at(Vector2(300,240 if registering else 260),"NAME",14,Color("e9cc90"))
 	var nr:=Rect2(300,255 if registering else 275,550,48);draw_rect(nr,Color("22363c"));draw_rect(nr,Color("ffe2aa") if account_focus==0 else Color("8ba49c"),false,2)
 	text_at(nr.position+Vector2(14,31),account_name if account_name!="" else "Name eingeben …",19,Color("fff0cf") if account_name!="" else Color("9fb4ac"))
