@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 04.10.2026"
 const NOTES=[
+["Elara · Heilkapelle", "Elaras Map-0-Innenraum ist jetzt eine eigene 32px-Kapelle mit Mittelgang, Kirchenbänken, Podest, Altar, Alchemie-Nische, Lager und Kerzen. Das Heilungsfeld am Altar regeneriert HP/Energie und kann per E vollständig heilen."],
 ["Map 0 · Grünreste LIVE", "Die restlichen hellgrünen Bodenflecken wurden entfernt: Naturtextur, Grasbüschel, Blumenstiele, Grundstücks-Pads und statischer Chunk-Renderer verwenden jetzt dieselbe warme Herbstpalette."],
 ["Arkankern · Blitz LIVE", "Arkankern · Blitz ist jetzt ein echtes Attacken-Skill-Item: BENUTZEN lernt Blitzlanze auf Stufe 1 ohne Skillpunktkosten. Bereits gekaufte Kerne aus älteren Saves werden ebenfalls erkannt."],
 ["Map 0 · Ambiente LIVE", "Die komplette natürliche Bodenfläche von Sonnenhain nutzt jetzt die warmen orange-/rostfarbenen Ambiente-Sprites statt der bisherigen grünen Gras-, Moos- und Waldbodendarstellung. Wege und Pflaster bleiben unverändert."],
