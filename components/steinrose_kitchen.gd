@@ -162,9 +162,9 @@ func keyboard_input(g,event:InputEvent)->bool:
 	if shown.is_empty():return false
 	var current:int=shown.find(selected)
 	if current<0:current=0
-	if event.keycode in [KEY_LEFT,KEY_A]:
+	if event.keycode in [KEY_LEFT,KEY_UP,KEY_A]:
 		selected=int(shown[(current-1+shown.size())%shown.size()])
-	elif event.keycode in [KEY_RIGHT,KEY_D]:
+	elif event.keycode in [KEY_RIGHT,KEY_DOWN,KEY_D]:
 		selected=int(shown[(current+1)%shown.size()])
 	elif event.keycode in [KEY_ENTER,KEY_KP_ENTER,KEY_E]:
 		if tab==3:cook(g,selected)
