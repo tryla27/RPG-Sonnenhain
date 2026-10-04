@@ -362,6 +362,8 @@ var pip_loan_received := false
 var pip_loan_level := 0
 var pip_return_dialogue_index := 0
 var fusion_history:Array=[]
+var fusion_codex_page:=0
+var fusion_codex_selected:=0
 # Dauerhafter, normalisierter Fusionsfortschritt: "kleinereID:groessereID" -> {fusion_id, rank}.
 var learned_fusions:Dictionary={}
 var enemies: Array = []
@@ -3098,7 +3100,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event_matches_binding(event, "heal"): quick_potion(false)
 	elif event_matches_binding(event, "resource"): quick_potion(true)
 	elif event_matches_binding(event, "dodge") and dash_cooldown <= 0: dodge()
-	elif interior_id < 0:
+	elif interior_id < 0 or arena_mode != "":
 		for slot in 4:
 			if event_matches_binding(event, "ability_%d" % (slot + 1)):
 				use_ability(slot)
@@ -3908,7 +3910,8 @@ func enter_arena(mode: String) -> void:
 	battle_zones.clear()
 	hp = max_hp()
 	energy = max_energy()
-	message("%s · Die erste Welle naht!" % ("LETZTE WACHE" if mode == "final" else "ARENA DER EWIGEN WACHT"))
+	for i in cooldowns.size(): cooldowns[i] = 0.0
+	message("%s · Die erste Welle naht! Fähigkeiten 1–4 sind bereit." % ("LETZTE WACHE" if mode == "final" else "ARENA DER EWIGEN WACHT"))
 	play_sound("level")
 	announce_multiplayer_context()
 
@@ -6159,6 +6162,45 @@ func fusion_source_skills()->Array:
 		if float(ABILITIES[id].get("cd",0.0))<=0.0:continue
 		out.append(id)
 	return out
+
+func fusion_catalog_skills()->Array:
+	var out:Array=[]
+	for tree in SKILL_TREES:
+		for raw_id in tree:
+			var id:int=int(raw_id)
+			if id in CLASS_ULTIMATES or id in [9,10,11]:continue
+			if id<0 or id>=ABILITIES.size():continue
+			if float(ABILITIES[id].get("cd",0.0))<=0.0:continue
+			if id not in out:out.append(id)
+	out.sort()
+	return out
+
+func fusion_codex_pairs()->Array:
+	var ids:Array=fusion_catalog_skills()
+	var pairs:Array=[]
+	for a_index in range(ids.size()):
+		for b_index in range(a_index+1,ids.size()):
+			var a:int=int(ids[a_index]);var b:int=int(ids[b_index])
+			var definition:=fusion_definition_by_key(fusion_key(a,b))
+			pairs.append({"a":a,"b":b,"definition":definition})
+	return pairs
+
+func fusion_codex_current()->Dictionary:
+	var pairs:=fusion_codex_pairs()
+	if pairs.is_empty():return {}
+	fusion_codex_selected=clampi(fusion_codex_selected,0,pairs.size()-1)
+	return pairs[fusion_codex_selected]
+
+func fusion_codex_status(pair:Dictionary)->String:
+	var a:int=int(pair.get("a",-1));var b:int=int(pair.get("b",-1))
+	var definition:Variant=pair.get("definition",{})
+	if definition is Dictionary and not definition.is_empty():
+		var id:int=int(definition.get("id",-1))
+		if id>=0 and id<learned.size() and learned[id]:
+			return "SPIELBAR · STUFE %d/%d" % [int(skill_levels[id]),clampi(int(definition.get("max_rank",4)),1,4)]
+		return "SPIELBARES REZEPT"
+	var learned_sources:=a>=0 and b>=0 and a<learned.size() and b<learned.size() and learned[a] and learned[b]
+	return "KODEX · QUELLEN GELERNT" if learned_sources else "KODEX · QUELLEN FEHLEN"
 
 func available_fusions()->Array:
 	ensure_skill_state_size()
@@ -10062,18 +10104,83 @@ func draw_fusion_crystal() -> void:
 	text_at(p+Vector2(-72,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,144)
 
 func draw_fusion_panel() -> void:
-	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(760,124),"%d GOLD" % gold,16,Color("f6dc9a"));text_at(Vector2(165,160),"Verschmelzen kostet nur Gold. Essenz und Ausgangsattacken bleiben erhalten.",13,Color("cbd9da"))
-	var offers:=available_fusions()
-	if offers.is_empty():
-		text_at(Vector2(185,225),"Lerne mindestens zwei aktive Attacken. Bereits erschaffene Fusionen bleiben erhalten.",15,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,760)
-	for i in offers.size():
-		var f:Dictionary=offers[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
-		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Gold · Stufe %d/4 · Quellen bleiben gelernt" % [int(f["gold"]),int(skill_levels[id])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),("VERSTÄRKEN" if learned[id] else "VERSCHMELZEN") if can_fuse(f) else "GESPERRT",can_fuse(f))
+	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"))
+	text_at(Vector2(760,124),"%d GOLD" % gold,16,Color("f6dc9a"))
+	text_at(Vector2(165,160),"FUSIONS-KODEX · alle zulässigen Skill-Paare · spielbare Rezepte sind markiert.",13,Color("cbd9da"))
+	var pairs:=fusion_codex_pairs()
+	if pairs.is_empty():
+		text_at(Vector2(185,225),"Keine fusionsfähigen aktiven Skills gefunden.",15,Color("e7c5ad"))
+		return
+	var per_page:=6
+	var pages:=maxi(1,ceili(float(pairs.size())/float(per_page)))
+	fusion_codex_page=clampi(fusion_codex_page,0,pages-1)
+	var first:=fusion_codex_page*per_page
+	var last:=mini(pairs.size(),first+per_page)
+	ui_box(Rect2(165,190,525,350),Color("263647"))
+	for row in range(first,last):
+		var pair:Dictionary=pairs[row]
+		var y:=205+(row-first)*51
+		var selected:=row==fusion_codex_selected
+		ui_box(Rect2(178,y,498,43),Color("52656a") if selected else Color("253a48"))
+		var a:int=int(pair["a"]);var b:int=int(pair["b"])
+		draw_skill_sprite(a,Vector2(184,y+5),30)
+		draw_skill_sprite(b,Vector2(222,y+5),30)
+		text_at(Vector2(260,y+18),"%s + %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],11,Color("fff1bc"),HORIZONTAL_ALIGNMENT_LEFT,300)
+		text_at(Vector2(260,y+35),fusion_codex_status(pair),9,Color("bfe8bd") if not (pair.get("definition",{}) as Dictionary).is_empty() else Color("b7c5cc"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	ui_button(Rect2(178,551,70,34),"<",fusion_codex_page>0)
+	text_at(Vector2(260,574),"SEITE %d/%d · %d KOMBINATIONEN" % [fusion_codex_page+1,pages,pairs.size()],11,Color("cbd9da"))
+	ui_button(Rect2(604,551,70,34),">",fusion_codex_page<pages-1)
+
+	var current:=fusion_codex_current()
+	if current.is_empty():return
+	var a:int=int(current["a"]);var b:int=int(current["b"])
+	ui_box(Rect2(710,190,270,350),Color("20343a"))
+	text_at(Vector2(725,215),"3D SPELL-VORSCHAU",12,Color("e9cc90"))
+	preload("res://components/class_spell_preview.gd").draw(self,a,Rect2(724,230,112,70))
+	preload("res://components/class_spell_preview.gd").draw(self,b,Rect2(850,230,112,70))
+	text_at(Vector2(829,270),"+",22,Color("d9c8ff"))
+	text_at(Vector2(725,326),ABILITIES[a]["name"],11,Color("fff0ce"),HORIZONTAL_ALIGNMENT_LEFT,112)
+	text_at(Vector2(850,326),ABILITIES[b]["name"],11,Color("fff0ce"),HORIZONTAL_ALIGNMENT_LEFT,112)
+	var definition:Dictionary=current.get("definition",{})
+	if definition.is_empty():
+		text_at(Vector2(725,370),"Noch kein kuratiertes Gameplay-Rezept.",12,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,235)
+		text_at(Vector2(725,397),"Das Paar bleibt im Codex sichtbar,",10,Color("b7c5cc"))
+		text_at(Vector2(725,417),"wird aber nicht als fertiger Spell verkauft.",10,Color("b7c5cc"))
+		ui_button(Rect2(725,478,235,44),"KODEX-EINTRAG",false)
+	else:
+		var id:int=int(definition["id"])
+		text_at(Vector2(725,363),"ERGEBNIS",11,Color("e9cc90"))
+		draw_skill_sprite(id,Vector2(725,375),42)
+		text_at(Vector2(775,397),ABILITIES[id]["name"],15,Color("fff1bc"),HORIZONTAL_ALIGNMENT_LEFT,180)
+		text_at(Vector2(725,430),"%d Gold · Stufe %d/%d" % [int(definition["gold"]),int(skill_levels[id]),clampi(int(definition.get("max_rank",4)),1,4)],11,Color("f4d49b"))
+		var allowed:=can_fuse(definition)
+		ui_button(Rect2(725,478,235,44),("VERSTÄRKEN" if learned[id] else "VERSCHMELZEN") if allowed else "GESPERRT",allowed)
 
 func click_fusion(mouse:Vector2) -> void:
-	var offers:=available_fusions()
-	for i in offers.size():
-		if Rect2(745,223+i*118,190,45).has_point(mouse): buy_fusion(i);return
+	var pairs:=fusion_codex_pairs()
+	if pairs.is_empty():return
+	var per_page:=6
+	var pages:=maxi(1,ceili(float(pairs.size())/float(per_page)))
+	if Rect2(178,551,70,34).has_point(mouse):
+		fusion_codex_page=maxi(0,fusion_codex_page-1);fusion_codex_selected=fusion_codex_page*per_page;return
+	if Rect2(604,551,70,34).has_point(mouse):
+		fusion_codex_page=mini(pages-1,fusion_codex_page+1);fusion_codex_selected=fusion_codex_page*per_page;return
+	var first:=fusion_codex_page*per_page
+	var last:=mini(pairs.size(),first+per_page)
+	for row in range(first,last):
+		if Rect2(178,205+(row-first)*51,498,43).has_point(mouse):
+			fusion_codex_selected=row;return
+	if Rect2(725,478,235,44).has_point(mouse):
+		var current:=fusion_codex_current()
+		if current.is_empty():return
+		var definition:Dictionary=current.get("definition",{})
+		if definition.is_empty():return
+		var offers:=available_fusions()
+		var key:=fusion_key(int(definition["a"]),int(definition["b"]))
+		for i in offers.size():
+			if fusion_key(int(offers[i]["a"]),int(offers[i]["b"]))==key:
+				buy_fusion(i)
+				return
 
 func draw_skill_star(center: Vector2, tint: Color, lit: bool) -> void:
 	if lit: draw_rect(Rect2(center - Vector2(7, 7), Vector2(14, 14)), Color(tint, 0.2))
