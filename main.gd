@@ -6745,6 +6745,16 @@ func sell_all_unequipped() -> void:
 	message("%d Items verkauft: +%d Gold. Ausrüstung behalten." % [count, total])
 	save_game()
 
+func item_skill_unlock_id(item:Dictionary)->int:
+	var explicit:=int(item.get("skill_unlock",-1))
+	if explicit>=0:return explicit
+	var item_name:=str(item.get("name",""))
+	var element:=str(item.get("element","")).to_lower()
+	# Backward compatibility for already-owned Arkankern items from older saves.
+	if item_name.begins_with("Arkankern") and element=="blitz":
+		return 18 # Blitzlanze
+	return -1
+
 func use_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
 	if food_system.eat(self,index): return
@@ -6773,6 +6783,24 @@ func use_item(index: int) -> void:
 		arcane_step_learned=class_id==1
 		inventory.remove_at(index);selected_item=-1
 		message("%s freigeschaltet: %s" % [CLASS_NAMES[class_id],CLASS_RELIC_SKILLS[class_id]])
+		play_sound("level");save_game();return
+	var unlock_id:=item_skill_unlock_id(item)
+	if unlock_id>=0:
+		ensure_skill_state_size()
+		if unlock_id>=ABILITIES.size():
+			message("%s enthält keine gültige Fähigkeit." % name)
+			return
+		if learned[unlock_id]:
+			message("%s ist bereits gelernt." % ABILITIES[unlock_id]["name"])
+			return
+		var required_level:=int(ABILITIES[unlock_id]["req"])
+		if level<required_level:
+			message("%s kann ab Level %d gelernt werden." % [ABILITIES[unlock_id]["name"],required_level])
+			return
+		learned[unlock_id]=true
+		skill_levels[unlock_id]=maxi(1,int(skill_levels[unlock_id]))
+		inventory.remove_at(index);selected_item=-1
+		message("%s gelernt · durch %s" % [ABILITIES[unlock_id]["name"],name])
 		play_sound("level");save_game();return
 	if item["icon"] == "potion":
 		if name in ["Energietrank", "Manatrank"]: energy = minf(max_energy(), energy + 65)
@@ -6821,7 +6849,7 @@ func refresh_shop_stock() -> void:
 			{"name":"Arkanrobe %s" % suffix, "icon":"armor", "power":4 + int(tier / 3.0), "price":210 + tier * 26, "rarity":rarity, "level":tier},
 			{"name":"Fokusring %s" % suffix, "icon":"ring", "power":10 + tier * 2, "price":160 + tier * 22, "rarity":rarity, "level":tier},
 			{"name":"Kristallreif %s" % suffix, "icon":"head", "head_class":1, "power":5 + int(tier / 2.0), "price":260 + tier * 31, "rarity":mini(3,rarity+1), "level":tier},
-			{"name":"Arkankern · %s" % shop_element.capitalize(), "icon":"essence", "power":0, "price":240 + tier * 20, "rarity":mini(3,rarity+1), "level":tier, "element":shop_element}],
+			{"name":"Arkankern · %s" % shop_element.capitalize(), "icon":"essence", "power":0, "price":240 + tier * 20, "rarity":mini(3,rarity+1), "level":tier, "element":shop_element, "skill_unlock":18 if shop_element=="blitz" else -1}],
 		"merchant":[
 			{"name":"Reisendenring %s" % suffix, "icon":"ring", "power":8 + tier * 2, "price":80 + tier * 19, "rarity":rarity, "level":tier},
 			{"name":"Umhang %s" % suffix, "icon":"armor", "power":1 + int(tier / 4.0), "price":65 + tier * 14, "rarity":rarity, "level":tier},
@@ -6881,6 +6909,9 @@ func buy_item(stock_item: Dictionary) -> void:
 	if icon=="head":
 		purchased["head_class"]=clampi(int(stock_item.get("head_class",1 if merchant_kind=="arcane" else class_id)),0,2)
 		purchased["design"]=purchased["head_class"]
+	if int(stock_item.get("skill_unlock",-1))>=0:
+		purchased["skill_unlock"]=int(stock_item["skill_unlock"])
+		purchased["tooltip"]="Lernen: %s" % ABILITIES[int(stock_item["skill_unlock"])]["name"]
 	if not can_add_item(purchased):
 		message("Dein Inventar ist voll.")
 		return
