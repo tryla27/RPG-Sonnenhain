@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 04.10.2026"
 const NOTES=[
+["Händler · Sortiment", "Alle sieben Minuten kommen pro Händler drei rollengerechte Angebote hinzu. Bis 30 bleiben alte Waren kaufbar; danach ersetzen drei neue die ältesten drei. Zehn Seiten, Rotation und Sortiment werden gespeichert."],
 ["Spells", "K/HUD öffnet Fähigkeiten wieder überall: Lernen und Stufe 2–4 mit Skillpunkten. Borin ist dafür nicht erforderlich; gelernte Spells und Belegung bleiben erhalten."],
 ["Runen", "Borins Runenlehre ist getrennt von Spells und nutzt Essenzpunkte. Alle fünf Runenbäume werden für jede Klasse und Rasse vollständig im Multiplayer übertragen."],
 ["Bosshelme", "Alle drei Boss-Kopfbedeckungen sind für jede Klasse ausrüstbar; Inventarbutton und Server-Speichern nutzen dieselbe Regel. Alte Trophäen werden erkannt."],

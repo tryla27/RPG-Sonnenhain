@@ -45,7 +45,7 @@ func run()->void:
 		assert(not g.inventory_item_usable(g.inventory[0]))
 		assert(not store.valid_data(g.capture_save_data(),g.player_uuid),"Normal foreign class hats stay blocked")
 		g.validate_equipment_slots();assert(g.equipped_head_uid==-1)
-	g.class_id=1;g.reset_class_skills();g.inventory.clear();g.shop_rotation=-1
+	g.class_id=1;g.reset_class_skills();g.inventory.clear();g.shop_rotation=-1;g.shop_stock.clear()
 	var seen:Dictionary={}
 	var first:Dictionary={}
 	for cycle in 10:
@@ -64,11 +64,12 @@ func run()->void:
 		for offer in g.shop_stock["arcane"]:
 			var before:int=g.gold;g.buy_item(offer)
 			assert(g.gold==before-int(offer["price"]))
-		assert(g.inventory.size()==6)
+		assert(g.inventory.size()<=mini(30,(cycle+1)*3) and not g.inventory.is_empty())
 		assert(store.valid_data(g.capture_save_data(),g.player_uuid),"Every rotating offer buys and saves")
-		assert(g.inventory[4]["head_class"]==1 and g.inventory_item_usable(g.inventory[4]))
+		for owned in g.inventory:
+			if owned["icon"]=="head":assert(owned["head_class"]==1 and g.inventory_item_usable(owned))
 	g.refresh_shop_stock()
-	assert(g.shop_rotation==0 and g.shop_stock==first,"Cycle wraps only after all ten")
+	assert(g.shop_rotation==0 and g.shop_stock["arcane"].slice(27)==first["arcane"],"Full stock retains nine batches and adds the new first batch")
 	var legacy:Dictionary=g.capture_save_data().duplicate(true);legacy.erase("shop_rotation")
 	g.apply_save_data(legacy);assert(g.shop_rotation==0)
 	g.refresh_shop_stock();assert(g.shop_rotation==1)
@@ -80,5 +81,5 @@ func run()->void:
 	for suffix in ["",".bak",".tmp"]:
 		if FileAccess.file_exists(file+suffix):DirAccess.remove_absolute(file+suffix)
 	DirAccess.remove_absolute(folder)
-	print("BOSS_HEADS_SHOP_ROTATION_OK nine wearable/save/load combos, legacy trophies, normal class restriction, ten unique rotations, wrap, reload, 60 purchases, stale-confirm reset, schema")
+	print("BOSS_HEADS_SHOP_ROTATION_OK nine wearable/save/load combos, legacy trophies, normal class restriction, ten unique rotations, wrap, reload, growing stocks and purchases up to 30 offers, stale-confirm reset, schema")
 	g.queue_free();quit()

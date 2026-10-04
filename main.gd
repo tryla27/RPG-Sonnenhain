@@ -5419,8 +5419,10 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	shop_rotation=preload("res://components/shop_rotation.gd").restore(data)
 	shop_timer = clampf(float(data.get("shop_timer", 0.0)), 0.0, 419.0)
 	var stored_shop: Variant = data.get("shop_stock", {})
-	if stored_shop is Dictionary and stored_shop.has("smith"): shop_stock = stored_shop
-	append_new_equipment()
+	if stored_shop is Dictionary and stored_shop.has("smith"):
+		shop_stock = stored_shop.duplicate(true)
+		for role in shop_stock:shop_stock[role]=shop_stock[role].slice(maxi(0,shop_stock[role].size()-30))
+	sanitize_role_shop_stock()
 	var stored_chests: Array = data.get("opened_chests", [])
 	var stored_chest_until: Array = data.get("chest_respawn_until", [])
 	for i in opened_chests.size():
@@ -5878,6 +5880,7 @@ func start_new_game() -> void:
 	last_waystone = 1
 	waystone_unlocked = [true, false, false, false, false, false, false, false, false, false, false, false]
 	shop_rotation=-1
+	shop_stock.clear()
 	shop_timer = 0.0
 	refresh_shop_stock()
 	for i in bosses_defeated.size(): bosses_defeated[i] = false
@@ -6663,6 +6666,7 @@ func use_item(index: int) -> void:
 	save_game()
 
 func refresh_shop_stock() -> void:
+	var previous_stock:=shop_stock.duplicate(true)
 	var tier := maxi(1, level)
 	var weapon := class_weapon_icon()
 	var weapon_word: String = {"sword":"Klinge", "staff":"Stab", "bow":"Bogen"}[weapon]
@@ -6698,6 +6702,19 @@ func refresh_shop_stock() -> void:
 			{"name":"Meister-%s %s" % [weapon_word, suffix], "icon":weapon, "power":10 + tier * 3, "price":680 + tier * 83, "rarity":mini(3, rarity + 1), "level":tier, "element":shop_element}]
 	}
 	append_new_equipment()
+	# Elara's ten deliveries include known regional herbs and elemental essences.
+	for region in range(1,FoodSystem.REGIONAL_HERBS.size()+1):
+		var herb:Dictionary=FoodSystem.herb_for_region(region)
+		shop_stock["alchemy"].append({"name":herb["name"],"icon":"herb","power":0,"price":8+region*2,"rarity":0,"level":1})
+	for element in ["eis","blitz","gift"]:
+		shop_stock["alchemy"].append({"name":"Essenz · "+element.capitalize(),"icon":"essence","power":0,"price":80+tier*8,"rarity":rarity,"level":tier,"element":element})
+	var pools:=shop_stock.duplicate(true)
+	shop_stock={}
+	for role in pools:
+		var pool:Array=pools[role]
+		var batch:Array=[]
+		for offset in 3:batch.append(pool[(shop_rotation*3+offset)%pool.size()])
+		shop_stock[role]=preload("res://components/shop_rotation.gd").append_offers(previous_stock.get(role,[]),batch)
 
 func append_food_stock() -> void:
 	if not shop_stock.has("merchant"): shop_stock["merchant"]=[]
@@ -10426,7 +10443,7 @@ func draw_shop_panel() -> void:
 	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else ("PIP (ARKANHANDEL)" if merchant_kind == "arcane" else "HÄNDLER"))
 	text_at(Vector2(165, 125), shop_name, 25, Color("ffeda9"))
 	text_at(Vector2(804, 126), "%d GOLD" % gold, 17, Color("f9dba0"))
-	text_at(Vector2(169, 174), "KAUFEN · Rotation %d/10 · Neues Angebot in %d:%02d" % [maxi(1,shop_rotation+1),int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 17, Color("e8f2de"))
+	text_at(Vector2(169, 174), "%d/30 Angebote · 3 neu in %d:%02d" % [shop_stock[merchant_kind].size(),int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 16, Color("e8f2de"))
 	ui_button(Rect2(760,145,80,40),"<",shop_page>0)
 	ui_button(Rect2(850,145,100,40),str(shop_page+1)+" / "+str(int((shop_stock[merchant_kind].size()+2)/3)),(shop_page+1)*3 < shop_stock[merchant_kind].size())
 	if merchant_kind=="alchemy": ui_button(Rect2(600,145,150,40),"VOLLHEILUNG")

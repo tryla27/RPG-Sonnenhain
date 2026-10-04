@@ -186,7 +186,7 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 		if not value is String or String(value).length() > 96: return false
 	if not data.get("shop_stock",{}) is Dictionary: return false
 	for stock in data.get("shop_stock",{}).values():
-		if not stock is Array or stock.size() > 100: return false
+		if not stock is Array or stock.size() > 30: return false
 		for item in stock:
 			if not item is Dictionary or not item.get("name") is String or not item.get("icon") is String: return false
 	return JSON.stringify(data).to_utf8_buffer().size() <= MAX_BYTES
