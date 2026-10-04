@@ -169,7 +169,7 @@ func meal_effect_text()->String:
  if buff_kind!="":parts.append(str(labels.get(buff_kind,buff_kind)))
  return " · ".join(parts)
 func nearest(g)->Dictionary:
- if g.konflux.active or g.arena_mode!="" or g.dungeon_id>=0 or g.interior_id>=0:return {}
+ if g.arena_mode!="" or g.dungeon_id>=0 or g.interior_id>=0:return {}
  configure(g)
  var found:Dictionary={};var distance:=95.0
  var player_region:int=g.region_at(g.player_pos)
@@ -261,9 +261,9 @@ func tick(g,delta:float)->void:
  if meal_until<=now and active_food_name!="":clear_meal()
  if regen_until<=now:
   regen_rate=0
- elif g.hp>0 and g.character_created and not g.server_save.loading and g.death_timer<=0 and not g.konflux.active and g.arena_mode=="":
+ elif g.hp>0 and g.character_created and not g.server_save.loading and g.death_timer<=0 and g.arena_mode=="":
   g.heal_player(regen_rate*maxf(0,delta))
- if meal_active() and g.hp>0 and g.character_created and not g.server_save.loading and g.death_timer<=0 and not g.konflux.active and g.arena_mode=="":
+ if meal_active() and g.hp>0 and g.character_created and not g.server_save.loading and g.death_timer<=0 and g.arena_mode=="":
   if meal_hp_regen>0:g.heal_player(meal_hp_regen*maxf(0,delta))
   if meal_mana_regen>0:g.energy=minf(g.max_energy(),g.energy+meal_mana_regen*maxf(0,delta))
 
