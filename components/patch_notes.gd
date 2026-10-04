@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 04.10.2026"
 const NOTES=[
+["Grafik · Sprite-Pilot", "Menschlicher Krieger und Waldschleim nutzen erstmals echte 8-Richtungs-Idle-Sprites. Fehlende Bewegungs- und Kampfanimationen fallen weiterhin sicher auf den bisherigen Renderer zurück."],
+["Welt · Bereinigung", "Die frühere separate PvP-Großkarte samt Weltgrafiken, Musik, Galerie und Spezialtests wurde entfernt; normale Oberwelt, Dungeons, Koop und Dorf-Arena bleiben erhalten."],
 ["Alma · Tastatur", "In Almas Rezept- und Kochlisten navigieren W/S jetzt hoch und runter; Pfeiltasten und Maus bleiben weiterhin nutzbar."],
 ["Runen · Wirkung", "Borins geskillte Runen wirken jetzt auf Krits, Lebensraub, Autoangriffe, Block, Notfallschutz, Regeneration, Bewegung, Cooldowns, Energie und Elektroketten. Gegnerbezogene Boni nutzen im Multiplayer die Runen des Angreifers."],
 ["Tränke & Kuchen", "Kleine Lebenstränke heilen 50% der maximalen HP, große 80%. Roter Sonnenkuchen füllt HP vollständig, Blauer Mondkuchen Mana vollständig; das Inventar zeigt die Wirkung korrekt."],
