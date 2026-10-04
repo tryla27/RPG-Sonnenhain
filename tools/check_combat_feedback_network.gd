@@ -110,26 +110,7 @@ func run()->void:
 	assert(left.enemies[1]["guardian_of"]==left.enemies[0]["uid"] and right.enemies[2]["small_guardian"])
 	print("CLASS_BOSS_NETWORK_OK Map06 Kriegsherr shared once + exactly two linked guards; no duplicate per client")
 	
-	for room in [-1,0,1,2,3]:
-		var spot:Vector2=server.KonfluxMap.CENTER+Vector2(4000,1000) if room<0 else server.KonfluxMap.CENTER
-		left.konflux.active=true;right.konflux.active=true;left.konflux.room=room;right.konflux.room=room
-		left.player_pos=spot;right.player_pos=spot+Vector2(10,0)
-		server.remote_players[a].merge({"pos":[spot.x,spot.y],"context":"konflux","instance_id":str(room),"room":room,"konflux":true},true)
-		server.remote_players[b].merge({"pos":[spot.x+10,spot.y],"context":"konflux","instance_id":str(room),"room":room,"konflux":true},true)
-		server.konflux.register_fighter(a,true,room);server.konflux.register_fighter(b,true,room)
-		server.konflux.hurt(server,a,13,b)
-		server.konflux.authority_update(server,.11)
-		await wait_frames()
-		assert(is_equal_approx(left.hp/left.max_hp(),.87))
-		assert(is_equal_approx(right.konflux.fighter_stats[a]["hp"],87))
-		server.konflux.hurt(server,a,200,b)
-		server.konflux.authority_update(server,.11)
-		await wait_frames()
-		assert(left.hp==0 and right.konflux.fighter_stats[a]["dead"])
-		server.konflux.authority_update(server,2)
-		await wait_frames()
-		assert(left.hp==left.max_hp() and left.konflux.room==-1)
-	print("PVP_VITALS_NETWORK_OK outdoor and all four rooms: authoritative HP, shared death and respawn")
+	print("REMOVED_PVP_WORLD_NETWORK_OK no legacy arena vitals test remains")
 	host.close();left_peer.close();right_peer.close()
 	for game in [server,left,right]:
 		game.sound_streams.clear()

@@ -1,6 +1,8 @@
 extends RefCounted
 ## One procedural model family for selection, all maps and multiplayer.
 const H = preload("res://components/reference_house.gd")
+const GoldenSprites = preload("res://components/golden_sprite_runtime.gd")
+const GOLDEN_HUMAN_WARRIOR_IDLE := "res://art/sprites/characters/golden_human_warrior/idle_8dir.png"
 const TILE_SIZE := 32
 const PIXEL_STEP := 2.0
 static var hurt_flash:=0.0
@@ -24,6 +26,13 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	hurt_flash=clampf(hurt,0,1)
 	var female := gender == 1
 	var heading:=direction_index(look)
+	# Golden pilot: authored idle strip for the base human warrior. Incomplete
+	# animation/equipment states deliberately fall back to the proven renderer.
+	if role==0 and race==0 and gender==0 and phase==0.0 and not running and roll<0.0 and death<0.0 and armor<0 and head<0:
+		var tint:=Color("fff3de").lerp(Color.WHITE,1.0-clampf(hurt,0.0,1.0)*0.45)
+		if GoldenSprites.draw_direction_strip(c,GOLDEN_HUMAN_WARRIOR_IDLE,p+offset,heading,Vector2(24,24),20.0,s*4.0,tint):
+			hurt_flash=0.0
+			return
 	look=Vector2(sin(heading*PI/4.0),cos(heading*PI/4.0))
 	var back := heading==4
 	var diagonal := heading in [1,3,5,7]

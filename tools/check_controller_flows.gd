@@ -76,7 +76,6 @@ func run() -> void:
 	pad.right = Vector2(-1,0)
 	pad.used = true
 	game.touch_enabled = true
-	game.konflux.enter(game)
 	game.update_player(0.016)
 	if game.facing.distance_to(Vector2.LEFT) > 0.01: failures += 1
 	pad.buttons[102] = true

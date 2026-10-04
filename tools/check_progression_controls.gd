@@ -39,15 +39,7 @@ func run() -> void:
 			previous = reward
 	if game.enemy_xp_reward(0,0,30) != 0: failures += 1
 	if game.enemy_xp_reward(25,0,40) <= game.enemy_xp_reward(0,0,40): failures += 1
-	game.konflux.enter(game)
-	game.player_pos = game.KonfluxMap.CENTER
-	game.konflux.interact(game)
-	if game.konflux.active or game.player_pos != game.WAYSTONES[0]+Vector2(0,105): failures += 1
-	game.konflux.enter(game)
-	game.player_pos = game.KonfluxMap.CENTER
-	game.use_waystone()
-	if game.konflux.active or game.player_pos != game.WAYSTONES[0]+Vector2(0,105): failures += 1
-	print("PROGRESSION_CONTROLS_CHECK failures=",failures," · 23 bindings / 2700 XP comparisons / spawn return E+F")
+	print("PROGRESSION_CONTROLS_CHECK failures=",failures," · 23 bindings / 2700 XP comparisons")
 	game.queue_free()
 	await process_frame
 	quit(1 if failures > 0 else 0)

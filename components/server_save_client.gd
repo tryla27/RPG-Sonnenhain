@@ -45,7 +45,7 @@ func digest(data: Dictionary) -> String:
 	return JSON.stringify(clean).sha256_text()
 
 func queue(g, data: Dictionary) -> void:
-	if g.creative_mode or g.konflux_preview_mode or g.multiplayer_smoke_client_mode or not g.character_created: return
+	if g.creative_mode or g.multiplayer_smoke_client_mode or not g.character_created: return
 	if uuid != g.player_uuid or token.is_empty(): restore(data)
 	var incoming:=data.duplicate(true)
 	var changed:=latest.is_empty() or digest(incoming)!=digest(latest)
@@ -61,7 +61,7 @@ func connected(g) -> bool:
 	return g.network_mode == "client" and g.multiplayer.multiplayer_peer != null and g.multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
 
 func begin(g) -> void:
-	if g.creative_mode or g.konflux_preview_mode or g.multiplayer_smoke_client_mode or not g.character_created or not connected(g): return
+	if g.creative_mode or g.multiplayer_smoke_client_mode or not g.character_created or not connected(g): return
 	var data: Dictionary = g.capture_save_data()
 	if uuid != g.player_uuid or token.is_empty(): restore(data)
 	latest = data
@@ -90,7 +90,7 @@ func flush(g) -> void:
 	g.rpc_zz_save_put.rpc_id(1,token,uuid,revision,last_request,inflight["data"])
 
 func update(g) -> void:
-	if g.dedicated_server_mode or g.creative_mode or g.konflux_preview_mode or g.multiplayer_smoke_client_mode or not g.character_created: return
+	if g.dedicated_server_mode or g.creative_mode or g.multiplayer_smoke_client_mode or not g.character_created: return
 	if not connected(g): return
 	var now := Time.get_ticks_msec()
 	if not ready:
