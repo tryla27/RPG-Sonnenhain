@@ -335,7 +335,7 @@ func draw_cook_page(g) -> void:
 		g.draw_rect(Rect2(412,py,550,38),Color("8a6243").darkened(0.05*plank))
 		g.draw_rect(Rect2(412,py+36,550,2),Color("4f382d"))
 	for mark in range(0,520,52):
-		g.draw_rect(Rect2(425+mark,217+(mark/52%3)*40,18,2),Color("b1875c",0.55))
+		g.draw_rect(Rect2(425+mark,217+(int(mark/52)%3)*40,18,2),Color("b1875c",0.55))
 	var shown:=table_window_indices()
 	for slot in shown.size():
 		var recipe_index:int=int(shown[slot])
@@ -353,7 +353,7 @@ func draw_cook_page(g) -> void:
 			g.text_at(Vector2(card.position.x+6,card.position.y+101),"BEREIT",8,Color("fff0a8"),HORIZONTAL_ALIGNMENT_CENTER,56)
 		elif not learned[recipe_index]:
 			g.draw_rect(Rect2(card.position+Vector2(4,4),card.size-Vector2(8,8)),Color(0.08,0.09,0.10,0.46))
-			g.text_at(Vector2(card.position.x+8,card.position.y+101),"🔒 %dG" % int(RECIPES[recipe_index]["learn_cost"]),8,Color("d7b892"),HORIZONTAL_ALIGNMENT_CENTER,52)
+			g.text_at(Vector2(card.position.x+8,card.position.y+101),"LOCK %dG" % int(RECIPES[recipe_index]["learn_cost"]),8,Color("d7b892"),HORIZONTAL_ALIGNMENT_CENTER,52)
 		else:
 			g.draw_rect(card,Color("c9a45e",0.42),false,1)
 		if is_selected:
