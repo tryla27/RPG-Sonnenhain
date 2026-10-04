@@ -12827,22 +12827,8 @@ func safe_world_teleport_destination(base: Vector2, expected_region: int = -1) -
 	return base.clamp(Vector2(30,30),WORLD-Vector2(30,30))
 
 func run_teleport_consistency_smoke() -> bool:
-	var old_level := level
-	var old_creative := creative_mode
-	creative_mode = false
-	level = KONFLUX_MIN_LEVEL-1
-	var low_blocked := not can_enter_konflux()
-	level = KONFLUX_MIN_LEVEL
-	var high_allowed := can_enter_konflux()
-	var entrance_target := safe_world_teleport_destination(KonfluxMap.ENTRANCE,region_at(KonfluxMap.ENTRANCE))
-	var entrance_ok := region_at(entrance_target) == region_at(KonfluxMap.ENTRANCE) and not terrain_blocked(entrance_target)
-	var center_ok := not KonfluxMap.blocked(KonfluxMap.CENTER,KonfluxMap.CENTER,-1,hero_collision_radius())
-	var rooms_ok := true
-	for room_id in range(KonfluxMap.BUILDING_IDS.size()):
-		var inside := KonfluxMap.CENTER+Vector2(0,190)
-		var outside: Vector2 = KonfluxMap.LOCATIONS[KonfluxMap.BUILDING_IDS[room_id]]+Vector2(0,110)
-		if KonfluxMap.blocked(inside,inside,room_id,hero_collision_radius()) or KonfluxMap.blocked(outside,outside,-1,hero_collision_radius()):
-			rooms_ok = false
+	# The removed legacy PvP world is intentionally no longer part of the
+	# multiplayer smoke test. Keep validating every live world portal.
 	var portals_ok := true
 	for portal in PORTALS:
 		var target_region := int(portal[2])
@@ -12851,13 +12837,9 @@ func run_teleport_consistency_smoke() -> bool:
 		var backward := safe_world_teleport_destination(portal[0]+Vector2(0,110),back_region)
 		if region_at(forward) != target_region or terrain_blocked(forward) or region_at(backward) != back_region or terrain_blocked(backward):
 			portals_ok = false
-	level = old_level
-	creative_mode = old_creative
-	var ok := low_blocked and high_allowed and entrance_ok and center_ok and rooms_ok and portals_ok
-	if ok:
-		print("TELEPORT_SMOKE_OK konflux_lv40=true entrance=true center=true rooms=true portals=true")
-	return ok
-
+	if portals_ok:
+		print("TELEPORT_SMOKE_OK live_world_portals=true")
+	return portals_ok
 
 @rpc("any_peer","call_remote","reliable")
 func rpc_account_request(action:String,name:String,password:String,password_confirm:String="")->void:
