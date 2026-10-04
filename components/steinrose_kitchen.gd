@@ -7,6 +7,7 @@ const BERRIES := [
 	"Pflaume","Nebelbeeren","Bernsteinfrucht","Quellbeeren","Daemmerbeeren","Himmelsfrucht"
 ]
 const BERRY_REGIONS := [1,2,3,4,5,6,7,8,9,10,11,12]
+const TABLE_VISIBLE := 7
 
 const RECIPES := [
 	{"name":"Waldbeer-Kompott","ingredients":{"Himbeeren":2,"Heidelbeeren":2,"Sonnenkraut":1},"learn_cost":0,"desc":"Warme Waldbeeren fuer lange Wege.","effect":"+25 HP sofort · +2 HP/s · 6:00"},
@@ -68,10 +69,24 @@ func learned_indices() -> Array[int]:
 	return result
 
 func visible_recipe_indices() -> Array[int]:
-	if tab==3:return learned_indices()
 	var result:Array[int]=[]
 	for i in RECIPES.size():result.append(i)
 	return result
+
+func table_window_indices()->Array[int]:
+	var result:Array[int]=[]
+	var last_start:=maxi(0,RECIPES.size()-TABLE_VISIBLE)
+	var start:=clampi(selected-int(TABLE_VISIBLE/2),0,last_start)
+	for i in range(start,mini(start+TABLE_VISIBLE,RECIPES.size())):
+		result.append(i)
+	return result
+
+func select_relative(g,delta:int)->void:
+	if RECIPES.is_empty():return
+	selected=posmod(selected+delta,RECIPES.size())
+	g.play_sound("menu")
+	g.queue_redraw()
+
 
 func can_cook(g, index: int = -1) -> bool:
 	var use_index := selected if index < 0 else index
@@ -149,39 +164,41 @@ func open(g) -> void:
 
 func set_tab(g,index:int)->void:
 	tab=clampi(index,0,3)
-	if tab==3 and not bool(learned[selected]):
-		var known:=learned_indices()
-		if not known.is_empty():selected=known[0]
+	selected=clampi(selected,0,RECIPES.size()-1)
 	g.play_sound("menu")
 	g.queue_redraw()
+
 
 func keyboard_input(g,event:InputEvent)->bool:
 	if g.panel!="steinrose" or not (event is InputEventKey) or not event.pressed or event.echo:return false
 	if tab!=3:return false
-	var shown:=learned_indices()
-	if shown.is_empty():return false
-	var current:=shown.find(selected)
-	if current<0:current=0
-	if event.keycode==KEY_UP:
-		selected=shown[(current-1+shown.size())%shown.size()]
-	elif event.keycode==KEY_DOWN:
-		selected=shown[(current+1)%shown.size()]
-	elif event.keycode==KEY_ENTER or event.keycode==KEY_KP_ENTER:
+	if event.keycode in [KEY_LEFT,KEY_A]:
+		select_relative(g,-1)
+	elif event.keycode in [KEY_RIGHT,KEY_D]:
+		select_relative(g,1)
+	elif event.keycode in [KEY_ENTER,KEY_KP_ENTER,KEY_E]:
 		cook(g,selected)
-	else:return false
-	g.play_sound("menu")
-	g.queue_redraw()
+	elif event.keycode==KEY_L:
+		learn_recipe(g,selected)
+	else:
+		return false
 	return true
+
 
 func click(g, mouse: Vector2) -> void:
 	for i in 4:
 		if Rect2(165,170+i*48,220,40).has_point(mouse):
 			set_tab(g,i);return
-	if tab in [0,3]:
-		var shown:=visible_recipe_indices()
-		for row_index in shown.size():
+	if tab==0:
+		for row_index in RECIPES.size():
 			if Rect2(410,190+row_index*27,300,24).has_point(mouse):
-				selected=shown[row_index]
+				selected=row_index
+				g.play_sound("menu");g.queue_redraw();return
+	if tab==3:
+		var shown:=table_window_indices()
+		for slot in shown.size():
+			if Rect2(416+slot*76,218,68,108).has_point(mouse):
+				selected=int(shown[slot])
 				g.play_sound("menu");g.queue_redraw();return
 	if tab==0 and not learned[selected] and Rect2(410,548,180,38).has_point(mouse):
 		learn_recipe(g);return
@@ -189,6 +206,7 @@ func click(g, mouse: Vector2) -> void:
 		cook(g);return
 	if Rect2(810,548,170,38).has_point(mouse) or Rect2(965,91,41,35).has_point(mouse):
 		g.panel="";g.queue_redraw()
+
 
 func draw_recipe_detail(g, allow_cook:bool=false) -> void:
 	var detail:=recipe()
@@ -279,22 +297,73 @@ func draw_effects_page(g) -> void:
 		var y:=466.0+row*13.0
 		g.text_at(Vector2(x,y),"%s · %s" % [RECIPES[i]["name"],RECIPES[i]["effect"]],8,Color("c8d7cf"),HORIZONTAL_ALIGNMENT_LEFT,265)
 
+func draw_table_detail(g)->void:
+	var detail:=recipe()
+	g.ui_box(Rect2(410,350,550,180),Color("20343a"))
+	var icon_id:=FoodSystem.index_for(str(detail["name"]))
+	FoodSystem.icon(g,Vector2(424,366),icon_id,1.15)
+	g.text_at(Vector2(478,378),str(detail["name"]).to_upper(),14,Color("ffe2aa"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	g.text_at(Vector2(478,399),str(detail["desc"]),9,Color("dce7d8"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	g.text_at(Vector2(478,421),str(detail["effect"]),9,Color("ffe4aa"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	var status:=ingredient_status(g)
+	var x:=424.0
+	var y:=456.0
+	var col:=0
+	for item_name in detail["ingredients"]:
+		var owned:=int(status[item_name]["owned"])
+		var needed:=int(status[item_name]["needed"])
+		g.text_at(Vector2(x+col*172,y),"%s %d/%d" % [ingredient_label(str(item_name)),owned,needed],9,Color("bde8bd") if owned>=needed else Color("e8aaa0"),HORIZONTAL_ALIGNMENT_LEFT,165)
+		col+=1
+		if col>=3:
+			col=0
+			y+=20
+	var ready:=can_cook(g,selected)
+	if ready:
+		g.text_at(Vector2(424,516),"BEREIT · alle Zutaten vorhanden",10,Color("ffe39a"))
+	elif not learned[selected]:
+		g.text_at(Vector2(424,516),"GESPERRT · L zum Lernen · %d Gold" % int(detail["learn_cost"]),10,Color("d7b892"))
+	else:
+		g.text_at(Vector2(424,516),"NOCH NICHT KOCHBAR · fehlende Zutaten sind rot",10,Color("e8aaa0"))
+
 func draw_cook_page(g) -> void:
-	g.text_at(Vector2(410,177),"KOCHEN · NUR GELERNTE REZEPTE",14,Color("e9cc90"))
-	var shown:=learned_indices()
-	if shown.is_empty():
-		g.text_at(Vector2(410,215),"Noch keine Rezepte gelernt.",11,Color("e8aaa0"))
-		return
-	for row_index in shown.size():
-		var recipe_index:int=shown[row_index]
-		var row:=Rect2(410,190+row_index*27,300,24)
-		g.ui_box(row,Color("607666") if recipe_index==selected else Color("30474b"))
+	g.text_at(Vector2(410,177),"ALMAS TISCH · A/D ODER ←/→ WÄHLEN",14,Color("e9cc90"))
+	# Holzplatte mit klaren Pixelkanten und drei Planken.
+	g.draw_rect(Rect2(404,202,566,140),Color("392a24"))
+	g.draw_rect(Rect2(408,206,558,132),Color("76523a"))
+	for plank in 3:
+		var py:=210.0+plank*42.0
+		g.draw_rect(Rect2(412,py,550,38),Color("8a6243").darkened(0.05*plank))
+		g.draw_rect(Rect2(412,py+36,550,2),Color("4f382d"))
+	for mark in range(0,520,52):
+		g.draw_rect(Rect2(425+mark,217+(mark/52%3)*40,18,2),Color("b1875c",0.55))
+	var shown:=table_window_indices()
+	for slot in shown.size():
+		var recipe_index:int=int(shown[slot])
+		var card:=Rect2(416+slot*76,218,68,108)
+		var ready:=can_cook(g,recipe_index)
+		var is_selected:=recipe_index==selected
+		var pulse:=0.55+0.35*sin(g.world_time*TAU)
+		# Teller.
+		g.draw_circle(Vector2(card.position.x+34,card.position.y+39),27,Color("e7dcc1"))
+		g.draw_circle(Vector2(card.position.x+34,card.position.y+39),21,Color("b7ad96"))
 		var output_id:=FoodSystem.index_for(str(RECIPES[recipe_index]["name"]))
-		FoodSystem.icon(g,row.position+Vector2(2,-3),output_id,0.55)
-		g.text_at(row.position+Vector2(30,17),str(RECIPES[recipe_index]["name"]),10,Color("fff0ce"))
-		g.text_at(row.position+Vector2(250,17),"BEREIT" if can_cook(g,recipe_index) else "FEHLT",8,Color("bce6bd") if can_cook(g,recipe_index) else Color("e8aaa0"))
-	draw_recipe_detail(g,true)
-	g.text_at(Vector2(410,525),"Kochen kostet kein zusaetzliches Gold.",9,Color("bde8bd"))
+		FoodSystem.icon(g,Vector2(card.position.x+18,card.position.y+23),output_id,0.78)
+		if ready:
+			g.draw_rect(card.grow(2),Color("ffe27a",pulse),false,3)
+			g.text_at(Vector2(card.position.x+6,card.position.y+101),"BEREIT",8,Color("fff0a8"),HORIZONTAL_ALIGNMENT_CENTER,56)
+		elif not learned[recipe_index]:
+			g.draw_rect(Rect2(card.position+Vector2(4,4),card.size-Vector2(8,8)),Color(0.08,0.09,0.10,0.46))
+			g.text_at(Vector2(card.position.x+8,card.position.y+101),"🔒 %dG" % int(RECIPES[recipe_index]["learn_cost"]),8,Color("d7b892"),HORIZONTAL_ALIGNMENT_CENTER,52)
+		else:
+			g.draw_rect(card,Color("c9a45e",0.42),false,1)
+		if is_selected:
+			g.draw_rect(card.grow(4),Color("fff0b0"),false,3)
+		var short_name:=str(RECIPES[recipe_index]["name"]).substr(0,11)
+		g.text_at(Vector2(card.position.x+3,card.position.y+82),short_name,8,Color("fff4d0"),HORIZONTAL_ALIGNMENT_CENTER,62)
+	g.text_at(Vector2(410,337),"A / ←",10,Color("ffe0a0"))
+	g.text_at(Vector2(912,337),"D / →",10,Color("ffe0a0"))
+	draw_table_detail(g)
+
 
 func draw(g) -> void:
 	g.text_at(Vector2(165,138),"ALMA · KUECHE DER STEINROSE",29,Color("ffe1a0"))
