@@ -385,6 +385,7 @@ var projectiles: Array = []
 var enemy_projectiles: Array = []
 var last_waystone := 1
 var waystone_unlocked: Array = [true, false, false, false, false, false, false, false, false, false, false, false]
+var shop_rotation := -1
 var shop_timer := 0.0
 var shop_stock: Dictionary = {}
 var previous_region := 0
@@ -1762,6 +1763,7 @@ func _process(delta: float) -> void:
 		if shop_timer >= 420.0:
 			shop_timer = 0.0
 			refresh_shop_stock()
+			save_game()
 	attack_timer = maxf(0.0, attack_timer - delta)
 	swing_timer = maxf(0.0, swing_timer - delta)
 	dash_timer = maxf(0.0, dash_timer - delta)
@@ -5225,7 +5227,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "skill_level_points_granted":skill_level_points_granted, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "skill_level_points_granted":skill_level_points_granted, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_rotation":shop_rotation,"shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5414,6 +5416,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	var stored_stones: Array = data.get("waystone_unlocked", [])
 	for i in mini(stored_stones.size(), WAYSTONES.size()): waystone_unlocked[i] = bool(stored_stones[i])
 	if stored_stones.is_empty(): waystone_unlocked[last_waystone] = true
+	shop_rotation=preload("res://components/shop_rotation.gd").restore(data)
 	shop_timer = clampf(float(data.get("shop_timer", 0.0)), 0.0, 419.0)
 	var stored_shop: Variant = data.get("shop_stock", {})
 	if stored_shop is Dictionary and stored_shop.has("smith"): shop_stock = stored_shop
@@ -5874,6 +5877,7 @@ func start_new_game() -> void:
 	for i in boss_cooldowns.size(): boss_cooldowns[i] = 0.0
 	last_waystone = 1
 	waystone_unlocked = [true, false, false, false, false, false, false, false, false, false, false, false]
+	shop_rotation=-1
 	shop_timer = 0.0
 	refresh_shop_stock()
 	for i in bosses_defeated.size(): bosses_defeated[i] = false
@@ -6661,10 +6665,14 @@ func refresh_shop_stock() -> void:
 	var weapon_word: String = {"sword":"Klinge", "staff":"Stab", "bow":"Bogen"}[weapon]
 	var smith_weapon := "sword"
 	var smith_weapon_word := "Klinge"
-	var suffix: String = ["der Wiesen", "des Nebels", "der Funken", "der Gezeiten", "des Morgenrots", "des Himmels"].pick_random()
+	shop_rotation=preload("res://components/shop_rotation.gd").next_index(shop_rotation)
+	var theme:Dictionary=preload("res://components/shop_rotation.gd").THEMES[shop_rotation]
+	var suffix:String=theme["suffix"]
+	shop_page=0
+	pending_purchase=-1
+	pending_purchase_item={}
 	var rarity := 1 if tier < 12 else (2 if tier < 30 else 3)
-	var elements := ["eis", "blitz", "gift"]
-	var shop_element: String = elements.pick_random()
+	var shop_element:String=theme["element"]
 	shop_stock = {
 		"smith":[
 			{"name":"%s %s" % [smith_weapon_word, suffix], "icon":smith_weapon, "power":4 + tier * 2, "price":80 + tier * 20, "rarity":rarity, "level":tier},
@@ -6679,7 +6687,7 @@ func refresh_shop_stock() -> void:
 			{"name":"Elementstab · %s" % shop_element.capitalize(), "icon":"staff", "power":9 + tier * 2, "price":175 + tier * 30, "rarity":mini(3,rarity+1), "level":tier, "element":shop_element},
 			{"name":"Arkanrobe %s" % suffix, "icon":"armor", "power":4 + int(tier / 3.0), "price":210 + tier * 26, "rarity":rarity, "level":tier},
 			{"name":"Fokusring %s" % suffix, "icon":"ring", "power":10 + tier * 2, "price":160 + tier * 22, "rarity":rarity, "level":tier},
-			{"name":"Kristallreif %s" % suffix, "icon":"head", "power":5 + int(tier / 2.0), "price":260 + tier * 31, "rarity":mini(3,rarity+1), "level":tier},
+			{"name":"Kristallreif %s" % suffix, "icon":"head", "head_class":1, "power":5 + int(tier / 2.0), "price":260 + tier * 31, "rarity":mini(3,rarity+1), "level":tier},
 			{"name":"Arkankern · %s" % shop_element.capitalize(), "icon":"essence", "power":0, "price":240 + tier * 20, "rarity":mini(3,rarity+1), "level":tier, "element":shop_element}],
 		"merchant":[
 			{"name":"Reisendenring %s" % suffix, "icon":"ring", "power":8 + tier * 2, "price":80 + tier * 19, "rarity":rarity, "level":tier},
@@ -6724,6 +6732,9 @@ func buy_item(stock_item: Dictionary) -> void:
 		message("Dieses Angebot ist ungültig.")
 		return
 	var purchased := make_item(String(stock_item.get("name","Fundstück")), icon, clampi(int(stock_item.get("rarity",1)),0,4), maxi(0,int(stock_item.get("power",0))), int(price/2.0), String(stock_item.get("element","")), maxi(1,int(stock_item.get("level",level))))
+	if icon=="head":
+		purchased["head_class"]=clampi(int(stock_item.get("head_class",1 if merchant_kind=="arcane" else class_id)),0,2)
+		purchased["design"]=purchased["head_class"]
 	if not can_add_item(purchased):
 		message("Dein Inventar ist voll.")
 		return
@@ -10291,9 +10302,9 @@ func draw_inventory_panel() -> void:
 		if item["icon"] in ["sword", "staff", "bow", "armor", "ring", "head"]: detail += " · +%d" % int(item["power"])
 		text_at(Vector2(643, 518), detail, 13, Color("e5eddd"), HORIZONTAL_ALIGNMENT_LEFT, 320)
 		var action_label := "MEISTERGABE NUTZEN" if bool(item.get("class_relic",false)) else ("ESSEN" if item["icon"] == "food" else "BENUTZEN")
-		if item["icon"] in ["sword","staff","bow","armor","ring"]:
+		if item["icon"] in ["sword","staff","bow","armor","ring","head"]:
 			action_label = "AUSZIEHEN" if is_equipped_uid(int(item.get("uid",-1))) else "AUSRÜSTEN"
-		ui_button(Rect2(643, 538, 320, 42), action_label, bool(item.get("class_relic",false)) or item["icon"] in ["potion", "food", class_weapon_icon(), "armor", "ring"])
+		ui_button(Rect2(643, 538, 320, 42), action_label, inventory_item_usable(item))
 	else:
 		text_at(Vector2(643, 508), "Wähle einen Gegenstand aus dem Inventar.", 14, Color("dbe8d5"))
 	var mouse := get_viewport().get_mouse_position()
@@ -10412,7 +10423,7 @@ func draw_shop_panel() -> void:
 	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else ("PIP (ARKANHANDEL)" if merchant_kind == "arcane" else "HÄNDLER"))
 	text_at(Vector2(165, 125), shop_name, 25, Color("ffeda9"))
 	text_at(Vector2(804, 126), "%d GOLD" % gold, 17, Color("f9dba0"))
-	text_at(Vector2(169, 174), "KAUFEN · Neues Angebot in %d:%02d" % [int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 17, Color("e8f2de"))
+	text_at(Vector2(169, 174), "KAUFEN · Rotation %d/10 · Neues Angebot in %d:%02d" % [maxi(1,shop_rotation+1),int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 17, Color("e8f2de"))
 	ui_button(Rect2(760,145,80,40),"<",shop_page>0)
 	ui_button(Rect2(850,145,100,40),str(shop_page+1)+" / "+str(int((shop_stock[merchant_kind].size()+2)/3)),(shop_page+1)*3 < shop_stock[merchant_kind].size())
 	if merchant_kind=="alchemy": ui_button(Rect2(600,145,150,40),"VOLLHEILUNG")
@@ -12084,16 +12095,20 @@ func item_icon_for_uid(uid: int) -> String:
 			return str(item.get("icon",""))
 	return ""
 
+func inventory_item_usable(item:Dictionary)->bool:
+	return bool(item.get("class_relic",false)) or item.get("icon","") in ["potion","food",class_weapon_icon(),"armor","ring"] or preload("res://components/headgear_rules.gd").allowed(item,class_id)
+
 func equipped_head_allowed() -> bool:
 	if equipped_head_uid < 0: return true
 	for item in inventory:
 		if int(item.get("uid",-1)) != equipped_head_uid: continue
 		if str(item.get("icon","")) != "head": return false
 		# Boss-Kopfrüstungen sind Trophäen und dürfen klassenübergreifend getragen werden.
-		return bool(item.get("boss_hat",false)) or int(item.get("head_class",-1)) == class_id
+		return preload("res://components/headgear_rules.gd").allowed(item,class_id)
 	return false
 
 func validate_equipment_slots() -> void:
+	for item in inventory:preload("res://components/headgear_rules.gd").normalize(item)
 	if not equipped_head_allowed():equipped_head_uid=-1
 	var weapon_icon := item_icon_for_uid(equipped_uid)
 	if equipped_uid >= 0 and (weapon_icon == "" or weapon_icon != class_weapon_icon()):
@@ -12133,7 +12148,7 @@ func toggle_equipment_item(index: int) -> bool:
 	var uid := int(item.get("uid",-1))
 	var icon := str(item.get("icon",""))
 	if icon=="head":
-		if not bool(item.get("boss_hat",false)) and int(item.get("head_class",-1))!=class_id:
+		if not preload("res://components/headgear_rules.gd").allowed(item,class_id):
 			message("Diese Kopfbedeckung gehört einer anderen Klasse.")
 			return true
 		var removing:=equipped_head_uid==uid
@@ -12217,6 +12232,7 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 		item["mastery_skill"]=CLASS_RELIC_SKILLS[int(item["mastery_class"])]
 	else:
 		item.erase("mastery_class");item.erase("mastery_skill")
+	preload("res://components/headgear_rules.gd").normalize(item)
 	if bool(item.get("boss_hat",false)):
 		item["boss_hat"]=true
 		item["head_class"]=clampi(int(item.get("head_class",-1)),0,2)

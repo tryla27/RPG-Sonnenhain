@@ -97,6 +97,8 @@ func valid_steinrose_state(raw:Variant)->bool:
 	return true
 
 func valid_data(data: Dictionary, uuid: String) -> bool:
+	var rotation:Variant=data.get("shop_rotation",-1)
+	if not (rotation is int or rotation is float) or not is_finite(float(rotation)) or float(rotation)!=floorf(float(rotation)) or int(rotation)<-1 or int(rotation)>9:return false
 	if not valid_food_state(data.get("food_state",{})):return false
 	if not valid_steinrose_state(data.get("steinrose_state",{})):return false
 	if data.size() > 80: return false
@@ -132,7 +134,7 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 	if int(data.get("equipped_ring2_uid",-1)) >= 0 and (int(data["class_id"]) != 1 or int(data["equipped_ring2_uid"]) == int(data.get("equipped_ring_uid",-1))): return false
 	if int(data.get("equipped_head_uid",-1))>=0:
 		for item in data["inventory"]:
-			if int(item["uid"])==int(data["equipped_head_uid"]) and (item["icon"]!="head" or int(item.get("head_class",-1))!=int(data["class_id"])):return false
+			if int(item["uid"])==int(data["equipped_head_uid"]) and not preload("res://components/headgear_rules.gd").allowed(item,int(data["class_id"])):return false
 	for field in ["learned","skill_levels","slots","quests","event_states","event_progress","opened_chests","chest_respawn_until","dungeon_chests_opened","dungeon_chest_respawn_until","bosses_defeated","waystone_unlocked","discovered_regions","processed_server_transactions","recent_players","village_gates","arena_leaderboard"]:
 		if not data.get(field,[]) is Array or data.get(field,[]).size() > (256 if field == "processed_server_transactions" else 100): return false
 	var fog:Variant=data.get("world_fog",[])

@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 04.10.2026"
 const NOTES=[
+["Bosshelme", "Alle drei Boss-Kopfbedeckungen sind für jede Klasse ausrüstbar; Inventarbutton und Server-Speichern nutzen dieselbe Regel. Alte Trophäen werden erkannt."],
+["Händler", "Zehn vorbereitete Sortimente wechseln alle sieben Minuten ohne Wiederholung bis zum Umlaufende. Rotation und Restzeit bleiben gespeichert; Pip zeigt den Stand an."],
 ["NEU · Skillpunkte", "Jedes Level-Up vergibt jetzt +1 Skillpunkt zusätzlich zur Essenz. Bestehende Charaktere bekommen ihre bisherigen Level-Up-Punkte einmalig rückwirkend nachgetragen."],
 ["NEU · Fähigkeiten", "Normale gelernte Fähigkeiten folgen jetzt dem 4-Stufen-Prinzip: Stufe 1 gelernt; Stufen 2, 3 und 4 kosten jeweils 1 Skillpunkt und besitzen Level-Gates."],
 ["NEU · Multiplayer", "Fähigkeitsränge werden im Multiplayer auf Stufe 1–4 begrenzt und vom Server aus dem synchronisierten Skill-Rang übernommen statt dem Cast-Wert blind zu vertrauen."],
