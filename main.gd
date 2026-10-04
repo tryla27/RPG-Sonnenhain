@@ -10169,8 +10169,8 @@ func draw_fusion_preview_card(entry:Dictionary)->void:
 		text_at(Vector2(686,218),"KOMBINATIONS-CODEX · VORSCHAU",10,Color("cbbcf0"))
 	text_at(Vector2(680,405),str(entry["name"]),15,Color("fff0ce"),HORIZONTAL_ALIGNMENT_CENTER,272)
 	text_at(Vector2(680,430),"%s + %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],10,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_CENTER,272)
-	var learned_a:=a<learned.size() and learned[a]
-	var learned_b:=b<learned.size() and learned[b]
+	var learned_a:bool=a<learned.size() and bool(learned[a])
+	var learned_b:bool=b<learned.size() and bool(learned[b])
 	text_at(Vector2(680,455),"QUELLEN  %s / %s" % ["✓" if learned_a else "–","✓" if learned_b else "–"],10,Color("bde8bd") if learned_a and learned_b else Color("e8aaa0"),HORIZONTAL_ALIGNMENT_CENTER,272)
 	if implemented:
 		var rank:=int(skill_levels[output]) if output<skill_levels.size() else 0
@@ -10198,7 +10198,7 @@ func draw_fusion_panel() -> void:
 		var entry:Dictionary=entries[index]
 		var a:=int(entry["a"]);var b:=int(entry["b"])
 		var implemented:=bool(entry["implemented"])
-		var both_known:=a<learned.size() and b<learned.size() and learned[a] and learned[b]
+		var both_known:bool=a<learned.size() and b<learned.size() and bool(learned[a]) and bool(learned[b])
 		var row_rect:=Rect2(165,185+row*47,480,41)
 		ui_button(row_rect,"%03d  %s + %s" % [index+1,str(ABILITIES[a]["name"]).substr(0,17),str(ABILITIES[b]["name"]).substr(0,17)],true,index==fusion_codex_index)
 		if implemented:
