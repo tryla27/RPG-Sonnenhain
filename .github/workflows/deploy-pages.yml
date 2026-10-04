@@ -163,7 +163,6 @@ jobs:
           cp website/site.css build/site/site.css
           cp -R website/patches build/site/patches
           cp website/ui-preview.png build/site/ui-preview.png
-          cp -R website/konflux-gallery build/site/konflux-gallery
           cp -R website/mobile build/site/mobile
           cp CNAME build/site/CNAME
           printf '{"version":"v29.1","commit":"%s"}\n' "$GITHUB_SHA" > build/site/version.json
