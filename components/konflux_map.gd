@@ -1,6 +1,6 @@
 extends RefCounted
-## Compatibility tombstone for the removed Konflux PvP world.
-## The former 80k x 80k map, PvP simulation, chunks, interiors and rendering
+## Compatibility tombstone for the removed legacy world.
+## The former dedicated world simulation, chunks, interiors and rendering
 ## were removed on 2026-10-04. This no-op API keeps unrelated save/network code
 ## loadable while callers are retired incrementally.
 const SIZE := Vector2.ZERO
@@ -43,7 +43,7 @@ static func safe(_p:Vector2,_interior:int=-1)->bool:return true
 static func line_clear(_a:Vector2,_b:Vector2,_interior:int=-1)->bool:return true
 func enter(g,_pos:Vector2=Vector2.ZERO,_target_room:int=-1)->void:
 	active=false
-	if g!=null and g.has_method("message"):g.message("Die frühere PvP-Welt wurde entfernt.")
+	if g!=null and g.has_method("message"):g.message("Dieser frühere Bereich wurde entfernt.")
 func leave(_g,_to_start:bool=false)->void:active=false
 func announce_room(_g,_to_start:bool=false)->void:pass
 func register_fighter(peer:int,enabled:bool,target_room:int)->void:
