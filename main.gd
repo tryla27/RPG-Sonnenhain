@@ -6199,7 +6199,7 @@ func fusion_codex_status(pair:Dictionary)->String:
 		if id>=0 and id<learned.size() and learned[id]:
 			return "SPIELBAR · STUFE %d/%d" % [int(skill_levels[id]),clampi(int(definition.get("max_rank",4)),1,4)]
 		return "SPIELBARES REZEPT"
-	var learned_sources:=a>=0 and b>=0 and a<learned.size() and b<learned.size() and learned[a] and learned[b]
+	var learned_sources:bool=a>=0 and b>=0 and a<learned.size() and b<learned.size() and bool(learned[a]) and bool(learned[b])
 	return "KODEX · QUELLEN GELERNT" if learned_sources else "KODEX · QUELLEN FEHLEN"
 
 func available_fusions()->Array:
