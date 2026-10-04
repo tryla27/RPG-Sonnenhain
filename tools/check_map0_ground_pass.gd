@@ -9,6 +9,10 @@ func _initialize()->void:
 	assert(Plan.GRID==Vector2i(56,82))
 	assert(Plan.CHUNK_ORDER==["NW","MW","MO","NO","SW","SO"])
 	assert(Map0.legacy_overlay_count()==0)
+	# Map 0 natural floor must stay on the orange/rost autumn ambience palette.
+	assert(Map0.MATERIAL_TINTS["grass_meadow"]==Color(1.00,0.58,0.24))
+	assert(Map0.MATERIAL_TINTS["grass_moss"]==Color(0.96,0.43,0.16))
+	assert(Map0.MATERIAL_TINTS["forest_floor"]==Color(1.00,0.68,0.34))
 
 	var total:=0
 	var materials:Dictionary={}
