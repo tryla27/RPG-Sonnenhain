@@ -30,7 +30,7 @@ func run():
 		if Time.get_ticks_msec() > deadline: quit(2); return
 		await process_frame
 	g.server_save.uuid = g.player_uuid
-	g.server_save.token = "b".repeat(64)
+	g.server_save.token = "c".repeat(64)
 	g.server_save.latest = g.capture_save_data()
 	g.server_save.dirty = true
 	g.rpc_zz_save_open.rpc_id(1,g.server_save.token,g.player_uuid)
