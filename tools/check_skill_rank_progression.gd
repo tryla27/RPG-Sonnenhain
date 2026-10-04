@@ -19,10 +19,24 @@ func run()->void:
 	g.level=3
 	g.xp=0
 	g.skill_points=0
+	g.skill_level_points_granted=2
 	var needed:=g.xp_required()
 	g.gain_xp(needed)
 	assert(g.level==4)
 	assert(g.skill_points==1)
+	assert(g.skill_level_points_granted==3)
+
+	# Alte Saves bekommen fehlende Level-Up-Punkte genau einmal nachgetragen.
+	g.level=20
+	g.skill_points=4
+	g.skill_level_points_granted=0
+	var migrated:=g.restore_level_skill_point_progress({})
+	assert(migrated==19)
+	assert(g.skill_points==23)
+	assert(g.skill_level_points_granted==19)
+	var migrated_again:=g.restore_level_skill_point_progress({"skill_level_points_granted":19})
+	assert(migrated_again==0)
+	assert(g.skill_points==23)
 
 	# Rang 1 = gelernt. Rang 2-4 kosten je 1 SP und besitzen Level-Gates.
 	var fireball:=16
@@ -74,6 +88,6 @@ func run()->void:
 	g.skill_levels[43]=1
 	assert(not g.can_upgrade_skill(43))
 
-	print("SKILL_RANK_PROGRESSION_OK +1 SP/level; ranks 1-4; 1 SP upgrades; gates; network rank cap")
+	print("SKILL_RANK_PROGRESSION_OK +1 SP/level; legacy backfill; ranks 1-4; 1 SP upgrades; gates; network rank cap")
 	g.free()
 	quit()
