@@ -8495,9 +8495,9 @@ func draw_village_ground() -> void:
 	]
 	for pad:Rect2 in pads:
 		if not pad.grow(48).intersects(current_static_bounds()):continue
-		draw_rect(pad,Color("6f7d57",0.18))
-		draw_rect(pad.grow(-8),Color("8a7b5d",0.10))
-		draw_rect(pad,Color("a79b79",0.38),false,3)
+		draw_rect(pad,Color("8b5732",0.18))
+		draw_rect(pad.grow(-8),Color("a06b3f",0.10))
+		draw_rect(pad,Color("c08a58",0.38),false,3)
 		for x in range(int(pad.position.x)+16,int(pad.end.x)-16,32):
 			draw_rect(Rect2(Vector2(x,pad.position.y-2),Vector2(18,4)),Color("b8ae8f",0.48))
 			draw_rect(Rect2(Vector2(x,pad.end.y-2),Vector2(18,4)),Color("756b55",0.38))

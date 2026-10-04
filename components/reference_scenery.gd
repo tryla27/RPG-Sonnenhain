@@ -7,11 +7,11 @@ static func rect(c: CanvasItem, p: Vector2, x: float, y: float, w: float, h: flo
 	PixelStyle32.rect(c,Rect2(p+Vector2(x,y),Vector2(w,h)),Color(color))
 
 static func ground(c: CanvasItem, p: Vector2, seed_value: int) -> void:
-	rect(c,p,0,0,64,64,"659349")
+	rect(c,p,0,0,64,64,"7b4a26")
 	for i in range(28):
 		var x: int = posmod(seed_value+i*37,61)
 		var y: int = posmod(seed_value/7+i*23,61)
-		rect(c,p,x,y,2+posmod(i,3),2,["729f4f","587e40","88aa54","608947"][i%4])
+		rect(c,p,x,y,2+posmod(i,3),2,["a9682e","85502a","c07a35","70452a"][i%4])
 	for i in range(3):
 		var q := p+Vector2(posmod(seed_value+i*19,48),posmod(seed_value/11+i*13,48))
 		grass(c,q,seed_value+i)
@@ -19,14 +19,14 @@ static func ground(c: CanvasItem, p: Vector2, seed_value: int) -> void:
 static func grass(c: CanvasItem, p: Vector2, key: int = 0) -> void:
 	for i in range(5):
 		var h: int = 3+posmod(key+i*7,7)
-		rect(c,p,i*3,9-h,2,h,["456b36","709b47","96b956"][i%3])
-		rect(c,p,i*3-1,8-h,2,2,"b1c76b" if i%2==0 else "789f4b")
+		rect(c,p,i*3,9-h,2,h,["70472b","9b5c2d","c77934"][i%3])
+		rect(c,p,i*3-1,8-h,2,2,"d18a3d" if i%2==0 else "a65f2f")
 
 static func flower(c: CanvasItem, p: Vector2, key: int) -> void:
 	for i in range(3):
 		var q := p+Vector2(i*8, posmod(key+i*3,7))
-		rect(c,q,0,2,2,12,"456d39")
-		rect(c,q,-4,8,5,2,"87a452")
+		rect(c,q,0,2,2,12,"76502f")
+		rect(c,q,-4,8,5,2,"9c6434")
 		var col: String = ["eee6b3","d9a3c4","9e8ec1","eab35e"][posmod(key+i,4)]
 		rect(c,q,-5,-2,12,3,col)
 		rect(c,q,-2,-5,5,10,col)
