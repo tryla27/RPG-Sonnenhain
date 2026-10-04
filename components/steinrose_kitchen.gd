@@ -157,16 +157,16 @@ func set_tab(g,index:int)->void:
 
 func keyboard_input(g,event:InputEvent)->bool:
 	if g.panel!="steinrose" or not (event is InputEventKey) or not event.pressed or event.echo:return false
-	if tab!=3:return false
-	var shown:=learned_indices()
+	if tab not in [0,3]:return false
+	var shown:=visible_recipe_indices()
 	if shown.is_empty():return false
 	var current:=shown.find(selected)
 	if current<0:current=0
-	if event.keycode==KEY_UP:
+	if event.keycode in [KEY_UP,KEY_W]:
 		selected=shown[(current-1+shown.size())%shown.size()]
-	elif event.keycode==KEY_DOWN:
+	elif event.keycode in [KEY_DOWN,KEY_S]:
 		selected=shown[(current+1)%shown.size()]
-	elif event.keycode==KEY_ENTER or event.keycode==KEY_KP_ENTER:
+	elif tab==3 and (event.keycode==KEY_ENTER or event.keycode==KEY_KP_ENTER):
 		cook(g,selected)
 	else:return false
 	g.play_sound("menu")
