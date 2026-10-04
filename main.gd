@@ -364,6 +364,7 @@ var pip_return_dialogue_index := 0
 var fusion_history:Array=[]
 # Dauerhafter, normalisierter Fusionsfortschritt: "kleinereID:groessereID" -> {fusion_id, rank}.
 var learned_fusions:Dictionary={}
+var fusion_codex_index:=0
 var enemies: Array = []
 var drops: Array = []
 var effects: Array = []
@@ -2949,6 +2950,18 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 	if panel=="steinrose" and steinrose.keyboard_input(self,event):
 		return
+	if panel=="fusion" and event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode in [KEY_UP,KEY_W]:
+			fusion_codex_select(-1)
+		elif event.keycode in [KEY_DOWN,KEY_S]:
+			fusion_codex_select(1)
+		elif event.keycode in [KEY_ENTER,KEY_KP_ENTER,KEY_E]:
+			var selected_fusion:=selected_fusion_codex_entry()
+			if not selected_fusion.is_empty() and bool(selected_fusion.get("implemented",false)):
+				buy_fusion_definition(fusion_definition_by_key(str(selected_fusion["key"])))
+		else:
+			pass
+		return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			panel = "start"
@@ -3098,7 +3111,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event_matches_binding(event, "heal"): quick_potion(false)
 	elif event_matches_binding(event, "resource"): quick_potion(true)
 	elif event_matches_binding(event, "dodge") and dash_cooldown <= 0: dodge()
-	elif interior_id < 0:
+	elif interior_id < 0 or arena_mode != "":
 		for slot in 4:
 			if event_matches_binding(event, "ability_%d" % (slot + 1)):
 				use_ability(slot)
@@ -3908,6 +3921,8 @@ func enter_arena(mode: String) -> void:
 	battle_zones.clear()
 	hp = max_hp()
 	energy = max_energy()
+	stamina = max_stamina()
+	for cooldown_index in cooldowns.size():cooldowns[cooldown_index]=0.0
 	message("%s · Die erste Welle naht!" % ("LETZTE WACHE" if mode == "final" else "ARENA DER EWIGEN WACHT"))
 	play_sound("level")
 	announce_multiplayer_context()
@@ -3925,6 +3940,9 @@ func update_arena(delta: float) -> void:
 	if arena_intermission <= 0.0:
 		arena_wave += 1
 		arena_intermission = -1.0
+		energy=max_energy()
+		stamina=max_stamina()
+		for cooldown_index in cooldowns.size():cooldowns[cooldown_index]=0.0
 		var count := mini(24, 3 + arena_wave * 2)
 		if arena_mode == "final": count = 3 + arena_wave * 2
 		for i in count:
@@ -6152,13 +6170,67 @@ func fusion_rank_from_network_state(state:Dictionary,fusion_id:int)->int:
 
 func fusion_source_skills()->Array:
 	var out:Array=[]
-	for id in range(0,40):
-		if id>=learned.size() or not learned[id]:continue
+	for id in fusion_candidate_skill_ids():
+		if id<learned.size() and learned[id]:out.append(id)
+	return out
+
+func fusion_candidate_skill_ids()->Array:
+	var out:Array=[]
+	for id in range(0,mini(40,ABILITIES.size())):
 		if id in CLASS_ULTIMATES or id in [9,10,11]:continue
-		# Nur aktiv nutzbare Fähigkeiten anbieten; passive Werte gehören nicht in den Kristall.
 		if float(ABILITIES[id].get("cd",0.0))<=0.0:continue
 		out.append(id)
 	return out
+
+func fusion_source_tint(id:int)->Color:
+	if id in [16,22]:return Color("f08a55")
+	if id in [12,17]:return Color("86d9f0")
+	if id in [13,18,34,37,39]:return Color("f3db69")
+	if id in [14,28]:return Color("8fd06f")
+	if id in [19,20,21,23]:return Color("b49be7")
+	return Color("d8b873")
+
+func fusion_preview_name(a:int,b:int)->String:
+	var definition:=fusion_definition_by_key(fusion_key(a,b))
+	if not definition.is_empty():return str(ABILITIES[int(definition["id"])]["name"])
+	return "%s × %s" % [str(ABILITIES[a]["name"]),str(ABILITIES[b]["name"])]
+
+func fusion_codex_entries()->Array:
+	var entries:Array=[]
+	var ids:=fusion_candidate_skill_ids()
+	for ai in ids.size():
+		for bi in range(ai+1,ids.size()):
+			var a:=int(ids[ai])
+			var b:=int(ids[bi])
+			var key:=fusion_key(a,b)
+			var definition:=fusion_definition_by_key(key)
+			var implemented:=not definition.is_empty()
+			var preview_gold:=int(definition.get("gold",1200+60*maxi(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])))) if implemented else 1200+60*maxi(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"]))
+			entries.append({
+				"key":key,
+				"a":a,
+				"b":b,
+				"id":int(definition.get("id",-1)) if implemented else -1,
+				"gold":preview_gold,
+				"implemented":implemented,
+				"name":fusion_preview_name(a,b)
+			})
+	return entries
+
+func selected_fusion_codex_entry()->Dictionary:
+	var entries:=fusion_codex_entries()
+	if entries.is_empty():return {}
+	fusion_codex_index=clampi(fusion_codex_index,0,entries.size()-1)
+	return entries[fusion_codex_index]
+
+func fusion_codex_select(delta:int)->void:
+	var entries:=fusion_codex_entries()
+	if entries.is_empty():
+		fusion_codex_index=0
+		return
+	fusion_codex_index=posmod(fusion_codex_index+delta,entries.size())
+	play_sound("menu")
+	queue_redraw()
 
 func available_fusions()->Array:
 	ensure_skill_state_size()
@@ -6174,6 +6246,7 @@ func available_fusions()->Array:
 		offers.append(fusion.duplicate(true))
 	return offers
 
+
 func fusion_skill_cost(fusion:Dictionary) -> int:
 	var a:=int(fusion["a"]);var b:=int(fusion["b"])
 	return maxi(1,ceili(float(skill_point_cost(a)+skill_point_cost(b))*0.75))
@@ -6184,11 +6257,8 @@ func can_fuse(fusion:Dictionary) -> bool:
 	var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
 	return a!=b and learned[a] and learned[b] and int(skill_levels[id])<max_rank and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
 
-func buy_fusion(index:int) -> bool:
-	var offers:=available_fusions()
-	if index < 0 or index >= offers.size(): return false
-	var fusion:Dictionary=offers[index]
-	if not can_fuse(fusion):
+func buy_fusion_definition(fusion:Dictionary)->bool:
+	if fusion.is_empty() or not can_fuse(fusion):
 		message("Diese Verschmelzung ist gerade nicht verfügbar.")
 		return false
 	var id:=int(fusion["id"])
@@ -6226,7 +6296,14 @@ func buy_fusion(index:int) -> bool:
 	fusion_history.append({"key":key,"id":id,"a":a,"b":b,"rank":int(skill_levels[id]),"gold":price,"at":int(Time.get_unix_time_from_system())})
 	message("%s + %s → %s · STUFE %d/4 · -%d Gold · Ausgangsattacken bleiben erhalten" % [ABILITIES[a]["name"],ABILITIES[b]["name"],ABILITIES[id]["name"],int(skill_levels[id]),price])
 	save_game()
+	queue_redraw()
 	return true
+
+func buy_fusion(index:int) -> bool:
+	var offers:=available_fusions()
+	if index < 0 or index >= offers.size(): return false
+	return buy_fusion_definition(offers[index])
+
 
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
@@ -10061,19 +10138,93 @@ func draw_fusion_crystal() -> void:
 		draw_rect(Rect2(p+spark,Vector2(4,4)),Color("bdeaff"))
 	text_at(p+Vector2(-72,68),"VERSCHMELZEN",12,Color("e7dcff"),HORIZONTAL_ALIGNMENT_CENTER,144)
 
+func draw_fusion_preview_card(entry:Dictionary)->void:
+	var box:=Rect2(666,190,300,330)
+	ui_box(box,Color("29243f"))
+	var a:=int(entry["a"])
+	var b:=int(entry["b"])
+	var implemented:=bool(entry.get("implemented",false))
+	var output:=int(entry.get("id",-1))
+	var tint_a:=fusion_source_tint(a)
+	var tint_b:=fusion_source_tint(b)
+	var aura:=tint_a.lerp(tint_b,0.5)
+	var bob:=sin(world_time*2.4)*3.0
+	var center:=Vector2(816,292+bob)
+	# Mehrlagiger Sockel erzeugt Pseudo-Tiefe, ohne den Pixelstil zu verlassen.
+	for depth in range(5,0,-1):
+		var dy:=float(depth)*3.0
+		draw_colored_polygon(PackedVector2Array([center+Vector2(0,-62+dy),center+Vector2(78,dy),center+Vector2(0,62+dy),center+Vector2(-78,dy)]),Color("111827",0.24+depth*0.05))
+	draw_colored_polygon(PackedVector2Array([center+Vector2(0,-62),center+Vector2(78,0),center+Vector2(0,62),center+Vector2(-78,0)]),Color(aura,0.22))
+	draw_arc(center,88,0,TAU,32,Color(aura,0.55+0.20*sin(world_time*3.0)),3)
+	draw_rect(Rect2(center+Vector2(-61,-35),Vector2(58,58)),Color("09101b",0.62))
+	draw_rect(Rect2(center+Vector2(7,-20),Vector2(58,58)),Color("09101b",0.62))
+	draw_skill_sprite(a,center+Vector2(-58,-38),54)
+	draw_skill_sprite(b,center+Vector2(10,-23),54)
+	if implemented and output>=0:
+		draw_rect(Rect2(center+Vector2(-27,31),Vector2(54,54)),Color("09101b",0.72))
+		draw_skill_sprite(output,center+Vector2(-25,33),50)
+		text_at(Vector2(686,218),"ECHTE FUSION",11,Color("bde8bd"))
+	else:
+		text_at(Vector2(686,218),"KOMBINATIONS-CODEX · VORSCHAU",10,Color("cbbcf0"))
+	text_at(Vector2(680,405),str(entry["name"]),15,Color("fff0ce"),HORIZONTAL_ALIGNMENT_CENTER,272)
+	text_at(Vector2(680,430),"%s + %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],10,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_CENTER,272)
+	var learned_a:=a<learned.size() and learned[a]
+	var learned_b:=b<learned.size() and learned[b]
+	text_at(Vector2(680,455),"QUELLEN  %s / %s" % ["✓" if learned_a else "–","✓" if learned_b else "–"],10,Color("bde8bd") if learned_a and learned_b else Color("e8aaa0"),HORIZONTAL_ALIGNMENT_CENTER,272)
+	if implemented:
+		var rank:=int(skill_levels[output]) if output<skill_levels.size() else 0
+		text_at(Vector2(680,479),"STUFE %d/4 · %d GOLD" % [rank,int(entry["gold"])],11,Color("ffe0a0"),HORIZONTAL_ALIGNMENT_CENTER,272)
+		var definition:=fusion_definition_by_key(str(entry["key"]))
+		var label:="MAXIMAL" if rank>=int(definition.get("max_rank",4)) else ("VERSTÄRKEN" if rank>0 else "VERSCHMELZEN")
+		ui_button(Rect2(710,495,212,38),label,can_fuse(definition))
+	else:
+		text_at(Vector2(680,482),"Alle möglichen Paare werden hier gezeigt.",10,Color("c9bce8"),HORIZONTAL_ALIGNMENT_CENTER,272)
+		text_at(Vector2(680,503),"Noch kein eigener Laufzeiteffekt · keine Save-ID erzeugt.",9,Color("aebfb9"),HORIZONTAL_ALIGNMENT_CENTER,272)
+
 func draw_fusion_panel() -> void:
-	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(760,124),"%d GOLD" % gold,16,Color("f6dc9a"));text_at(Vector2(165,160),"Verschmelzen kostet nur Gold. Essenz und Ausgangsattacken bleiben erhalten.",13,Color("cbd9da"))
-	var offers:=available_fusions()
-	if offers.is_empty():
-		text_at(Vector2(185,225),"Lerne mindestens zwei aktive Attacken. Bereits erschaffene Fusionen bleiben erhalten.",15,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,760)
-	for i in offers.size():
-		var f:Dictionary=offers[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
-		ui_box(Rect2(165,y,800,104),Color("263647"));text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"));text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"));text_at(Vector2(185,y+78),"%d Gold · Stufe %d/4 · Quellen bleiben gelernt" % [int(f["gold"]),int(skill_levels[id])],13,Color("f4d49b"));ui_button(Rect2(745,y+28,190,45),("VERSTÄRKEN" if learned[id] else "VERSCHMELZEN") if can_fuse(f) else "GESPERRT",can_fuse(f))
+	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG · CODEX",25,Color("d9c8ff"))
+	text_at(Vector2(790,124),"%d GOLD" % gold,16,Color("f6dc9a"))
+	var entries:=fusion_codex_entries()
+	if entries.is_empty():
+		text_at(Vector2(185,225),"Keine fusionsfähigen aktiven Attacken definiert.",15,Color("e7c5ad"))
+		return
+	fusion_codex_index=clampi(fusion_codex_index,0,entries.size()-1)
+	var start:=clampi(fusion_codex_index-4,0,maxi(0,entries.size()-8))
+	text_at(Vector2(165,158),"%d mögliche Kombinationen · ↑/↓ oder W/S · Enter/E fusioniert implementierte Paare" % entries.size(),11,Color("cbd9da"),HORIZONTAL_ALIGNMENT_LEFT,790)
+	for row in 8:
+		var index:=start+row
+		if index>=entries.size():break
+		var entry:Dictionary=entries[index]
+		var a:=int(entry["a"]);var b:=int(entry["b"])
+		var implemented:=bool(entry["implemented"])
+		var both_known:=a<learned.size() and b<learned.size() and learned[a] and learned[b]
+		var row_rect:=Rect2(165,185+row*47,480,41)
+		ui_button(row_rect,"%03d  %s + %s" % [index+1,str(ABILITIES[a]["name"]).substr(0,17),str(ABILITIES[b]["name"]).substr(0,17)],true,index==fusion_codex_index)
+		if implemented:
+			text_at(Vector2(555,211+row*47),"AKTIV" if both_known else "QUELLEN",8,Color("bde8bd") if both_known else Color("e7c48d"))
+		else:
+			text_at(Vector2(555,211+row*47),"VORSCHAU",8,Color("cbbcf0"))
+	draw_fusion_preview_card(entries[fusion_codex_index])
+	text_at(Vector2(165,574),"Kombination %d / %d · alle aktiven Quellskills werden paarweise aufgeführt." % [fusion_codex_index+1,entries.size()],10,Color("aebfb9"),HORIZONTAL_ALIGNMENT_LEFT,780)
 
 func click_fusion(mouse:Vector2) -> void:
-	var offers:=available_fusions()
-	for i in offers.size():
-		if Rect2(745,223+i*118,190,45).has_point(mouse): buy_fusion(i);return
+	var entries:=fusion_codex_entries()
+	if entries.is_empty():return
+	var start:=clampi(fusion_codex_index-4,0,maxi(0,entries.size()-8))
+	for row in 8:
+		var index:=start+row
+		if index>=entries.size():break
+		if Rect2(165,185+row*47,480,41).has_point(mouse):
+			fusion_codex_index=index
+			play_sound("menu")
+			queue_redraw()
+			return
+	var entry:=selected_fusion_codex_entry()
+	if entry.is_empty() or not bool(entry.get("implemented",false)):return
+	var definition:=fusion_definition_by_key(str(entry["key"]))
+	if Rect2(710,495,212,38).has_point(mouse) and can_fuse(definition):
+		buy_fusion_definition(definition)
+
 
 func draw_skill_star(center: Vector2, tint: Color, lit: bool) -> void:
 	if lit: draw_rect(Rect2(center - Vector2(7, 7), Vector2(14, 14)), Color(tint, 0.2))
