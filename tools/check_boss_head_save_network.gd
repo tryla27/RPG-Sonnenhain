@@ -8,7 +8,7 @@ func run():
 	g.set_process(false)
 	g.set_process_input(false)
 	g.character_created = true
-	g.player_uuid = "network-save-test"
+	g.player_uuid = "boss-head-save-test"
 	g.hero_name = "Netztest"
 	g.class_id = 1
 	g.gold = 34567
