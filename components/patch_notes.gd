@@ -1,7 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 04.10.2026"
 const NOTES=[
-["NEU · Skillpunkte", "Jedes Level-Up vergibt jetzt +1 Skillpunkt zusätzlich zur Essenz. Skillpunkte können bei Borin in gelernte Fähigkeiten investiert werden."],
+["NEU · Skillpunkte", "Jedes Level-Up vergibt jetzt +1 Skillpunkt zusätzlich zur Essenz. Bestehende Charaktere bekommen ihre bisherigen Level-Up-Punkte einmalig rückwirkend nachgetragen."],
 ["NEU · Fähigkeiten", "Normale gelernte Fähigkeiten folgen jetzt dem 4-Stufen-Prinzip: Stufe 1 gelernt; Stufen 2, 3 und 4 kosten jeweils 1 Skillpunkt und besitzen Level-Gates."],
 ["NEU · Multiplayer", "Fähigkeitsränge werden im Multiplayer auf Stufe 1–4 begrenzt und vom Server aus dem synchronisierten Skill-Rang übernommen statt dem Cast-Wert blind zu vertrauen."],
 ["NEU · Verschmelzung", "Sekundäreffekte von Damage-Fusionen entstehen am tatsächlichen Trefferpunkt. Flammenwirbel folgt dem Feuerball, Blitzkern der Blitzlanze und Eisball bleibt impactgebunden."],
