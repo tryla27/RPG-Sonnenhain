@@ -2,6 +2,8 @@ extends RefCounted
 ## Native design renderer. Preview only; no combat stats or loot changes.
 const Combat=preload("res://components/mob_combat.gd")
 const Hero=preload("res://components/rpg_hero.gd")
+const GoldenSprites=preload("res://components/golden_sprite_runtime.gd")
+const GOLDEN_FOREST_SLIME_IDLE:="res://art/sprites/mobs/golden_forest_slime/idle_8dir.png"
 const HEAVY=[4,7,9,12,13,14,16,24,26]
 const ARMED=[2,4,7,8,9,12,13,14,15,16,20,24,26]
 static func tier(level:int)->int:
@@ -57,6 +59,11 @@ static func weapon(c:CanvasItem,p:Vector2,t:int,level:int,side:int,back:bool,loo
 # Eigener Waldschleim-Test: nur Typ 0 nutzt den neuen 32px Body.
 static func paint_waldschleim(c:CanvasItem,p:Vector2,look:Vector2,base:Color,phase:float,attack:float,scale_factor:float,stretch:Vector2)->void:
 	var heading:=Hero.direction_index(look)
+	# Authored Golden-Mob idle. Moving/attacking states remain on the native
+	# renderer until their production strips exist, so gameplay never loses art.
+	if absf(phase)<0.0001 and attack<0.0:
+		if GoldenSprites.draw_direction_strip(c,GOLDEN_FOREST_SLIME_IDLE,p,heading,Vector2(32,32),26.0,scale_factor*4.0):
+			return
 	var back:=heading in [3,4,5]
 	var profile:=heading in [2,6]
 	var side:=-1 if heading in [5,6,7] else 1
