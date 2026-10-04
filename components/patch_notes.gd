@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 04.10.2026"
 const NOTES=[
+["Alma · Tastatur", "In Almas Rezept- und Kochlisten navigieren W/S jetzt hoch und runter; Pfeiltasten und Maus bleiben weiterhin nutzbar."],
 ["Runen · Wirkung", "Borins geskillte Runen wirken jetzt auf Krits, Lebensraub, Autoangriffe, Block, Notfallschutz, Regeneration, Bewegung, Cooldowns, Energie und Elektroketten. Gegnerbezogene Boni nutzen im Multiplayer die Runen des Angreifers."],
 ["Tränke & Kuchen", "Kleine Lebenstränke heilen 50% der maximalen HP, große 80%. Roter Sonnenkuchen füllt HP vollständig, Blauer Mondkuchen Mana vollständig; das Inventar zeigt die Wirkung korrekt."],
 ["Anmeldung · Tastatur", "Tab und Umschalt wechseln das Feld; Umschalt+Tab geht zurück. Großbuchstaben und Sonderzeichen bleiben im gewählten Feld. Funktioniert auch bei Registrierung und im Browser."],

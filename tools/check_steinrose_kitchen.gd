@@ -34,6 +34,12 @@ func find_food(g, name:String) -> int:
 		if str(g.inventory[i].get("name",""))==name:return i
 	return -1
 
+func key_event(code:Key)->InputEventKey:
+	var event:=InputEventKey.new()
+	event.keycode=code
+	event.pressed=true
+	return event
+
 func run() -> void:
 	var g:=TestGame.new()
 	root.add_child(g)
@@ -61,6 +67,23 @@ func run() -> void:
 	g.steinrose.set_tab(g,1);assert(g.steinrose.tab==1)
 	g.steinrose.set_tab(g,2);assert(g.steinrose.tab==2)
 	g.steinrose.set_tab(g,3);assert(g.steinrose.tab==3)
+	g.steinrose.set_tab(g,0)
+	g.steinrose.selected=0
+	assert(g.steinrose.keyboard_input(g,key_event(KEY_S)))
+	assert(g.steinrose.selected==1)
+	assert(g.steinrose.keyboard_input(g,key_event(KEY_W)))
+	assert(g.steinrose.selected==0)
+	assert(g.steinrose.keyboard_input(g,key_event(KEY_UP)))
+	assert(g.steinrose.selected==Kitchen.RECIPES.size()-1)
+	assert(g.steinrose.keyboard_input(g,key_event(KEY_DOWN)))
+	assert(g.steinrose.selected==0)
+	g.steinrose.learned[1]=true
+	g.steinrose.set_tab(g,3)
+	assert(g.steinrose.keyboard_input(g,key_event(KEY_S)))
+	assert(g.steinrose.selected==1)
+	assert(g.steinrose.keyboard_input(g,key_event(KEY_W)))
+	assert(g.steinrose.selected==0)
+	g.steinrose.learned[1]=false
 	g.steinrose.set_tab(g,0)
 	g.panel=""
 
