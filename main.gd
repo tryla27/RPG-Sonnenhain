@@ -2951,6 +2951,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if panel=="steinrose" and steinrose.keyboard_input(self,event):
 		return
 	if panel=="fusion" and event is InputEventKey and event.pressed and not event.echo:
+		var fusion_key_handled:=true
 		if event.keycode in [KEY_UP,KEY_W]:
 			fusion_codex_select(-1)
 		elif event.keycode in [KEY_DOWN,KEY_S]:
@@ -2960,8 +2961,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			if not selected_fusion.is_empty() and bool(selected_fusion.get("implemented",false)):
 				buy_fusion_definition(fusion_definition_by_key(str(selected_fusion["key"])))
 		else:
-			pass
-		return
+			fusion_key_handled=false
+		if fusion_key_handled:return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			panel = "start"
