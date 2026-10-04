@@ -10,9 +10,24 @@ func _initialize()->void:
 	assert(Plan.CHUNK_ORDER==["NW","MW","MO","NO","SW","SO"])
 	assert(Map0.legacy_overlay_count()==0)
 	# Map 0 natural floor must stay on the orange/rost autumn ambience palette.
-	assert(Map0.MATERIAL_TINTS["grass_meadow"]==Color(1.00,0.58,0.24))
-	assert(Map0.MATERIAL_TINTS["grass_moss"]==Color(0.96,0.43,0.16))
-	assert(Map0.MATERIAL_TINTS["forest_floor"]==Color(1.00,0.68,0.34))
+	assert(Map0.NATURAL_MATERIALS==["grass_meadow","grass_moss","forest_floor"])
+	assert(Map0.MATERIAL_TINTS["grass_meadow"]==Color(1.00,0.93,0.74))
+	assert(Map0.MATERIAL_TINTS["grass_moss"]==Color(0.93,0.68,0.43))
+	assert(Map0.MATERIAL_TINTS["forest_floor"]==Color(0.86,0.58,0.34))
+	var natural_source:=Map0.shared_tileset.get_source(int(Map0.source_ids["grass_meadow"])) as TileSetAtlasSource
+	var natural_image:=natural_source.texture.get_image()
+	var residual_green:=0
+	for y in range(0,natural_image.get_height(),4):
+		for x in range(0,natural_image.get_width(),4):
+			var col:=natural_image.get_pixel(x,y)
+			if col.a>0.01 and col.g>0.20 and col.g>col.b*1.05 and col.g>col.r*0.92:
+				residual_green+=1
+	assert(residual_green==0,"Map 0 autumn texture still contains green-dominant natural pixels")
+	var scenery_source:=FileAccess.get_file_as_string("res://components/reference_scenery.gd")
+	for forbidden in ["659349","729f4f","587e40","88aa54","608947","456b36","709b47","96b956","b1c76b","789f4b"]:
+		assert(scenery_source.find(forbidden)<0,"legacy bright-green low ambience remains: "+forbidden)
+	var main_source:=FileAccess.get_file_as_string("res://main.gd")
+	assert(main_source.find('draw_rect(pad,Color("6f7d57",0.18))')<0,"legacy green property-pad overlay remains")
 
 	var total:=0
 	var materials:Dictionary={}
@@ -51,5 +66,5 @@ func _initialize()->void:
 		assert(int(summary["missing"])==0)
 	assert(builder.validate_map0_ground().is_empty())
 
-	print("MAP0_GROUND_PASS_OK 4592 native 32px cells, six chunks, no legacy overlays, gates clear")
+	print("MAP0_GROUND_PASS_OK 4592 native 32px cells, autumnized natural texture, low ambience warm, six chunks, gates clear")
 	quit()
