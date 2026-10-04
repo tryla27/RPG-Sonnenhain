@@ -8,10 +8,12 @@ const EAST_EXIT:=Plan.EAST_GATE
 const SOUTH_EXIT:=Plan.SOUTH_GATE
 const ATLAS_PATH:="res://art/start32/terrain_32.webp"
 const MATERIAL_IDS:=["grass_meadow","grass_moss","forest_floor","earth_path","village_stone","old_cobble","arcane_floor"]
+# Map 0 uses the warm/orange ambience treatment across every natural ground
+# sprite. Roads, stone plazas and arcane accents keep their original palette.
 const MATERIAL_TINTS:={
-	"grass_meadow":Color(0.96,1.00,0.92),
-	"grass_moss":Color(0.82,0.94,0.80),
-	"forest_floor":Color(0.84,0.78,0.66),
+	"grass_meadow":Color(1.00,0.58,0.24),
+	"grass_moss":Color(0.96,0.43,0.16),
+	"forest_floor":Color(1.00,0.68,0.34),
 	"earth_path":Color(0.86,0.72,0.58),
 	"village_stone":Color(0.84,0.86,0.82),
 	"old_cobble":Color(0.70,0.74,0.70),
