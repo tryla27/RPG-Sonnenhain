@@ -187,6 +187,7 @@ const ABILITIES := [
 const CLASS_NAMES := ["Krieger", "Magier", "Bogenschütze"]
 const CLASS_SKILLS := [[0, 1, 2, 3, 5, 7, 12, 13, 14], [16, 17, 18, 19, 20, 21, 22, 23], [25, 26, 27, 28, 29, 30, 31, 32]]
 const CLASS_ULTIMATES := [15, 24, 33]
+const MAX_SKILL_RANK := 4
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
 const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200,"max_rank":4},{"id":41,"a":1,"b":36,"gold":2200,"max_rank":4},{"id":42,"a":18,"b":37,"gold":4200,"max_rank":4},{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}]
@@ -327,6 +328,8 @@ var level := 1
 var xp := 0
 var gold := 55
 var skill_points := 0
+# Anzahl der bereits vergebenen Level-Up-Skillpunkte; verhindert doppelte Save-Migration.
+var skill_level_points_granted := 0
 var class_id := 0
 var pending_class := 0
 var learned: Array = []
@@ -1214,6 +1217,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"active_borin_quests":sanitize_active_borin_quest_rows(state.get("active_borin_quests",[])),
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
 		"fusions":sanitize_fusion_rows(state.get("fusions",[])),
+		"skill_ranks":sanitize_skill_rank_rows(state.get("skill_ranks",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -3481,7 +3485,9 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 		rank=server_fusion_rank
 		fusion_key_value=fusion_key(int(fusion_definition["a"]),int(fusion_definition["b"]))
 	else:
-		rank = clampi(rank,1,5)
+		var server_skill_rank:=skill_rank_from_network_state(state,id)
+		if server_skill_rank<=0:return
+		rank=server_skill_rank
 	var visual_payload:Dictionary={"kind":"ability","ability":id,"pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":int(state.get("weapon",0)),"element":str(state.get("element",""))}
 	if fusion_key_value!="":
 		visual_payload["fusion_key"]=fusion_key_value
@@ -4618,20 +4624,42 @@ func gain_xp(amount: int) -> void:
 	while xp >= xp_required():
 		xp -= xp_required()
 		level += 1
-		var earned_point := false
-		# Essenz ist das Level-Fortschrittssystem: XP bleibt unangetastet,
-		# jeder Charakter besitzt auf Level N insgesamt N Essenz (max. 40).
+		skill_points += 1
+		skill_level_points_granted += 1
+		# Level-Ups geben gleichzeitig Essenz und einen Skillpunkt.
+		# Skillpunkte verstärken gelernte Fähigkeiten nach dem 4-Stufen-Prinzip.
 		var ultimate_level:=ultimate_unlock_level()
 		if level >= ultimate_level:
 			learned[class_ultimate()] = true
-			skill_levels[class_ultimate()] = mini(5,1+int((level-ultimate_level)/5.0))
+			skill_levels[class_ultimate()] = mini(MAX_SKILL_RANK,1+int((level-ultimate_level)/5.0))
 		hp = max_hp()
 		energy = max_energy()
-		message("LEVEL %d! +1 ESSENZ · %d/%d frei" % [level,essence.available(level),essence.total_for_level(level)])
+		message("LEVEL %d! +1 SKILLPUNKT · +1 ESSENZ · %d/%d Essenz frei" % [level,essence.available(level),essence.total_for_level(level)])
 		play_sound("level")
 
+func restore_level_skill_point_progress(data:Dictionary)->int:
+	var expected:=maxi(0,level-1)
+	var stored:=clampi(int(data.get("skill_level_points_granted",0)),0,expected)
+	var missing:=maxi(0,expected-stored)
+	if missing>0:skill_points+=missing
+	skill_level_points_granted=expected
+	return missing
+
 func skill_rank_level(index: int, rank: int) -> int:
-	return int(ABILITIES[index]["req"]) + [0, 3, 8, 15, 24][clampi(rank - 1, 0, 4)]
+	if index < 0 or index >= ABILITIES.size(): return 40
+	var offset:int=[0,3,8,15][clampi(rank-1,0,MAX_SKILL_RANK-1)]
+	return mini(40,int(ABILITIES[index]["req"])+offset)
+
+func skill_upgrade_cost(_index:int,_next_rank:int)->int:
+	return 1
+
+func can_upgrade_skill(index:int)->bool:
+	if index<0 or index>=ABILITIES.size() or index>=learned.size() or not learned[index]:return false
+	if index in CLASS_ULTIMATES or not fusion_definition_by_id(index).is_empty():return false
+	var current:=clampi(int(skill_levels[index]),1,MAX_SKILL_RANK)
+	if current>=MAX_SKILL_RANK:return false
+	var next_rank:=current+1
+	return level>=skill_rank_level(index,next_rank) and skill_points>=skill_upgrade_cost(index,next_rank)
 
 func make_item(name: String, icon: String, rarity: int, power: int, value: int, element: String = "", item_level: int = -1) -> Dictionary:
 	var ilvl := maxi(1, level if item_level < 0 else item_level)
@@ -5197,7 +5225,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "skill_level_points_granted":skill_level_points_granted, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5335,6 +5363,9 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	for i in mini(WORLD_EVENTS.size(), stored_events.size()): event_states[i] = clampi(int(stored_events[i]), 0, 3)
 	for i in mini(WORLD_EVENTS.size(), stored_progress.size()): event_progress[i] = maxi(0, int(stored_progress[i]))
 	skill_points = maxi(0, int(data.get("skill_points", 0)))
+	var backfilled_skill_points:=restore_level_skill_point_progress(data)
+	if backfilled_skill_points>0 and not from_server:
+		pause_status="Level-Fortschritt migriert · +%d Skillpunkte nachgetragen." % backfilled_skill_points
 	var stored_learned: Array = data.get("learned", [])
 	if stored_learned.size() >= 12:
 		for i in mini(ABILITIES.size(), stored_learned.size()): learned[i] = bool(stored_learned[i])
@@ -5344,7 +5375,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	var stored_levels: Array = data.get("skill_levels", [])
 	if stored_levels.size() > 0:
 		for i in mini(ABILITIES.size(), stored_levels.size()):
-			skill_levels[i] = clampi(int(stored_levels[i]), 0, 5)
+			skill_levels[i] = clampi(int(stored_levels[i]), 0, MAX_SKILL_RANK)
 			learned[i] = skill_levels[i] > 0
 	else:
 		for i in ABILITIES.size(): skill_levels[i] = 1 if learned[i] else 0
@@ -5444,7 +5475,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	var ultimate_level:=ultimate_unlock_level()
 	if level >= ultimate_level:
 		learned[class_ultimate()] = true
-		skill_levels[class_ultimate()] = mini(5,1+int((level-ultimate_level)/5.0))
+		skill_levels[class_ultimate()] = mini(MAX_SKILL_RANK,1+int((level-ultimate_level)/5.0))
 	else:
 		learned[class_ultimate()] = false
 		skill_levels[class_ultimate()] = 0
@@ -5817,6 +5848,7 @@ func start_new_game() -> void:
 	xp = 0
 	gold = 55
 	skill_points = 0
+	skill_level_points_granted = 0
 	essence.reset()
 	book_system.learned.clear()
 	book_system.active.clear()
@@ -6014,7 +6046,7 @@ func set_creative_level(target: int) -> void:
 	var ultimate_level:=ultimate_unlock_level()
 	if level >= ultimate_level:
 		learned[class_ultimate()] = true
-		skill_levels[class_ultimate()] = mini(5,1+int((level-ultimate_level)/5.0))
+		skill_levels[class_ultimate()] = mini(MAX_SKILL_RANK,1+int((level-ultimate_level)/5.0))
 	else:
 		learned[class_ultimate()] = false
 		skill_levels[class_ultimate()] = 0
@@ -6202,6 +6234,36 @@ func fusion_rank_from_network_state(state:Dictionary,fusion_id:int)->int:
 		return clampi(int(row[2]),0,clampi(int(definition.get("max_rank",4)),1,4))
 	return 0
 
+func skill_rank_rows()->Array:
+	ensure_skill_state_size()
+	var rows:Array=[]
+	for id in range(ABILITIES.size()):
+		if id>=learned.size() or not learned[id]:continue
+		if not fusion_definition_by_id(id).is_empty():continue
+		rows.append([id,clampi(int(skill_levels[id]),1,MAX_SKILL_RANK)])
+	return rows
+
+func sanitize_skill_rank_rows(raw:Variant)->Array:
+	var out:Array=[]
+	if not raw is Array:return out
+	var seen:Dictionary={}
+	for row in raw:
+		if not row is Array or row.size()<2:continue
+		var id:=int(row[0])
+		if id<0 or id>=ABILITIES.size() or seen.has(id):continue
+		if not fusion_definition_by_id(id).is_empty():continue
+		seen[id]=true
+		out.append([id,clampi(int(row[1]),1,MAX_SKILL_RANK)])
+	return out
+
+func skill_rank_from_network_state(state:Dictionary,skill_id:int)->int:
+	var raw_rows:Variant=state.get("skill_ranks",[])
+	if not raw_rows is Array:return 0
+	for row in raw_rows:
+		if not row is Array or row.size()<2:continue
+		if int(row[0])==skill_id:return clampi(int(row[1]),1,MAX_SKILL_RANK)
+	return 0
+
 func fusion_source_skills()->Array:
 	var out:Array=[]
 	for id in range(0,40):
@@ -6289,13 +6351,17 @@ func click_skills(mouse: Vector2) -> void:
 		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
 	for card in mini(6,maxi(0,ids.size()-start)):
-		var id:int=ids[start+card];var col:=card%3;var row:=int(card/3.0)
-		if Rect2(165+col*275,250+row*132,265,118).has_point(mouse):
+		var id:int=ids[start+card];var col:=card%3;var row:=int(card/3.0);var x:=165+col*275;var y:=250+row*132
+		if learned[id] and Rect2(x+134,y+77,119,30).has_point(mouse):
+			upgrade_skill(id)
+			return
+		if Rect2(x,y,265,118).has_point(mouse):
 			if learned[id]:
 				for s in 3:
 					if slots[s]==id:slots[s]=-1
 				slots[selected_slot]=id;save_game()
-			else: buy_skill(id)
+			else:
+				buy_skill(id)
 			return
 
 func learned_loadout_skills()->Array:
@@ -6326,8 +6392,36 @@ func click_skill_loadout(mouse:Vector2)->void:
 			play_sound("menu")
 			return
 
-func upgrade_skill(index: int) -> void:
-	buy_skill(index)
+func upgrade_skill(index:int)->bool:
+	ensure_skill_state_size()
+	if index<0 or index>=ABILITIES.size() or not learned[index]:
+		message("Diese Fähigkeit ist noch nicht gelernt.")
+		return false
+	if index in CLASS_ULTIMATES:
+		message("Klassenfähigkeiten entwickeln sich automatisch.")
+		return false
+	if not fusion_definition_by_id(index).is_empty():
+		message("Fusionen werden am Verschmelzungskristall verstärkt.")
+		return false
+	var current:=clampi(int(skill_levels[index]),1,MAX_SKILL_RANK)
+	if current>=MAX_SKILL_RANK:
+		message("%s ist bereits auf Stufe 4." % ABILITIES[index]["name"])
+		return false
+	var next_rank:=current+1
+	var required_level:=skill_rank_level(index,next_rank)
+	if level<required_level:
+		message("Stufe %d von %s wird ab Level %d freigeschaltet." % [next_rank,ABILITIES[index]["name"],required_level])
+		return false
+	var price:=skill_upgrade_cost(index,next_rank)
+	if skill_points<price:
+		message("Du brauchst %d Skillpunkt%s." % [price,"e" if price!=1 else ""])
+		return false
+	skill_points-=price
+	skill_levels[index]=next_rank
+	message("%s verbessert · STUFE %d/4 · -%d SP" % [ABILITIES[index]["name"],next_rank,price])
+	play_sound("level")
+	save_game()
+	return true
 
 func inventory_sort_key(item:Dictionary)->Array:
 	var uid:=int(item.get("uid",-1))
@@ -9492,7 +9586,7 @@ func draw_mechanics_panel() -> void:
 		text_at(Vector2(190,575), "%d Quests insgesamt · Questbuch: J" % QUESTS.size(), 13, Color('aebfb9'))
 	elif mechanics_page == 2:
 		text_at(Vector2(190,211), "Borin: Kampf · Magie · Robotik sind für jede Rasse und Klasse offen.", 16, Color('e9cc90'))
-		text_at(Vector2(190,250), "Skillpunkte bleiben beim normalen Leveln unverändert. Skills werden gezielt bei Borin gekauft.", 13, Color('e5ecd9'))
+		text_at(Vector2(190,250), "Jedes Level-Up gibt +1 Skillpunkt. Gelernte Fähigkeiten werden bei Borin bis Stufe 4 verbessert.", 13, Color('e5ecd9'))
 		text_at(Vector2(190,282), "Drei aktive Slots werden nur bei Borin kostenlos umbelegt. Taste 4 bleibt die Klassen-Ultimate.", 13, Color('e5ecd9'))
 		text_at(Vector2(190,328), "KRISTALL DER VERSCHMELZUNG", 17, Color('d9c8ff'))
 		text_at(Vector2(190,356), "Neben Borin: zwei gelernte aktive Skills + Gold → Fusionsskill. Keine Skillpunkte werden verbraucht.", 13, Color('cbd9da'))
@@ -10067,11 +10161,24 @@ func draw_skills_panel() -> void:
 	for card in mini(6,maxi(0,ids.size()-start)):
 		var id:int=ids[start+card];var col:=card%3;var row:=int(card/3.0);var x:=165+col*275;var y:=250+row*132
 		ui_box(Rect2(x,y,265,118),Color("314b54") if learned[id] else Color("243944"));draw_skill_icon(Vector2(x+12,y+12),id,30)
-		text_at(Vector2(x+50,y+31),ABILITIES[id]["name"],15,Color("fff1bc"),HORIZONTAL_ALIGNMENT_LEFT,198);text_at(Vector2(x+12,y+57),ABILITIES[id]["desc"],11,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,240)
-		var req:=int(ABILITIES[id]["req"]);var price:=skill_point_cost(id)
-		text_at(Vector2(x+12,y+88),"GELERNT · SLOT %d" % (selected_slot+1) if learned[id] else ("KAUFEN · %d SP" % price if level>=req else "GESPERRT · LV %d" % req),12,Color("9de6c2") if learned[id] or level>=req else Color("c98d84"))
-	text_at(Vector2(165,530),"Gelernte Skills anklicken → ausgewählten Slot belegen · Wechsel bei Borin kostenlos.",13,Color("d9e6d5"))
-	text_at(Vector2(165,554),"Verschmelzungen gibt es nur am Kristall neben Borin.",13,Color("b9d9cf"))
+		text_at(Vector2(x+50,y+31),ABILITIES[id]["name"],15,Color("fff1bc"),HORIZONTAL_ALIGNMENT_LEFT,198)
+		text_at(Vector2(x+12,y+57),ABILITIES[id]["desc"],11,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,240)
+		var req:=int(ABILITIES[id]["req"])
+		if learned[id]:
+			var rank:=clampi(int(skill_levels[id]),1,MAX_SKILL_RANK)
+			text_at(Vector2(x+12,y+91),"STUFE %d/4" % rank,12,Color("9de6c2"))
+			if rank>=MAX_SKILL_RANK:
+				ui_button(Rect2(x+134,y+77,119,30),"MAX STUFE 4",false)
+			else:
+				var next_rank:=rank+1
+				var next_req:=skill_rank_level(id,next_rank)
+				var label:="+ STUFE · 1 SP" if level>=next_req else "AB LV %d" % next_req
+				ui_button(Rect2(x+134,y+77,119,30),label,can_upgrade_skill(id))
+		else:
+			var price:=skill_point_cost(id)
+			text_at(Vector2(x+12,y+88),"LERNEN · %d SP" % price if level>=req else "GESPERRT · LV %d" % req,12,Color("f4d49b") if level>=req else Color("c98d84"))
+	text_at(Vector2(165,530),"Jedes Level-Up: +1 Skillpunkt · gelernte Fähigkeiten bis STUFE 4 verbessern.",13,Color("d9e6d5"))
+	text_at(Vector2(165,554),"Skillkarte anklicken = Slot belegen · +STUFE verbessert · Fusionen am Kristall.",13,Color("b9d9cf"))
 	var mastery:String=str(["Wut: %.0f/100" % warrior_rage,"Risssprung (LEER): %s" % ("bereit" if mage_rift_blink_unlocked() else "gesperrt"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id])
 	if not class_mastery_unlocked:
 		mastery = "Relikt von Map %02d · %s" % [6+class_id,ENEMY_TYPES[12+class_id]["name"]]
@@ -11016,6 +11123,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"active_quests":sanitize_active_quest_rows(state.get("active_quests",[])),
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
 		"fusions":sanitize_fusion_rows(state.get("fusions",[])),
+		"skill_ranks":sanitize_skill_rank_rows(state.get("skill_ranks",[])),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -12214,7 +12322,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
