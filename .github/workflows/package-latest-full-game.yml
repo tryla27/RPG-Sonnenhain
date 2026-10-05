@@ -1,0 +1,46 @@
+name: Package latest full game source
+
+on:
+  push:
+    branches:
+      - package/latest-full-game
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout production main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Verify Godot project and stamp source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f project.godot
+          git rev-parse HEAD > SOURCE_COMMIT.txt
+          {
+            echo "Sonnenhain full source package"
+            echo "Open project.godot with Godot 4.7.2 or newer."
+            printf "Source commit: "
+            cat SOURCE_COMMIT.txt
+          } > IMPORT_README.txt
+
+      - name: Create full source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip -r Sonnenhain-komplettes-Spiel-latest.zip .             -x '.git/*'                '.github/workflows/package-latest-full-game.yml'                'Sonnenhain-komplettes-Spiel-latest.zip'
+          unzip -l Sonnenhain-komplettes-Spiel-latest.zip | grep -q ' project.godot$'
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonnenhain-komplettes-spiel-latest
+          path: Sonnenhain-komplettes-Spiel-latest.zip
+          if-no-files-found: error
+          retention-days: 7
