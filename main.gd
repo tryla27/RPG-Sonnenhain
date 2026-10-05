@@ -12431,6 +12431,7 @@ func item_icon_for_uid(uid: int) -> String:
 	return ""
 
 func inventory_item_usable(item:Dictionary)->bool:
+	if item_skill_unlock_id(item)>=0:return true
 	return bool(item.get("class_relic",false)) or item.get("icon","") in ["potion","food",class_weapon_icon(),"armor","ring"] or preload("res://components/headgear_rules.gd").allowed(item,class_id)
 
 func equipped_head_allowed() -> bool:
