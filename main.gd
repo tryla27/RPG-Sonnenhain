@@ -192,6 +192,7 @@ const MAX_SKILL_RANK := 4
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
 const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200,"max_rank":4},{"id":41,"a":1,"b":36,"gold":2200,"max_rank":4},{"id":42,"a":18,"b":37,"gold":4200,"max_rank":4},{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}]
+const COSMETIC_ACCENT_HEX := ["be5368","557fc0","5f9b68","b7894f","8d62aa","55a5a5","cf6f59","c94f7e","6a6fd1","4e9ad6","4ca6a0","5caf7a","86b84d","c2b14a","d48c4f","a86b4e","8c6a58","9a7acb","c36db5","d7d7d7"]
 # Zentrale Regel: Damage-Fusionen lösen ihren Sekundäreffekt am tatsächlichen Trefferpunkt aus.
 # Reine Schutz-/Buff-Fusionen bleiben als ON_CAST-Ausnahme am Spieler.
 const FUSION_IMPACT_PROFILES := {
@@ -5478,7 +5479,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	cosmetic_hair=clampi(int(data.get("cosmetic_hair",0)),0,3)
 	cosmetic_cloak=clampi(int(data.get("cosmetic_cloak",0)),0,3)
 	cosmetic_jewelry=clampi(int(data.get("cosmetic_jewelry",0)),0,3)
-	cosmetic_accent=clampi(int(data.get("cosmetic_accent",0)),0,5)
+	cosmetic_accent=clampi(int(data.get("cosmetic_accent",0)),0,COSMETIC_ACCENT_HEX.size()-1)
 	stamina = max_stamina()
 	sprint_blend = 0.0
 	sprint_heading = Vector2.ZERO
@@ -9015,6 +9016,8 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	var use_race := pending_race if panel == "creation" and preview_class >= 0 else hero_race
 	var use_gender := pending_gender if panel == "creation" and preview_class >= 0 else hero_gender
 	var attack_now := swing_timer > 0.0 and preview_class < 0
+	if preview_class < 0:
+		draw_character_cloak_back(p,look,scale_factor,cosmetic_cloak,cosmetic_accent,walking,is_sprinting,dash_timer>0.0 or warrior_jump_timer>0.0,death_timer>0.0,world_time)
 	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender,-2,-1.0,0.0,-2,-2,is_sprinting if preview_class<0 else false)
 	if in_world and preview_class < 0 and class_id == 0 and hero_race == 0 and hero_gender == 0 and warrior_jump_timer > 0.0: return
 	if in_world and (death_timer > 0 or (dash_timer > 0 and class_id != 1)): return
@@ -9842,11 +9845,12 @@ func draw_appearance_panel() -> void:
 	text_at(Vector2(165,130),"FENNA · CHARACTER EDITOR",27,Color("ffd8ef"))
 	text_at(Vector2(165,160),"Nur Optik: Frisur, Umhang, Schmuck und Farbakzent. Rasse und Klasse bleiben unverändert.",13,Color("d9e3dd"))
 	ui_box(Rect2(175,200,330,340),Color("5d495d"))
+	draw_character_cloak_back(Vector2(340,390),Vector2.DOWN,2.0,cosmetic_cloak,cosmetic_accent,false,false,false,false,world_time)
 	draw_character_sprite(Vector2(340,390),class_id,false,Vector2.DOWN,2.0,false,hero_race,hero_gender,-1,-1.0,0.0,-1,0,false)
 	draw_character_cosmetics(Vector2(340,390),Vector2.DOWN,2.0,hero_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
 	var labels:=["FRISUR","UMHANG","SCHMUCK","FARBAKZENT"]
 	var values:=[cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent]
-	var max_values:=[4,4,4,6]
+	var max_values:=[4,4,4,COSMETIC_ACCENT_HEX.size()]
 	for row in 4:
 		var y:=220+row*72
 		text_at(Vector2(555,y),labels[row],16,Color("ffe4b7"))
@@ -9859,7 +9863,7 @@ func draw_appearance_panel() -> void:
 func click_appearance(mouse:Vector2) -> void:
 	if Rect2(555,518,300,44).has_point(mouse):
 		save_game();panel="";return
-	var limits:=[4,4,4,6]
+	var limits:=[4,4,4,COSMETIC_ACCENT_HEX.size()]
 	for row in 4:
 		var y:=220+row*72
 		var delta:=0
@@ -9875,13 +9879,85 @@ func click_appearance(mouse:Vector2) -> void:
 		save_game()
 		return
 
+func cosmetic_accent_color(accent_index:int)->Color:
+	return Color(COSMETIC_ACCENT_HEX[clampi(accent_index,0,COSMETIC_ACCENT_HEX.size()-1)])
+
+func cloak_motion_profile(cloak:int,look:Vector2,walking:bool,sprinting:bool,dashing:bool,dead:bool,phase:float)->Dictionary:
+	var style:=clampi(cloak,0,3)
+	if style<=0:return {"visible":false}
+	var raw_look:=look.normalized() if look.length()>0.01 else Vector2.DOWN
+	var length_by_style:=[0.0,20.0,27.0,34.0]
+	var width_by_style:=[0.0,13.0,16.0,19.0]
+	var inertia_by_style:=[0.0,0.82,1.0,1.18]
+	var length:float=length_by_style[style]
+	var hem_half:float=width_by_style[style]
+	var inertia:float=inertia_by_style[style]
+	var speed_pull:=0.0
+	if walking:speed_pull=2.5*inertia
+	if sprinting:speed_pull=5.0*inertia
+	if dashing:speed_pull=9.0*inertia
+	var sway_strength:=(1.25 if walking else 0.45)*inertia
+	if sprinting:sway_strength=0.8*inertia
+	if dashing:sway_strength=0.35*inertia
+	if dead:
+		speed_pull=0.0
+		sway_strength=0.0
+		length+=3.0
+		hem_half+=2.0
+	var cadence:=9.0 if walking else 1.6
+	var sway:=sin(phase*cadence)*sway_strength
+	var lift:=abs(sin(phase*cadence))*((1.4 if walking else 0.35)*inertia)
+	if sprinting:lift+=2.0*inertia
+	if dashing:lift+=4.0*inertia
+	var trail:=-raw_look*speed_pull
+	var perpendicular:=Vector2(-raw_look.y,raw_look.x)
+	trail+=perpendicular*sway
+	# Pixelart: nur halbe Pixel zulassen.
+	trail.x=round(trail.x*2.0)/2.0
+	trail.y=round(trail.y*2.0)/2.0
+	lift=round(lift*2.0)/2.0
+	return {
+		"visible":true,
+		"neck_half":5.0+style*0.8,
+		"shoulder_half":9.0+style*1.5,
+		"hem_half":hem_half,
+		"length":length,
+		"trail":trail,
+		"lift":lift,
+		"inertia":inertia
+	}
+
+func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0)->void:
+	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
+	if not bool(motion.get("visible",false)):return
+	var accent:=cosmetic_accent_color(accent_index)
+	var neck_half:=float(motion["neck_half"])
+	var shoulder_half:=float(motion["shoulder_half"])
+	var hem_half:=float(motion["hem_half"])
+	var length:=float(motion["length"])
+	var trail:Vector2=motion["trail"]
+	var lift:=float(motion["lift"])
+	var top_y:=-11.0
+	var hem_y:=length-lift
+	var left_hem:=Vector2(-hem_half,hem_y)+trail
+	var right_hem:=Vector2(hem_half,hem_y)+trail
+	var points:=PackedVector2Array([
+		p+Vector2(-neck_half,top_y)*scale_factor,
+		p+Vector2(-shoulder_half,-2.0)*scale_factor,
+		p+left_hem*scale_factor,
+		p+right_hem*scale_factor,
+		p+Vector2(shoulder_half,-2.0)*scale_factor,
+		p+Vector2(neck_half,top_y)*scale_factor
+	])
+	PixelStyle32.polygon(self,points,accent.darkened(0.26))
+	# Halsverschluss: bleibt am Nacken fest, während nur der Saum nachzieht.
+	PixelStyle32.line(self,p+Vector2(-neck_half,top_y+1.0)*scale_factor,p+Vector2(neck_half,top_y+1.0)*scale_factor,accent.lightened(0.30),1.8*scale_factor)
+	PixelStyle32.circle(self,p+Vector2(0,top_y+1.0)*scale_factor,1.6*scale_factor,accent.lightened(0.42))
+	# Mittelfalte verstärkt den Stoffeindruck und folgt gedämpft dem Nachzug.
+	PixelStyle32.line(self,p+Vector2(0,top_y+2.0)*scale_factor,p+(Vector2(0,hem_y-3.0)+trail*0.45)*scale_factor,accent.darkened(0.38),1.2*scale_factor)
+
 func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int,hair:int,cloak:int,jewelry:int,accent_index:int)->void:
-	var accents:=[Color("be5368"),Color("557fc0"),Color("5f9b68"),Color("b7894f"),Color("8d62aa"),Color("55a5a5")]
-	var accent:Color=accents[clampi(accent_index,0,accents.size()-1)]
-	if cloak>0:
-		var width:=18.0+cloak*3.0
-		PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-width,-6)*scale_factor,p+Vector2(width,-6)*scale_factor,p+Vector2((14+cloak*2),31)*scale_factor,p+Vector2(-(14+cloak*2),31)*scale_factor]),accent.darkened(0.18))
-		PixelStyle32.line(self,p+Vector2(-width,-5)*scale_factor,p+Vector2(width,-5)*scale_factor,accent.lightened(0.25),2.0*scale_factor)
+	var accent:=cosmetic_accent_color(accent_index)
 	if hair>0:
 		if race==2:
 			for side in [-1.0,1.0]:
