@@ -527,6 +527,7 @@ var cosmetic_hair := 0
 var cosmetic_cloak := 0
 var cosmetic_jewelry := 0
 var cosmetic_accent := 0
+var appearance_preview_dir := 0 # 0 down, 1 left, 2 up, 3 right
 var pending_gender := 0
 var pending_race := 0
 var creation_name := ""
@@ -9841,13 +9842,23 @@ func draw_mechanics_panel() -> void:
 		text_at(Vector2(190,512), "Normale Oberwelt: maximal 10 aktive Gegner, deutlich längeres Spawnintervall.", 13, Color('dfe9dc'))
 	ui_button(Rect2(820,548,160,38), "SCHLIESSEN")
 
+func appearance_preview_look()->Vector2:
+	return [Vector2.DOWN,Vector2.LEFT,Vector2.UP,Vector2.RIGHT][clampi(appearance_preview_dir,0,3)]
+
+func appearance_preview_label()->String:
+	return ["VORNE","LINKS","HINTEN","RECHTS"][clampi(appearance_preview_dir,0,3)]
+
 func draw_appearance_panel() -> void:
 	text_at(Vector2(165,130),"FENNA · CHARACTER EDITOR",27,Color("ffd8ef"))
 	text_at(Vector2(165,160),"Nur Optik: Frisur, Umhang, Schmuck und Farbakzent. Rasse und Klasse bleiben unverändert.",13,Color("d9e3dd"))
 	ui_box(Rect2(175,200,330,340),Color("5d495d"))
-	draw_character_cloak_back(Vector2(340,390),Vector2.DOWN,2.0,cosmetic_cloak,cosmetic_accent,false,false,false,false,world_time)
-	draw_character_sprite(Vector2(340,390),class_id,false,Vector2.DOWN,2.0,false,hero_race,hero_gender,-1,-1.0,0.0,-1,0,false)
-	draw_character_cosmetics(Vector2(340,390),Vector2.DOWN,2.0,hero_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
+	var preview_look:=appearance_preview_look()
+	draw_character_cloak_back(Vector2(340,390),preview_look,2.0,cosmetic_cloak,cosmetic_accent,false,false,false,false,world_time)
+	draw_character_sprite(Vector2(340,390),class_id,false,preview_look,2.0,false,hero_race,hero_gender,-1,-1.0,0.0,-1,0,false)
+	draw_character_cosmetics(Vector2(340,390),preview_look,2.0,hero_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
+	ui_button(Rect2(205,494,62,36),"<")
+	text_at(Vector2(274,518),appearance_preview_label(),13,Color("ffe4b7"),HORIZONTAL_ALIGNMENT_CENTER,132)
+	ui_button(Rect2(413,494,62,36),">")
 	var labels:=["FRISUR","UMHANG","SCHMUCK","FARBAKZENT"]
 	var values:=[cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent]
 	var max_values:=[4,4,4,COSMETIC_ACCENT_HEX.size()]
@@ -9863,6 +9874,10 @@ func draw_appearance_panel() -> void:
 func click_appearance(mouse:Vector2) -> void:
 	if Rect2(555,518,300,44).has_point(mouse):
 		save_game();panel="";return
+	if Rect2(205,494,62,36).has_point(mouse):
+		appearance_preview_dir=posmod(appearance_preview_dir-1,4);play_sound("menu");queue_redraw();return
+	if Rect2(413,494,62,36).has_point(mouse):
+		appearance_preview_dir=posmod(appearance_preview_dir+1,4);play_sound("menu");queue_redraw();return
 	var limits:=[4,4,4,COSMETIC_ACCENT_HEX.size()]
 	for row in 4:
 		var y:=220+row*72
@@ -9883,15 +9898,27 @@ func cosmetic_accent_color(accent_index:int)->Color:
 	return Color(COSMETIC_ACCENT_HEX[clampi(accent_index,0,COSMETIC_ACCENT_HEX.size()-1)])
 
 func cloak_motion_profile(cloak:int,look:Vector2,walking:bool,sprinting:bool,dashing:bool,dead:bool,phase:float)->Dictionary:
-	var style:=clampi(cloak,0,3)
-	if style<=0:return {"visible":false}
+	# cosmetic_cloak 0..3 sind vier echte Designs; es gibt keinen versteckten "kein Umhang"-Slot.
+	var style:=clampi(cloak,0,3)+1
 	var raw_look:=look.normalized() if look.length()>0.01 else Vector2.DOWN
-	var length_by_style:=[0.0,20.0,27.0,34.0]
-	var width_by_style:=[0.0,13.0,16.0,19.0]
-	var inertia_by_style:=[0.0,0.82,1.0,1.18]
+	var direction_index:=cardinal_direction_index(raw_look)
+	var length_by_style:=[0.0,21.0,27.0,34.0,40.0]
+	var width_by_style:=[0.0,23.0,26.0,29.0,32.0]
+	var shoulder_by_style:=[0.0,16.0,18.0,20.0,22.0]
+	var inertia_by_style:=[0.0,0.72,0.88,1.02,1.16]
 	var length:float=length_by_style[style]
 	var hem_half:float=width_by_style[style]
+	var shoulder_half:float=shoulder_by_style[style]
 	var inertia:float=inertia_by_style[style]
+	# Rückenansicht zeigt die volle Stofffläche, Front etwas schmaler; Seitenansicht asymmetrisch.
+	if direction_index==0:
+		hem_half-=2.0
+		shoulder_half-=1.0
+	elif direction_index==3:
+		hem_half+=2.0
+		shoulder_half+=1.0
+	elif direction_index in [1,2]:
+		hem_half-=3.0
 	var speed_pull:float=0.0
 	if walking:speed_pull=2.5*inertia
 	if sprinting:speed_pull=5.0*inertia
@@ -9912,14 +9939,15 @@ func cloak_motion_profile(cloak:int,look:Vector2,walking:bool,sprinting:bool,das
 	var trail:=-raw_look*speed_pull
 	var perpendicular:=Vector2(-raw_look.y,raw_look.x)
 	trail+=perpendicular*sway
-	# Pixelart: nur halbe Pixel zulassen.
 	trail.x=round(trail.x*2.0)/2.0
 	trail.y=round(trail.y*2.0)/2.0
 	lift=round(lift*2.0)/2.0
 	return {
 		"visible":true,
+		"style":style,
+		"direction_index":direction_index,
 		"neck_half":5.0+style*0.8,
-		"shoulder_half":9.0+style*1.5,
+		"shoulder_half":shoulder_half,
 		"hem_half":hem_half,
 		"length":length,
 		"trail":trail,
@@ -9958,6 +9986,15 @@ func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:i
 
 func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int,hair:int,cloak:int,jewelry:int,accent_index:int)->void:
 	var accent:=cosmetic_accent_color(accent_index)
+	# Sichtbarer Halsverschluss liegt vor dem Körper, Stofffläche bleibt dahinter.
+	if cloak>=0:
+		var raw_look:=look.normalized() if look.length()>0.01 else Vector2.DOWN
+		var direction_index:=cardinal_direction_index(raw_look)
+		var collar_y:=-11.0
+		var collar_half:=5.5+clampi(cloak,0,3)*0.8
+		if direction_index==3:collar_y=-12.0
+		PixelStyle32.line(self,p+Vector2(-collar_half,collar_y)*scale_factor,p+Vector2(collar_half,collar_y)*scale_factor,accent.lightened(0.24),1.8*scale_factor)
+		PixelStyle32.circle(self,p+Vector2(0,collar_y)*scale_factor,1.6*scale_factor,accent.lightened(0.42))
 	if hair>0:
 		if race==2:
 			for side in [-1.0,1.0]:

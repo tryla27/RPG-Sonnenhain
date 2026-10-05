@@ -150,7 +150,7 @@ func run():
 		var color:Color=g.cosmetic_accent_color(accent_index)
 		seen_colors[color.to_html(false)]=true
 	assert(seen_colors.size()==20)
-	for cloak_style in [1,2,3]:
+	for cloak_style in [0,1,2,3]:
 		var idle:Dictionary=g.cloak_motion_profile(cloak_style,Vector2.DOWN,false,false,false,false,0.5)
 		var walk:Dictionary=g.cloak_motion_profile(cloak_style,Vector2.RIGHT,true,false,false,false,0.5)
 		var sprint:Dictionary=g.cloak_motion_profile(cloak_style,Vector2.RIGHT,true,true,false,false,0.5)
@@ -160,10 +160,12 @@ func run():
 		assert(abs(float(sprint["trail"].x))>=abs(float(walk["trail"].x)))
 		assert(abs(float(dash["trail"].x))>=abs(float(sprint["trail"].x)))
 		assert(is_equal_approx(float(dash["trail"].x)*2.0,round(float(dash["trail"].x)*2.0)))
-	var short_cloak:Dictionary=g.cloak_motion_profile(1,Vector2.UP,false,false,false,false,0.0)
+	var short_cloak:Dictionary=g.cloak_motion_profile(0,Vector2.UP,false,false,false,false,0.0)
 	var long_cloak:Dictionary=g.cloak_motion_profile(3,Vector2.UP,false,false,false,false,0.0)
 	assert(float(long_cloak["length"])>float(short_cloak["length"]))
-	assert(not bool(g.cloak_motion_profile(0,Vector2.DOWN,false,false,false,false,0.0)["visible"]))
+	assert(g.appearance_preview_look()==Vector2.DOWN)
+	g.appearance_preview_dir=2
+	assert(g.appearance_preview_look()==Vector2.UP and g.appearance_preview_label()=="HINTEN")
 
 	print("GAMEPLAY_STABILITY_OK inventory lock/drop/sort; warrior crit; transactional save repair; boss loot; falcon rune; auto waystone; dungeon loop reset; fusion gate; boss leash; kitchen keys; cloak colors/motion")
 	g.free()
