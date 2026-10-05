@@ -9892,11 +9892,11 @@ func cloak_motion_profile(cloak:int,look:Vector2,walking:bool,sprinting:bool,das
 	var length:float=length_by_style[style]
 	var hem_half:float=width_by_style[style]
 	var inertia:float=inertia_by_style[style]
-	var speed_pull:=0.0
+	var speed_pull:float=0.0
 	if walking:speed_pull=2.5*inertia
 	if sprinting:speed_pull=5.0*inertia
 	if dashing:speed_pull=9.0*inertia
-	var sway_strength:=(1.25 if walking else 0.45)*inertia
+	var sway_strength:float=(1.25 if walking else 0.45)*inertia
 	if sprinting:sway_strength=0.8*inertia
 	if dashing:sway_strength=0.35*inertia
 	if dead:
@@ -9904,9 +9904,9 @@ func cloak_motion_profile(cloak:int,look:Vector2,walking:bool,sprinting:bool,das
 		sway_strength=0.0
 		length+=3.0
 		hem_half+=2.0
-	var cadence:=9.0 if walking else 1.6
-	var sway:=sin(phase*cadence)*sway_strength
-	var lift:=abs(sin(phase*cadence))*((1.4 if walking else 0.35)*inertia)
+	var cadence:float=9.0 if walking else 1.6
+	var sway:float=sin(phase*cadence)*sway_strength
+	var lift:float=abs(sin(phase*cadence))*((1.4 if walking else 0.35)*inertia)
 	if sprinting:lift+=2.0*inertia
 	if dashing:lift+=4.0*inertia
 	var trail:=-raw_look*speed_pull
