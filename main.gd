@@ -526,6 +526,18 @@ var cosmetic_hair := 0
 var cosmetic_cloak := 0
 var cosmetic_jewelry := 0
 var cosmetic_accent := 0
+const COSMETIC_ACCENTS := [
+	Color("be5368"),Color("557fc0"),Color("5f9b68"),Color("b7894f"),Color("8d62aa"),
+	Color("55a5a5"),Color("cf6f59"),Color("c94f7e"),Color("6a6fd1"),Color("4e9ad6"),
+	Color("4ca6a0"),Color("5caf7a"),Color("86b84d"),Color("c2b14a"),Color("d48c4f"),
+	Color("a86b4e"),Color("8c6a58"),Color("9a7acb"),Color("c36db5"),Color("d7d7d7")
+]
+const CLOAK_STYLES := [
+	{"visible":false,"shoulder":0.0,"hem":0.0,"length":0.0,"inertia":0.0},
+	{"visible":true,"shoulder":9.0,"hem":12.0,"length":19.0,"inertia":0.55},
+	{"visible":true,"shoulder":11.0,"hem":16.0,"length":26.0,"inertia":0.75},
+	{"visible":true,"shoulder":13.0,"hem":20.0,"length":33.0,"inertia":0.95}
+]
 var pending_gender := 0
 var pending_race := 0
 var creation_name := ""
@@ -5478,7 +5490,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	cosmetic_hair=clampi(int(data.get("cosmetic_hair",0)),0,3)
 	cosmetic_cloak=clampi(int(data.get("cosmetic_cloak",0)),0,3)
 	cosmetic_jewelry=clampi(int(data.get("cosmetic_jewelry",0)),0,3)
-	cosmetic_accent=clampi(int(data.get("cosmetic_accent",0)),0,5)
+	cosmetic_accent=clampi(int(data.get("cosmetic_accent",0)),0,COSMETIC_ACCENTS.size()-1)
 	stamina = max_stamina()
 	sprint_blend = 0.0
 	sprint_heading = Vector2.ZERO
@@ -9015,6 +9027,10 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	var use_race := pending_race if panel == "creation" and preview_class >= 0 else hero_race
 	var use_gender := pending_gender if panel == "creation" and preview_class >= 0 else hero_gender
 	var attack_now := swing_timer > 0.0 and preview_class < 0
+	if preview_class < 0:
+		var dash_strength:=clampf(dash_timer/maxf(0.01,dodge_duration),0.0,1.0) if in_world and dodge_duration>0.0 else 0.0
+		var jump_strength:=clampf(warrior_jump_timer/maxf(0.01,warrior_jump_duration),0.0,1.0) if in_world else 0.0
+		draw_character_cloak_back(p,look,scale_factor,cosmetic_cloak,cosmetic_accent,walking,sprint_blend if in_world else 0.0,dash_strength,jump_strength)
 	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender,-2,-1.0,0.0,-2,-2,is_sprinting if preview_class<0 else false)
 	if in_world and preview_class < 0 and class_id == 0 and hero_race == 0 and hero_gender == 0 and warrior_jump_timer > 0.0: return
 	if in_world and (death_timer > 0 or (dash_timer > 0 and class_id != 1)): return
@@ -9842,11 +9858,12 @@ func draw_appearance_panel() -> void:
 	text_at(Vector2(165,130),"FENNA · CHARACTER EDITOR",27,Color("ffd8ef"))
 	text_at(Vector2(165,160),"Nur Optik: Frisur, Umhang, Schmuck und Farbakzent. Rasse und Klasse bleiben unverändert.",13,Color("d9e3dd"))
 	ui_box(Rect2(175,200,330,340),Color("5d495d"))
+	draw_character_cloak_back(Vector2(340,390),Vector2.DOWN,2.0,cosmetic_cloak,cosmetic_accent,false,0.0,0.0,0.0)
 	draw_character_sprite(Vector2(340,390),class_id,false,Vector2.DOWN,2.0,false,hero_race,hero_gender,-1,-1.0,0.0,-1,0,false)
 	draw_character_cosmetics(Vector2(340,390),Vector2.DOWN,2.0,hero_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
 	var labels:=["FRISUR","UMHANG","SCHMUCK","FARBAKZENT"]
 	var values:=[cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent]
-	var max_values:=[4,4,4,6]
+	var max_values:=[4,4,4,20]
 	for row in 4:
 		var y:=220+row*72
 		text_at(Vector2(555,y),labels[row],16,Color("ffe4b7"))
@@ -9859,7 +9876,7 @@ func draw_appearance_panel() -> void:
 func click_appearance(mouse:Vector2) -> void:
 	if Rect2(555,518,300,44).has_point(mouse):
 		save_game();panel="";return
-	var limits:=[4,4,4,6]
+	var limits:=[4,4,4,20]
 	for row in 4:
 		var y:=220+row*72
 		var delta:=0
@@ -9875,13 +9892,75 @@ func click_appearance(mouse:Vector2) -> void:
 		save_game()
 		return
 
+func cloak_style_metrics(cloak:int)->Dictionary:
+	return CLOAK_STYLES[clampi(cloak,0,CLOAK_STYLES.size()-1)].duplicate(true)
+
+func cloak_motion_offsets(look:Vector2,cloak:int,walking:bool,sprint_amount:float,dash_strength:float,jump_strength:float,phase:float)->Dictionary:
+	if cloak<=0:return {"tail":Vector2.ZERO,"lift":0.0,"flutter":0.0}
+	var metrics:=cloak_style_metrics(cloak)
+	var inertia:=float(metrics.get("inertia",0.0))
+	var raw_look:=look.normalized() if look.length()>0.01 else Vector2.DOWN
+	var direction_index:=cardinal_direction_index(raw_look)
+	var base_look:Vector2=[Vector2.DOWN,Vector2.LEFT,Vector2.RIGHT,Vector2.UP][direction_index]
+	var sprint:=clampf(sprint_amount,0.0,1.0)
+	var dash:=clampf(dash_strength,0.0,1.0)
+	var jump:=clampf(jump_strength,0.0,1.0)
+	var sway_speed:=8.0 if sprint>0.05 else (5.5 if walking else 1.25)
+	var sway_amp:=(1.55 if walking else 0.55)*inertia
+	if sprint>0.05:sway_amp*=0.55
+	var side_sway:=snappedf(sin(phase*sway_speed+cloak*0.55)*sway_amp,0.5)
+	var pull_amount:=sprint*(3.5+cloak)+dash*(7.5+cloak*1.4)+jump*(4.5+cloak)
+	var tail:Vector2=-base_look*pull_amount
+	tail.x=snappedf(tail.x+side_sway,0.5)
+	tail.y=snappedf(tail.y,0.5)
+	var lift:=snappedf(sprint*(1.5+cloak*0.4)+dash*(3.0+cloak*0.6)+jump*(4.0+cloak*0.7),0.5)
+	var flutter:=snappedf(abs(sin(phase*(8.5 if walking else 2.0)+cloak))*(0.35+cloak*0.25)*(0.8+dash),0.5)
+	return {"tail":tail,"lift":lift,"flutter":flutter}
+
+func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprint_amount:float=0.0,dash_strength:float=0.0,jump_strength:float=0.0)->void:
+	if cloak<=0:return
+	var metrics:=cloak_style_metrics(cloak)
+	if not bool(metrics.get("visible",false)):return
+	var accent:Color=COSMETIC_ACCENTS[clampi(accent_index,0,COSMETIC_ACCENTS.size()-1)]
+	var raw_look:=look.normalized() if look.length()>0.01 else Vector2.DOWN
+	var direction_index:=cardinal_direction_index(raw_look)
+	var base_look:Vector2=[Vector2.DOWN,Vector2.LEFT,Vector2.RIGHT,Vector2.UP][direction_index]
+	var motion:=cloak_motion_offsets(base_look,cloak,walking,sprint_amount,dash_strength,jump_strength,world_time)
+	var tail:Vector2=motion["tail"]
+	var lift:=float(motion["lift"])
+	var flutter:=float(motion["flutter"])
+	var neck_half:=4.5+cloak*0.7
+	var shoulder_half:=float(metrics["shoulder"])
+	var hem_half:=float(metrics["hem"])
+	var hem_y:=float(metrics["length"])
+	var top_y:=-10.0
+	if base_look==Vector2.UP:
+		hem_y+=3.0
+		hem_half+=2.0
+	elif base_look==Vector2.DOWN:
+		hem_half*=0.82
+	elif abs(base_look.x)>0.5:
+		hem_half*=0.92
+	var left_hem:=Vector2(-hem_half+tail.x-flutter,hem_y+tail.y-lift)
+	var right_hem:=Vector2(hem_half+tail.x+flutter,hem_y+tail.y-lift)
+	var points:=PackedVector2Array([
+		p+Vector2(-neck_half,top_y)*scale_factor,
+		p+Vector2(-shoulder_half,-2.0)*scale_factor,
+		p+left_hem*scale_factor,
+		p+right_hem*scale_factor,
+		p+Vector2(shoulder_half,-2.0)*scale_factor,
+		p+Vector2(neck_half,top_y)*scale_factor
+	])
+	PixelStyle32.polygon(self,points,accent.darkened(0.26))
+	PixelStyle32.line(self,p+Vector2(-shoulder_half,-1.0)*scale_factor,p+Vector2(shoulder_half,-1.0)*scale_factor,accent.darkened(0.38),1.0*scale_factor)
+	PixelStyle32.line(self,p+Vector2(tail.x*0.15,1.0)*scale_factor,p+Vector2(tail.x*0.45,hem_y+tail.y-lift-4.0)*scale_factor,accent.darkened(0.40),1.0*scale_factor)
+
 func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int,hair:int,cloak:int,jewelry:int,accent_index:int)->void:
-	var accents:=[Color("be5368"),Color("557fc0"),Color("5f9b68"),Color("b7894f"),Color("8d62aa"),Color("55a5a5")]
-	var accent:Color=accents[clampi(accent_index,0,accents.size()-1)]
+	var accent:Color=COSMETIC_ACCENTS[clampi(accent_index,0,COSMETIC_ACCENTS.size()-1)]
 	if cloak>0:
-		var width:=18.0+cloak*3.0
-		PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(-width,-6)*scale_factor,p+Vector2(width,-6)*scale_factor,p+Vector2((14+cloak*2),31)*scale_factor,p+Vector2(-(14+cloak*2),31)*scale_factor]),accent.darkened(0.18))
-		PixelStyle32.line(self,p+Vector2(-width,-5)*scale_factor,p+Vector2(width,-5)*scale_factor,accent.lightened(0.25),2.0*scale_factor)
+		var clasp_y:=-10.0
+		PixelStyle32.line(self,p+Vector2(-5.0,clasp_y)*scale_factor,p+Vector2(5.0,clasp_y)*scale_factor,accent.lightened(0.30),1.8*scale_factor)
+		PixelStyle32.circle(self,p+Vector2(0,clasp_y)*scale_factor,1.8*scale_factor,accent.lightened(0.48))
 	if hair>0:
 		if race==2:
 			for side in [-1.0,1.0]:
