@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 05.10.2026"
 const NOTES=[
+["Fusionen · Übersicht", "Der Verschmelzungskristall zeigt jetzt alle vier bekannten Fusionen dauerhaft an und nennt bei gesperrten Rezepten exakt die noch fehlenden Ausgangsattacken."],
 ["Atelier · Umhangform", "Die vier Umhänge liegen jetzt kompakt über Rücken und Schultern, enden vor den Füßen und besitzen je Blickrichtung eine schmalere, natürlichere Silhouette statt der bisherigen Rock-/Plattenform."],
 ["Skill-Items · BENUTZEN", "Arkankerne und andere Gegenstände mit Fähigkeitsfreischaltung besitzen im Inventar jetzt wieder einen aktiven BENUTZEN-Button und können ihre hinterlegte Fähigkeit lernen."],
 ["Atelier · Umhänge sichtbar", "Alle vier Umhangvarianten werden jetzt sichtbar gerendert. Der Umhang liegt hinter der Figur, besitzt einen sichtbaren Halsverschluss und Fennas Vorschau lässt sich nach links und rechts drehen."],

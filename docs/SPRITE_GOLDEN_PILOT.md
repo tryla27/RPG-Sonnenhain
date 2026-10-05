@@ -141,3 +141,20 @@ Die Runtime muss weiterhin berücksichtigen:
 ## Pilot-Artefakte
 
 Für die visuelle Stilabnahme wurden am 2026-10-04 bereits eine Golden-Character/Golden-Mob-Konzepttafel sowie je ein extrahiertes 8-Richtungs-Idle-Testsheet erzeugt. Diese dienen zunächst als Stil- und Maßstabsreferenz; die finalen Produktionssheets sollen als saubere transparente Einzelassets in die oben genannten Pfade übernommen werden.
+
+## Aktueller Produktionsstand (2026-10-05)
+
+Bereits live:
+
+- menschlicher Krieger: authored 8-Richtungs-Idle-Sprite
+- menschlicher Krieger: 8-Richtungs-Sprunganimation mit 8 Frames je Richtung
+- Waldschleim: authored 8-Richtungs-Idle-Sprite
+- gemeinsamer Golden-Sprite-Runtime-Loader mit prozeduralem Fallback
+
+Noch offen aus dem ursprünglichen Pixelart-Plan:
+
+- Krieger: walk, run, attack_1, attack_2, ability, hit, death, dodge als authored Sprites
+- Waldschleim: move, attack, hit, death als authored Sprites
+- anschließend Ausrüstung in getrennte Sprite-Layer überführen, sobald die Basisanimationen vollständig abgenommen sind
+
+Wichtig: Diese offenen Reihen werden nicht durch alte Branches blind zurückgemerged. Neue Sprite-Arbeit muss auf dem aktuellen `main` aufsetzen, damit Atelier-, Umhang-, Skill-, Save- und Multiplayer-Fixes erhalten bleiben.
