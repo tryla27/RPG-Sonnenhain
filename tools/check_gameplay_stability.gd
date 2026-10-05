@@ -163,6 +163,17 @@ func run():
 	var short_cloak:Dictionary=g.cloak_motion_profile(0,Vector2.UP,false,false,false,false,0.0)
 	var long_cloak:Dictionary=g.cloak_motion_profile(3,Vector2.UP,false,false,false,false,0.0)
 	assert(float(long_cloak["length"])>float(short_cloak["length"]))
+	for look in [Vector2.DOWN,Vector2.LEFT,Vector2.UP,Vector2.RIGHT]:
+		var profile:Dictionary=g.cloak_motion_profile(3,look,false,false,false,false,0.0)
+		var points:PackedVector2Array=g.cloak_local_points(profile)
+		assert(points.size()==8)
+		var max_y:float=-999.0
+		var max_abs_x:float=0.0
+		for point in points:
+			max_y=maxf(max_y,point.y)
+			max_abs_x=maxf(max_abs_x,absf(point.x))
+		assert(max_y<=31.0, "Umhang darf im Stand nicht unter die Füße ragen")
+		assert(max_abs_x<=24.0, "Umhang darf nicht rockartig zu breit werden")
 	assert(g.appearance_preview_look()==Vector2.DOWN)
 	g.appearance_preview_dir=2
 	assert(g.appearance_preview_look()==Vector2.UP and g.appearance_preview_label()=="HINTEN")

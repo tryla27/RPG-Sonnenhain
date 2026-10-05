@@ -9898,44 +9898,46 @@ func cosmetic_accent_color(accent_index:int)->Color:
 	return Color(COSMETIC_ACCENT_HEX[clampi(accent_index,0,COSMETIC_ACCENT_HEX.size()-1)])
 
 func cloak_motion_profile(cloak:int,look:Vector2,walking:bool,sprinting:bool,dashing:bool,dead:bool,phase:float)->Dictionary:
-	# cosmetic_cloak 0..3 sind vier echte Designs; es gibt keinen versteckten "kein Umhang"-Slot.
+	# Vier echte Designs. Die Werte bleiben bewusst kompakt, damit der Umhang
+	# am Rücken endet und nicht wie ein Rock unter den Füßen herausragt.
 	var style:=clampi(cloak,0,3)+1
 	var raw_look:=look.normalized() if look.length()>0.01 else Vector2.DOWN
 	var direction_index:=cardinal_direction_index(raw_look)
-	var length_by_style:=[0.0,21.0,27.0,34.0,40.0]
-	var width_by_style:=[0.0,23.0,26.0,29.0,32.0]
-	var shoulder_by_style:=[0.0,16.0,18.0,20.0,22.0]
-	var inertia_by_style:=[0.0,0.72,0.88,1.02,1.16]
+	var length_by_style:=[0.0,18.0,22.0,26.0,30.0]
+	var hem_by_style:=[0.0,12.0,14.0,16.0,18.0]
+	var shoulder_by_style:=[0.0,10.0,11.5,13.0,14.5]
+	var inertia_by_style:=[0.0,0.68,0.82,0.96,1.08]
 	var length:float=length_by_style[style]
-	var hem_half:float=width_by_style[style]
+	var hem_half:float=hem_by_style[style]
 	var shoulder_half:float=shoulder_by_style[style]
 	var inertia:float=inertia_by_style[style]
-	# Rückenansicht zeigt die volle Stofffläche, Front etwas schmaler; Seitenansicht asymmetrisch.
-	if direction_index==0:
-		hem_half-=2.0
-		shoulder_half-=1.0
-	elif direction_index==3:
+	# Rückenansicht zeigt die volle Stofffläche. Vorne bleibt der Umhang schmaler,
+	# damit primär Seitenkante und Saum hinter dem Körper sichtbar sind.
+	if direction_index==3:
 		hem_half+=2.0
 		shoulder_half+=1.0
+	elif direction_index==0:
+		hem_half-=1.5
+		shoulder_half-=1.0
 	elif direction_index in [1,2]:
-		hem_half-=3.0
+		hem_half-=2.0
+		shoulder_half-=1.5
 	var speed_pull:float=0.0
-	if walking:speed_pull=2.5*inertia
-	if sprinting:speed_pull=5.0*inertia
-	if dashing:speed_pull=9.0*inertia
-	var sway_strength:float=(1.25 if walking else 0.45)*inertia
-	if sprinting:sway_strength=0.8*inertia
+	if walking:speed_pull=1.5*inertia
+	if sprinting:speed_pull=3.0*inertia
+	if dashing:speed_pull=5.0*inertia
+	var sway_strength:float=(0.9 if walking else 0.3)*inertia
+	if sprinting:sway_strength=0.65*inertia
 	if dashing:sway_strength=0.35*inertia
 	if dead:
 		speed_pull=0.0
 		sway_strength=0.0
-		length+=3.0
-		hem_half+=2.0
-	var cadence:float=9.0 if walking else 1.6
+		length+=2.0
+	var cadence:float=8.0 if walking else 1.4
 	var sway:float=sin(phase*cadence)*sway_strength
-	var lift:float=abs(sin(phase*cadence))*((1.4 if walking else 0.35)*inertia)
-	if sprinting:lift+=2.0*inertia
-	if dashing:lift+=4.0*inertia
+	var lift:float=abs(sin(phase*cadence))*((0.9 if walking else 0.2)*inertia)
+	if sprinting:lift+=1.2*inertia
+	if dashing:lift+=2.2*inertia
 	var trail:=-raw_look*speed_pull
 	var perpendicular:=Vector2(-raw_look.y,raw_look.x)
 	trail+=perpendicular*sway
@@ -9946,7 +9948,7 @@ func cloak_motion_profile(cloak:int,look:Vector2,walking:bool,sprinting:bool,das
 		"visible":true,
 		"style":style,
 		"direction_index":direction_index,
-		"neck_half":5.0+style*0.8,
+		"neck_half":4.5+style*0.55,
 		"shoulder_half":shoulder_half,
 		"hem_half":hem_half,
 		"length":length,
@@ -9955,34 +9957,53 @@ func cloak_motion_profile(cloak:int,look:Vector2,walking:bool,sprinting:bool,das
 		"inertia":inertia
 	}
 
-func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0)->void:
-	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
-	if not bool(motion.get("visible",false)):return
-	var accent:=cosmetic_accent_color(accent_index)
+func cloak_local_points(motion:Dictionary)->PackedVector2Array:
+	var direction_index:=int(motion["direction_index"])
 	var neck_half:=float(motion["neck_half"])
 	var shoulder_half:=float(motion["shoulder_half"])
 	var hem_half:=float(motion["hem_half"])
 	var length:=float(motion["length"])
 	var trail:Vector2=motion["trail"]
 	var lift:=float(motion["lift"])
-	var top_y:=-11.0
+	var top_y:=-12.0
+	var shoulder_y:=-4.0
+	var waist_y:=8.0
 	var hem_y:=length-lift
-	var left_hem:=Vector2(-hem_half,hem_y)+trail
-	var right_hem:=Vector2(hem_half,hem_y)+trail
-	var points:=PackedVector2Array([
-		p+Vector2(-neck_half,top_y)*scale_factor,
-		p+Vector2(-shoulder_half,-2.0)*scale_factor,
-		p+left_hem*scale_factor,
-		p+right_hem*scale_factor,
-		p+Vector2(shoulder_half,-2.0)*scale_factor,
-		p+Vector2(neck_half,top_y)*scale_factor
+	var side_shift:=0.0
+	# Seitenansicht: Stoff hängt sichtbar hinter dem Körper statt symmetrisch wie ein Rock.
+	if direction_index==1:side_shift=5.0
+	elif direction_index==2:side_shift=-5.0
+	var waist_half:=lerpf(shoulder_half,hem_half,0.45)
+	var side_vec:=Vector2(side_shift,0.0)
+	var half_trail:=trail*0.45
+	return PackedVector2Array([
+		Vector2(-neck_half,top_y),
+		Vector2(-shoulder_half,shoulder_y)+side_vec*0.18,
+		Vector2(-waist_half,waist_y)+side_vec*0.45+half_trail,
+		Vector2(-hem_half,hem_y)+side_vec+trail,
+		Vector2(hem_half,hem_y)+side_vec+trail,
+		Vector2(waist_half,waist_y)+side_vec*0.45+half_trail,
+		Vector2(shoulder_half,shoulder_y)+side_vec*0.18,
+		Vector2(neck_half,top_y)
 	])
-	PixelStyle32.polygon(self,points,accent.darkened(0.26))
-	# Halsverschluss: bleibt am Nacken fest, während nur der Saum nachzieht.
-	PixelStyle32.line(self,p+Vector2(-neck_half,top_y+1.0)*scale_factor,p+Vector2(neck_half,top_y+1.0)*scale_factor,accent.lightened(0.30),1.8*scale_factor)
-	PixelStyle32.circle(self,p+Vector2(0,top_y+1.0)*scale_factor,1.6*scale_factor,accent.lightened(0.42))
-	# Mittelfalte verstärkt den Stoffeindruck und folgt gedämpft dem Nachzug.
-	PixelStyle32.line(self,p+Vector2(0,top_y+2.0)*scale_factor,p+(Vector2(0,hem_y-3.0)+trail*0.45)*scale_factor,accent.darkened(0.38),1.2*scale_factor)
+
+func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0)->void:
+	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
+	if not bool(motion.get("visible",false)):return
+	var accent:=cosmetic_accent_color(accent_index)
+	var local_points:=cloak_local_points(motion)
+	var points:=PackedVector2Array()
+	for point in local_points:points.append(p+point*scale_factor)
+	PixelStyle32.polygon(self,points,accent.darkened(0.24))
+	var neck_half:=float(motion["neck_half"])
+	var trail:Vector2=motion["trail"]
+	var length:=float(motion["length"])
+	var lift:=float(motion["lift"])
+	# Nackenverschluss bleibt fest; nur Rücken/Saum reagieren auf Bewegung.
+	PixelStyle32.line(self,p+Vector2(-neck_half,-11.0)*scale_factor,p+Vector2(neck_half,-11.0)*scale_factor,accent.lightened(0.28),1.6*scale_factor)
+	# Zwei Stofffalten statt einer dominanten Mittellinie geben dem Mantel eine Rückenform.
+	PixelStyle32.line(self,p+Vector2(-3,-8)*scale_factor,p+(Vector2(-2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.34),1.0*scale_factor)
+	PixelStyle32.line(self,p+Vector2(3,-8)*scale_factor,p+(Vector2(2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.34),1.0*scale_factor)
 
 func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int,hair:int,cloak:int,jewelry:int,accent_index:int)->void:
 	var accent:=cosmetic_accent_color(accent_index)
