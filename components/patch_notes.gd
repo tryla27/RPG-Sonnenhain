@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 05.10.2026"
 const NOTES=[
+["Fusionen · Opferprinzip", "Beim Verschmelzen werden beide Ausgangsspells samt ihrer investierten Skillstufen dauerhaft geopfert. Der neue Fusionsspell wird automatisch in den frühesten möglichen aktiven Slot gelegt und ist sofort benutzbar."],
 ["Fusionen · Übersicht", "Der Verschmelzungskristall zeigt jetzt alle vier bekannten Fusionen dauerhaft an und nennt bei gesperrten Rezepten exakt die noch fehlenden Ausgangsattacken."],
 ["Atelier · Umhangform", "Die vier Umhänge liegen jetzt kompakt über Rücken und Schultern, enden vor den Füßen und besitzen je Blickrichtung eine schmalere, natürlichere Silhouette statt der bisherigen Rock-/Plattenform."],
 ["Skill-Items · BENUTZEN", "Arkankerne und andere Gegenstände mit Fähigkeitsfreischaltung besitzen im Inventar jetzt wieder einen aktiven BENUTZEN-Button und können ihre hinterlegte Fähigkeit lernen."],

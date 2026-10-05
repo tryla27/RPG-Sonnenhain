@@ -6468,6 +6468,15 @@ func can_fuse(fusion:Dictionary) -> bool:
 	var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
 	return a!=b and learned[a] and learned[b] and int(skill_levels[id])<max_rank and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
 
+func fusion_target_slot(source_a:int,source_b:int,fusion_id:int=-1)->int:
+	# Bevorzugt den frühesten Slot eines geopferten Spells bzw. einer schon vorhandenen Fusion.
+	for i in slots.size():
+		if int(slots[i]) in [source_a,source_b,fusion_id]:return i
+	for i in slots.size():
+		if int(slots[i])<0:return i
+	# Volle Leiste: Slot 1 wird ersetzt, damit die Fusion garantiert sofort benutzbar ist.
+	return 0
+
 func buy_fusion(index:int) -> bool:
 	var offers:=available_fusions()
 	if index < 0 or index >= offers.size(): return false
@@ -6479,25 +6488,41 @@ func buy_fusion(index:int) -> bool:
 	var a:=int(fusion["a"])
 	var b:=int(fusion["b"])
 	var price:=int(fusion["gold"])
+	var target_slot:=fusion_target_slot(a,b,id)
+	var sacrificed_rank_a:=int(skill_levels[a])
+	var sacrificed_rank_b:=int(skill_levels[b])
 	var learned_before:=learned.duplicate()
 	var levels_before:=skill_levels.duplicate()
+	var cooldowns_before:=cooldowns.duplicate()
 	var slots_before:=slots.duplicate()
+	var selected_slot_before:=selected_slot
 	var gold_before:=gold
 	var history_before:=fusion_history.duplicate(true)
 	var learned_fusions_before:=learned_fusions.duplicate(true)
 
-	# Quellen bleiben immer gelernt. Erst Output setzen, validieren, dann Kosten festschreiben.
-	learned[a]=true
-	learned[b]=true
-	skill_levels[a]=maxi(1,int(skill_levels[a]))
-	skill_levels[b]=maxi(1,int(skill_levels[b]))
+	# Echte Fusion: beide Quellen und ihre investierten Skillstufen werden geopfert.
+	learned[a]=false
+	learned[b]=false
+	skill_levels[a]=0
+	skill_levels[b]=0
+	cooldowns[a]=0.0
+	cooldowns[b]=0.0
+	for i in slots.size():
+		if int(slots[i]) in [a,b,id]:slots[i]=-1
+
+	# Die neue Fusion übernimmt sofort den frühesten möglichen aktiven Slot.
 	learned[id]=true
 	skill_levels[id]=clampi(int(skill_levels[id])+1,1,clampi(int(fusion.get("max_rank",4)),1,4))
+	cooldowns[id]=0.0
+	slots[target_slot]=id
+	selected_slot=target_slot
 
-	if not learned[id] or not learned[a] or not learned[b]:
+	if not learned[id] or learned[a] or learned[b] or int(skill_levels[a])!=0 or int(skill_levels[b])!=0 or int(slots[target_slot])!=id:
 		learned=learned_before
 		skill_levels=levels_before
+		cooldowns=cooldowns_before
 		slots=slots_before
+		selected_slot=selected_slot_before
 		gold=gold_before
 		fusion_history=history_before
 		learned_fusions=learned_fusions_before
@@ -6507,8 +6532,12 @@ func buy_fusion(index:int) -> bool:
 	gold-=price
 	var key:=fusion_key(a,b)
 	learned_fusions[key]={"fusion_id":id,"rank":int(skill_levels[id])}
-	fusion_history.append({"key":key,"id":id,"a":a,"b":b,"rank":int(skill_levels[id]),"gold":price,"at":int(Time.get_unix_time_from_system())})
-	message("%s + %s → %s · STUFE %d/4 · -%d Gold · Ausgangsattacken bleiben erhalten" % [ABILITIES[a]["name"],ABILITIES[b]["name"],ABILITIES[id]["name"],int(skill_levels[id]),price])
+	fusion_history.append({
+		"key":key,"id":id,"a":a,"b":b,"rank":int(skill_levels[id]),"gold":price,
+		"sacrificed_rank_a":sacrificed_rank_a,"sacrificed_rank_b":sacrificed_rank_b,
+		"slot":target_slot,"at":int(Time.get_unix_time_from_system())
+	})
+	message("%s + %s → %s · Quellen geopfert · Fusion in Slot %d" % [ABILITIES[a]["name"],ABILITIES[b]["name"],ABILITIES[id]["name"],target_slot+1])
 	save_game()
 	return true
 
@@ -10611,7 +10640,7 @@ func fusion_button_label(fusion:Dictionary)->String:
 func draw_fusion_panel() -> void:
 	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"))
 	text_at(Vector2(760,124),"%d GOLD" % gold,16,Color("f6dc9a"))
-	text_at(Vector2(165,160),"Alle bekannten Fusionen bleiben sichtbar. Fehlende Ausgangsattacken werden direkt angezeigt.",12,Color("cbd9da"))
+	text_at(Vector2(165,160),"Fusionen opfern beide Ausgangsattacken samt Skillstufen und werden automatisch ausgerüstet.",12,Color("cbd9da"))
 	for i in FUSIONS.size():
 		var f:Dictionary=FUSIONS[i]
 		var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"])
@@ -10622,7 +10651,7 @@ func draw_fusion_panel() -> void:
 		text_at(Vector2(185,y+22),ABILITIES[id]["name"],16,Color("fff1bc"))
 		text_at(Vector2(185,y+44),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],12,Color("cde5d5"))
 		if missing.is_empty():
-			text_at(Vector2(185,y+66),"%d Gold · Stufe %d/4 · Quellen bleiben gelernt" % [int(f["gold"]),int(skill_levels[id])],11,Color("f4d49b"))
+			text_at(Vector2(185,y+66),"%d Gold · Fusion Stufe %d/4 · beide Quellen werden geopfert" % [int(f["gold"]),int(skill_levels[id])],11,Color("f4d49b"))
 		else:
 			text_at(Vector2(185,y+66),"Fehlt: %s" % ", ".join(missing),11,Color("e7a99f"))
 		ui_button(Rect2(745,y+19,190,43),fusion_button_label(f),enabled)

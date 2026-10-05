@@ -32,13 +32,26 @@ func run():
 	assert(not offers.is_empty(),"Gelernte Attacken müssen als Verschmelzungsangebote erscheinen")
 	var f:Dictionary=offers[0]
 	assert(g.learned[int(f["a"])] and g.learned[int(f["b"])],"Fusion darf nur gelernte Attacken anbieten")
+	# Quellen liegen auf Slot 2/3; die Fusion muss den frühesten geopferten Slot übernehmen.
+	g.slots=[20,int(f["a"]),int(f["b"])]
+	g.skill_levels[int(f["a"])]=3
+	g.skill_levels[int(f["b"])]=2
 	var before:=g.skill_points;var cash:=g.gold
+	assert(g.fusion_target_slot(int(f["a"]),int(f["b"]),int(f["id"]))==1)
 	assert(g.buy_fusion(0))
-	assert(g.learned[int(f["id"])] and g.learned[int(f["a"])] and g.learned[int(f["b"])])
-	assert(g.skill_points==before and g.gold==cash-int(f["gold"]))
-	# Das Belegungsmenü listet gelernte aktive Attacken separat von passiven Werten.
+	assert(g.learned[int(f["id"])])
+	assert(not g.learned[int(f["a"])] and not g.learned[int(f["b"])])
+	assert(int(g.skill_levels[int(f["a"])])==0 and int(g.skill_levels[int(f["b"])])==0)
+	assert(g.skill_points==before,"Geopferte Skillpunkte werden nicht zurückerstattet")
+	assert(g.gold==cash-int(f["gold"]))
+	assert(g.slots[0]==20 and g.slots[1]==int(f["id"]) and g.slots[2]==-1)
+	assert(g.selected_slot==1)
+	# Wenn kein Quellspell ausgerüstet ist und die Leiste voll ist, nimmt die Fusion Slot 1.
+	g.slots=[16,20,34]
+	assert(g.fusion_target_slot(int(f["a"]),int(f["b"]),int(f["id"]))==0)
+	# Das Belegungsmenü enthält die Fusion, aber nicht mehr die geopferten Quellen.
 	var loadout:Array=g.learned_loadout_skills()
-	assert(16 in loadout and 18 in loadout and 20 in loadout)
+	assert(int(f["id"]) in loadout and int(f["a"]) not in loadout and int(f["b"]) not in loadout)
 	# Klassenboni kommen aus genau einem Relikt des passenden Bosses.
 	assert(g.region_at(g.CLASS_BOSS_SITES[0])==6 and g.region_at(g.CLASS_BOSS_SITES[1])==7 and g.region_at(g.CLASS_BOSS_SITES[2])==8)
 	for boss_index in 3:
