@@ -10460,29 +10460,42 @@ func fusion_missing_sources(fusion:Dictionary)->Array[String]:
 			missing.append(str(ABILITIES[source_id]["name"]))
 	return missing
 
+func fusion_offer_index(fusion_id:int)->int:
+	var offers:=available_fusions()
+	for i in offers.size():
+		if int(offers[i]["id"])==fusion_id:return i
+	return -1
+
 func draw_fusion_panel() -> void:
-	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"));text_at(Vector2(760,124),"%d GOLD" % gold,16,Color("f6dc9a"));text_at(Vector2(165,160),"Verschmelzen kostet nur Gold. Essenz und Ausgangsattacken bleiben erhalten.",13,Color("cbd9da"))
+	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"))
+	text_at(Vector2(760,124),"%d GOLD" % gold,16,Color("f6dc9a"))
+	text_at(Vector2(165,160),"Alle bekannten Rezepte bleiben sichtbar. Fehlende Ausgangsattacken werden direkt angezeigt.",12,Color("cbd9da"))
 	for i in FUSIONS.size():
-		var f:Dictionary=FUSIONS[i];var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"]);var y:=195+i*118
+		var f:Dictionary=FUSIONS[i]
+		var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"])
+		var y:=185+i*91
 		var missing:=fusion_missing_sources(f)
-		var unlocked:=missing.is_empty() and int(skill_levels[id])<clampi(int(f.get("max_rank",4)),1,4)
-		ui_box(Rect2(165,y,800,104),Color("263647"))
-		text_at(Vector2(185,y+27),ABILITIES[id]["name"],17,Color("fff1bc"))
-		text_at(Vector2(185,y+51),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],13,Color("cde5d5"))
+		var max_rank:=clampi(int(f.get("max_rank",4)),1,4)
+		var at_max:=id<skill_levels.size() and int(skill_levels[id])>=max_rank
+		var enabled:=missing.is_empty() and not at_max and can_fuse(f)
+		ui_box(Rect2(165,y,800,82),Color("263647"))
+		text_at(Vector2(185,y+22),ABILITIES[id]["name"],16,Color("fff1bc"))
+		text_at(Vector2(185,y+44),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],12,Color("cde5d5"))
 		if missing.is_empty():
-			text_at(Vector2(185,y+78),"%d Gold · Stufe %d/4 · Quellen bleiben gelernt" % [int(f["gold"]),int(skill_levels[id])],13,Color("f4d49b"))
+			text_at(Vector2(185,y+66),"%d Gold · Stufe %d/4" % [int(f["gold"]),int(skill_levels[id])],11,Color("f4d49b"))
 		else:
-			text_at(Vector2(185,y+78),"Fehlt: %s" % ", ".join(missing),13,Color("e7a99f"))
-		ui_button(Rect2(745,y+28,190,45),("VERSTÄRKEN" if learned[id] else "VERSCHMELZEN") if unlocked and can_fuse(f) else ("MAXIMUM" if missing.is_empty() and int(skill_levels[id])>=clampi(int(f.get("max_rank",4)),1,4) else "GESPERRT"),unlocked and can_fuse(f))
+			text_at(Vector2(185,y+66),"Fehlt: %s" % ", ".join(missing),11,Color("e7a99f"))
+		var button_label:="MAXIMUM" if at_max else (("VERSTÄRKEN" if learned[id] else "VERSCHMELZEN") if missing.is_empty() else "GESPERRT")
+		ui_button(Rect2(745,y+19,190,43),button_label,enabled)
 
 func click_fusion(mouse:Vector2) -> void:
 	for i in FUSIONS.size():
-		if Rect2(745,223+i*118,190,45).has_point(mouse):
-			var f:Dictionary=FUSIONS[i]
-			if fusion_missing_sources(f).is_empty() and can_fuse(f):
-				var offer_index:=available_fusions().find(f)
-				if offer_index>=0:buy_fusion(offer_index)
-			return
+		var f:Dictionary=FUSIONS[i]
+		var y:=185+i*91
+		if not Rect2(745,y+19,190,43).has_point(mouse):continue
+		var offer_index:=fusion_offer_index(int(f["id"]))
+		if offer_index>=0:buy_fusion(offer_index)
+		return
 
 func draw_skill_star(center: Vector2, tint: Color, lit: bool) -> void:
 	if lit: draw_rect(Rect2(center - Vector2(7, 7), Vector2(14, 14)), Color(tint, 0.2))
