@@ -21,7 +21,12 @@ func run():
 	assert(float(g.enemies[0]["hp"])<hp_before,"Magier-Kampfskill verursacht keinen Schaden")
 	g.enemies.clear()
 	g.reset_class_skills();g.level=40;g.skill_points=30;g.gold=20000
+	assert(g.FUSIONS.size()==4)
+	assert(g.fusion_missing_sources(g.FUSIONS[0]).size()==2)
 	assert(g.buy_skill(16));assert(g.buy_skill(20));assert(g.buy_skill(17));assert(g.buy_skill(18))
+	assert(g.fusion_missing_sources(g.FUSIONS[3]).is_empty())
+	assert(g.fusion_offer_index(43)>=0)
+	assert(g.fusion_missing_sources(g.FUSIONS[0])==["Wirbelhieb"])
 	var offers:Array=g.available_fusions()
 	assert(not offers.is_empty(),"Gelernte Attacken müssen als Verschmelzungsangebote erscheinen")
 	var f:Dictionary=offers[0]
