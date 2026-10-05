@@ -9076,6 +9076,7 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 		weapon_pos += base_look * (5.0 + 6.0 * sin(progress * PI)) * scale_factor
 	elif attack_now and weapon_family == 1:
 		weapon_pos += Vector2(0, -7.0 * sin(progress * PI)) * scale_factor
+	var hand_side := base_look.rotated(-PI * 0.5)
 	var hand_offset := weapon_hand_offset(base_look)
 	var arm_start := p + Vector2(signf(hand_offset.x)*18.0,-5.0)*scale_factor
 	var grip := weapon_pos + (hand_offset + weapon_look*3.0)*scale_factor
