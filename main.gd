@@ -9041,16 +9041,28 @@ func draw_player() -> void:
 	if poison_blade_timer > 0: draw_arc(player_pos, 49, 0, TAU, 28, Color("addc78", 0.55), 4)
 
 func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in_world: bool = false, preview_class: int = -1) -> void:
-	# v27: Figur selbst kommt aus einem pixelgenauen Sprite-Sheet. Rasse, Geschlecht und Klasse ändern die Silhouette.
+	# Figur und Atelier-Kosmetik teilen denselben Renderpfad. Der Umhang wechselt
+	# abhängig von der Blickrichtung zwischen Hintergrund- und Vordergrund-Layer.
 	var visual_class := class_id if preview_class < 0 else preview_class
 	var use_race := pending_race if panel == "creation" and preview_class >= 0 else hero_race
 	var use_gender := pending_gender if panel == "creation" and preview_class >= 0 else hero_gender
 	var attack_now := swing_timer > 0.0 and preview_class < 0
+	var cloak_look:=look
+	if preview_class<0 and class_id==0 and warrior_jump_timer>0.0:
+		cloak_look=warrior_jump_direction
 	if preview_class < 0:
-		draw_character_cloak_back(p,look,scale_factor,cosmetic_cloak,cosmetic_accent,walking,is_sprinting,dash_timer>0.0 or warrior_jump_timer>0.0,death_timer>0.0,world_time)
+		draw_character_cloak_back(p,cloak_look,scale_factor,cosmetic_cloak,cosmetic_accent,walking,is_sprinting,dash_timer>0.0 or warrior_jump_timer>0.0,death_timer>0.0,world_time)
 	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender,-2,-1.0,0.0,-2,-2,is_sprinting if preview_class<0 else false)
-	if in_world and preview_class < 0 and class_id == 0 and hero_race == 0 and hero_gender == 0 and warrior_jump_timer > 0.0: return
-	if in_world and (death_timer > 0 or (dash_timer > 0 and class_id != 1)): return
+
+	# Authored Sprung-/Dash-Sprites dürfen die Kosmetik nicht mehr verschlucken.
+	var golden_jump:=in_world and preview_class<0 and class_id==0 and hero_race==0 and hero_gender==0 and warrior_jump_timer>0.0
+	var early_visual_return:=in_world and (death_timer>0.0 or (dash_timer>0.0 and class_id!=1))
+	if golden_jump or early_visual_return:
+		if preview_class<0:
+			draw_character_cloak_foreground(p,cloak_look,scale_factor,cosmetic_cloak,cosmetic_accent,walking,is_sprinting,dash_timer>0.0 or warrior_jump_timer>0.0,death_timer>0.0,world_time)
+			draw_character_cosmetics(p,cloak_look,scale_factor,use_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
+		return
+
 	# Arm, Hand und Waffe folgen während des Angriffs derselben Bewegung.
 	var design := equipped_weapon_design() if preview_class < 0 else visual_class * 4
 	var weapon_family := visual_class
@@ -9064,9 +9076,6 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 		weapon_pos += base_look * (5.0 + 6.0 * sin(progress * PI)) * scale_factor
 	elif attack_now and weapon_family == 1:
 		weapon_pos += Vector2(0, -7.0 * sin(progress * PI)) * scale_factor
-	# Feste Waffenhand: Schulter und Griff bleiben während des gesamten Schlages
-	# auf derselben Körperseite. Nur Unterarm und Waffe schwingen.
-	var hand_side := base_look.rotated(-PI * 0.5)
 	var hand_offset := weapon_hand_offset(base_look)
 	var arm_start := p + Vector2(signf(hand_offset.x)*18.0,-5.0)*scale_factor
 	var grip := weapon_pos + (hand_offset + weapon_look*3.0)*scale_factor
@@ -9083,11 +9092,13 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 		var hand_color: Color = [Color('e7b995'),Color('91a56d'),Color('a0bbc0')][clampi(use_race,0,2)]
 		draw_circle(grip,4.3*scale_factor,Color('493d45'))
 		draw_circle(grip,2.8*scale_factor,hand_color)
-	# Facing north: the body masks the rear arm and weapon across the head.
+	# Nach Norden maskiert der Körper die hintere Waffenhand. Danach kommt der
+	# Umhang als physisch vorderster Rücken-Layer.
 	if base_look == Vector2.UP:
 		draw_character_sprite(p,visual_class,walking,look,scale_factor,attack_now,use_race,use_gender,-2,-1.0,0.0,-2,-2,is_sprinting if preview_class<0 else false)
 	if preview_class < 0:
-		draw_character_cosmetics(p,look,scale_factor,use_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
+		draw_character_cloak_foreground(p,cloak_look,scale_factor,cosmetic_cloak,cosmetic_accent,walking,is_sprinting,dash_timer>0.0 or warrior_jump_timer>0.0,death_timer>0.0,world_time)
+		draw_character_cosmetics(p,cloak_look,scale_factor,use_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
 
 
 func weapon_attack_look(look: Vector2, family: int, design: int, progress: float) -> Vector2:
@@ -9884,6 +9895,7 @@ func draw_appearance_panel() -> void:
 	var preview_look:=appearance_preview_look()
 	draw_character_cloak_back(Vector2(340,390),preview_look,2.0,cosmetic_cloak,cosmetic_accent,false,false,false,false,world_time)
 	draw_character_sprite(Vector2(340,390),class_id,false,preview_look,2.0,false,hero_race,hero_gender,-1,-1.0,0.0,-1,0,false)
+	draw_character_cloak_foreground(Vector2(340,390),preview_look,2.0,cosmetic_cloak,cosmetic_accent,false,false,false,false,world_time)
 	draw_character_cosmetics(Vector2(340,390),preview_look,2.0,hero_race,cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent)
 	ui_button(Rect2(205,494,62,36),"<")
 	text_at(Vector2(274,518),appearance_preview_label(),13,Color("ffe4b7"),HORIZONTAL_ALIGNMENT_CENTER,132)
@@ -10016,35 +10028,62 @@ func cloak_local_points(motion:Dictionary)->PackedVector2Array:
 		Vector2(neck_half,top_y)
 	])
 
-func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0)->void:
-	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
-	if not bool(motion.get("visible",false)):return
-	var accent:=cosmetic_accent_color(accent_index)
+func cloak_layer_mode(look:Vector2)->String:
+	var raw:=look.normalized() if look.length()>0.01 else Vector2.DOWN
+	match cardinal_direction_index(raw):
+		3:return "foreground" # Rücken: Stoff liegt zwischen Kamera und Rücken.
+		1,2:return "side"
+		_:return "background"
+
+func draw_character_cloak_shape(p:Vector2,scale_factor:float,motion:Dictionary,accent:Color)->void:
 	var local_points:=cloak_local_points(motion)
 	var points:=PackedVector2Array()
 	for point in local_points:points.append(p+point*scale_factor)
-	PixelStyle32.polygon(self,points,accent.darkened(0.24))
-	var neck_half:=float(motion["neck_half"])
+	PixelStyle32.polygon(self,points,accent.darkened(0.18))
 	var trail:Vector2=motion["trail"]
 	var length:=float(motion["length"])
 	var lift:=float(motion["lift"])
-	# Nackenverschluss bleibt fest; nur Rücken/Saum reagieren auf Bewegung.
-	PixelStyle32.line(self,p+Vector2(-neck_half,-11.0)*scale_factor,p+Vector2(neck_half,-11.0)*scale_factor,accent.lightened(0.28),1.6*scale_factor)
-	# Zwei Stofffalten statt einer dominanten Mittellinie geben dem Mantel eine Rückenform.
-	PixelStyle32.line(self,p+Vector2(-3,-8)*scale_factor,p+(Vector2(-2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.34),1.0*scale_factor)
-	PixelStyle32.line(self,p+Vector2(3,-8)*scale_factor,p+(Vector2(2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.34),1.0*scale_factor)
+	# Zwei dezente Stofffalten, damit die Fläche als Rückenmantel lesbar bleibt.
+	PixelStyle32.line(self,p+Vector2(-3,-8)*scale_factor,p+(Vector2(-2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.32),1.0*scale_factor)
+	PixelStyle32.line(self,p+Vector2(3,-8)*scale_factor,p+(Vector2(2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.32),1.0*scale_factor)
+
+func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0)->void:
+	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
+	if not bool(motion.get("visible",false)):return
+	# In Rückenansicht wird die volle Fläche absichtlich erst nach dem Körper gezeichnet.
+	if cloak_layer_mode(look)=="foreground":return
+	draw_character_cloak_shape(p,scale_factor,motion,cosmetic_accent_color(accent_index))
+
+func draw_character_cloak_foreground(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0)->void:
+	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
+	if not bool(motion.get("visible",false)):return
+	var accent:=cosmetic_accent_color(accent_index)
+	var mode:=cloak_layer_mode(look)
+	if mode=="foreground":
+		draw_character_cloak_shape(p,scale_factor,motion,accent)
+	elif mode=="side":
+		# Seitenansicht: nur die körpernahe Kante liegt vor Arm/Rüstung.
+		var direction_index:=int(motion["direction_index"])
+		var side_sign:float=1.0 if direction_index==1 else -1.0
+		var shoulder:=float(motion["shoulder_half"])
+		var hem:=float(motion["hem_half"])
+		var length:=float(motion["length"])-float(motion["lift"])
+		var trail:Vector2=motion["trail"]
+		var edge:=PackedVector2Array([
+			p+Vector2(side_sign*(shoulder-2.0),-5.0)*scale_factor,
+			p+Vector2(side_sign*(shoulder+2.0),0.0)*scale_factor,
+			p+(Vector2(side_sign*hem,length)+trail)*scale_factor,
+			p+(Vector2(side_sign*(hem-4.0),length-2.0)+trail*0.8)*scale_factor
+		])
+		PixelStyle32.polygon(self,edge,accent.darkened(0.12))
+	# Halsverschluss ist in jeder Richtung sichtbar und bleibt fest am Körper.
+	var collar_y:=-12.0 if int(motion["direction_index"])==3 else -11.0
+	var collar_half:=float(motion["neck_half"])+1.2
+	PixelStyle32.line(self,p+Vector2(-collar_half,collar_y)*scale_factor,p+Vector2(collar_half,collar_y)*scale_factor,accent.lightened(0.30),2.0*scale_factor)
+	PixelStyle32.circle(self,p+Vector2(0,collar_y)*scale_factor,1.8*scale_factor,accent.lightened(0.46))
 
 func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int,hair:int,cloak:int,jewelry:int,accent_index:int)->void:
 	var accent:=cosmetic_accent_color(accent_index)
-	# Sichtbarer Halsverschluss liegt vor dem Körper, Stofffläche bleibt dahinter.
-	if cloak>=0:
-		var raw_look:=look.normalized() if look.length()>0.01 else Vector2.DOWN
-		var direction_index:=cardinal_direction_index(raw_look)
-		var collar_y:=-11.0
-		var collar_half:=5.5+clampi(cloak,0,3)*0.8
-		if direction_index==3:collar_y=-12.0
-		PixelStyle32.line(self,p+Vector2(-collar_half,collar_y)*scale_factor,p+Vector2(collar_half,collar_y)*scale_factor,accent.lightened(0.24),1.8*scale_factor)
-		PixelStyle32.circle(self,p+Vector2(0,collar_y)*scale_factor,1.6*scale_factor,accent.lightened(0.42))
 	if hair>0:
 		if race==2:
 			for side in [-1.0,1.0]:
