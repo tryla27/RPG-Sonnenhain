@@ -71,6 +71,7 @@ func run():
 	g.inventory.append(core)
 	var core_points_before:=g.skill_points
 	assert(not g.learned[18] and g.item_skill_unlock_id(core)==18)
+	assert(g.inventory_item_usable(core), "Arkankern-Skillitems müssen im Inventar einen aktiven BENUTZEN-Button haben")
 	g.use_item(0)
 	assert(g.learned[18] and int(g.skill_levels[18])==1)
 	assert(g.inventory.is_empty() and g.skill_points==core_points_before)

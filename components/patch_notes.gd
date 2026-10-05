@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 05.10.2026"
 const NOTES=[
+["Skill-Items · BENUTZEN", "Arkankerne und andere Gegenstände mit Fähigkeitsfreischaltung besitzen im Inventar jetzt wieder einen aktiven BENUTZEN-Button und können ihre hinterlegte Fähigkeit lernen."],
 ["Atelier · Umhänge sichtbar", "Alle vier Umhangvarianten werden jetzt sichtbar gerendert. Der Umhang liegt hinter der Figur, besitzt einen sichtbaren Halsverschluss und Fennas Vorschau lässt sich nach links und rechts drehen."],
 ["Atelier · Umhänge & Farben", "Umhänge sitzen jetzt am Nacken hinter der Figur und reagieren auf Idle, Laufen, Sprint/Dash und Blickrichtung. Fennas Farbakzent bietet 20 Farbtöne für Frisur, Umhang und Schmuck."],
 ["Krieger · Sprunganimation LIVE", "Der männliche Menschen-Krieger der Morgenwache besitzt beim Ausweichen und beim Sturmsprung jetzt acht Blickrichtungen mit jeweils acht eigenen Bewegungsphasen."],
