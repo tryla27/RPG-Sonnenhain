@@ -174,6 +174,10 @@ func run():
 			max_abs_x=maxf(max_abs_x,absf(point.x))
 		assert(max_y<=31.0, "Umhang darf im Stand nicht unter die Füße ragen")
 		assert(max_abs_x<=24.0, "Umhang darf nicht rockartig zu breit werden")
+	assert(g.cloak_layer_mode(Vector2.DOWN)=="background")
+	assert(g.cloak_layer_mode(Vector2.UP)=="foreground")
+	assert(g.cloak_layer_mode(Vector2.LEFT)=="side")
+	assert(g.cloak_layer_mode(Vector2.RIGHT)=="side")
 	assert(g.appearance_preview_look()==Vector2.DOWN)
 	g.appearance_preview_dir=2
 	assert(g.appearance_preview_look()==Vector2.UP and g.appearance_preview_label()=="HINTEN")
