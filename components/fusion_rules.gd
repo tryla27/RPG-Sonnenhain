@@ -57,6 +57,55 @@ static func is_fusible(id:int)->bool:
 static func normalized_key(a:int,b:int)->String:
 	return "%d:%d" % [mini(a,b),maxi(a,b)]
 
+# Pair IDs remain stable when additional spells are appended. Existing recipes
+# retain their save IDs (40–43); generated outputs never become ingredients.
+static func output_id(a:int,b:int)->int:
+	var low:=mini(a,b)
+	var high:=maxi(a,b)
+	# Reserve 0–999 for authored spells so new source IDs cannot collide with outputs.
+	return 1000+int(high*(high-1)/2)+low
+
+static func registry_capacity()->int:
+	var capacity:=44
+	for a in META:
+		for b in META:
+			if int(a)<int(b):capacity=maxi(capacity,output_id(int(a),int(b))+1)
+	return capacity
+
+static func catalog(abilities:Array,existing:Array)->Array:
+	var recipes:Array=[]
+	var known:Dictionary={}
+	for recipe in existing:
+		known[normalized_key(int(recipe["a"]),int(recipe["b"]))]=recipe
+	for a in abilities.size():
+		if not is_fusible(a):continue
+		for b in range(a+1,abilities.size()):
+			var template:=template_for_pair(a,b)
+			if template.is_empty():continue
+			var key:=normalized_key(a,b)
+			var recipe:Dictionary=known[key].duplicate(true) if known.has(key) else {
+				"id":output_id(a,b),"a":a,"b":b,"max_rank":4,
+				"gold":600+50*maxi(int(abilities[a]["req"]),int(abilities[b]["req"]))}
+			recipe["template"]=template
+			recipe["execution"]="CARRIER_IMPACT" if known.has(key) else "COMPOSITE_CAST"
+			recipes.append(recipe)
+	return recipes
+
+static func abilities_with_fusions(base:Array,recipes:Array)->Array:
+	var result:Array=base.duplicate(true)
+	for recipe in recipes:
+		var id:=int(recipe["id"])
+		if id<base.size():continue
+		while result.size()<=id:result.append({"name":"", "cd":0.0,"cost":0,"req":999999})
+		var a:Dictionary=base[int(recipe["a"])]
+		var b:Dictionary=base[int(recipe["b"])]
+		result[id]={"name":"%s · %s" % [a["name"],b["name"]],"kind":id,
+			"desc":"Vereint beide Ausgangsspells in einem gemeinsamen Einsatz.",
+			"cd":maxf(float(a["cd"]),float(b["cd"]))*1.30,
+			"cost":ceili((float(a["cost"])+float(b["cost"]))*0.675),
+			"req":maxi(int(a["req"]),int(b["req"]))}
+	return result
+
 static func metadata(id:int)->Dictionary:
 	var raw:Variant=META.get(id,{})
 	return raw.duplicate(true) if raw is Dictionary else {}

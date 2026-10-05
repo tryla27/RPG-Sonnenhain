@@ -38,14 +38,15 @@ static func window_tile(c:CanvasItem,origin:Vector2,x:int,y:int,lit:bool=false)-
 	c.draw_rect(Rect2(p+Vector2(10,16),Vector2(12,2)),TIMBER)
 
 static func door_tile(c:CanvasItem,origin:Vector2,x:int,y:int,double_door:bool=false)->void:
-	var p:=origin+Vector2(x,y)*TILE
+	# 72 px = 2.25 m at the hero's scale; the former 31 px door was too short.
+	var p:=origin+Vector2(x,y)*TILE+Vector2(0,-24)
 	var width:=58.0 if double_door else 26.0
 	var left:=p.x-13.0 if double_door else p.x+3.0
-	c.draw_rect(Rect2(Vector2(left,p.y+1),Vector2(width,31)),TIMBER)
-	c.draw_rect(Rect2(Vector2(left+3,p.y+4),Vector2(width-6,28)),DOOR)
+	c.draw_rect(Rect2(Vector2(left,p.y+1),Vector2(width,72)),TIMBER)
+	c.draw_rect(Rect2(Vector2(left+3,p.y+4),Vector2(width-6,66)),DOOR)
 	if double_door:
-		c.draw_rect(Rect2(Vector2(p.x+15,p.y+4),Vector2(3,28)),TIMBER)
-	c.draw_circle(Vector2(left+width-7,p.y+17),2.5,GOLD)
+		c.draw_rect(Rect2(Vector2(p.x+15,p.y+4),Vector2(3,66)),TIMBER)
+	c.draw_circle(Vector2(left+width-7,p.y+42),2.5,GOLD)
 
 static func roof_row(c:CanvasItem,origin:Vector2,y:int,x0:int,x1:int,accent:Color)->void:
 	for x in range(x0,x1):

@@ -136,7 +136,7 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 		for item in data["inventory"]:
 			if int(item["uid"])==int(data["equipped_head_uid"]) and not preload("res://components/headgear_rules.gd").allowed(item,int(data["class_id"])):return false
 	for field in ["learned","skill_levels","slots","quests","event_states","event_progress","opened_chests","chest_respawn_until","dungeon_chests_opened","dungeon_chest_respawn_until","bosses_defeated","waystone_unlocked","discovered_regions","processed_server_transactions","recent_players","village_gates","arena_leaderboard"]:
-		if not data.get(field,[]) is Array or data.get(field,[]).size() > (256 if field == "processed_server_transactions" else 100): return false
+		if not data.get(field,[]) is Array or data.get(field,[]).size() > (maxi(1024,preload("res://components/fusion_rules.gd").registry_capacity()) if field in ["learned","skill_levels"] else (256 if field == "processed_server_transactions" else 100)): return false
 	var fog:Variant=data.get("world_fog",[])
 	if not fog is Array or fog.size()>512:return false
 	for fog_byte in fog:
@@ -155,12 +155,31 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 			if not learned[slot_id] is bool or not bool(learned[slot_id]):return false
 			if used_slots.has(slot_id):return false
 			used_slots[slot_id]=true
-	# Die drei bisher definierten Fusionen setzen ihre beiden Ausgangsskills voraus.
-	for fusion in [[40,0,16],[41,1,36],[42,18,37]]:
-		var fusion_id:int=fusion[0]
-		if fusion_id < learned.size() and learned[fusion_id] is bool and bool(learned[fusion_id]):
-			if fusion[1] >= learned.size() or fusion[2] >= learned.size():return false
-			if not bool(learned[fusion[1]]) or not bool(learned[fusion[2]]):return false
+	# Outputs are checked against the normalized registry, not sacrificed source flags.
+	var rules=preload("res://components/fusion_rules.gd")
+	var progress:Variant=data.get("learned_fusions",{})
+	if not progress is Dictionary or progress.size()>int(rules.META.size()*(rules.META.size()-1)/2):return false
+	for key in progress:
+		var pair:=str(key).split(":")
+		if pair.size()!=2 or not pair[0].is_valid_int() or not pair[1].is_valid_int():return false
+		var a:=int(pair[0]);var b:=int(pair[1])
+		if a>=b or not rules.is_fusible(a) or not rules.is_fusible(b):return false
+		var expected:int={"0:16":40,"1:36":41,"18:37":42,"17:18":43}.get(str(key),rules.output_id(a,b))
+		var entry:Variant=progress[key]
+		if not entry is Dictionary or int(entry.get("fusion_id",-1))!=expected or int(entry.get("rank",0))<1 or int(entry.get("rank",0))>4:return false
+	var output_sources:Dictionary={40:[0,16],41:[1,36],42:[18,37],43:[17,18]}
+	for a in rules.META:
+		for b in rules.META:
+			if int(a)<int(b):output_sources[rules.output_id(int(a),int(b))]=[int(a),int(b)]
+	for id in learned.size():
+		if not learned[id] is bool:return false
+		if not learned[id] or id<40 or rules.is_fusible(id):continue
+		if not output_sources.has(id):return false
+		var pair:Array=output_sources[id]
+		var key:String=rules.normalized_key(int(pair[0]),int(pair[1]))
+		if progress.has(key) and int(progress[key].get("fusion_id",-1))==id:continue
+		# Old four-recipe saves are still accepted before their migration.
+		if id>=44 or int(pair[1])>=learned.size() or not bool(learned[int(pair[0])]) or not bool(learned[int(pair[1])]):return false
 	# Klassenboni kommen aus den einmaligen Boss-Relikten auf Map 06/07/08.
 	# Der Save darf deshalb nicht mehr an eine Quest gebunden sein. Die
 	# klassenspezifische Konsistenz bleibt serverseitig strikt.

@@ -83,7 +83,7 @@ static func prepare(_distance:Callable)->void:
 	noise.fractal_octaves=2
 	var routes:Array=[
 		PackedVector2Array([Vector2(832,960),Vector2(1120,960),Vector2(1456,960),Vector2(1664,1024),EAST_EXIT]),
-		PackedVector2Array([Vector2(832,1184),Vector2(864,1568),Vector2(864,1984),Vector2(896,2304),SOUTH_EXIT]),
+		PackedVector2Array([Vector2(832,1184),Vector2(656,1456),Vector2(656,2440),Vector2(875,2440),SOUTH_EXIT]),
 		PackedVector2Array([Vector2(384,1024),Vector2(832,1024),Vector2(1280,1024)]),
 		PackedVector2Array([Vector2(832,608),Vector2(832,1024),Vector2(832,1440)])
 	]
@@ -91,9 +91,7 @@ static func prepare(_distance:Callable)->void:
 		if shop.has("shared_with"):continue
 		var home:Vector2=shop["house"]
 		var kind:String=str(shop["kind"])
-		var door:=home+Vector2(96,180)
-		if kind=="borin":door=home+Vector2(128,240)
-		elif kind=="arena":door=home+Vector2(192,260)
+		var door:=preload("res://components/village_buildings.gd").door(home,kind)
 		var entry:=Vector2(clampf(door.x,416,1248),clampf(door.y,640,1408))
 		if door.y>1500:entry=Vector2(864,door.y)
 		elif door.x<480:entry=Vector2(416,clampf(door.y,704,2208))

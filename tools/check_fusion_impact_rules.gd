@@ -20,7 +20,7 @@ func run()->void:
 	g.reset_class_skills()
 
 	# Jede feste Fusion muss eine eindeutige Ortsregel besitzen.
-	for fusion in g.FUSIONS:
+	for fusion in g.BUILTIN_FUSIONS:
 		var id:=int(fusion["id"])
 		assert(not g.fusion_impact_profile(id).is_empty())
 	assert(g.fusion_spawn_rule(40)=="DAMAGE_IMPACT_POSITION")

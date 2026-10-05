@@ -1,6 +1,10 @@
 extends RefCounted
 const VERSION="PATCH 05.10.2026"
 const NOTES=[
+["Dorf · Große Referenzgebäude", "Schmiede, Heilkapelle und Steinrose verwenden die neuen transparenten Referenzgrafiken. Die Arena ist deutlich größer und besitzt einen neuen Kampfplatz sowie eine größere Eingangshalle. Türen, Laufwege und Kollisionen sind auf den Heldenmaßstab abgestimmt."],
+["Kristall · 528 Fusionen", "Alle eindeutigen Paare der 33 geeigneten Spells sind am Kristall sichtbar. Herstellbare Fusionen leuchten; gesperrte Rezepte nennen fehlende Spells, Level und Gold. Beide Quellen werden geopfert, die Fusion wird sofort ausgerüstet."],
+["Atelier · Kopfschmuck und Abzeichen", "Roboter erhalten zehn unterschiedliche Kopfaufsätze. Zehn Brustabzeichen ersetzen den bisherigen Schmuck. Die Kosmetik wird mitgespeichert und im Mehrspieler synchronisiert; Umhänge bleiben hinter der Blickrichtung und folgen auch Rollen und Fallen."],
+["Dorf · Brett und Laternen", "Das Schwarze Brett besitzt jetzt Holzmaserung und mehrere Aushänge. Alle Dorflaternen nutzen ein einheitliches warmes Licht, das nachts stärker sichtbar wird."],
 ["Atelier · Umhang-Layer", "Krieger-Umhänge werden jetzt richtungsabhängig gerendert: vorne hinter dem Körper, hinten über dem Rücken und seitlich mit sichtbarer Stoffkante. Der alte fest eingebaute braune Krieger-Umhang wurde entfernt; Kosmetik bleibt auch beim Sprung sichtbar."],
 ["Fusionen · Opferprinzip", "Beim Verschmelzen werden beide Ausgangsspells samt ihrer investierten Skillstufen dauerhaft geopfert. Der neue Fusionsspell wird automatisch in den frühesten möglichen aktiven Slot gelegt und ist sofort benutzbar."],
 ["Fusionen · Übersicht", "Der Verschmelzungskristall zeigt jetzt alle vier bekannten Fusionen dauerhaft an und nennt bei gesperrten Rezepten exakt die noch fehlenden Ausgangsattacken."],

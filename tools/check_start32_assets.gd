@@ -12,7 +12,7 @@ func _initialize()->void:
 		var im=sprite.get_image()
 		assert(im.get_pixel(0,0).a<0.01,"Non-transparent sprite background")
 		assert(im.get_pixel(1535,1023).a<0.01,"Non-transparent sprite corner")
-	assert(not g.is_blocked(g.TAVERN_HOUSE+Vector2(126,180),g.TAVERN_HOUSE+Vector2(126,205)))
+	assert(not g.is_blocked(g.village_house_door(g.village_house("Alma")),g.village_house_door(g.village_house("Alma"))+Vector2(0,25)))
 	print("FAITHFUL_START32_OK native32px TileSet, all material sources, 4592 cells, transparent sprite corners, tavern approach")
 	g.free()
 	quit()

@@ -92,8 +92,9 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	var scale := Vector2.ONE*s*squash
 	var pivot := p+offset+Vector2(0,-10+(2 if running and role==0 else (1 if running else 0)))*s
 	if death >= 0: pivot.y += smoothstep(0.0,0.7,death)*19.0*s
-	var origin := pivot-(Vector2(28,44)*scale).rotated(rotation)
-	c.draw_set_transform(origin,rotation,scale)
+	var body_transform:=Transform2D(rotation,scale,0.0,Vector2.ZERO)
+	body_transform.origin=pivot-body_transform*Vector2(28,44)
+	c.draw_set_transform_matrix(body_transform)
 	# Klassen-Hintergrunddetails. Der Krieger besitzt keinen fest eingebauten
 	# braunen Umhang mehr; sein Umhang kommt ausschließlich aus dem Atelier-Layer
 	# in main.gd, damit Farbe, Form, Blickrichtung und Sprung konsistent bleiben.

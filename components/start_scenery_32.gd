@@ -22,13 +22,13 @@ static func house(c:CanvasItem,p:Vector2,kind:int=0)->void:
 	VillageHouseTiles32.paint(c,p,mapped)
 
 static func themed_house(c:CanvasItem,p:Vector2,kind:String)->void:
-	VillageHouseTiles32.paint(c,p,kind)
+	if not preload("res://components/village_buildings.gd").paint(c,p,kind):VillageHouseTiles32.paint(c,p,kind)
 
 static func borin_house(c:CanvasItem,p:Vector2)->void:
 	VillageHouseTiles32.paint(c,p,"borin")
 
 static func arena_building(c:CanvasItem,p:Vector2)->void:
-	VillageHouseTiles32.paint(c,p,"arena")
+	preload("res://components/village_buildings.gd").paint(c,p,"arena")
 
 static func tree(c:CanvasItem,p:Vector2,_key:int)->void:
 	init_art()
@@ -81,21 +81,11 @@ static func barrel(c:CanvasItem,p:Vector2)->void:
 	c.draw_rect(Rect2(p+Vector2(-18,-28),Vector2(36,42)),Color("8a6548"))
 	for y in [-25,-5,11]: c.draw_rect(Rect2(p+Vector2(-20,y),Vector2(40,4)),Color("4d4540"))
 static func lamp(c:CanvasItem,p:Vector2)->void:
-	init_art()
-	if props != null:
-		sprite(c,props,Rect2(160,460,220,520),Rect2(p+Vector2(-20,-88),Vector2(40,100)))
-		return
-	c.draw_rect(Rect2(p+Vector2(-3,-70),Vector2(6,78)),Color("45413c"))
-	c.draw_rect(Rect2(p+Vector2(-11,-72),Vector2(22,5)),Color("6d6250"))
-	c.draw_rect(Rect2(p+Vector2(-8,-65),Vector2(16,18)),Color("f2c96f"))
+	preload("res://components/village_fixtures.gd").lamp(c,p)
+
 static func board(c:CanvasItem,p:Vector2)->void:
-	init_art()
-	if props != null:
-		sprite(c,props,Rect2(445,530,425,440),Rect2(p+Vector2(-48,-94),Vector2(96,100)))
-		return
-	c.draw_rect(Rect2(p+Vector2(-4,-55),Vector2(8,70)),Color("574737"))
-	c.draw_rect(Rect2(p+Vector2(-42,-72),Vector2(84,44)),Color("9a784f"))
-	c.draw_rect(Rect2(p+Vector2(-38,-68),Vector2(76,36)),Color("c39b63"))
+	preload("res://components/village_fixtures.gd").board(c,p)
+
 static func cart(c:CanvasItem,p:Vector2,kind:String)->void:
 	init_art()
 	if props != null:

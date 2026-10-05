@@ -7,11 +7,11 @@ const SHOPS := [
 	{"name":"Liora","house":Vector2(1280,1088),"kind":"elder","sign":"RATSHALLE","cart":Vector2(1498,1376),"shared_with":"Mira"},
 	{"name":"Fenna","house":Vector2(160,640),"kind":"style","sign":"ATELIER","cart":Vector2(288,896)},
 	{"name":"Elara","house":Vector2(160,1120),"kind":"healer","sign":"HEILHAUS","cart":Vector2(288,1376)},
-	{"name":"Alma","house":Vector2(160,1568),"kind":"innkeeper","sign":"STEINROSE","cart":Vector2(288,1824)},
+	{"name":"Alma","house":Vector2(160,1888),"kind":"innkeeper","sign":"STEINROSE","cart":Vector2(288,1824)},
 	{"name":"Mira","house":Vector2(1280,1088),"kind":"elder","sign":"RAT & QUESTS","cart":Vector2(1498,1376)},
 	{"name":"Pip","house":Vector2(1248,320),"kind":"apprentice","sign":"GEHILFE","cart":Vector2(1440,608),"shared_with":"Borin"},
-	{"name":"Torvald","house":Vector2(160,2048),"kind":"smith","sign":"SCHMIEDE","cart":Vector2(384,2304)},
-	{"name":"Arven","house":Vector2(1120,1904),"kind":"arena","sign":"ARENA","cart":Vector2(1438,2224),"large":true},
+	{"name":"Torvald","house":Vector2(160,160),"kind":"smith","sign":"SCHMIEDE","cart":Vector2(584,580)},
+	{"name":"Arven","house":Vector2(672,1440),"kind":"arena","sign":"ARENA","cart":Vector2(1480,2500),"large":true},
 	{"name":"Borin","house":Vector2(1248,320),"kind":"borin","sign":"BORINS SKILLHAUS","cart":Vector2(1440,608)}
 ]
 static func plaza(c: CanvasItem) -> void:

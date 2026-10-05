@@ -28,11 +28,16 @@ static func kind_for_id(id:int)->String:
 static func role_for_id(id:int)->String:
 	return ROLES[id] if id>=0 and id<ROLES.size() else ""
 
+static func exit_offset(id:int)->Vector2:
+	return Vector2(0,340) if id==3 else Vector2(0,210)
+
 static func healing_field_pos(center:Vector2,id:int)->Vector2:
 	return center+Vector2(0,-34) if id==ELARA_ID else Vector2(-100000,-100000)
 
 static func blocked(pos:Vector2,center:Vector2,id:int=-1)->bool:
 	var local:=pos-center
+	if id==3:
+		return absf(local.x)>650.0 or absf(local.y)>366.0 or local.y< -270.0 or (absf(local.x)>532.0 and absf(local.y)<260.0)
 	if absf(local.x)>438.0 or absf(local.y)>246.0:return true
 	if Rect2(center+Vector2(-438,-246),Vector2(876,70)).has_point(pos):return true
 	if id==ELARA_ID:
@@ -56,6 +61,9 @@ static func blocked(pos:Vector2,center:Vector2,id:int=-1)->bool:
 	return false
 
 static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:bool,interact_label:String)->void:
+	if id==3:
+		preload("res://components/arena_interior.gd").lobby(c,center,font,"AKTION" if touch_enabled else interact_label)
+		return
 	var kind:=kind_for_id(id)
 	var accent:Color={
 		"inn":Color("b56f52"),"elder":Color("8d78a9"),"research":Color("668da0"),

@@ -92,6 +92,14 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Village navigation and spell fusion catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in check_village_fusion_upgrade check_fusion_identity check_fusion_impact_rules check_map_logic check_map0_transitions; do
+            timeout 120 "$GODOT_BIN" --headless --path . --script "tools/$script.gd"
+          done
+
       - name: Inspect live server release
         env:
           VSERVER_HOST: ${{ secrets.VSERVER_HOST }}

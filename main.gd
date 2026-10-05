@@ -76,7 +76,7 @@ const Wagon32 = preload("res://components/wagon_32.gd")
 const StartTileMap32 = preload("res://components/start_tilemap_32.gd")
 var start_tilemap_32_attached := false
 var live_reconnect_timer := 0.0
-const REFERENCE_TREES := [Vector2(80,650),Vector2(860,360),Vector2(720,560),Vector2(80,1580),Vector2(1640,1540),Vector2(920,1810),Vector2(760,2160),Vector2(1580,2320),Vector2(430,2320)]
+const REFERENCE_TREES := [Vector2(80,650),Vector2(860,360),Vector2(720,560),Vector2(80,1580),Vector2(1640,1540),Vector2(920,1810),Vector2(760,2160),Vector2(1580,2320),Vector2(80,2440)]
 const REFERENCE_WELL := Vector2(1184, 832)
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
@@ -139,7 +139,11 @@ const ENEMY_TYPES := [
 	{"name":"Himmelsfalter", "region":12, "hp":390, "damage":60, "speed":148, "xp":145, "color":Color("d9c6e8")},
 	{"name":"Sternenwächterin", "region":12, "hp":560, "damage":69, "speed":85, "xp":180, "color":Color("e4d4b5")}
 ]
-const ABILITIES := [
+const VillageBuildings=preload("res://components/village_buildings.gd")
+const VillageFixtures=preload("res://components/village_fixtures.gd")
+const CharacterAdornments=preload("res://components/character_adornments.gd")
+const ArenaInterior=preload("res://components/arena_interior.gd")
+const BASE_ABILITIES := [
 	{"name":"Wirbelhieb", "desc":"Kreisender Nahkampfschlag", "cost":28, "cd":6.0, "req":3, "kind":0},
 	{"name":"Schildwall", "desc":"Schutz für wenige Sekunden", "cost":24, "cd":12.0, "req":8, "kind":1},
 	{"name":"Sturmsprung", "desc":"Sprung und Betäubung", "cost":30, "cd":9.0, "req":12, "kind":2},
@@ -191,7 +195,11 @@ const CLASS_ULTIMATES := [15, 24, 33]
 const MAX_SKILL_RANK := 4
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
-const FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200,"max_rank":4},{"id":41,"a":1,"b":36,"gold":2200,"max_rank":4},{"id":42,"a":18,"b":37,"gold":4200,"max_rank":4},{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}]
+const BUILTIN_FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200,"max_rank":4},{"id":41,"a":1,"b":36,"gold":2200,"max_rank":4},{"id":42,"a":18,"b":37,"gold":4200,"max_rank":4},{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}]
+var FUSIONS:Array=FusionRules.catalog(BASE_ABILITIES,BUILTIN_FUSIONS)
+var ABILITIES:Array=FusionRules.abilities_with_fusions(BASE_ABILITIES,FUSIONS)
+var fusion_page:=0
+
 const COSMETIC_ACCENT_HEX := ["be5368","557fc0","5f9b68","b7894f","8d62aa","55a5a5","cf6f59","c94f7e","6a6fd1","4e9ad6","4ca6a0","5caf7a","86b84d","c2b14a","d48c4f","a86b4e","8c6a58","9a7acb","c36db5","d7d7d7"]
 # Zentrale Regel: Damage-Fusionen lösen ihren Sekundäreffekt am tatsächlichen Trefferpunkt aus.
 # Reine Schutz-/Buff-Fusionen bleiben als ON_CAST-Ausnahme am Spieler.
@@ -250,11 +258,11 @@ const NPCS := [
 	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1376, 1268), "color":Color("a77ccb"), "kind":"quest"},
 	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1376, 560), "color":Color("6783bd"), "kind":"quest"},
 	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1376, 1268), "color":Color("6bbba4"), "kind":"quest"},
-	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(256, 2228), "color":Color("ab6e60"), "kind":"smith"},
+	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(374, 577), "color":Color("ab6e60"), "kind":"smith"},
 	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(256, 820), "color":Color("c080aa"), "kind":"stylist"},
 	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1376, 560), "color":Color("9f8bcc"), "kind":"apprentice"},
 	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(256, 1300), "color":Color("e2bc91"), "kind":"healer_alchemy"},
-	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1312, 2164), "color":Color("a48cbd"), "kind":"arena"}
+	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1209,2460), "color":Color("a48cbd"), "kind":"arena"}
 ]
 const SHOPS := {
 	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
@@ -265,12 +273,12 @@ const WAYSTONES := [Vector2(825, 915), Vector2(3300, 1900), Vector2(3200, 6200),
 const RESCUE_POS := Vector2(3150, 2350)
 const RESCUE_GOAL := 20
 const ARENA_CENTER := Vector2(8000, 4800)
-const ARENA_RADIUS := 490.0
+const ARENA_RADIUS := 640.0
 const DUNGEON_CENTER := Vector2(8000, 4800)
 const DUNGEON_ENTRANCES := [2, 3, 8]
 const DUNGEON_NAMES := ["Turmgewölbe", "Kristallgruft", "Versunkene Krypta"]
 const DUNGEON_ENEMIES := [[4, 5], [6, 7], [21, 22]]
-const TAVERN_HOUSE := Vector2(160, 1568)
+const TAVERN_HOUSE := Vector2(160, 1888)
 const VILLAGE_REF_ORIGIN := Vector2(0, 550)
 const VILLAGE_REF_RECT := Rect2(0, 550, 1672, 840)
 const VILLAGE_REF_SOLIDS := [Rect2(-40, 548, 1752, 112), Rect2(15, 805, 310, 140), Rect2(305, 1025, 310, 145), Rect2(1295, 1015, 365, 145), Rect2(12, 1012, 95, 95), Rect2(325, 825, 345, 30), Rect2(995, 825, 350, 30), Rect2(890, 870, 105, 45), Rect2(1625, 950, 50, 250)]
@@ -1239,6 +1247,10 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
 		"fusions":sanitize_fusion_rows(state.get("fusions",[])),
 		"skill_ranks":sanitize_skill_rank_rows(state.get("skill_ranks",[])),
+		"cosmetic_hair":clampi(int(state.get("cosmetic_hair",0)),0,10 if int(state.get("race",0))==2 else 3),
+		"cosmetic_cloak":clampi(int(state.get("cosmetic_cloak",0)),0,3),
+		"cosmetic_jewelry":clampi(int(state.get("cosmetic_jewelry",0)),0,10),
+		"cosmetic_accent":clampi(int(state.get("cosmetic_accent",0)),0,COSMETIC_ACCENT_HEX.size()-1),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -1869,6 +1881,7 @@ func _process(delta: float) -> void:
 	# Der Arenarand liegt außerhalb eines einzelnen Bildschirms; die Kamera begleitet den Helden.
 	var camera_focus: Vector2 = ARENA_CENTER + (player_pos - ARENA_CENTER) * 0.88 if arena_mode != "" else player_pos
 	var target_camera: Vector2 = camera_focus - VIEW * 0.5 if arena_mode != "" else (INTERIOR_CENTER - VIEW * 0.5 if interior_id >= 0 else (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW))
+	if interior_id==3:target_camera=player_pos.clamp(INTERIOR_CENTER-Vector2(96,64),INTERIOR_CENTER+Vector2(96,64))-VIEW*0.5
 	var context := "%s:%d:%d" % [arena_mode,interior_id,dungeon_id]
 	if context != camera_context or camera_smooth.distance_to(target_camera) > 450.0:
 		camera_smooth = target_camera
@@ -2405,12 +2418,7 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 				house_info=candidate
 				break
 		var house_kind:=str(house_info.get("kind","home"))
-		if house_kind=="borin":
-			if Rect2(house+Vector2(12,105),Vector2(232,110)).grow(hero_collision_radius()).has_point(pos):return true
-		elif house_kind=="arena":
-			if Rect2(house+Vector2(8,88),Vector2(368,136)).grow(hero_collision_radius()).has_point(pos):return true
-		elif Rect2(house + Vector2(8, 73), Vector2(176, 75)).grow(hero_collision_radius()).has_point(pos):
-			return true
+		if VillageBuildings.solid(house,house_kind).grow(hero_collision_radius()).has_point(pos):return true
 	for solid in (VILLAGE_REF_SOLIDS if USE_VILLAGE_REFERENCE_BACKGROUND else []):
 		if solid.has_point(pos):
 			return true
@@ -2654,11 +2662,10 @@ func village_house(name:String)->Dictionary:
 	return {}
 
 func village_house_door(house:Dictionary)->Vector2:
-	var p:Vector2=house["house"]
-	match str(house["kind"]):
-		"borin": return p+Vector2(128,240)
-		"arena": return p+Vector2(192,260)
-		_: return p+Vector2(96,180)
+	if house.has("shared_with"):
+		var owner:=village_house(str(house["shared_with"]))
+		if not owner.is_empty():return VillageBuildings.door(owner["house"],str(owner["kind"]))
+	return VillageBuildings.door(house["house"],str(house["kind"]))
 
 func village_resident_is_indoors(name:String)->bool:
 	return not village_house(name).is_empty()
@@ -3624,6 +3631,18 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
+	server_ability_effects(id,origin,dir,remote_class,power,rank,sender)
+
+func server_ability_effects(id:int,origin:Vector2,dir:Vector2,remote_class:int,power:int,rank:int,sender:int)->void:
+	var fusion_definition:=fusion_definition_by_id(id)
+	if id>=BASE_ABILITIES.size():
+		if fusion_definition.is_empty():return
+		for source in [int(fusion_definition["a"]),int(fusion_definition["b"])]:
+			server_ability_effects(source,origin,dir,remote_class,maxi(1,roundi(power*0.725)),rank,sender)
+		return
+	# Support components are applied by the owning client, never converted into attacks.
+	if FusionRules.is_fusible(id) and not bool(FusionRules.metadata(id).get("damage",false)):return
+	var state:Dictionary=remote_players.get(sender,{})
 	if id in [3,7,16,18,20,25,26,28,29,30,34,40,42,43]:
 		for shot in ability_projectiles(id,origin,dir,remote_class,power):
 			shot["owner_peer"]=sender
@@ -3694,6 +3713,17 @@ func use_ability(slot: int) -> void:
 	var cast_dir := facing
 	if uses_server_world():
 		rpc_client_ability.rpc_id(1, id, [cast_pos.x,cast_pos.y], [cast_dir.x,cast_dir.y], power, rank)
+	execute_ability_effects(id,rank,power,cast_pos,cast_dir)
+
+func execute_ability_effects(id:int,rank:int,power:int,cast_pos:Vector2,cast_dir:Vector2)->void:
+	if id>=BASE_ABILITIES.size():
+		var fusion:=fusion_definition_by_id(id)
+		if fusion.is_empty():return
+		var shared_power:=maxi(1,roundi(power*0.725))
+		execute_ability_effects(int(fusion["a"]),rank,shared_power,cast_pos,cast_dir)
+		execute_ability_effects(int(fusion["b"]),rank,shared_power,player_pos,cast_dir)
+		effect(player_pos,ABILITIES[id]["name"],Color("d9c8ff"),0.9)
+		return
 	match id:
 		0:
 			for i in range(enemies.size() - 1, -1, -1):
@@ -4205,7 +4235,7 @@ func enter_village_house(name:String) -> void:
 	interior_return_pos=village_house_door(house)+Vector2(0,48)
 	save_game()
 	interior_id=next_id
-	player_pos=INTERIOR_CENTER+Vector2(0,170)
+	player_pos=INTERIOR_CENTER+VillageInteriors32.exit_offset(interior_id)-Vector2(0,40)
 	enemies.clear()
 	drops.clear()
 	projectiles.clear()
@@ -4961,7 +4991,7 @@ func interact() -> void:
 				return
 	if arena_mode != "": return
 	if interior_id >= 0:
-		if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 215)) < 100:
+		if player_pos.distance_to(INTERIOR_CENTER + VillageInteriors32.exit_offset(interior_id)) < 100:
 			leave_village_house()
 		elif in_elara_healing_field(72.0):
 			hp=max_hp()
@@ -5477,9 +5507,9 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	hero_name = str(data.get("hero_name", "Held"))
 	hero_gender = clampi(int(data.get("hero_gender", 0)), 0, 1)
 	hero_race = clampi(int(data.get("hero_race", 0)), 0, 2)
-	cosmetic_hair=clampi(int(data.get("cosmetic_hair",0)),0,3)
+	cosmetic_hair=clampi(int(data.get("cosmetic_hair",0)),0,10 if hero_race==2 else 3)
 	cosmetic_cloak=clampi(int(data.get("cosmetic_cloak",0)),0,3)
-	cosmetic_jewelry=clampi(int(data.get("cosmetic_jewelry",0)),0,3)
+	cosmetic_jewelry=clampi(int(data.get("cosmetic_jewelry",0)),0,10)
 	cosmetic_accent=clampi(int(data.get("cosmetic_accent",0)),0,COSMETIC_ACCENT_HEX.size()-1)
 	stamina = max_stamina()
 	sprint_blend = 0.0
@@ -6250,6 +6280,7 @@ func skill_choices() -> Array:
 
 func buy_skill(index:int) -> bool:
 	if index < 0 or index >= ABILITIES.size() or index not in all_slot_skills(): return false
+	if not fusion_definition_by_id(index).is_empty():return false
 	if learned[index]: return false
 	if level < int(ABILITIES[index]["req"]): message("%s benötigt Level %d." % [ABILITIES[index]["name"],ABILITIES[index]["req"]]);return false
 	var price:=skill_point_cost(index)
@@ -6262,17 +6293,22 @@ func fusion_key(source_a:int,source_b:int)->String:
 	var high:=maxi(source_a,source_b)
 	return "%d:%d" % [low,high]
 
-func fusion_definition_by_key(key:String)->Dictionary:
+var fusion_ids:Dictionary={}
+var fusion_keys:Dictionary={}
+
+func index_fusions()->void:
+	if not fusion_ids.is_empty():return
 	for fusion in FUSIONS:
-		if fusion_key(int(fusion["a"]),int(fusion["b"]))==key:
-			return fusion
-	return {}
+		fusion_ids[int(fusion["id"])]=fusion
+		fusion_keys[fusion_key(int(fusion["a"]),int(fusion["b"]))]=fusion
+
+func fusion_definition_by_key(key:String)->Dictionary:
+	index_fusions()
+	return fusion_keys.get(key,{})
 
 func fusion_definition_by_id(fusion_id:int)->Dictionary:
-	for fusion in FUSIONS:
-		if int(fusion["id"])==fusion_id:
-			return fusion
-	return {}
+	index_fusions()
+	return fusion_ids.get(fusion_id,{})
 
 func fusion_impact_profile(fusion_id:int)->Dictionary:
 	var raw:Variant=FUSION_IMPACT_PROFILES.get(fusion_id,{})
@@ -6376,10 +6412,14 @@ func apply_fusion_progress_to_skills()->void:
 		var rank:=clampi(int(state.get("rank",1)),1,clampi(int(definition.get("max_rank",4)),1,4))
 		learned[output]=true
 		skill_levels[output]=maxi(int(skill_levels[output]),rank)
-		learned[source_a]=true
-		learned[source_b]=true
-		skill_levels[source_a]=maxi(1,int(skill_levels[source_a]))
-		skill_levels[source_b]=maxi(1,int(skill_levels[source_b]))
+		var sacrificed:=false
+		for entry in fusion_history:
+			if entry is Dictionary and str(entry.get("key",""))==key and entry.has("sacrificed_rank_a"):sacrificed=true
+		if not sacrificed:
+			learned[source_a]=true
+			learned[source_b]=true
+			skill_levels[source_a]=maxi(1,int(skill_levels[source_a]))
+			skill_levels[source_b]=maxi(1,int(skill_levels[source_b]))
 
 func fusion_progress_rows()->Array:
 	var rows:Array=[]
@@ -6436,7 +6476,7 @@ func skill_rank_from_network_state(state:Dictionary,skill_id:int)->int:
 
 func fusion_source_skills()->Array:
 	var out:Array=[]
-	for id in range(0,40):
+	for id in BASE_ABILITIES.size():
 		if id>=learned.size() or not learned[id]:continue
 		if not FusionRules.is_fusible(id):continue
 		# Nur aktiv nutzbare Fähigkeiten anbieten; passive/Ultimates/reine Bewegung/Fusionsoutputs sind ausgeschlossen.
@@ -6466,7 +6506,7 @@ func can_fuse(fusion:Dictionary) -> bool:
 	ensure_skill_state_size()
 	var a:=int(fusion["a"]);var b:=int(fusion["b"]);var id:=int(fusion["id"])
 	var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
-	return a!=b and learned[a] and learned[b] and int(skill_levels[id])<max_rank and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
+	return a!=b and learned[a] and learned[b] and int(skill_levels[id])<max_rank and level >= maxi(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
 
 func fusion_target_slot(source_a:int,source_b:int,fusion_id:int=-1)->int:
 	# Bevorzugt den frühesten Slot eines geopferten Spells bzw. einer schon vorhandenen Fusion.
@@ -7213,6 +7253,8 @@ func draw_day_night_overlay() -> void:
 		draw_rect(Rect2(camera_pos, VIEW), Color("172644", 0.22 * night))
 	if dusk > 0.01:
 		draw_rect(Rect2(camera_pos, VIEW), Color("df895b", 0.055 * dusk))
+	for lamp in VillageFixtures.LAMPS:
+		if visible_world(lamp,130):VillageFixtures.glow(self,lamp,night,world_time)
 
 func draw_online_list() -> void:
 	if not online_list_open: return
@@ -7289,7 +7331,7 @@ func draw_rescue_alert() -> void:
 		text_at(Vector2(351, 190), "+160 XP · +80 Gold · seltene Klassenwaffe", 15, Color("f6e0a0"))
 	elif danger:
 		text_at(Vector2(304, 190), "FORTSCHRITT  %d / %d" % [rescue_kills, RESCUE_GOAL], 15, Color("ffb1a1"), HORIZONTAL_ALIGNMENT_CENTER, 544)
-	
+
 
 func draw_spell_visual(visual: Dictionary) -> void:
 	var origin: Vector2=visual["pos"]
@@ -7692,6 +7734,12 @@ func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scal
 				PixelStyle32.rect(self,Rect2(rune-Vector2(2,2)*scale_factor,Vector2(4,4)*scale_factor),Color('e2c477'))
 
 func draw_skill_sprite(id: int, p: Vector2, size: float = 32.0) -> void:
+	if id>=BASE_ABILITIES.size():
+		var fusion:=fusion_definition_by_id(id)
+		if fusion.is_empty():return
+		draw_skill_sprite(int(fusion["a"]),p,size*0.65)
+		draw_skill_sprite(int(fusion["b"]),p+Vector2.ONE*size*0.35,size*0.65)
+		return
 	if id >= 34:
 		var s:float=size/32.0
 		var center:=p+Vector2(16,16)*s
@@ -7926,7 +7974,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 		for cy in range(cell_min_y, cell_max_y):
 			var obstacle := obstacle_in_cell(cx, cy)
 			if not obstacle.is_empty() and class_boss_arena_index_at(obstacle['pos'],65.0)<0 and visible_world(obstacle['pos'], 110): draw_obstacle(obstacle)
-	
+
 	draw_village_ground()
 	if bounds.intersects(Rect2(WAYSTONES[0]-Vector2(280,280),Vector2(560,560))):SpawnPlatform32.platform(self,WAYSTONES[0])
 	draw_rect(Rect2(Vector2.ZERO, WORLD), Color('45726d'), false, 7)
@@ -8091,36 +8139,8 @@ func draw_overworld_atmosphere() -> void:
 		if visible_world(torch_pos, 55): draw_torch(torch_pos, region_at(torch_pos) == 4, true)
 
 func draw_arena_world() -> void:
-	draw_rect(Rect2(camera_pos, VIEW), Color("1b2632"))
-	var center := ARENA_CENTER
-	draw_circle(center, ARENA_RADIUS + 23.0, Color("493d4a"))
-	draw_circle(center, ARENA_RADIUS + 10.0, Color("ba9564"))
-	draw_circle(center, ARENA_RADIUS - 4.0, Color("45525a"))
-	draw_circle(center, ARENA_RADIUS - 24.0, Color("66635b"))
-	draw_circle(center, ARENA_RADIUS - 43.0, Color("74766f"))
-	for ring in [92.0, 216.0, 345.0, 434.0]:
-		draw_arc(center, ring, 0.0, TAU, 96, Color("c7ab76", 0.52), 3)
-	for i in 40:
-		var angle := float(i) * TAU / 40.0
-		var direction := Vector2.RIGHT.rotated(angle)
-		var edge := center + direction * (ARENA_RADIUS - 5.0)
-		draw_line(edge - direction * 27.0, edge - direction * 7.0, Color("e0c282"), 7)
-		if i % 5 == 0:
-			draw_circle(edge + direction * 20.0, 13.0, Color("342f3a"))
-			draw_rect(Rect2(edge + direction * 20.0 - Vector2(5, 16), Vector2(10, 11)), Color("e3a960"))
-			draw_rect(Rect2(edge + direction * 20.0 - Vector2(3, 22), Vector2(6, 8)), Color("fff0ae"))
-	for row in range(-8, 9):
-		for column in range(-8, 9):
-			var tile := center + Vector2(column * 58.0, row * 58.0)
-			if tile.distance_to(center) > ARENA_RADIUS - 58.0: continue
-			var code := hash_cell(column + 47, row + 91)
-			draw_rect(Rect2(tile - Vector2(16, 10), Vector2(32, 20)), Color("858478", 0.43))
-			if code % 4 == 0: draw_rect(Rect2(tile - Vector2(9, 4), Vector2(12, 4)), Color("dbc89a", 0.53))
-			if code % 11 == 0: draw_rect(Rect2(tile + Vector2(11, 9), Vector2(6, 4)), Color("c3a074", 0.45))
-	draw_arc(center, 38.0, 0.0, TAU, 32, Color("e1c98f"), 4)
-	for i in 8:
-		var rune := center + Vector2.RIGHT.rotated(float(i) * TAU / 8.0) * 28.0
-		draw_rect(Rect2(rune - Vector2(3, 3), Vector2(6, 6)), Color("a6d7dc") if arena_mode == "final" else Color("f0c783"))
+	draw_rect(Rect2(camera_pos, VIEW),Color("24201f"))
+	ArenaInterior.paint(self,ARENA_CENTER,ARENA_RADIUS)
 
 func _trail_theme(region: int) -> int:
 	return 1 if region in [3,4,7,10,11,12] else (2 if region in [2,5,9] else (3 if region == 8 else 0))
@@ -9464,14 +9484,14 @@ func draw_hud() -> void:
 	if dungeon_id >= 0:
 		nearest = "E  ·  Gewölbe verlassen" if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110 else ("E  ·  Versiegelte Truhe" if player_pos.distance_to(DUNGEON_CENTER + Vector2(555, 0)) < 105 and dungeon_chest_ready(dungeon_id) else "")
 	elif interior_id >= 0:
-		nearest = "E  ·  Gebäude verlassen" if player_pos.distance_to(INTERIOR_CENTER + Vector2(0, 210)) < 95 else ""
+		nearest = "E  ·  Gebäude verlassen" if player_pos.distance_to(INTERIOR_CENTER + VillageInteriors32.exit_offset(interior_id)) < 95 else ""
 		if in_elara_healing_field(92.0):
 			nearest="E  ·  Heilungsfeld am Altar · HP & Energie auffüllen"
 		else:
 			var interior_actor:=nearby_interior_actor(150.0)
 			if not interior_actor.is_empty(): nearest="E  ·  %s ansprechen" % interior_actor["name"]
 	else:
-		if player_pos.distance_to(TAVERN_HOUSE + Vector2(126, 157)) < 112: nearest = "E  ·  Zur Steinrose betreten"
+		if player_pos.distance_to(VillageBuildings.door(TAVERN_HOUSE,"innkeeper")) < 112: nearest = "E  ·  Zur Steinrose betreten"
 		for index in DUNGEON_ENTRANCES.size():
 			if player_pos.distance_to(LANDMARKS[int(DUNGEON_ENTRANCES[index])]["pos"] + Vector2(-30, 70)) < 84:
 				nearest = "E  ·  %s betreten" % DUNGEON_NAMES[index]
@@ -9901,15 +9921,15 @@ func draw_appearance_panel() -> void:
 	ui_button(Rect2(205,494,62,36),"<")
 	text_at(Vector2(274,518),appearance_preview_label(),13,Color("ffe4b7"),HORIZONTAL_ALIGNMENT_CENTER,132)
 	ui_button(Rect2(413,494,62,36),">")
-	var labels:=["FRISUR","UMHANG","SCHMUCK","FARBAKZENT"]
+	var labels:=["KOPFSCHMUCK" if hero_race==2 else "FRISUR","UMHANG","BRUSTABZEICHEN","FARBAKZENT"]
 	var values:=[cosmetic_hair,cosmetic_cloak,cosmetic_jewelry,cosmetic_accent]
-	var max_values:=[4,4,4,COSMETIC_ACCENT_HEX.size()]
+	var max_values:=[11 if hero_race==2 else 4,4,11,COSMETIC_ACCENT_HEX.size()]
 	for row in 4:
 		var y:=220+row*72
 		text_at(Vector2(555,y),labels[row],16,Color("ffe4b7"))
 		ui_button(Rect2(555,y+18,50,38),"<")
 		ui_box(Rect2(615,y+18,180,38),Color("45545a"))
-		text_at(Vector2(615,y+44),"%d / %d" % [values[row]+1,max_values[row]],15,Color("f6edda"),HORIZONTAL_ALIGNMENT_CENTER,180)
+		text_at(Vector2(615,y+44),(CharacterAdornments.HEAD_NAMES[cosmetic_hair] if row==0 and hero_race==2 else (CharacterAdornments.BADGE_NAMES[cosmetic_jewelry] if row==2 else "%d / %d" % [values[row]+1,max_values[row]])),15,Color("f6edda"),HORIZONTAL_ALIGNMENT_CENTER,180)
 		ui_button(Rect2(805,y+18,50,38),">")
 	ui_button(Rect2(555,518,300,44),"FERTIG")
 
@@ -9920,7 +9940,7 @@ func click_appearance(mouse:Vector2) -> void:
 		appearance_preview_dir=posmod(appearance_preview_dir-1,4);play_sound("menu");queue_redraw();return
 	if Rect2(413,494,62,36).has_point(mouse):
 		appearance_preview_dir=posmod(appearance_preview_dir+1,4);play_sound("menu");queue_redraw();return
-	var limits:=[4,4,4,COSMETIC_ACCENT_HEX.size()]
+	var limits:=[11 if hero_race==2 else 4,4,11,COSMETIC_ACCENT_HEX.size()]
 	for row in 4:
 		var y:=220+row*72
 		var delta:=0
@@ -9990,6 +10010,7 @@ func cloak_motion_profile(cloak:int,look:Vector2,walking:bool,sprinting:bool,das
 		"visible":true,
 		"style":style,
 		"direction_index":direction_index,
+		"look":raw_look,
 		"neck_half":4.5+style*0.55,
 		"shoulder_half":shoulder_half,
 		"hem_half":hem_half,
@@ -10013,8 +10034,8 @@ func cloak_local_points(motion:Dictionary)->PackedVector2Array:
 	var hem_y:=length-lift
 	var side_shift:=0.0
 	# Seitenansicht: Stoff hängt sichtbar hinter dem Körper statt symmetrisch wie ein Rock.
-	if direction_index==1:side_shift=5.0
-	elif direction_index==2:side_shift=-5.0
+	if direction_index==1:side_shift=13.0
+	elif direction_index==2:side_shift=-13.0
 	var waist_half:=lerpf(shoulder_half,hem_half,0.45)
 	var side_vec:=Vector2(side_shift,0.0)
 	var half_trail:=trail*0.45
@@ -10037,6 +10058,7 @@ func cloak_layer_mode(look:Vector2)->String:
 		_:return "background"
 
 func draw_character_cloak_shape(p:Vector2,scale_factor:float,motion:Dictionary,accent:Color)->void:
+	adornment_transform(p,motion.get("look",Vector2.DOWN),scale_factor,float(motion.get("death_progress",-1.0)),-1.0,int(motion.get("role",-1)),int(motion.get("race",-1)))
 	var local_points:=cloak_local_points(motion)
 	var points:=PackedVector2Array()
 	for point in local_points:points.append(p+point*scale_factor)
@@ -10047,22 +10069,26 @@ func draw_character_cloak_shape(p:Vector2,scale_factor:float,motion:Dictionary,a
 	# Zwei dezente Stofffalten, damit die Fläche als Rückenmantel lesbar bleibt.
 	PixelStyle32.line(self,p+Vector2(-3,-8)*scale_factor,p+(Vector2(-2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.32),1.0*scale_factor)
 	PixelStyle32.line(self,p+Vector2(3,-8)*scale_factor,p+(Vector2(2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.32),1.0*scale_factor)
+	draw_set_transform(character_canvas_offset)
 
-func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0)->void:
+func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0,death_progress:float=-1.0,role:int=-1,race:int=-1)->void:
 	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
+	motion["death_progress"]=death_progress;motion["role"]=role;motion["race"]=race
 	if not bool(motion.get("visible",false)):return
 	# In Rückenansicht wird die volle Fläche absichtlich erst nach dem Körper gezeichnet.
 	if cloak_layer_mode(look)=="foreground":return
 	draw_character_cloak_shape(p,scale_factor,motion,cosmetic_accent_color(accent_index))
 
-func draw_character_cloak_foreground(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0)->void:
+func draw_character_cloak_foreground(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0,death_progress:float=-1.0,role:int=-1,race:int=-1)->void:
 	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
+	motion["death_progress"]=death_progress;motion["role"]=role;motion["race"]=race
 	if not bool(motion.get("visible",false)):return
 	var accent:=cosmetic_accent_color(accent_index)
 	var mode:=cloak_layer_mode(look)
 	if mode=="foreground":
 		draw_character_cloak_shape(p,scale_factor,motion,accent)
 	elif mode=="side":
+		adornment_transform(p,look,scale_factor,death_progress,-1.0,role,race)
 		# Seitenansicht: nur die körpernahe Kante liegt vor Arm/Rüstung.
 		var direction_index:=int(motion["direction_index"])
 		var side_sign:float=1.0 if direction_index==1 else -1.0
@@ -10077,28 +10103,44 @@ func draw_character_cloak_foreground(p:Vector2,look:Vector2,scale_factor:float,c
 			p+(Vector2(side_sign*(hem-4.0),length-2.0)+trail*0.8)*scale_factor
 		])
 		PixelStyle32.polygon(self,edge,accent.darkened(0.12))
+	adornment_transform(p,look,scale_factor,death_progress,-1.0,role,race)
 	# Halsverschluss ist in jeder Richtung sichtbar und bleibt fest am Körper.
 	var collar_y:=-12.0 if int(motion["direction_index"])==3 else -11.0
 	var collar_half:=float(motion["neck_half"])+1.2
 	PixelStyle32.line(self,p+Vector2(-collar_half,collar_y)*scale_factor,p+Vector2(collar_half,collar_y)*scale_factor,accent.lightened(0.30),2.0*scale_factor)
 	PixelStyle32.circle(self,p+Vector2(0,collar_y)*scale_factor,1.8*scale_factor,accent.lightened(0.46))
+	draw_set_transform(character_canvas_offset)
+
+func adornment_transform(p:Vector2,look:Vector2,scale_factor:float,death:float=-1.0,roll:float=-1.0,role:int=-1,race:int=-1)->void:
+	var local:=p.is_equal_approx(player_pos) and panel not in ["appearance","creation","creation_review"]
+	var use_role:=class_id if role<0 else role
+	var use_race:=hero_race if race<0 else race
+	if local:
+		death=1.0-death_timer/DEATH_DURATION if death_timer>0.0 else -1.0
+		roll=1.0-dash_timer/dodge_duration if dash_timer>0.0 else -1.0
+	var rotation:=0.0
+	var fall:=0.0
+	if roll>=0.0:
+		rotation=(-1.0 if dash_dir.x<0 else 1.0)*TAU*roll if use_role!=1 else dash_dir.x*0.13*sin(roll*PI)
+	if death>=0.0:
+		fall=smoothstep(0.12,0.72,death)
+		rotation=fall*(PI*0.40 if use_race==2 else PI*0.46)*(1.0 if look.x>=0 else -1.0)
+	var pivot:=p+Vector2(0,-10)*scale_factor
+	var shift:=Vector2(0,smoothstep(0.0,0.7,death)*19.0*scale_factor) if death>=0 else Vector2.ZERO
+	draw_set_transform(character_canvas_offset+pivot+shift-pivot.rotated(rotation),rotation)
 
 func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int,hair:int,cloak:int,jewelry:int,accent_index:int)->void:
+	adornment_transform(p,look,scale_factor)
 	var accent:=cosmetic_accent_color(accent_index)
 	if hair>0:
 		if race==2:
-			for side in [-1.0,1.0]:
-				PixelStyle32.line(self,p+Vector2(side*5,-39)*scale_factor,p+Vector2(side*(7+hair*2),-51-hair*2)*scale_factor,accent,2.5*scale_factor)
+			CharacterAdornments.head(self,p,look,scale_factor,hair,accent)
 		else:
 			var y:=-39.0
 			for i in range(-hair,hair+1):
 				PixelStyle32.rect(self,Rect2(p+Vector2(i*5-3,y-abs(i)*2)*scale_factor,Vector2(7,6)*scale_factor),accent.darkened(0.05*abs(i)))
-	if jewelry>0:
-		for side in [-1.0,1.0]:
-			PixelStyle32.circle(self,p+Vector2(side*12,-20)*scale_factor,(1.7+jewelry*.45)*scale_factor,accent.lightened(.35))
-		if jewelry>=2:
-			PixelStyle32.line(self,p+Vector2(-6,-8)*scale_factor,p+Vector2(0,-1)*scale_factor,accent.lightened(.35),1.5*scale_factor)
-			PixelStyle32.line(self,p+Vector2(6,-8)*scale_factor,p+Vector2(0,-1)*scale_factor,accent.lightened(.35),1.5*scale_factor)
+	CharacterAdornments.badge(self,p,look,scale_factor,jewelry,accent)
+	draw_set_transform(character_canvas_offset)
 
 func draw_account_gate() -> void:
 	text_at(Vector2(300,190),"SONNENHAIN KONTO",34,Color("ffe2aa"))
@@ -10678,30 +10720,52 @@ func fusion_button_label(fusion:Dictionary)->String:
 	return "VERSTÄRKEN" if id<learned.size() and learned[id] else "VERSCHMELZEN"
 
 func draw_fusion_panel() -> void:
+	ensure_skill_state_size()
 	text_at(Vector2(165,125),"KRISTALL DER VERSCHMELZUNG",25,Color("d9c8ff"))
 	text_at(Vector2(760,124),"%d GOLD" % gold,16,Color("f6dc9a"))
-	text_at(Vector2(165,160),"Fusionen opfern beide Ausgangsattacken samt Skillstufen und werden automatisch ausgerüstet.",12,Color("cbd9da"))
-	for i in FUSIONS.size():
-		var f:Dictionary=FUSIONS[i]
+	text_at(Vector2(165,154),"Beide Quellen werden geopfert. Die Fusion wird sofort ausgerüstet.",12,Color("cbd9da"))
+	var pages:=ceili(FUSIONS.size()/4.0)
+	fusion_page=clampi(fusion_page,0,pages-1)
+	for row in 4:
+		var index:=fusion_page*4+row
+		if index>=FUSIONS.size():break
+		var f:Dictionary=FUSIONS[index]
 		var id:=int(f["id"]);var a:=int(f["a"]);var b:=int(f["b"])
-		var y:=185+i*91
+		var y:=177+row*86
+		var enabled:=can_fuse(f)
+		var box:=Rect2(165,y,800,79)
+		ui_box(box,Color("30474e") if enabled else Color("202b34"))
+		if enabled:draw_rect(box.grow(-2),Color("9bead4"),false,2)
+		var tint:=Color("fff1bc") if enabled else Color("83908e")
+		text_at(Vector2(180,y+20),str(ABILITIES[id]["name"]),14,tint,HORIZONTAL_ALIGNMENT_LEFT,550)
+		text_at(Vector2(180,y+39),"%s + %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],11,tint)
 		var missing:=fusion_missing_sources(f)
-		var enabled:=missing.is_empty() and can_fuse(f)
-		ui_box(Rect2(165,y,800,82),Color("263647"))
-		text_at(Vector2(185,y+22),ABILITIES[id]["name"],16,Color("fff1bc"))
-		text_at(Vector2(185,y+44),"%s  +  %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],12,Color("cde5d5"))
-		if missing.is_empty():
-			text_at(Vector2(185,y+66),"%d Gold · Fusion Stufe %d/4 · beide Quellen werden geopfert" % [int(f["gold"]),int(skill_levels[id])],11,Color("f4d49b"))
-		else:
-			text_at(Vector2(185,y+66),"Fehlt: %s" % ", ".join(missing),11,Color("e7a99f"))
-		ui_button(Rect2(745,y+19,190,43),fusion_button_label(f),enabled)
+		var requirement:=maxi(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"]))
+		if level<requirement:missing.append("Level %d" % requirement)
+		if gold<int(f["gold"]):missing.append("%d Gold" % (int(f["gold"])-gold))
+		if int(skill_levels[id])>=int(f.get("max_rank",4)):missing.append("Maximalrang erreicht")
+		text_at(Vector2(180,y+56),"Level %d · %d Gold · Rang %d/4" % [requirement,int(f["gold"]),int(skill_levels[id])],10,tint)
+		text_at(Vector2(180,y+71),"Bereit" if missing.is_empty() else "Fehlt: %s" % ", ".join(missing),10,Color("a4e4bc") if enabled else Color("b18f88"),HORIZONTAL_ALIGNMENT_LEFT,550)
+		ui_button(Rect2(745,y+18,190,40),fusion_button_label(f),enabled)
+	ui_button(Rect2(675,530,205,40),"NÄCHSTE BEREITE",not available_fusions().is_empty())
+	text_at(Vector2(250,557),"%d Kombinationen · Seite %d / %d" % [FUSIONS.size(),fusion_page+1,pages],14,Color("cbd9da"))
+	ui_button(Rect2(165,530,64,40),"<",fusion_page>0)
+	ui_button(Rect2(900,530,64,40),">",fusion_page<pages-1)
+	text_at(Vector2(165,596),"Passives, Ultimates, reine Ausweichbewegung und Fusionsspells sind keine Zutaten.",11,Color("93a4a3"))
 
 func click_fusion(mouse:Vector2) -> void:
-	for i in FUSIONS.size():
-		var f:Dictionary=FUSIONS[i]
-		var y:=185+i*91
-		if not Rect2(745,y+19,190,43).has_point(mouse):continue
-		var offer_index:=fusion_offer_index(int(f["id"]))
+	if Rect2(675,530,205,40).has_point(mouse):
+		for step in FUSIONS.size():
+			var candidate:=posmod((fusion_page+1)*4+step,FUSIONS.size())
+			if can_fuse(FUSIONS[candidate]):fusion_page=int(candidate/4);return
+		return
+	if Rect2(165,530,64,40).has_point(mouse):fusion_page=maxi(0,fusion_page-1);return
+	if Rect2(900,530,64,40).has_point(mouse):fusion_page=mini(ceili(FUSIONS.size()/4.0)-1,fusion_page+1);return
+	for row in 4:
+		var index:=fusion_page*4+row
+		if index>=FUSIONS.size():break
+		if not Rect2(745,195+row*86,190,40).has_point(mouse):continue
+		var offer_index:=fusion_offer_index(int(FUSIONS[index]["id"]))
 		if offer_index>=0:buy_fusion(offer_index)
 		return
 
@@ -11387,13 +11451,13 @@ func village_props() -> Array:
 		for info in VillageLayout.SHOPS:
 			if info["house"]==house and not info.has("shared_with"):
 				kind=str(info["kind"]);break
-		props.append({"kind":"house","point":house,"depth":house.y+(250 if kind=="arena" else (235 if kind=="borin" else 155)),"house_kind":kind})
+		props.append({"kind":"house","point":house,"depth":VillageBuildings.depth(house,kind),"house_kind":kind})
 	for tree in REFERENCE_TREES: props.append({"kind":"tree","point":tree,"depth":tree.y+9})
 	props.append({"kind":"magic_tree","point":BORIN_MAGIC_TREE_POS,"depth":BORIN_MAGIC_TREE_POS.y+18})
 	props.append({"kind":"well","point":REFERENCE_WELL,"depth":REFERENCE_WELL.y+32})
 	props.append({"kind":"board","point":Vector2(630,1250),"depth":1272.0})
 	for p in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]: props.append({"kind":"fence","point":p,"depth":p.y+12})
-	for p in [Vector2(544,1056),Vector2(1120,1056),Vector2(1305,1200),Vector2(1430,1200),Vector2(480,1530)]: props.append({"kind":"lamp","point":p,"depth":p.y+8})
+	for p in VillageFixtures.LAMPS: props.append({"kind":"lamp","point":p,"depth":p.y+8})
 	for p in [Vector2(460,940),Vector2(1220,1290),Vector2(520,1660),Vector2(1470,1215)]: props.append({"kind":"barrel","point":p,"depth":p.y+17})
 	for p in [Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]: props.append({"kind":"bush","point":p,"depth":p.y+28})
 	for shop in VillageLayout.SHOPS:
@@ -11405,11 +11469,10 @@ func prop_bounds(prop: Dictionary) -> Rect2:
 	match prop["kind"]:
 		"house":
 			var house_kind:=str(prop.get("house_kind","home"))
-			if house_kind=="arena": return Rect2(p+Vector2(-16,-32),Vector2(416,304))
-			return Rect2(p+Vector2(-16,-64),Vector2(288,320)) if house_kind=="borin" else Rect2(p+Vector2(-16,-64),Vector2(224,256))
+			return VillageBuildings.bounds(p,house_kind)
 		"tree": return Rect2(p+Vector2(-88,-176),Vector2(176,208))
 		"magic_tree": return Rect2(p+Vector2(-112,-224),Vector2(224,264))
-		"lamp": return Rect2(p+Vector2(-20,-88),Vector2(40,112))
+		"lamp": return Rect2(p+Vector2(-20,-104),Vector2(40,120))
 		"barrel": return Rect2(p+Vector2(-24,-40),Vector2(48,80))
 		"cart": return Rect2(p+Vector2(-52,-68),Vector2(132,108))
 		"fence": return Rect2(p+Vector2(-16,-48),Vector2(144,80))
@@ -11423,7 +11486,7 @@ func paint_village_prop(prop: Dictionary) -> void:
 		"house":
 			draw_house(p)
 			for shop in VillageLayout.SHOPS:
-				if shop["house"] == p and not shop.has("shared_with") and str(shop["kind"])!="arena":
+				if shop["house"] == p and not shop.has("shared_with") and not VillageBuildings.SPECS.has(str(shop["kind"])):
 					StartScenery32.sign(self,p,shop["sign"],font)
 					break
 		"tree":
@@ -11596,6 +11659,10 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"active_events":sanitize_active_event_rows(state.get("active_events",[])),
 		"fusions":sanitize_fusion_rows(state.get("fusions",[])),
 		"skill_ranks":sanitize_skill_rank_rows(state.get("skill_ranks",[])),
+		"cosmetic_hair":clampi(int(state.get("cosmetic_hair",0)),0,10 if int(state.get("race",0))==2 else 3),
+		"cosmetic_cloak":clampi(int(state.get("cosmetic_cloak",0)),0,3),
+		"cosmetic_jewelry":clampi(int(state.get("cosmetic_jewelry",0)),0,10),
+		"cosmetic_accent":clampi(int(state.get("cosmetic_accent",0)),0,COSMETIC_ACCENT_HEX.size()-1),
 		"pos":[incoming_pos.x,incoming_pos.y],
 		"facing":[clean_facing.x,clean_facing.y],
 		"class":clampi(int(state.get("class",0)),0,2),
@@ -12068,6 +12135,18 @@ func rpc_remote_combat_visual(peer_id: int, payload: Dictionary) -> void:
 	if not pos.is_finite() or not dir.is_finite() or dir.length_squared() < 0.01: return
 	dir = dir.normalized()
 	var remote_class:int=clampi(int(payload.get("class",0)),0,2)
+	var ability_id:=int(payload.get("ability",-1))
+	if str(payload.get("kind","normal"))=="ability" and ability_id>=BASE_ABILITIES.size():
+		var recipe:=fusion_definition_by_id(ability_id)
+		if recipe.is_empty():return
+		for source in [int(recipe["a"]),int(recipe["b"])]:
+			if source in [3,7,16,18,20,25,26,28,29,30,34]:
+				for shot in ability_projectiles(source,pos,dir,remote_class,0):
+					shot["damage"]=0;shot["network_visual"]=true;shot["remote_owner"]=peer_id
+					projectiles.append(shot)
+			else:
+				spell_visuals.append({"kind":source,"pos":pos,"end":pos,"dir":dir,"rank":clampi(int(payload.get("fusion_rank",1)),1,4),"life":0.65,"max":0.65})
+		return
 	if str(payload.get("kind","normal"))=="ability" and int(payload.get("ability",-1)) in [3,7,16,18,20,25,26,28,29,30]:
 		for shot in ability_projectiles(int(payload["ability"]),pos,dir,remote_class,0):
 			shot["damage"]=0;shot["network_visual"]=true;shot["remote_owner"]=peer_id
@@ -12286,8 +12365,17 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		draw_circle(rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
 		draw_arc(rp + Vector2(0, 10), 30.0, 0.0, TAU, 24, Color("8ee7ff", 0.82), 2.0)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
+		var cloth:=int(state.get("cosmetic_cloak",0))
+		var accent:=int(state.get("cosmetic_accent",0))
+		draw_character_cloak_back(rp,rdir,WORLD_CHARACTER_SCALE,cloth,accent,bool(state.get("walking",false)),bool(state.get("running",false)),false,float(state.get("hp",1))<=0,world_time,float(state.get("death_progress",-1.0)),cls,race)
 		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, WORLD_CHARACTER_SCALE, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)))
 		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5*WORLD_CHARACTER_SCALE), cls, clampi(int(state.get("weapon",0)),0,11), rdir, WORLD_CHARACTER_SCALE)
+		draw_character_cloak_foreground(rp,rdir,WORLD_CHARACTER_SCALE,cloth,accent,bool(state.get("walking",false)),bool(state.get("running",false)),false,float(state.get("hp",1))<=0,world_time,float(state.get("death_progress",-1.0)),cls,race)
+		adornment_transform(rp,rdir,WORLD_CHARACTER_SCALE,float(state.get("death_progress",-1.0)),-1.0,cls,race)
+		var color:=cosmetic_accent_color(accent)
+		if race==2:CharacterAdornments.head(self,rp,rdir,WORLD_CHARACTER_SCALE,int(state.get("cosmetic_hair",0)),color)
+		CharacterAdornments.badge(self,rp,rdir,WORLD_CHARACTER_SCALE,int(state.get("cosmetic_jewelry",0)),color)
+		draw_set_transform(character_canvas_offset)
 		combat_feedback.health(self,"peer:%d"%int(peer_id),rp+Vector2(0,-43),float(state.get("hp",1)),float(state.get("max_hp",1)),60,Color("79caa3"))
 		var party_peer_ids := local_party_peer_ids()
 		var name_color := Color("ffe0a1") if int(peer_id) in party_peer_ids else Color("bfe7ff")
@@ -12800,7 +12888,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "rune_ranks":essence.ranks.duplicate(true), "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "rune_ranks":essence.ranks.duplicate(true), "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "cosmetic_hair":cosmetic_hair,"cosmetic_cloak":cosmetic_cloak,"cosmetic_jewelry":cosmetic_jewelry,"cosmetic_accent":cosmetic_accent, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
@@ -13305,9 +13393,7 @@ func projectile_world_blocked(point:Vector2)->bool:
 					info=candidate
 					break
 			var kind:=str(info.get("kind","home"))
-			if kind=="borin" and Rect2(home+Vector2(12,105),Vector2(232,110)).has_point(point):return true
-			if kind=="arena" and Rect2(home+Vector2(8,88),Vector2(368,136)).has_point(point):return true
-			if kind not in ["borin","arena"] and Rect2(home+Vector2(8,73),Vector2(176,75)).has_point(point):return true
+			if VillageBuildings.solid(home,kind).has_point(point):return true
 		for stone in WAYSTONES:
 			if stone==WAYSTONES[0]:
 				if SpawnStoneBody.blocks(point-stone,0):return true
