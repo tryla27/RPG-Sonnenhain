@@ -3,10 +3,13 @@ extends RefCounted
 # Hero body ≈64 world pixels = 2 m. Doors stay larger than the hero.
 const PIXELS_PER_METRE:=32.0
 const SPECS:={
-	"smith":{"asset":"smith","size":Vector2(448,448),"door":Vector2(214,397),"solid":Rect2(24,298,400,76)},
-	"healer":{"asset":"chapel","size":Vector2(448,448),"door":Vector2(220,417),"solid":Rect2(44,318,340,72)},
-	"innkeeper":{"asset":"tavern","size":Vector2(448,448),"door":Vector2(225,394),"solid":Rect2(32,296,352,76)},
-	"arena":{"asset":"arena","size":Vector2(1088,1088),"door":Vector2(537,980),"solid":Rect2(64,640,960,298)}
+	"smith":{"asset":"smith","size":Vector2(448,448),"door":Vector2(214,397),"solid":Rect2(24,220,400,154)},
+	"healer":{"asset":"chapel","size":Vector2(448,448),"door":Vector2(220,417),"solid":Rect2(44,240,340,150)},
+	"innkeeper":{"asset":"tavern","size":Vector2(448,448),"door":Vector2(225,394),"solid":Rect2(32,220,352,152)},
+	"style":{"asset":"atelier","size":Vector2(448,448),"door":Vector2(224,414),"solid":Rect2(32,220,384,174)},
+	"borin":{"asset":"skillhaus","size":Vector2(448,448),"door":Vector2(224,414),"solid":Rect2(32,220,384,174)},
+	"elder":{"asset":"ratshalle","size":Vector2(448,448),"door":Vector2(224,414),"solid":Rect2(44,250,360,144)},
+	"arena":{"asset":"arena","size":Vector2(1088,1088),"door":Vector2(537,980),"solid":Rect2(64,320,960,618)}
 }
 static var textures:Dictionary={}
 

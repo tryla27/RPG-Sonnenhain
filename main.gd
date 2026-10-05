@@ -76,7 +76,7 @@ const Wagon32 = preload("res://components/wagon_32.gd")
 const StartTileMap32 = preload("res://components/start_tilemap_32.gd")
 var start_tilemap_32_attached := false
 var live_reconnect_timer := 0.0
-const REFERENCE_TREES := [Vector2(80,650),Vector2(860,360),Vector2(720,560),Vector2(80,1580),Vector2(1640,1540),Vector2(920,1810),Vector2(760,2160),Vector2(1580,2320),Vector2(80,2440)]
+const REFERENCE_TREES := [Vector2(64,650),Vector2(860,360),Vector2(720,560),Vector2(64,1580),Vector2(1080,350),Vector2(960,96),Vector2(352,1780),Vector2(64,2080),Vector2(64,2440)]
 const REFERENCE_WELL := Vector2(1184, 832)
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
@@ -209,8 +209,8 @@ const FUSION_IMPACT_PROFILES := {
 	42:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":18,"secondary":37,"effect":"tesla_wave","radius":145.0,"damage_mult":0.38},
 	43:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":18,"secondary":17,"effect":"iceball","radius":118.0,"damage_mult":0.42}
 }
-const BORIN_HOUSE_POS := Vector2(1248,320)
-const BORIN_MAGIC_TREE_POS := Vector2(1552,544)
+const BORIN_HOUSE_POS := Vector2(1248,64)
+const BORIN_MAGIC_TREE_POS := Vector2(1120,616)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
 const WORLD_CHARACTER_SCALE := 0.84
 const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14300,1200)] # Map 06 / 07 / 08
@@ -255,13 +255,13 @@ const BORIN_QUESTS := [
 	{"title":"Borins letzte Lehre","req":39,"target":25,"count":10,"skill_points":3,"item_rarity":3,"item_power":58}
 ]
 const NPCS := [
-	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1376, 1268), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1376, 560), "color":Color("6783bd"), "kind":"quest"},
-	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1376, 1268), "color":Color("6bbba4"), "kind":"quest"},
+	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1312, 1394), "color":Color("a77ccb"), "kind":"quest"},
+	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1472, 498), "color":Color("6783bd"), "kind":"quest"},
+	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1312, 1394), "color":Color("6bbba4"), "kind":"quest"},
 	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(374, 577), "color":Color("ab6e60"), "kind":"smith"},
-	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(256, 820), "color":Color("c080aa"), "kind":"stylist"},
-	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1376, 560), "color":Color("9f8bcc"), "kind":"apprentice"},
-	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(256, 1300), "color":Color("e2bc91"), "kind":"healer_alchemy"},
+	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(384, 1074), "color":Color("c080aa"), "kind":"stylist"},
+	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1472, 498), "color":Color("9f8bcc"), "kind":"apprentice"},
+	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(380, 1557), "color":Color("e2bc91"), "kind":"healer_alchemy"},
 	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1209,2460), "color":Color("a48cbd"), "kind":"arena"}
 ]
 const SHOPS := {
@@ -2378,7 +2378,7 @@ func hero_collision_radius() -> float:
 func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 	if konflux.active: return KonfluxMap.blocked(pos,player_pos if from_pos.x<0 else from_pos,konflux.room,hero_collision_radius())
 	if arena_mode != "": return pos.distance_to(ARENA_CENTER) > ARENA_RADIUS - 22.0
-	if interior_id >= 0: return VillageInteriors32.blocked(pos,INTERIOR_CENTER,interior_id)
+	if interior_id >= 0: return VillageInteriors32.blocked(pos,INTERIOR_CENTER,interior_id,hero_collision_radius())
 	if dungeon_id >= 0: return dungeon_blocked(pos)
 	if pos.x < 26 or pos.y < 26 or pos.x > WORLD.x - 26 or pos.y > WORLD.y - 26:
 		return true
@@ -4306,7 +4306,7 @@ func interior_actors() -> Array:
 			{"name":"Pip","role":"Arkanhändler · Stäbe & Magie","pos":INTERIOR_CENTER+Vector2(130,-65),"color":Color("9f8bcc"),"kind":"arcane_merchant"}
 		]
 	var pos:=INTERIOR_CENTER+Vector2(0,-95)
-	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-215,-42)
+	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-140,-85)
 	elif room_name=="Elara": pos=INTERIOR_CENTER+Vector2(-235,-55)
 	var npc_kind:="innkeeper" if room_name=="Alma" else ("smith" if room_name=="Torvald" else ("stylist" if room_name=="Fenna" else ("apprentice" if room_name=="Pip" else ("healer_alchemy" if room_name=="Elara" else ("arena" if room_name=="Arven" else "quest")))))
 	return [{"name":room_name,"role":VillageInteriors32.role_for_id(interior_id),"pos":pos,"color":Color("c9b58a"),"kind":npc_kind}]

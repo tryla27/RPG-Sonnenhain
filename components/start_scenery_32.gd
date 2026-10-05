@@ -25,7 +25,7 @@ static func themed_house(c:CanvasItem,p:Vector2,kind:String)->void:
 	if not preload("res://components/village_buildings.gd").paint(c,p,kind):VillageHouseTiles32.paint(c,p,kind)
 
 static func borin_house(c:CanvasItem,p:Vector2)->void:
-	VillageHouseTiles32.paint(c,p,"borin")
+	if not preload("res://components/village_buildings.gd").paint(c,p,"borin"):VillageHouseTiles32.paint(c,p,"borin")
 
 static func arena_building(c:CanvasItem,p:Vector2)->void:
 	preload("res://components/village_buildings.gd").paint(c,p,"arena")

@@ -38,7 +38,9 @@ func run()->void:
 	check(g.enemies.is_empty(),"Client duplicated server mobs")
 	g.network_mode="offline"
 	var home:Vector2=g.house_positions()[0]
-	var a:=home+Vector2(96,190);var b:=home+Vector2(96,70)
+	var facade:Rect2=g.VillageBuildings.solid(home,"elder")
+	var a:=Vector2(facade.get_center().x,facade.end.y+40);var b:=a-Vector2(0,200)
+	g.player_pos=a
 	check(g.projectile_collision(a,b,false)["hit"],"Offline swept house impact missing")
 	check(g.projectile_collision(a,b,true)["hit"],"Server swept house impact missing")
 	g.projectiles=[{"pos":a,"dir":Vector2.UP,"speed":2000.0,"life":2.0,"kind":3,"damage":10,"hits":[]}]

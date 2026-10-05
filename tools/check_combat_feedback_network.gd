@@ -70,9 +70,11 @@ func run()->void:
 	left.player_pos=Vector2(825,1095);right.player_pos=Vector2(825,1095)
 	server.remote_players[a]["pos"]=[825.0,1095.0];server.remote_players[b]["pos"]=[825.0,1095.0]
 	var home:Vector2=server.village_house("Fenna")["house"]
+	var facade:Rect2=server.VillageBuildings.solid(home,"style")
+	var shot_origin:=Vector2(facade.get_center().x,facade.end.y+40)
 	for kind in [0,1,2,3]:
 		var before_left:int=left.combat_feedback.breaks.size();var before_right:int=right.combat_feedback.breaks.size()
-		server.projectiles=[{"pos":home+Vector2(96,190),"dir":Vector2.UP,"speed":2000.0,"life":1.0,"damage":10,"kind":kind,"owner_peer":a,"hits":[]}]
+		server.projectiles=[{"pos":shot_origin,"dir":Vector2.UP,"speed":2000.0,"life":1.0,"damage":10,"kind":kind,"owner_peer":a,"hits":[]}]
 		server.update_dedicated_player_projectiles(.08)
 		await wait_frames()
 		assert(server.projectiles.is_empty())

@@ -142,7 +142,7 @@ for name in [n for n in sfx if n not in procedural_sfx] + ['nebel', 'bernstein',
 assert 'DoorSfx.make(true)' in source and 'DoorSfx.make(false)' in source, 'procedural village door sounds not wired'
 atlas = (root / 'art' / 'sonnenhain_tiles.png').read_bytes()
 assert atlas[:8] == b'\x89PNG\r\n\x1a\n' and int.from_bytes(atlas[16:20], 'big') == 128 and int.from_bytes(atlas[20:24], 'big') == 64
-for connection in ['func draw_pixel_tile', 'func draw_tavern_world', 'func tavern_blocked', 'func draw_village_interior', 'func enter_village_house', 'func leave_village_house', 'func enter_tavern', 'func leave_tavern', 'VillageInteriors32.blocked(pos,INTERIOR_CENTER,interior_id)', 'interior_return_pos if interior_id >= 0 else player_pos', '"res://art/sonnenhain_tiles.png"']:
+for connection in ['func draw_pixel_tile', 'func draw_tavern_world', 'func tavern_blocked', 'func draw_village_interior', 'func enter_village_house', 'func leave_village_house', 'func enter_tavern', 'func leave_tavern', 'VillageInteriors32.blocked(pos,INTERIOR_CENTER,interior_id,hero_collision_radius())', 'interior_return_pos if interior_id >= 0 else player_pos', '"res://art/sonnenhain_tiles.png"']:
     assert connection in source, f'missing pixel-art scene connection: {connection}'
 assert source.count('draw_pixel_tile(') > 15
 for connection in ['func load_bindings', 'func save_bindings', 'func reset_bindings', 'func draw_controls_panel', 'func movement_vector', 'binding_pressed("attack")', 'binding_short("ability_%d" % (slot + 1))']:
@@ -204,15 +204,15 @@ for connection in [
 village_layout = (root / 'components' / 'village_layout.gd').read_text(encoding='utf8')
 for resident in ['Mira','Liora','Arven','Torvald','Fenna','Pip','Elara','Alma','Borin']:
     assert f'"name":"{resident}"' in village_layout, f'missing village house: {resident}'
-assert '"name":"Borin","house":Vector2(1248,320)' in village_layout, 'Borin house anchor moved'
-assert 'const BORIN_MAGIC_TREE_POS := Vector2(1552,544)' in source, 'Borin magic tree anchor moved'
+assert '"name":"Borin","house":Vector2(1248,64)' in village_layout, 'Borin house anchor moved'
+assert 'const BORIN_MAGIC_TREE_POS := Vector2(1120,616)' in source, 'Borin magic tree anchor moved'
 assert 'const BORIN_CRYSTAL_POS := Vector2(1512,736)' in source, 'Borin fusion crystal anchor moved'
 interiors32 = (root / 'components' / 'village_interiors_32.gd').read_text(encoding='utf8')
 for chapel_token in [
     'const ELARA_ID := 7',
     'ELARA_CONCEPT := "res://art/concepts/map0/elara_church_interior_32px.webp"',
     'static func healing_field_pos',
-    'Kapelle: Altar/Podest oben, Lager rechts',
+    'for y in [72,136]:',
     'Heilungsfeld direkt vor dem Altar',
     'Zwei Kirchenbank-Reihen',
 ]:
@@ -246,7 +246,7 @@ for name, xs, ys, kind in shop_rows:
     seen_houses.add(key)
     if kind == 'arena':
         rect = (x + 72, y + 472, 944, 445)
-    elif kind in ['smith','healer','innkeeper']:
+    elif kind in ['smith','healer','innkeeper','style','elder','borin']:
         rect = (x, y, 448, 448)
     elif kind == 'borin':
         rect = (x - 16, y - 64, 288, 320)

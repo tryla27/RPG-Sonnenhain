@@ -34,30 +34,51 @@ static func exit_offset(id:int)->Vector2:
 static func healing_field_pos(center:Vector2,id:int)->Vector2:
 	return center+Vector2(0,-34) if id==ELARA_ID else Vector2(-100000,-100000)
 
-static func blocked(pos:Vector2,center:Vector2,id:int=-1)->bool:
+static func furniture(id:int)->Array[Rect2]:
+	# Physical objects only: carpets, healing fields and painted runes stay walkable.
+	var items:Array[Rect2]=[]
+	if id==3:
+		for side in [-1,1]:
+			for row in 6:items.append(Rect2(Vector2(side*590-42,-236+row*80),Vector2(84,32)))
+		for x in [-160,160]:items.append(Rect2(x-10,-257,20,67))
+		return items
+	if id==ELARA_ID:
+		items=[Rect2(-144,-180,288,64),Rect2(246,-124,132,154),Rect2(-366,-112,112,120)]
+		for y in [72,136]:
+			for x in [-330,104]:items.append(Rect2(x,y,226,46))
+		return items
+	items.append(Rect2(-280,-190,560,42))
+	match kind_for_id(id):
+		"inn":
+			for y in [-40,80]:
+				for x in [-270,60]:items.append(Rect2(x,y,210,46))
+			items.append(Rect2(-364,-146,68,68))
+		"elder":
+			items.append(Rect2(-176,-18,352,70))
+			for x in [-144,-48,48,144]:items.append(Rect2(x,58,48,30))
+		"smith":
+			items.append(Rect2(-300,-132,116,86))
+			items.append(Rect2(-310,18,214,54))
+			items.append(Rect2(172,-126,72,48))
+		"style":
+			for x in [-250,-170,170,250]:items.append(Rect2(x,-132,48,72))
+			items.append(Rect2(-54,40,108,54))
+		"apprentice":
+			for x in [-220,-156,-92]:items.append(Rect2(x,-126,44,24))
+			items.append(Rect2(160,-110,104,54))
+		"magic":
+			for x in [-224,-160,160,224]:items.append(Rect2(x-14,-132,28,28))
+	return items
+
+static func blocked(pos:Vector2,center:Vector2,id:int=-1,radius:float=16.0)->bool:
 	var local:=pos-center
 	if id==3:
-		return absf(local.x)>650.0 or absf(local.y)>366.0 or local.y< -270.0 or (absf(local.x)>532.0 and absf(local.y)<260.0)
-	if absf(local.x)>438.0 or absf(local.y)>246.0:return true
-	if Rect2(center+Vector2(-438,-246),Vector2(876,70)).has_point(pos):return true
-	if id==ELARA_ID:
-		# Kapelle: Altar/Podest oben, Lager rechts, Kirchenbänke mit freiem Mittelgang.
-		for r in [
-			Rect2(center+Vector2(-144,-180),Vector2(288,64)),
-			Rect2(center+Vector2(246,-124),Vector2(132,154)),
-			Rect2(center+Vector2(-366,-112),Vector2(112,120)),
-			Rect2(center+Vector2(-330,72),Vector2(226,52)),
-			Rect2(center+Vector2(104,72),Vector2(226,52))
-		]:
-			if r.has_point(pos):return true
-		return false
-	for r in [
-		Rect2(center+Vector2(-366,-118),Vector2(118,92)),
-		Rect2(center+Vector2(248,-118),Vector2(118,92)),
-		Rect2(center+Vector2(-358,68),Vector2(112,74)),
-		Rect2(center+Vector2(246,68),Vector2(112,74))
-	]:
-		if r.has_point(pos):return true
+		if absf(local.x)>650.0-radius or absf(local.y)>366.0-radius or local.y< -270.0+radius:return true
+	else:
+		if absf(local.x)>438.0-radius or absf(local.y)>246.0-radius:return true
+		if local.y< -176.0+radius:return true
+	for rect in furniture(id):
+		if rect.grow(radius).has_point(local):return true
 	return false
 
 static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:bool,interact_label:String)->void:
@@ -92,6 +113,7 @@ static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:boo
 	# Theme props, kept on 32px rhythm.
 	match kind:
 		"magic":
+			for rect in furniture(id).slice(1):c.draw_rect(Rect2(center+rect.position,rect.size),Color("4b3b51"))
 			for x in [-224,-160,160,224]: c.draw_circle(center+Vector2(x,-118),12,Color("8fe9ff"))
 			c.draw_arc(center+Vector2(0,32),74,0,TAU,32,Color("c1a9ff"),5)
 		"apprentice":

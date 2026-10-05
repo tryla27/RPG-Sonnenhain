@@ -98,7 +98,7 @@ func run()->void:
 		assert(not g.is_blocked(door,door),"Blocked door: "+str(shop["name"]))
 		assert(reached.has(Vector2i((door/16.0).round())),"Unreachable door: "+str(shop["name"]))
 	assert(reached.has(Vector2i(55,160)),"South exit disconnected")
-	for name in ["smith","chapel","tavern","arena","arena_interior"]:
+	for name in ["smith","chapel","tavern","arena","arena_interior","atelier","skillhaus","ratshalle"]:
 		var texture:Texture2D=load("res://art/village/%s.png" % name)
 		var im:=texture.get_image()
 		assert(not im.is_empty() and im.get_pixel(0,0).a==0)
