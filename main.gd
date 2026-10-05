@@ -6468,10 +6468,10 @@ func can_fuse(fusion:Dictionary) -> bool:
 	var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
 	return a!=b and learned[a] and learned[b] and int(skill_levels[id])<max_rank and level >= mini(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
 
-func fusion_target_slot(source_a:int,source_b:int)->int:
-	# Bevorzugt den frühesten Slot eines geopferten Spells, dann den ersten freien Slot.
+func fusion_target_slot(source_a:int,source_b:int,fusion_id:int=-1)->int:
+	# Bevorzugt den frühesten Slot eines geopferten Spells bzw. einer schon vorhandenen Fusion.
 	for i in slots.size():
-		if int(slots[i]) in [source_a,source_b]:return i
+		if int(slots[i]) in [source_a,source_b,fusion_id]:return i
 	for i in slots.size():
 		if int(slots[i])<0:return i
 	# Volle Leiste: Slot 1 wird ersetzt, damit die Fusion garantiert sofort benutzbar ist.
@@ -6488,7 +6488,7 @@ func buy_fusion(index:int) -> bool:
 	var a:=int(fusion["a"])
 	var b:=int(fusion["b"])
 	var price:=int(fusion["gold"])
-	var target_slot:=fusion_target_slot(a,b)
+	var target_slot:=fusion_target_slot(a,b,id)
 	var sacrificed_rank_a:=int(skill_levels[a])
 	var sacrificed_rank_b:=int(skill_levels[b])
 	var learned_before:=learned.duplicate()
@@ -6508,7 +6508,7 @@ func buy_fusion(index:int) -> bool:
 	cooldowns[a]=0.0
 	cooldowns[b]=0.0
 	for i in slots.size():
-		if int(slots[i]) in [a,b]:slots[i]=-1
+		if int(slots[i]) in [a,b,id]:slots[i]=-1
 
 	# Die neue Fusion übernimmt sofort den frühesten möglichen aktiven Slot.
 	learned[id]=true
