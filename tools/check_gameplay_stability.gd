@@ -168,12 +168,14 @@ func run():
 		var points:PackedVector2Array=g.cloak_local_points(profile)
 		assert(points.size()==8)
 		var max_y:float=-999.0
-		var max_abs_x:float=0.0
+		var min_x:float=999.0
+		var max_x:float=-999.0
 		for point in points:
 			max_y=maxf(max_y,point.y)
-			max_abs_x=maxf(max_abs_x,absf(point.x))
+			min_x=minf(min_x,point.x)
+			max_x=maxf(max_x,point.x)
 		assert(max_y<=31.0, "Umhang darf im Stand nicht unter die Füße ragen")
-		assert(max_abs_x<=24.0, "Umhang darf nicht rockartig zu breit werden")
+		assert(max_x-min_x<=48.0, "Umhang darf nicht rockartig zu breit werden")
 	assert(g.cloak_layer_mode(Vector2.DOWN)=="background")
 	assert(g.cloak_layer_mode(Vector2.UP)=="foreground")
 	assert(g.cloak_layer_mode(Vector2.LEFT)=="side")

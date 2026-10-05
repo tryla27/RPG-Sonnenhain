@@ -10,10 +10,10 @@ func _initialize()->void:
 	assert(main.find("houses_192.png")==-1)
 	assert(source.find("VillageHouseTiles32.paint(c,p,kind)")>=0)
 	assert(source.find('VillageHouseTiles32.paint(c,p,"borin")')>=0)
-	assert(source.find('VillageHouseTiles32.paint(c,p,"arena")')>=0)
+	assert(source.find('village_buildings.gd").paint(c,p,"arena")')>=0)
 	# Footprints remain compatible with existing interaction/collision layout.
 	assert(Vector2(6,5)*Houses.TILE==Vector2(192,160))
 	assert(Vector2(8,7)*Houses.TILE==Vector2(256,224))
 	assert(Vector2(12,7)*Houses.TILE==Vector2(384,224))
-	print("MAP0_TILE_HOUSES_OK legacy atlas detached; normal/Borin/arena use native 32px composition")
+	print("MAP0_TILE_HOUSES_OK legacy atlas detached; normal/Borin use native 32px composition; arena uses shared reference art")
 	quit()

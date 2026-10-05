@@ -6447,7 +6447,7 @@ func fusion_rank_from_network_state(state:Dictionary,fusion_id:int)->int:
 func skill_rank_rows()->Array:
 	ensure_skill_state_size()
 	var rows:Array=[]
-	for id in range(ABILITIES.size()):
+	for id in range(BASE_ABILITIES.size()):
 		if id>=learned.size() or not learned[id]:continue
 		if not fusion_definition_by_id(id).is_empty():continue
 		rows.append([id,clampi(int(skill_levels[id]),1,MAX_SKILL_RANK)])
@@ -6460,7 +6460,7 @@ func sanitize_skill_rank_rows(raw:Variant)->Array:
 	for row in raw:
 		if not row is Array or row.size()<2:continue
 		var id:=int(row[0])
-		if id<0 or id>=ABILITIES.size() or seen.has(id):continue
+		if id<0 or id>=BASE_ABILITIES.size() or seen.has(id):continue
 		if not fusion_definition_by_id(id).is_empty():continue
 		seen[id]=true
 		out.append([id,clampi(int(row[1]),1,MAX_SKILL_RANK)])

@@ -31,7 +31,7 @@ Der Kristall zeigt alle Rezepte auf 132 Seiten. Herstellbare Einträge erhalten 
 
 ## Dateien
 
-Geändert: `main.gd`; `components/fusion_rules.gd`, `map0_ground_plan_32.gd`, `patch_notes.gd`, `rpg_hero.gd`, `server_save_store.gd`, `start_scenery_32.gd`, `start_tilemap_32.gd`, `village_house_tiles_32.gd`, `village_interiors_32.gd`, `village_layout.gd`; `tools/check_content.py`, `check_fusion_impact_rules.gd`, `check_map_logic.gd`, `check_start32_assets.gd`; `.github/workflows/ci.yml`.
+Geändert: `main.gd`; `components/fusion_rules.gd`, `map0_ground_plan_32.gd`, `patch_notes.gd`, `rpg_hero.gd`, `server_save_store.gd`, `start_scenery_32.gd`, `start_tilemap_32.gd`, `village_house_tiles_32.gd`, `village_interiors_32.gd`, `village_layout.gd`; `tools/check_content.py`, `check_fusion_impact_rules.gd`, `check_map_logic.gd`, `check_start32_assets.gd`, `check_skill_system.gd`, `check_gameplay_stability.gd`, `check_map0_tile_houses.gd`; `.github/workflows/ci.yml`.
 
 Neu: `components/arena_interior.gd`, `character_adornments.gd`, `village_buildings.gd`, `village_fixtures.gd`; `tools/check_village_fusion_upgrade.gd`, `capture_village_upgrade.gd`; diese Dokumentation und `docs/spell-fusionen.csv`.
 
@@ -41,6 +41,6 @@ Neue PNGs mit Importmetadaten: `art/village/smith.png`, `chapel.png`, `tavern.pn
 
 Geprüft: alle 528 Rezeptidentitäten und Spell-Ausführungen; Kosten-/Level-Sperren; Heil-/Schutz- und Schaden-/Kontrollkombinationen; Opfer und erneutes Laden; Server-Save-Validierung; Mehrspieler-Identitäten; Umhangrichtung; Erreichbarkeit sämtlicher Gebäudetüren und des geöffneten Südausgangs mit tatsächlicher Körperkollision; transparente Assetecken. Vorhandene Tests für Fusionen, Runen, Speicherstände, Dorfübergänge und Steinrose bestehen weiterhin.
 
-Gerenderte Übersichten zeigen acht Blickrichtungen, sämtliche zehn Aufsätze und Abzeichen sowie Bewegungs-, Angriffs-, Roll- und Fallphasen. Dorf, Arena, Eingangshalle und Fusionsübersicht wurden visuell geprüft. Die neue Fusions-/Navigationsprüfung läuft auch in CI.
+Gerenderte Übersichten zeigen acht Blickrichtungen, sämtliche zehn Aufsätze und Abzeichen sowie Bewegungs-, Angriffs-, Roll- und Fallphasen. Dorf, Arena, Eingangshalle und Fusionsübersicht wurden visuell geprüft. Alle 51 lokalen Prüfungen ohne Netzwerkverbindung bestehen, einschließlich reservierter Spell-IDs, Skillränge und der bisherigen Spielsysteme. Die neue Fusions-/Navigationsprüfung läuft auch in CI.
 
 Es wurden keine Platzhalter-Rezepte oder fehlenden Assetframes hinzugefügt. Die automatisch erzeugten Fusionen verwenden gemeinsame Namen und kombinierte vorhandene Effekte; sie benötigen keine handgezeichneten Einzelgrafiken für jedes Paar. Bestehende Rückfälle des Golden-Sprite-Piloten auf den prozeduralen Körperrenderer bleiben erhalten.
