@@ -326,6 +326,7 @@ for jump_name in ['south','south-west','west','north-west','north','north-east',
     assert png_size(warrior_jump_dir / f'jump-{jump_name}-8f-v1.png') == (2172, 724), f'golden warrior jump strip invalid: {jump_name}'
 assert png_size(slime_idle) == (256, 32), 'golden forest slime strip must be 8 x 32px'
 hero_renderer = (root / 'components' / 'rpg_hero.gd').read_text(encoding='utf8')
+assert 'if role == 0:\n\t\tpoly(c,Vector2.ZERO,[[10,29],[46,29]' not in hero_renderer, 'fixed warrior cloak must not return; atelier owns warrior cloak rendering'
 mob_renderer = (root / 'components' / 'monster_design_32.gd').read_text(encoding='utf8')
 golden_runtime = (root / 'components' / 'golden_sprite_runtime.gd').read_text(encoding='utf8')
 assert 'GOLDEN_HUMAN_WARRIOR_IDLE' in hero_renderer and 'draw_direction_strip' in hero_renderer

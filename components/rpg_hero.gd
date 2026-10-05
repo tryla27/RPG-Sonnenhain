@@ -94,12 +94,12 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	if death >= 0: pivot.y += smoothstep(0.0,0.7,death)*19.0*s
 	var origin := pivot-(Vector2(28,44)*scale).rotated(rotation)
 	c.draw_set_transform(origin,rotation,scale)
-	# Cloak/quiver behind the figure, never over the face.
-	if role == 0:
-		poly(c,Vector2.ZERO,[[10,29],[46,29],[49,66],[38,70],[9,64]],Color("753e43" if not female else "804752"))
-	elif role == 1:
+	# Klassen-Hintergrunddetails. Der Krieger besitzt keinen fest eingebauten
+	# braunen Umhang mehr; sein Umhang kommt ausschließlich aus dem Atelier-Layer
+	# in main.gd, damit Farbe, Form, Blickrichtung und Sprung konsistent bleiben.
+	if role == 1:
 		poly(c,Vector2.ZERO,[[12,29],[44,29],[49,70],[33,74],[9,69]],Color("302e51"))
-	else:
+	elif role == 2:
 		poly(c,Vector2.ZERO,[[8,27],[18,23],[27,63],[16,67]],Color("674836"))
 		for arrow in 3:
 			r(c,9+arrow*4,17,2,18,"bdad86")
