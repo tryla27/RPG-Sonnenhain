@@ -1,0 +1,2 @@
+Sonnenhain RPG v27 - kompakte Laufzeit-ZIP
+Entfernt wurden nur nicht benoetigte Musik-Duplikate (WAV-Versionen von Themen, die main.gd als OGG laedt) sowie MIDI-Quelldateien. Spielinhalte und Laufzeitdateien bleiben erhalten.
