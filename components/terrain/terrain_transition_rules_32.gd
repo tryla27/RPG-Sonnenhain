@@ -1,5 +1,5 @@
 extends RefCounted
-## Rows in map0_transitions_32.svg. Each row has A<-B edges x=0..3 and B<-A edges x=4..7.
+## 256 transition slots: eight supported material pairs, both directions, four edge directions and four local variants.
 const PAIRS:=[
 	["village_grass","village_path"],
 	["village_grass","village_stone"],
@@ -11,9 +11,15 @@ const PAIRS:=[
 	["garden_path","village_path"]
 ]
 
-static func coord(current:String,neighbor:String,direction:int)->Vector2i:
-	for row in PAIRS.size():
-		var pair:Array=PAIRS[row]
-		if current==pair[0] and neighbor==pair[1]:return Vector2i(direction,row)
-		if current==pair[1] and neighbor==pair[0]:return Vector2i(4+direction,row)
+static func edge_variant(current:String,neighbor:String,cell:Vector2i)->int:
+	return posmod(cell.x*92821+cell.y*68917+current.hash()*31+neighbor.hash()*17,4)
+
+static func coord(current:String,neighbor:String,direction:int,cell:Vector2i)->Vector2i:
+	for pair_index in PAIRS.size():
+		var pair:Array=PAIRS[pair_index]
+		var variant:=edge_variant(current,neighbor,cell)
+		if current==pair[0] and neighbor==pair[1]:
+			return Vector2i(direction*4+variant,pair_index*2)
+		if current==pair[1] and neighbor==pair[0]:
+			return Vector2i(direction*4+variant,pair_index*2+1)
 	return Vector2i(-1,-1)
