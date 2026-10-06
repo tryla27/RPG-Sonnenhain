@@ -1,5 +1,0 @@
-Sonnenhain RPG v27.1 Hotfix
-- Godot-4.3-Parserfehler in draw_gate_wall behoben.
-- 'part' wird explizit als Vector2 typisiert.
-- 'length' und 'axis_tile' werden explizit als float typisiert.
-- Ursache: Typinferenz aus einem untypisierten Array/Variant in Godot 4.3.

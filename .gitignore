@@ -1,1 +1,24 @@
 .godot/
+build/
+builds/
+dist/
+tmp/
+.cache/
+.DS_Store
+Thumbs.db
+*.log
+
+# Generated Godot web exports. These are built by CI/CD and must not live in source control.
+/web/
+/index.html
+/index.js
+/index.pck
+/index.wasm
+/index.audio.worklet.js
+/index.audio.position.worklet.js
+/index.icon.png
+/index.icon.png.import
+/index.apple-touch-icon.png
+/index.apple-touch-icon.png.import
+/index.png
+/index.png.import
