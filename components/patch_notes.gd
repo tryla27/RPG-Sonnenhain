@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 06.10.2026"
-const NOTES=[["Map 0 · Neues Terrain", "Sonnenhain verwendet neue 32px-Bodenfamilien für Gras, Wege, Pflaster, Hausvorplätze und Arena. Übergänge, dezente Details und visuelle Höhenstufen werden deterministisch gewählt; Gebäude, Türen, Kollisionen, Navigation, Saves und Multiplayer bleiben unverändert."],
+const NOTES=[
+["Map 0 · Neues Terrain", "Sonnenhain verwendet neue 32px-Bodenfamilien für Gras, Wege, Pflaster, Hausvorplätze und Arena. Übergänge, dezente Details und visuelle Höhenstufen werden deterministisch gewählt; Gebäude, Türen, Kollisionen, Navigation, Saves und Multiplayer bleiben unverändert."],
+["Kamera · Zielen beim Zoom", "Mauszielen bleibt bei 100 %, 85 % und 70 % Kamera-Zoom exakt am Cursor. Bildschirmkoordinaten werden wieder korrekt in Weltkoordinaten umgerechnet."],
 ["Dorf · Acht neue Innenräume", "Schmiede, Kapelle, Steinrose, Arena-Halle, Atelier, Ratshalle, Borins Haus und Pips Nebenraum verwenden die abgestimmten Pixelgrafiken. Möbel und Wände besitzen zur Grafik passende Hitboxen. Pips Werkstatt ist durch die Seitentür bei Borin erreichbar."],
 ["Dorf · Spawn, Brunnen und Pflanzen", "Der Kristall-Spawn besitzt eine große Steinplattform mit freier Treppe und festen Mauern. Brunnen, Herbstbäume, Runenbaum und drei Buscharten passen zu den Häusern. Pflanzen, Laternen und Zäune stehen außerhalb der Gebäude; der 2-Meter-Held bleibt die Größenreferenz."],
 ["Welt · Freiere Begehbarkeit", "Bäume blockieren nur noch am Stamm, Büsche sind durchgehbar und große prozedurale Hindernisse haben kleinere faire Kollisionsflächen. Hauptwege werden jetzt automatisch auf freie Begehbarkeit geprüft."],
