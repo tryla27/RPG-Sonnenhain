@@ -1,5 +1,5 @@
 extends RefCounted
-const VERSION="PATCH 05.10.2026"
+const VERSION="PATCH 06.10.2026"
 const NOTES=[
 ["Dorf · Große Referenzgebäude", "Schmiede, Heilkapelle und Steinrose verwenden die neuen transparenten Referenzgrafiken. Die Arena ist deutlich größer und besitzt einen neuen Kampfplatz sowie eine größere Eingangshalle. Türen, Laufwege und Kollisionen sind auf den Heldenmaßstab abgestimmt."],
 ["Kristall · 528 Fusionen", "Alle eindeutigen Paare der 33 geeigneten Spells sind am Kristall sichtbar. Herstellbare Fusionen leuchten; gesperrte Rezepte nennen fehlende Spells, Level und Gold. Beide Quellen werden geopfert, die Fusion wird sofort ausgerüstet."],
