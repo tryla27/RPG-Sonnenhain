@@ -77,7 +77,8 @@ const Wagon32 = preload("res://components/wagon_32.gd")
 const StartTileMap32 = preload("res://components/start_tilemap_32.gd")
 var start_tilemap_32_attached := false
 var live_reconnect_timer := 0.0
-const REFERENCE_TREES := [Vector2(64,650),Vector2(860,360),Vector2(720,560),Vector2(64,1580),Vector2(1080,350),Vector2(960,96),Vector2(352,1780),Vector2(64,2080),Vector2(64,2440)]
+# Map 0: normale Bäume vorerst vollständig entfernt, bis die neue Stilvorlage eingesetzt wird.
+const REFERENCE_TREES: Array = []
 const REFERENCE_WELL := Vector2(1184, 832)
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
@@ -11485,7 +11486,6 @@ func village_props() -> Array:
 	props.append({"kind":"board","point":Vector2(630,1250),"depth":1272.0})
 	for p in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]: props.append({"kind":"fence","point":p,"depth":p.y+12})
 	for p in VillageFixtures.LAMPS: props.append({"kind":"lamp","point":p,"depth":p.y+8})
-	for p in [Vector2(460,940),Vector2(1220,1290),Vector2(520,1660),Vector2(1470,1215)]: props.append({"kind":"barrel","point":p,"depth":p.y+17})
 	for p in [Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]: props.append({"kind":"bush","point":p,"depth":p.y+28})
 	for shop in VillageLayout.SHOPS:
 		if shop["kind"]=="smith":props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
