@@ -15,6 +15,8 @@ func _initialize()->void:
 	assert(FileAccess.file_exists(Catalog.OVERLAY_ATLAS))
 	assert(FileAccess.file_exists(Catalog.TRANSITION_ATLAS))
 	assert(FileAccess.file_exists(Catalog.HEIGHT_ATLAS))
+	assert(Catalog.VARIANTS==16)
+	assert(Catalog.FAMILY_ORDER.size()==12)
 
 	var total:=0
 	var materials:Dictionary={}
@@ -51,5 +53,5 @@ func _initialize()->void:
 	assert(Map0.transition_cells.size()>0,"new Map 0 terrain needs transition cells")
 	assert(Map0.overlay_cells.size()>0,"new Map 0 terrain needs detail overlays")
 	assert(Map0.height_cells.size()>0,"new Map 0 terrain needs visual height accents")
-	print("MAP0_GROUND_PASS_OK 4592 cells, new 32px terrain families, transitions, overlays and visual heights")
+	print("MAP0_GROUND_PASS_OK 4592 cells, 192 ground + 256 transition + 128 overlay + 64 height slots, deterministic Map 0 terrain")
 	quit()
