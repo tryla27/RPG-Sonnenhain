@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 06.10.2026"
 const NOTES=[
+["Technik · Fusionszustand", "Angebotsprüfung, Verfügbarkeitsregeln und Slotwahl der Fusionen sind intern modularisiert. Bedienung, Saves, IDs und Kampfverhalten bleiben unverändert."],
 ["Dorf · Große Referenzgebäude", "Schmiede, Heilkapelle und Steinrose verwenden die neuen transparenten Referenzgrafiken. Die Arena ist deutlich größer und besitzt einen neuen Kampfplatz sowie eine größere Eingangshalle. Türen, Laufwege und Kollisionen sind auf den Heldenmaßstab abgestimmt."],
 ["Kristall · 528 Fusionen", "Alle eindeutigen Paare der 33 geeigneten Spells sind am Kristall sichtbar. Herstellbare Fusionen leuchten; gesperrte Rezepte nennen fehlende Spells, Level und Gold. Beide Quellen werden geopfert, die Fusion wird sofort ausgerüstet."],
 ["Atelier · Kopfschmuck und Abzeichen", "Roboter erhalten zehn unterschiedliche Kopfaufsätze. Zehn Brustabzeichen ersetzen den bisherigen Schmuck. Die Kosmetik wird mitgespeichert und im Mehrspieler synchronisiert; Umhänge bleiben hinter der Blickrichtung und folgen auch Rollen und Fallen."],
