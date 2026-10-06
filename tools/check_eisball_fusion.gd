@@ -1,7 +1,8 @@
 extends SceneTree
 
 func _initialize()->void:
-	var main:=FileAccess.get_file_as_string("res://main.gd")\n\tvar catalog:=FileAccess.get_file_as_string("res://components/fusion_catalog.gd")
+	var main:=FileAccess.get_file_as_string("res://main.gd")
+	var catalog:=FileAccess.get_file_as_string("res://components/fusion_catalog.gd")
 	assert(catalog.find('{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}')>=0)
 	assert(main.find('"name":"Eisball"')>=0)
 	assert(main.find("func iceball_chain(")>=0)
