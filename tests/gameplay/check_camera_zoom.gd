@@ -33,6 +33,14 @@ func run()->void:
 	g.set_camera_zoom_index(-99,false)
 	assert(g.camera_zoom_index==0 and is_equal_approx(g.camera_zoom,1.0))
 
+	g.camera_pos=Vector2(400,250)
+	g.set_camera_zoom_index(0,false)
+	assert(approx_vec(g.screen_to_world(Vector2(576,324)),Vector2(976,574)))
+	g.set_camera_zoom_index(1,false)
+	assert(approx_vec(g.screen_to_world(Vector2(576,324)),Vector2(400,250)+Vector2(576,324)/0.85))
+	g.set_camera_zoom_index(2,false)
+	assert(approx_vec(g.screen_to_world(Vector2(576,324)),Vector2(400,250)+Vector2(576,324)/0.70))
+
 	g.set_camera_zoom_index(2,false)
 	g.world_builder.active=true
 	assert(is_equal_approx(g.effective_camera_zoom(),1.0))
@@ -40,6 +48,6 @@ func run()->void:
 	g.world_builder.active=false
 	assert(is_equal_approx(g.effective_camera_zoom(),0.70))
 
-	print("CAMERA_ZOOM_OK levels=100/85/70 expanded_view=true builder_safe=true")
+	print("CAMERA_ZOOM_OK levels=100/85/70 expanded_view=true mouse_aim_world_space=true builder_safe=true")
 	g.queue_free()
 	quit()
