@@ -1,4 +1,5 @@
 extends RefCounted
+const QuestProgressRules=preload("res://components/quest_progress_rules.gd")
 ## Durable character snapshots. The private capability is never broadcast as player identity.
 const MAX_BYTES := 262144
 const MAX_REVISION := 9007199254740990
@@ -247,6 +248,13 @@ func put(peer: int, token: String, uuid: String, revision: int, request: String,
 	var clean: Dictionary = JSON.parse_string(JSON.stringify(data))
 	for field in clean.keys():
 		if String(field).begins_with("server_save_"): clean.erase(field)
+	if not record.is_empty() and record.get("data") is Dictionary:
+		clean=QuestProgressRules.merge_save_progress(record["data"],clean)
+	# Merge-Helfer erzeugen bewusst Integer fuer Zustandsfelder. Vor Digest und
+	# Schreiben erneut durch JSON normalisieren, damit der spaetere Read-Digest
+	# byte-identisch zur gespeicherten Datenstruktur bleibt.
+	clean=JSON.parse_string(JSON.stringify(clean))
+	if not valid_data(clean,uuid): return {"ok":false,"error":"invalid_save","uuid":uuid}
 	var next := {"schema":1,"uuid":uuid,"revision":actual_revision+1,"request":request,"updated_at":int(Time.get_unix_time_from_system()),"data":clean,"digest":JSON.stringify(clean).sha256_text()}
 	var error := write_record(key,next)
 	if error != OK: return {"ok":false,"error":"disk_error","uuid":uuid}

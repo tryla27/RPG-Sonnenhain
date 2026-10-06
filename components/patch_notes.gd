@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 06.10.2026"
 const NOTES=[
+["Multiplayer · Einmalige Quests", "Quest-, Borin- und Welt-Event-Fortschritt kann beim Serverabgleich nicht mehr auf einen älteren Zustand zurückfallen. Abgeschlossene Aufgaben bleiben pro Charakter dauerhaft abgeschlossen."],
 ["Technik · Fusions-Lesemodell", "Fusions-Lookups, Impact-Profile und fehlende Quellen werden intern über ein separates Lesemodell ermittelt. Öffentliche Methoden und Spielverhalten bleiben unverändert."],
 ["Technik · Fusionszustand", "Angebotsprüfung, Verfügbarkeitsregeln und Slotwahl der Fusionen sind intern modularisiert. Bedienung, Saves, IDs und Kampfverhalten bleiben unverändert."],
 ["Dorf · Große Referenzgebäude", "Schmiede, Heilkapelle und Steinrose verwenden die neuen transparenten Referenzgrafiken. Die Arena ist deutlich größer und besitzt einen neuen Kampfplatz sowie eine größere Eingangshalle. Türen, Laufwege und Kollisionen sind auf den Heldenmaßstab abgestimmt."],
