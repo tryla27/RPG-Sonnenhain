@@ -26,7 +26,7 @@ func run()->void:
 				var p:=a.lerp(b,float(n)/float(count))
 				if g.region_at(p)==0:continue
 				for offset in [0.0,-22.0,22.0]:
-					var sample:=p+side*offset
+					var sample:Vector2=p+side*float(offset)
 					assert(not g.terrain_blocked(sample,16.0),"Main trail blocked at %s" % sample)
 				checked+=1
 
