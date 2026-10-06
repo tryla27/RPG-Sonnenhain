@@ -35,6 +35,8 @@ func run()->void:
 			var saved:Dictionary=store.put(901,token,g.player_uuid,revision,"head-%d-%d"%[hero_class,boss_class],data)
 			assert(saved["ok"]);revision=int(saved["revision"])
 			g.apply_save_data(store.read_record(store.key_for(token))["data"])
+			if not (g.equipped_head_uid==hat["uid"] and g.head_visual()==boss_class):
+				print("BOSS_HEAD_RELOAD_DEBUG hero=",hero_class," boss=",boss_class," expected_uid=",hat["uid"]," actual_uid=",g.equipped_head_uid," visual=",g.head_visual()," inventory=",g.inventory)
 			assert(g.equipped_head_uid==hat["uid"] and g.head_visual()==boss_class)
 			g.inventory[0].erase("boss_hat")
 			g.validate_equipment_slots()
