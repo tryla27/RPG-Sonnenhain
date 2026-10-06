@@ -87,13 +87,13 @@ static func prepare(_distance:Callable)->void:
 			visual_coords[cell]=Catalog.atlas_coord(visual,Selector.variant_index(visual,cell,4))
 			terrain[cell]=0 if legacy in NATURAL_MATERIALS else (1 if legacy=="earth_path" else 2)
 
-	var dirs:=[Vector2i.UP,Vector2i.RIGHT,Vector2i.DOWN,Vector2i.LEFT]
+	var dirs:Array[Vector2i]=[Vector2i.UP,Vector2i.RIGHT,Vector2i.DOWN,Vector2i.LEFT]
 	for cell:Vector2i in visual_cells:
 		var current:String=str(visual_cells[cell])
 		for di in 4:
-			var other:=cell+dirs[di]
+			var other:Vector2i=cell+dirs[di]
 			if not Plan.in_bounds(other):continue
-			var coord:=TransitionRules.coord(current,str(visual_cells.get(other,current)),di)
+			var coord:Vector2i=TransitionRules.coord(current,str(visual_cells.get(other,current)),di)
 			if coord.x>=0:
 				transition_cells[cell]=coord
 				break
