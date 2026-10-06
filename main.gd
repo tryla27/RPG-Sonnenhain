@@ -315,6 +315,9 @@ var facing := Vector2.RIGHT
 var camera_pos := Vector2.ZERO
 var camera_smooth := Vector2.ZERO
 var camera_context := ""
+const CAMERA_ZOOM_LEVELS := [1.0,0.85,0.70]
+var camera_zoom_index := 0
+var camera_zoom := 1.0
 const STATIC_CHUNK_SIZE := 512
 const STATIC_CACHE_LIMIT := 32
 var static_chunks: Dictionary = {}
@@ -1875,10 +1878,14 @@ func _process(delta: float) -> void:
 	for i in range(lightning_lines.size() - 1, -1, -1):
 		lightning_lines[i]["life"] = float(lightning_lines[i]["life"]) - delta
 		if lightning_lines[i]["life"] <= 0: lightning_lines.remove_at(i)
+	# Der sichtbare Weltraum wächst beim Herauszoomen; HUD und Eingabe bleiben in 1152x648.
+	var render_zoom:=effective_camera_zoom()
+	scale=Vector2.ONE*render_zoom
+	var view_size:=camera_view_size()
 	# Der Arenarand liegt außerhalb eines einzelnen Bildschirms; die Kamera begleitet den Helden.
 	var camera_focus: Vector2 = ARENA_CENTER + (player_pos - ARENA_CENTER) * 0.88 if arena_mode != "" else player_pos
-	var target_camera: Vector2 = camera_focus - VIEW * 0.5 if arena_mode != "" else (INTERIOR_CENTER - VIEW * 0.5 if interior_id >= 0 else (player_pos - VIEW * 0.5).clamp(Vector2.ZERO, WORLD - VIEW))
-	if interior_id==3:target_camera=player_pos.clamp(INTERIOR_CENTER-Vector2(96,64),INTERIOR_CENTER+Vector2(96,64))-VIEW*0.5
+	var target_camera: Vector2 = camera_focus - view_size * 0.5 if arena_mode != "" else (INTERIOR_CENTER - view_size * 0.5 if interior_id >= 0 else (player_pos - view_size * 0.5).clamp(Vector2.ZERO, WORLD - view_size))
+	if interior_id==3:target_camera=player_pos.clamp(INTERIOR_CENTER-Vector2(96,64),INTERIOR_CENTER+Vector2(96,64))-view_size*0.5
 	var context := "%s:%d:%d" % [arena_mode,interior_id,dungeon_id]
 	if context != camera_context or camera_smooth.distance_to(target_camera) > 450.0:
 		camera_smooth = target_camera
@@ -2994,6 +3001,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if hud_hovered else Input.CURSOR_ARROW)
 	if server_save.loading: return
 	if world_builder.active and world_builder.input(self,event):return
+	if panel=="" and not touch_enabled and not chat_open:
+		if event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN]:
+			change_camera_zoom(-1 if event.button_index==MOUSE_BUTTON_WHEEL_UP else 1)
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventKey and event.pressed and not event.echo and not event.ctrl_pressed and not event.meta_pressed and not event.alt_pressed:
+			if event.keycode in [KEY_PLUS,KEY_KP_ADD]:
+				change_camera_zoom(-1)
+				get_viewport().set_input_as_handled()
+				return
+			if event.keycode in [KEY_MINUS,KEY_KP_SUBTRACT]:
+				change_camera_zoom(1)
+				get_viewport().set_input_as_handled()
+				return
 	if controller.handle(self, event): return
 	if event is InputEventMouseMotion: controller.used = false
 	if panel == "controller" and event is InputEventKey and event.pressed and event.keycode == KEY_DELETE and controller.awaiting != "":
@@ -7041,7 +7062,7 @@ func sell_item(index: int) -> void:
 func _draw() -> void:
 	if panel in ["account_gate","account_login","account_register","account_migrate","start","creation","creation_review"] and not dedicated_server_mode:
 		character_canvas_offset=Vector2.ZERO
-		draw_set_transform(Vector2.ZERO)
+		apply_ui_transform()
 		draw_rect(Rect2(Vector2.ZERO,VIEW),Color("071321"))
 		for i in 18:
 			var x:float=i*72
@@ -7200,7 +7221,7 @@ func _draw() -> void:
 			draw_rect(Rect2(center + offset - Vector2(ember * 0.5, ember * 0.5), Vector2(ember, ember)), tint.lightened(0.28))
 	for arc_line in lightning_lines:
 		var a: Vector2 = arc_line["from"]
-		if not Rect2(a.min(arc_line["to"])-Vector2(32,32),(arc_line["to"]-a).abs()+Vector2(64,64)).intersects(Rect2(camera_pos,VIEW)): continue
+		if not Rect2(a.min(arc_line["to"])-Vector2(32,32),(arc_line["to"]-a).abs()+Vector2(64,64)).intersects(camera_world_rect()): continue
 		var b: Vector2 = arc_line["to"]
 		var middle := a.lerp(b, 0.5) + (b - a).normalized().rotated(PI * 0.5) * 17
 		draw_line(a, middle, Color("fff2a3", 0.55), 13)
@@ -7217,7 +7238,7 @@ func _draw() -> void:
 		var p: Vector2 = e["pos"] + Vector2(0, (float(e["max"]) - float(e["life"])) * -40)
 		text_at(p, String(e["text"]), 18, e["color"], HORIZONTAL_ALIGNMENT_CENTER, 180)
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0: draw_day_night_overlay()
-	draw_set_transform(Vector2.ZERO)
+	apply_ui_transform()
 	draw_hud()
 	character_canvas_offset = Vector2.ZERO
 	draw_chat_overlay()
@@ -7237,9 +7258,9 @@ func draw_day_night_overlay() -> void:
 	var night := pow(1.0 - daylight, 1.65)
 	var dusk := pow(absf(sin(phase * TAU)), 12.0)
 	if night > 0.01:
-		draw_rect(Rect2(camera_pos, VIEW), Color("172644", 0.22 * night))
+		draw_rect(camera_world_rect(), Color("172644", 0.22 * night))
 	if dusk > 0.01:
-		draw_rect(Rect2(camera_pos, VIEW), Color("df895b", 0.055 * dusk))
+		draw_rect(camera_world_rect(), Color("df895b", 0.055 * dusk))
 	for lamp in VillageFixtures.LAMPS:
 		if visible_world(lamp,130):VillageFixtures.glow(self,lamp,night,world_time)
 
@@ -7476,12 +7497,38 @@ func draw_spell_local(visual: Dictionary) -> void:
 				draw_line(source, target, Color(hue, alpha), 3)
 				draw_circle(target, 4 + 4 * alpha, Color("fff7e8", alpha))
 
+func effective_camera_zoom()->float:
+	if konflux.active or world_builder.active:return 1.0
+	return camera_zoom
+
+func camera_view_size()->Vector2:
+	return VIEW/maxf(0.01,effective_camera_zoom())
+
+func camera_world_rect()->Rect2:
+	return Rect2(camera_pos,camera_view_size())
+
+func apply_ui_transform()->void:
+	var z:=effective_camera_zoom()
+	draw_set_transform(Vector2.ZERO,0,Vector2.ONE/z)
+
+func set_camera_zoom_index(value:int,show_notice:bool=true)->void:
+	var next:=clampi(value,0,CAMERA_ZOOM_LEVELS.size()-1)
+	if next==camera_zoom_index:return
+	camera_zoom_index=next
+	camera_zoom=float(CAMERA_ZOOM_LEVELS[camera_zoom_index])
+	camera_context=""
+	if show_notice:message("Kamera · %d%%" % roundi(camera_zoom*100.0))
+	queue_redraw()
+
+func change_camera_zoom(step:int)->void:
+	set_camera_zoom_index(camera_zoom_index+step)
+
 func current_static_bounds() -> Rect2:
-	return static_draw_bounds if static_draw_bounds.has_area() else Rect2(camera_pos,VIEW)
+	return static_draw_bounds if static_draw_bounds.has_area() else camera_world_rect()
 
 func visible_world(pos: Vector2, margin: float = 100.0) -> bool:
 	if static_draw_bounds.has_area(): return static_draw_bounds.grow(margin).has_point(pos)
-	return pos.x > camera_pos.x - margin and pos.x < camera_pos.x + VIEW.x + margin and pos.y > camera_pos.y - margin and pos.y < camera_pos.y + VIEW.y + margin
+	return camera_world_rect().grow(margin).has_point(pos)
 
 func hash_cell(x: int, y: int) -> int:
 	var n := x * 92821 + y * 68917 + x * y * 31
@@ -7817,7 +7864,7 @@ func draw_world() -> void:
 		draw_dungeon_world()
 		return
 	if not draw_cached_overworld():
-		draw_static_overworld(Rect2(camera_pos,VIEW))
+		draw_static_overworld(camera_world_rect())
 	draw_class_boss_arenas()
 	draw_region_gates()
 
@@ -7967,12 +8014,12 @@ func draw_static_overworld(bounds: Rect2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, WORLD), Color('45726d'), false, 7)
 
 func draw_village_interior() -> void:
-	draw_rect(Rect2(camera_pos,VIEW),Color("141e23"))
+	draw_rect(camera_world_rect(),Color("141e23"))
 	VillageInteriors32.paint(self,INTERIOR_CENTER,interior_id,font,touch_enabled,binding_short("interact"))
 	for actor in interior_actors(): draw_npc(actor)
 
 func draw_tavern_world() -> void:
-	draw_rect(Rect2(camera_pos, VIEW), Color("141e23"))
+	draw_rect(camera_world_rect(), Color("141e23"))
 	var origin := INTERIOR_CENTER - Vector2(480, 288)
 	for x in 20:
 		for y in 12:
@@ -8010,7 +8057,7 @@ func draw_tavern_world() -> void:
 	text_at(INTERIOR_CENTER + Vector2(-110, 215), ("%s · ZURÜCK NACH SONNENHAIN" % ("AKTION" if touch_enabled else binding_short("interact"))), 14, Color("ffefd0"), HORIZONTAL_ALIGNMENT_CENTER, 220)
 
 func draw_dungeon_world() -> void:
-	draw_rect(Rect2(camera_pos, VIEW), Color("101920"))
+	draw_rect(camera_world_rect(), Color("101920"))
 	var room := Rect2(DUNGEON_CENTER - Vector2(690, 420), Vector2(1380, 840))
 	draw_rect(room.grow(24), Color("121a23"))
 	for x in 29:
@@ -8126,7 +8173,7 @@ func draw_overworld_atmosphere() -> void:
 		if visible_world(torch_pos, 55): draw_torch(torch_pos, region_at(torch_pos) == 4, true)
 
 func draw_arena_world() -> void:
-	draw_rect(Rect2(camera_pos, VIEW),Color("24201f"))
+	draw_rect(camera_world_rect(),Color("24201f"))
 	ArenaInterior.paint(self,ARENA_CENTER,ARENA_RADIUS)
 
 func _trail_theme(region: int) -> int:
@@ -9495,7 +9542,7 @@ func draw_hud() -> void:
 		draw_touch_controls()
 	else:
 		draw_ref_panel(Rect2(9, 586, 1134, 53))
-		text_at(Vector2(22, 605), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 10, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 650)
+		text_at(Vector2(22, 605), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge") + " · ZOOM: MAUSRAD / +/-", 10, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 760)
 		var hud_labels:Array=[
 			"%s SPELLS" % binding_short("skills"),
 			"%s INVENTAR" % binding_short("inventory"),
@@ -11370,8 +11417,8 @@ func static_chunk_keys(bounds: Rect2) -> Array:
 func update_static_cache() -> void:
 	if DisplayServer.get_name() == "headless": return
 	if not performance_cache_enabled or arena_mode != "" or interior_id >= 0 or dungeon_id >= 0: return
-	var needed := static_chunk_keys(Rect2(camera_pos,VIEW))
-	var ahead := static_chunk_keys(Rect2(camera_pos,VIEW).grow(160))
+	var needed := static_chunk_keys(camera_world_rect())
+	var ahead := static_chunk_keys(camera_world_rect().grow(160))
 	for key in ahead:
 		if not needed.has(key): needed.append(key)
 	var created := 0
@@ -11410,7 +11457,7 @@ func update_static_cache() -> void:
 
 func draw_cached_overworld() -> bool:
 	if not performance_cache_enabled: return false
-	var keys := static_chunk_keys(Rect2(camera_pos,VIEW))
+	var keys := static_chunk_keys(camera_world_rect())
 	for key in keys:
 		if not static_chunks.has(key) or Engine.get_process_frames()-int(static_chunks[key]["created"]) < 2: return false
 	for key in keys:
@@ -11489,7 +11536,7 @@ func update_foreground_cache() -> void:
 	# bei WebGL transparente/fehlende Texturen festhalten und dadurch Häuser,
 	# Händlerstände und weitere Props komplett verschwinden lassen.
 	return
-	var ahead := Rect2(camera_pos,VIEW).grow(200)
+	var ahead := camera_world_rect().grow(200)
 	var created := 0
 	for prop in village_props():
 		var bounds := prop_bounds(prop)

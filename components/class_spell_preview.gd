@@ -6,7 +6,8 @@ static func draw(g,id:int,rect:Rect2)->void:
 	g.draw_rect(rect,Color("102c3c"));g.draw_rect(rect,Color("627479"),false,1)
 	var t:float=fmod(Time.get_ticks_msec()/1000.0+id*.17,2.4)/2.4
 	var origin:Vector2=rect.position+Vector2(15,rect.size.y*.5)
-	g.draw_set_transform(origin,0,Vector2(.22,.22))
+	var ui_compensation:=1.0/maxf(0.01,float(g.effective_camera_zoom())) if g.has_method("effective_camera_zoom") else 1.0
+	g.draw_set_transform(origin*ui_compensation,0,Vector2(.22,.22)*ui_compensation)
 	var source:Vector2=Vector2.ZERO;var target:Vector2=Vector2(390,0)
 	g.draw_rect(Rect2(target+Vector2(-8,-28),Vector2(16,40)),Color("778c7a"))
 	var fx:Dictionary={"kind":id,"pos":Vector2(170,0),"end":target,"dir":Vector2.RIGHT,"rank":1,"life":1-t,"max":1.0}
@@ -30,4 +31,5 @@ static func draw(g,id:int,rect:Rect2)->void:
 	else:
 		if id==2:fx["pos"]=source
 		g.draw_spell_local(fx)
-	g.draw_set_transform(Vector2.ZERO)
+	if g.has_method("apply_ui_transform"):g.apply_ui_transform()
+	else:g.draw_set_transform(Vector2.ZERO)

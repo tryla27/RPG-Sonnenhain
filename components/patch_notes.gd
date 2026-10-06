@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 06.10.2026"
 const NOTES=[
+["Kamera · Herauszoomen", "Im Spiel gibt es jetzt drei feste Zoomstufen: 100 %, 85 % und 70 %. Mausrad oder +/- ändern den sichtbaren Weltraum; HUD und Menüs bleiben in Originalgröße."],
 ["Multiplayer · Faire Gruppenquests", "Geteilter Questfortschritt zählt nur noch für Gruppenmitglieder in passender Reichweite und Instanz. Bei Bossen ist zusätzlich echte, aktuelle Kampfbeteiligung nötig."],
 ["Multiplayer · Einmalige Quests", "Quest-, Borin- und Welt-Event-Fortschritt kann beim Serverabgleich nicht mehr auf einen älteren Zustand zurückfallen. Abgeschlossene Aufgaben bleiben pro Charakter dauerhaft abgeschlossen."],
 ["Technik · Fusions-Lesemodell", "Fusions-Lookups, Impact-Profile und fehlende Quellen werden intern über ein separates Lesemodell ermittelt. Öffentliche Methoden und Spielverhalten bleiben unverändert."],
