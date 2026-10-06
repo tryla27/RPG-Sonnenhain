@@ -50,10 +50,10 @@ static func prepare(_distance:Callable)->void:
 	if shared_tileset!=null:return
 	Offer.prepare()
 	shared_tileset=TileSet.new();shared_tileset.tile_size=Vector2i(TILE,TILE)
-	ground_source_id=make_source(Catalog.GROUND_ATLAS,4,12)
-	overlay_source_id=make_source(Catalog.OVERLAY_ATLAS,8,2)
-	transition_source_id=make_source(Catalog.TRANSITION_ATLAS,8,8)
-	height_source_id=make_source(Catalog.HEIGHT_ATLAS,4,4)
+	ground_source_id=make_source(Catalog.GROUND_ATLAS,16,12)
+	overlay_source_id=make_source(Catalog.OVERLAY_ATLAS,16,8)
+	transition_source_id=make_source(Catalog.TRANSITION_ATLAS,16,16)
+	height_source_id=make_source(Catalog.HEIGHT_ATLAS,8,8)
 	for id in Catalog.FAMILY_ORDER:source_ids[id]=ground_source_id
 	for id in MATERIAL_IDS:source_ids[id]=ground_source_id
 
@@ -84,7 +84,7 @@ static func prepare(_distance:Callable)->void:
 			var visual:String=Offer.resolve(legacy,cell,route_d)
 			material_cells[cell]=legacy
 			visual_cells[cell]=visual
-			visual_coords[cell]=Catalog.atlas_coord(visual,Selector.variant_index(visual,cell,4))
+			visual_coords[cell]=Catalog.atlas_coord(visual,Selector.variant_index(visual,cell,16))
 			terrain[cell]=0 if legacy in NATURAL_MATERIALS else (1 if legacy=="earth_path" else 2)
 
 	var dirs:Array[Vector2i]=[Vector2i.UP,Vector2i.RIGHT,Vector2i.DOWN,Vector2i.LEFT]
@@ -93,17 +93,17 @@ static func prepare(_distance:Callable)->void:
 		for di in 4:
 			var other:Vector2i=cell+dirs[di]
 			if not Plan.in_bounds(other):continue
-			var coord:Vector2i=TransitionRules.coord(current,str(visual_cells.get(other,current)),di)
+			var coord:Vector2i=TransitionRules.coord(current,str(visual_cells.get(other,current)),di,cell)
 			if coord.x>=0:
 				transition_cells[cell]=coord
 				break
 
 	for cell:Vector2i in visual_cells:
 		var family:String=str(visual_cells[cell]);var legacy:String=str(material_cells[cell])
-		if legacy=="arcane_floor":overlay_cells[cell]=Vector2i(4+Selector.variant_index("arcane",cell,2),1)
-		elif family in ["village_grass","moss_grass","forest_ground"] and Selector.chance("flora",cell,11):overlay_cells[cell]=Vector2i(Selector.variant_index("flowers",cell,4),0)
-		elif family in ["village_path","garden_path","arena_ground"] and Selector.chance("tracks",cell,13):overlay_cells[cell]=Vector2i(Selector.variant_index("tracks",cell,2),1)
-		elif family in ["village_stone","plaza_stone","old_cobble_rework","building_apron","arena_entry_stone","arena_border"] and Selector.chance("wear",cell,15):overlay_cells[cell]=Vector2i(4+Selector.variant_index("wear",cell,4),0)
+		if legacy=="arcane_floor":overlay_cells[cell]=Vector2i(Selector.variant_index("arcane",cell,16),6)
+		elif family in ["village_grass","moss_grass","forest_ground"] and Selector.chance("flora",cell,9):overlay_cells[cell]=Vector2i(Selector.variant_index("flowers",cell,16),0)
+		elif family in ["village_path","garden_path","arena_ground"] and Selector.chance("tracks",cell,11):overlay_cells[cell]=Vector2i(Selector.variant_index("tracks",cell,16),4)
+		elif family in ["village_stone","plaza_stone","old_cobble_rework","building_apron","arena_entry_stone","arena_border"] and Selector.chance("wear",cell,10):overlay_cells[cell]=Vector2i(Selector.variant_index("wear",cell,16),5)
 		var hc:=HeightRules.coord(cell,float(route_by_cell[cell]))
 		if hc.x>=0:height_cells[cell]=hc
 
