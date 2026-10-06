@@ -310,7 +310,7 @@ assert 'var fade_alpha := 1.0 if chat_open else clampf(chat_fade / 1.25, 0.0, 1.
 assert 'func start_coop_world() -> void:' in source and 'WELT STARTEN' in source and 'WELT BEITRETEN' in source, 'co-op world start/join flow missing'
 assert 'func is_web_platform() -> bool:' in source and 'OS.has_feature("web")' in source, 'browser networking guard missing'
 assert (root / 'export_presets.cfg').exists() and 'platform="Web"' in (root / 'export_presets.cfg').read_text(encoding='utf8'), 'web export preset missing'
-assert (root / 'WEB_EXPORT.md').exists(), 'web hosting guide missing'
+assert (root / 'docs' / 'deployment' / 'web-export.md').exists(), 'web hosting guide missing'
 print('OK v27.5: detailed enemy and player models, fantasy weapons, house atlas, chat fade, co-op world launch, continuous roads, day/night and Web preset')
 
 
