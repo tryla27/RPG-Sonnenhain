@@ -195,20 +195,13 @@ const CLASS_ULTIMATES := [15, 24, 33]
 const MAX_SKILL_RANK := 4
 const SKILL_TREE_NAMES := ["KAMPF", "MAGIE", "ROBOTIK"]
 const SKILL_TREES := [[0,1,2,3,4,5,6,7,8,12,13,14,25,26,27,28,29,30,31,32],[16,17,18,19,20,21,22,23],[34,35,36,37,38,39]]
-const BUILTIN_FUSIONS := [{"id":40,"a":0,"b":16,"gold":1200,"max_rank":4},{"id":41,"a":1,"b":36,"gold":2200,"max_rank":4},{"id":42,"a":18,"b":37,"gold":4200,"max_rank":4},{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}]
+const BUILTIN_FUSIONS := FusionCatalog.BUILTIN_FUSIONS
 var FUSIONS:Array=FusionRules.catalog(BASE_ABILITIES,BUILTIN_FUSIONS)
 var ABILITIES:Array=FusionRules.abilities_with_fusions(BASE_ABILITIES,FUSIONS)
 var fusion_page:=0
 
 const COSMETIC_ACCENT_HEX := ["be5368","557fc0","5f9b68","b7894f","8d62aa","55a5a5","cf6f59","c94f7e","6a6fd1","4e9ad6","4ca6a0","5caf7a","86b84d","c2b14a","d48c4f","a86b4e","8c6a58","9a7acb","c36db5","d7d7d7"]
-# Zentrale Regel: Damage-Fusionen lösen ihren Sekundäreffekt am tatsächlichen Trefferpunkt aus.
-# Reine Schutz-/Buff-Fusionen bleiben als ON_CAST-Ausnahme am Spieler.
-const FUSION_IMPACT_PROFILES := {
-	40:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":16,"secondary":0,"effect":"fire_whirl","radius":112.0,"damage_mult":0.34},
-	41:{"trigger":"ON_CAST","spawn":"PLAYER_POSITION","carrier":1,"secondary":36,"effect":"reactor_wall","radius":150.0,"damage_mult":0.22},
-	42:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":18,"secondary":37,"effect":"tesla_wave","radius":145.0,"damage_mult":0.38},
-	43:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":18,"secondary":17,"effect":"iceball","radius":118.0,"damage_mult":0.42}
-}
+const FUSION_IMPACT_PROFILES := FusionCatalog.IMPACT_PROFILES
 const BORIN_HOUSE_POS := Vector2(1248,64)
 const BORIN_MAGIC_TREE_POS := Vector2(1120,616)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
@@ -614,7 +607,7 @@ const WorldBuilder = preload("res://components/world_builder.gd")
 var world_builder = WorldBuilder.new()
 const WorldFog = preload("res://components/world_fog.gd")
 var world_fog = WorldFog.new()
-const FusionRules = preload("res://components/fusion_rules.gd")
+const FusionRules = preload("res://components/fusion_rules.gd")\nconst FusionCatalog = preload("res://components/fusion_catalog.gd")
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
