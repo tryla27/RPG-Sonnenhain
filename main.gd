@@ -607,7 +607,8 @@ const WorldBuilder = preload("res://components/world_builder.gd")
 var world_builder = WorldBuilder.new()
 const WorldFog = preload("res://components/world_fog.gd")
 var world_fog = WorldFog.new()
-const FusionRules = preload("res://components/fusion_rules.gd")\nconst FusionCatalog = preload("res://components/fusion_catalog.gd")
+const FusionRules = preload("res://components/fusion_rules.gd")
+const FusionCatalog = preload("res://components/fusion_catalog.gd")
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
