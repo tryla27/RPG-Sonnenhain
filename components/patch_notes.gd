@@ -82,3 +82,4 @@ static func draw(g)->void:
 		g.text_at(Vector2(170,y),NOTES[i][0],13,Color("ffe2aa"))
 		g.text_at(Vector2(330,y),NOTES[i][1],11,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,640)
 	g.text_at(Vector2(170,590),"%d weitere ältere Einträge im Patch-Verlauf." % maxi(0,NOTES.size()-visible_count),11,Color("9fb4ac"))
+# Production deploy trigger: Map 0 terrain rework 2026-10-06
