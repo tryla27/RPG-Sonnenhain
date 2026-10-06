@@ -2591,8 +2591,39 @@ func decorative_tree_in_cell(tx:int,ty:int) -> Dictionary:
 		11: tree = key%7==0
 		12: tree = key%6==0
 	if not tree:return {}
-	var trunk_radius := 18.0 if zone in [1,6,8,10] else (23.0 if zone in [2,3,7,9,11] else 27.0)
+	# Die Baumkrone darf groß wirken; nur der eigentliche Stamm blockiert.
+	var trunk_radius := 10.0 if zone in [1,6,8,10] else (12.0 if zone in [2,3,7,9,11] else 14.0)
 	return {"point":point+Vector2(24,42),"radius":trunk_radius,"zone":zone}
+
+func obstacle_collision_radius(obstacle:Dictionary)->float:
+	var zone:=int(obstacle.get("zone",0))
+	var visual_radius:=float(obstacle.get("radius",0.0))
+	match zone:
+		1,2:return minf(18.0,visual_radius*.32)
+		3:return minf(30.0,visual_radius*.52)
+		4:return minf(24.0,visual_radius*.42)
+		5:return minf(30.0,visual_radius*.48)
+		6:return minf(18.0,visual_radius*.34)
+		7:return minf(22.0,visual_radius*.40)
+		8:return 0.0 # Sträucher/Zweige sind Dekoration und komplett begehbar.
+		9:return minf(18.0,visual_radius*.34)
+		10:return minf(16.0,visual_radius*.30)
+		11:return minf(26.0,visual_radius*.46)
+		12:return minf(20.0,visual_radius*.36)
+		_:return minf(22.0,visual_radius*.40)
+
+func trail_clearance_points(step:float=48.0)->Array:
+	var out:Array=[]
+	for trail in TRAILS:
+		for i in range(trail.size()-1):
+			var a:Vector2=trail[i]
+			var b:Vector2=trail[i+1]
+			var length:=a.distance_to(b)
+			var count:=maxi(1,ceili(length/maxf(8.0,step)))
+			for n in range(count+1):
+				var point:=a.lerp(b,float(n)/float(count))
+				if region_at(point)!=0:out.append(point)
+	return out
 
 func terrain_blocked(p: Vector2,radius:float=-1.0) -> bool:
 	if radius<0:radius=hero_collision_radius()
@@ -2613,7 +2644,9 @@ func terrain_blocked(p: Vector2,radius:float=-1.0) -> bool:
 	for x in range(cx - 1, cx + 2):
 		for y in range(cy - 1, cy + 2):
 			var obstacle := obstacle_in_cell(x, y)
-			if not obstacle.is_empty() and p.distance_to(obstacle["pos"]) < float(obstacle["radius"]) + radius+2.0:
+			if obstacle.is_empty():continue
+			var collision_radius:=obstacle_collision_radius(obstacle)
+			if collision_radius>0.0 and p.distance_to(obstacle["pos"]) < collision_radius + radius+2.0:
 				return true
 	return false
 

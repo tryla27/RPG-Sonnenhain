@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 06.10.2026"
 const NOTES=[
+["Welt · Freiere Begehbarkeit", "Bäume blockieren nur noch am Stamm, Büsche sind durchgehbar und große prozedurale Hindernisse haben kleinere faire Kollisionsflächen. Hauptwege werden jetzt automatisch auf freie Begehbarkeit geprüft."],
 ["Map 0 · Szenerie bereinigt", "Die bisherigen normalen Bäume und Fässer wurden aus Sonnenhain entfernt. Borins eigener Zauberbaum bleibt bestehen; neue normale Bäume folgen erst mit der neuen Stilvorlage."],
 ["Kamera · Herauszoomen", "Im Spiel gibt es jetzt drei feste Zoomstufen: 100 %, 85 % und 70 %. Mausrad oder +/- ändern den sichtbaren Weltraum; HUD und Menüs bleiben in Originalgröße."],
 ["Multiplayer · Faire Gruppenquests", "Geteilter Questfortschritt zählt nur noch für Gruppenmitglieder in passender Reichweite und Instanz. Bei Bossen ist zusätzlich echte, aktuelle Kampfbeteiligung nötig."],
