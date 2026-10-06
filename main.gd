@@ -3001,12 +3001,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if hud_hovered else Input.CURSOR_ARROW)
 	if server_save.loading: return
 	if world_builder.active and world_builder.input(self,event):return
-	if panel=="" and not touch_enabled:
+	if panel=="" and not touch_enabled and not chat_open:
 		if event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN]:
 			change_camera_zoom(-1 if event.button_index==MOUSE_BUTTON_WHEEL_UP else 1)
 			get_viewport().set_input_as_handled()
 			return
-		if event is InputEventKey and event.pressed and not event.echo:
+		if event is InputEventKey and event.pressed and not event.echo and not event.ctrl_pressed and not event.meta_pressed and not event.alt_pressed:
 			if event.keycode in [KEY_PLUS,KEY_KP_ADD]:
 				change_camera_zoom(-1)
 				get_viewport().set_input_as_handled()
@@ -9542,7 +9542,7 @@ func draw_hud() -> void:
 		draw_touch_controls()
 	else:
 		draw_ref_panel(Rect2(9, 586, 1134, 53))
-		text_at(Vector2(22, 605), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge"), 10, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 650)
+		text_at(Vector2(22, 605), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge") + " · ZOOM: MAUSRAD / +/-", 10, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 760)
 		var hud_labels:Array=[
 			"%s SPELLS" % binding_short("skills"),
 			"%s INVENTAR" % binding_short("inventory"),
