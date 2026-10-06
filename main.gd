@@ -9,6 +9,7 @@ const ExperienceRules = preload("res://components/experience_rules.gd")
 const ControllerControls = preload("res://components/controller_controls.gd")
 var controller = ControllerControls.new()
 const QuestGuide = preload("res://components/quest_guide.gd")
+const QuestProgressRules = preload("res://components/quest_progress_rules.gd")
 var quest_guide = QuestGuide.new()
 const EssenceSystem = preload("res://components/essence_system.gd")
 const BookSystem = preload("res://components/book_system.gd")
@@ -5467,6 +5468,17 @@ func load_game() -> void:
 	if server_save.connected(self): server_save.begin(self)
 
 func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
+	if from_server and character_created and player_uuid!="" and str(data.get("player_uuid",""))==player_uuid:
+		data=QuestProgressRules.merge_save_progress({
+			"quests":quests,
+			"borin_quests":borin_quests,
+			"event_states":event_states,
+			"event_progress":event_progress,
+			"bosses_defeated":bosses_defeated,
+			"rescue_state":rescue_state,
+			"rescue_kills":rescue_kills,
+			"final_completed":final_completed
+		},data)
 	opened_village_gates.clear()
 	var saved_gates: Array = data.get("village_gates",[])
 	for gate_index in mini(saved_gates.size(),VILLAGE_GATES.size()):
