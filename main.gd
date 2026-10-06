@@ -2334,7 +2334,7 @@ func update_player(delta: float) -> void:
 		elif move.length() > 0.15:
 			facing = facing.slerp(move.normalized(), minf(1.0, delta * 14.0)).normalized()
 	else:
-		var aim: Vector2 = get_global_mouse_position() + camera_pos - player_pos + Vector2(0,KonfluxMap.height_at(player_pos) if konflux.active and konflux.room<0 else 0.0)
+		var aim: Vector2 = mouse_world_position() - player_pos + Vector2(0,KonfluxMap.height_at(player_pos) if konflux.active and konflux.room<0 else 0.0)
 		if aim.length() > 8: facing = aim.normalized()
 	if konflux.active:
 		if panel=="" and attack_input_active() and attack_timer<=0: normal_attack()
@@ -7554,6 +7554,12 @@ func camera_view_size()->Vector2:
 
 func camera_world_rect()->Rect2:
 	return Rect2(camera_pos,camera_view_size())
+
+func screen_to_world(screen_pos:Vector2)->Vector2:
+	return camera_pos+screen_pos/maxf(0.01,effective_camera_zoom())
+
+func mouse_world_position()->Vector2:
+	return screen_to_world(get_viewport().get_mouse_position())
 
 func apply_ui_transform()->void:
 	var z:=effective_camera_zoom()
