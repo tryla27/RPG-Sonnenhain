@@ -16,7 +16,7 @@ const FAMILY_ROWS:={
 	"village_path":4,"village_stone":5,"old_cobble_rework":6,"plaza_stone":7,
 	"building_apron":8,"arena_entry_stone":9,"arena_border":10,"arena_ground":11
 }
-const VARIANTS:=4
+const VARIANTS:=16
 
 static func has(id:String)->bool:
 	return FAMILY_ROWS.has(id)
