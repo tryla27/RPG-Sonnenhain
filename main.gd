@@ -609,6 +609,7 @@ const WorldFog = preload("res://components/world_fog.gd")
 var world_fog = WorldFog.new()
 const FusionRules = preload("res://components/fusion_rules.gd")
 const FusionCatalog = preload("res://components/fusion_catalog.gd")
+const FusionState = preload("res://components/fusion_state.gd")
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -6283,9 +6284,7 @@ func buy_skill(index:int) -> bool:
 	message("%s gelernt · %d Skillpunkte" % [ABILITIES[index]["name"],price]);save_game();return true
 
 func fusion_key(source_a:int,source_b:int)->String:
-	var low:=mini(source_a,source_b)
-	var high:=maxi(source_a,source_b)
-	return "%d:%d" % [low,high]
+	return FusionRules.normalized_key(source_a,source_b)
 
 var fusion_ids:Dictionary={}
 var fusion_keys:Dictionary={}
@@ -6480,17 +6479,7 @@ func fusion_source_skills()->Array:
 
 func available_fusions()->Array:
 	ensure_skill_state_size()
-	var offers:Array=[]
-	for fusion in FUSIONS:
-		var output:=int(fusion["id"])
-		var source_a:=int(fusion["a"])
-		var source_b:=int(fusion["b"])
-		var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
-		if output>=learned.size() or source_a>=learned.size() or source_b>=learned.size():continue
-		if not learned[source_a] or not learned[source_b]:continue
-		if learned[output] and int(skill_levels[output])>=max_rank:continue
-		offers.append(fusion.duplicate(true))
-	return offers
+	return FusionState.available_fusions(FUSIONS,learned,skill_levels)
 
 func fusion_skill_cost(fusion:Dictionary) -> int:
 	var a:=int(fusion["a"]);var b:=int(fusion["b"])
@@ -6498,18 +6487,10 @@ func fusion_skill_cost(fusion:Dictionary) -> int:
 
 func can_fuse(fusion:Dictionary) -> bool:
 	ensure_skill_state_size()
-	var a:=int(fusion["a"]);var b:=int(fusion["b"]);var id:=int(fusion["id"])
-	var max_rank:=clampi(int(fusion.get("max_rank",4)),1,4)
-	return a!=b and learned[a] and learned[b] and int(skill_levels[id])<max_rank and level >= maxi(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"])) and gold >= int(fusion["gold"])
+	return FusionState.can_fuse(fusion,learned,skill_levels,ABILITIES,level,gold)
 
 func fusion_target_slot(source_a:int,source_b:int,fusion_id:int=-1)->int:
-	# Bevorzugt den frühesten Slot eines geopferten Spells bzw. einer schon vorhandenen Fusion.
-	for i in slots.size():
-		if int(slots[i]) in [source_a,source_b,fusion_id]:return i
-	for i in slots.size():
-		if int(slots[i])<0:return i
-	# Volle Leiste: Slot 1 wird ersetzt, damit die Fusion garantiert sofort benutzbar ist.
-	return 0
+	return FusionState.target_slot(slots,source_a,source_b,fusion_id)
 
 func buy_fusion(index:int) -> bool:
 	var offers:=available_fusions()
