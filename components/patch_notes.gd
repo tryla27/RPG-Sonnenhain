@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 06.10.2026"
 const NOTES=[
+["Multiplayer · Faire Gruppenquests", "Geteilter Questfortschritt zählt nur noch für Gruppenmitglieder in passender Reichweite und Instanz. Bei Bossen ist zusätzlich echte, aktuelle Kampfbeteiligung nötig."],
 ["Multiplayer · Einmalige Quests", "Quest-, Borin- und Welt-Event-Fortschritt kann beim Serverabgleich nicht mehr auf einen älteren Zustand zurückfallen. Abgeschlossene Aufgaben bleiben pro Charakter dauerhaft abgeschlossen."],
 ["Technik · Fusions-Lesemodell", "Fusions-Lookups, Impact-Profile und fehlende Quellen werden intern über ein separates Lesemodell ermittelt. Öffentliche Methoden und Spielverhalten bleiben unverändert."],
 ["Technik · Fusionszustand", "Angebotsprüfung, Verfügbarkeitsregeln und Slotwahl der Fusionen sind intern modularisiert. Bedienung, Saves, IDs und Kampfverhalten bleiben unverändert."],

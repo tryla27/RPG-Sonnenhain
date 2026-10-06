@@ -13073,6 +13073,7 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 		if not remote_players.has(peer_id): continue
 		var state: Dictionary = remote_players[peer_id]
 		if str(state.get("context","world")) != "world": continue
+		if not server_party_quest_eligible(peer_id,killer_peer,enemy): continue
 		var matched_quests: Array = []
 		for entry in (state.get("active_quests",[]) as Array):
 			if not entry is Array or entry.size() < 1: continue
@@ -13098,6 +13099,12 @@ func server_send_all_quest_progress(killer_peer: int, enemy: Dictionary) -> void
 		var tx := "quest:%d:%s" % [mob_uid,uuid]
 		server_register_transaction(peer_id,tx)
 		rpc_server_quest_progress.rpc_id(peer_id,{"tx":tx,"quests":matched_quests,"borin_quests":matched_borin_quests,"events":matched_events,"rescue":rescue_match,"shared":peer_id != killer_peer,"boss":boss_index})
+
+func server_party_quest_eligible(member:int,killer:int,enemy:Dictionary)->bool:
+	if member<=0 or not remote_players.has(member):return false
+	if member==killer:
+		return str(remote_players[member].get("context","world"))=="world"
+	return server_party_member_eligible(member,killer,enemy)
 
 func server_party_member_xp(type: int, elite_kind: int, member: int) -> int:
 	if not remote_players.has(member): return 0
