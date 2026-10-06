@@ -23,11 +23,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Restore Godot cache
         id: godot-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             /tmp/godot
@@ -201,7 +201,7 @@ jobs:
             -- --save-test-url=ws://127.0.0.1:31876
 
       - name: Upload CI builds
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sonnenhain-ci-builds
           path: build/ci
