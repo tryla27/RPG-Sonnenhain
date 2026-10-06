@@ -610,6 +610,7 @@ var world_fog = WorldFog.new()
 const FusionRules = preload("res://components/fusion_rules.gd")
 const FusionCatalog = preload("res://components/fusion_catalog.gd")
 const FusionState = preload("res://components/fusion_state.gd")
+const FusionReadModel = preload("res://components/fusion_read_model.gd")
 const GENDER_NAMES := ["Mann", "Frau"]
 const RACE_NAMES := ["Mensch", "Ork", "Roboter"]
 
@@ -6291,24 +6292,23 @@ var fusion_keys:Dictionary={}
 
 func index_fusions()->void:
 	if not fusion_ids.is_empty():return
-	for fusion in FUSIONS:
-		fusion_ids[int(fusion["id"])]=fusion
-		fusion_keys[fusion_key(int(fusion["a"]),int(fusion["b"]))]=fusion
+	var indexes:=FusionReadModel.build_indexes(FUSIONS)
+	fusion_ids=indexes["by_id"]
+	fusion_keys=indexes["by_key"]
 
 func fusion_definition_by_key(key:String)->Dictionary:
 	index_fusions()
-	return fusion_keys.get(key,{})
+	return FusionReadModel.definition_by_key({"by_key":fusion_keys},key)
 
 func fusion_definition_by_id(fusion_id:int)->Dictionary:
 	index_fusions()
-	return fusion_ids.get(fusion_id,{})
+	return FusionReadModel.definition_by_id({"by_id":fusion_ids},fusion_id)
 
 func fusion_impact_profile(fusion_id:int)->Dictionary:
-	var raw:Variant=FUSION_IMPACT_PROFILES.get(fusion_id,{})
-	return raw.duplicate(true) if raw is Dictionary else {}
+	return FusionReadModel.impact_profile(FUSION_IMPACT_PROFILES,fusion_id)
 
 func fusion_spawn_rule(fusion_id:int)->String:
-	return str(fusion_impact_profile(fusion_id).get("spawn",""))
+	return FusionReadModel.spawn_rule(FUSION_IMPACT_PROFILES,fusion_id)
 
 func fusion_pair_template(source_a:int,source_b:int)->Dictionary:
 	return FusionRules.template_for_pair(source_a,source_b)
@@ -10674,17 +10674,10 @@ func draw_fusion_crystal() -> void:
 
 func fusion_missing_sources(fusion:Dictionary)->Array[String]:
 	ensure_skill_state_size()
-	var missing:Array[String]=[]
-	for source_id in [int(fusion["a"]),int(fusion["b"])]:
-		if source_id<0 or source_id>=learned.size() or not learned[source_id]:
-			missing.append(str(ABILITIES[source_id]["name"]))
-	return missing
+	return FusionReadModel.missing_sources(fusion,learned,ABILITIES)
 
 func fusion_offer_index(fusion_id:int)->int:
-	var offers:=available_fusions()
-	for i in offers.size():
-		if int(offers[i]["id"])==fusion_id:return i
-	return -1
+	return FusionReadModel.offer_index(available_fusions(),fusion_id)
 
 func fusion_button_label(fusion:Dictionary)->String:
 	var id:=int(fusion["id"])
