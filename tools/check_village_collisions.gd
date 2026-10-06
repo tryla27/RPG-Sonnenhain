@@ -6,8 +6,11 @@ func _initialize()->void:
 	for prop in game.village_props():
 		if prop["kind"]=="house":houses.append(game.prop_bounds(prop))
 	for prop in game.village_props():
-		if prop["kind"] not in ["tree","magic_tree"]:continue
+		if prop["kind"]=="house":continue
 		for house in houses:assert(not game.prop_bounds(prop).intersects(house),"Tree art overlaps house art")
+	var spawn:Rect2=game.SpawnPlatform32.bounds(game.WAYSTONES[0])
+	for prop in game.village_props():
+		assert(not game.prop_bounds(prop).intersects(spawn),"Dorfobjekt überlappt Spawn: %s" % str(prop))
 	for i in houses.size():
 		for j in range(i+1,houses.size()):assert(not houses[i].intersects(houses[j]),"Buildings overlap")
 	for id in 9:
@@ -41,6 +44,8 @@ func _initialize()->void:
 			for cell in reached:
 				if (center+Vector2(cell)*8).distance_to(actor["pos"])<40:reachable=true;break
 			assert(reachable,"Room NPC inaccessible from entrance")
+		if id==8:
+			assert(reached.has(Vector2i(((game.VillageInteriors32.link_offset(8)+Vector2(64,0))/8).round())),"Pip's side door is unreachable")
 	game.free()
 	print("VILLAGE_COLLISIONS_OK all tree/house bounds disjoint; nine rooms, furniture, body radius, swept movement, exits and NPC routes")
 	quit()

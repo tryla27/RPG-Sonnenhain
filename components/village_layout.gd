@@ -1,16 +1,21 @@
 extends RefCounted
 const H = preload("res://components/reference_house.gd")
+# Replacement art is ready: compact crowns stay outside all building rectangles.
+const TREES := [Vector2(800,300),Vector2(1088,300),Vector2(48,552),Vector2(48,1800),Vector2(48,2380)]
+const BUSHES := [Vector2(640,600),Vector2(816,1328),Vector2(1648,880),Vector2(592,1744),Vector2(1600,1344)]
+const FENCES := [Vector2(350,1700),Vector2(1256,2576),Vector2(1460,2576)]
+const BOARD := Vector2(688,1248)
 # 32px-Top-down-Dorf: Gebäude liegen in klaren Grundstücksblöcken um den
 # zentralen Platz. Die größeren Abstände orientieren sich am neuen World-Board,
 # ohne die bestehende Regionsgrenze oder Hausrenderer umzubauen.
 const SHOPS := [
 	{"name":"Liora","house":Vector2(1088,960),"kind":"elder","sign":"RATSHALLE","cart":Vector2(1498,1376),"shared_with":"Mira"},
-	{"name":"Fenna","house":Vector2(160,640),"kind":"style","sign":"ATELIER","cart":Vector2(288,896)},
-	{"name":"Elara","house":Vector2(160,1120),"kind":"healer","sign":"HEILHAUS","cart":Vector2(288,1376)},
-	{"name":"Alma","house":Vector2(160,1888),"kind":"innkeeper","sign":"STEINROSE","cart":Vector2(288,1824)},
+	{"name":"Fenna","house":Vector2(96,640),"kind":"style","sign":"ATELIER","cart":Vector2(288,896)},
+	{"name":"Elara","house":Vector2(96,1120),"kind":"healer","sign":"HEILHAUS","cart":Vector2(288,1376)},
+	{"name":"Alma","house":Vector2(96,1888),"kind":"innkeeper","sign":"STEINROSE","cart":Vector2(288,1824)},
 	{"name":"Mira","house":Vector2(1088,960),"kind":"elder","sign":"RAT & QUESTS","cart":Vector2(1498,1376)},
 	{"name":"Pip","house":Vector2(1248,64),"kind":"apprentice","sign":"GEHILFE","cart":Vector2(1440,608),"shared_with":"Borin"},
-	{"name":"Torvald","house":Vector2(160,160),"kind":"smith","sign":"SCHMIEDE","cart":Vector2(584,580)},
+	{"name":"Torvald","house":Vector2(96,160),"kind":"smith","sign":"SCHMIEDE","cart":Vector2(672,528)},
 	{"name":"Arven","house":Vector2(672,1440),"kind":"arena","sign":"ARENA","cart":Vector2(1480,2500),"large":true},
 	{"name":"Borin","house":Vector2(1248,64),"kind":"borin","sign":"BORINS SKILLHAUS","cart":Vector2(1440,608)}
 ]

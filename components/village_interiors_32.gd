@@ -29,189 +29,71 @@ static func role_for_id(id:int)->String:
 	return ROLES[id] if id>=0 and id<ROLES.size() else ""
 
 static func exit_offset(id:int)->Vector2:
-	return Vector2(0,340) if id==3 else Vector2(0,210)
+	return Vector2(0,340) if id==3 else (Vector2(0,168) if id==6 else Vector2(0,210))
 
 static func healing_field_pos(center:Vector2,id:int)->Vector2:
-	return center+Vector2(0,-34) if id==ELARA_ID else Vector2(-100000,-100000)
+	return center+pixel_point(id,Vector2(830,433)) if id==ELARA_ID else Vector2(-100000,-100000)
+
+# Geometry is authored in each source image's pixel coordinates and mapped by
+# the same transform as the renderer. Floors/rugs stay walkable; furniture does not.
+const ROOMS := {
+	0:{"asset":"taverne","source_size":Vector2(1659,948),"floor":Rect2(236,345,1190,397),"objects":[Rect2(242,223,510,127),Rect2(515,315,55,65),Rect2(1110,180,315,171),Rect2(1353,305,72,78),Rect2(348,415,146,140),Rect2(284,435,58,98),Rect2(499,435,55,99),Rect2(1165,461,146,146),Rect2(1107,483,54,98),Rect2(1315,482,58,98),Rect2(473,590,142,142),Rect2(411,614,54,100),Rect2(624,614,54,100)]},
+	1:{"asset":"ratshalle","source_size":Vector2(1660,948),"floor":Rect2(145,230,1370,474),"objects":[Rect2(615,302,432,176),Rect2(701,239,60,63),Rect2(885,238,70,64),Rect2(535,346,63,85),Rect2(1060,346,62,85),Rect2(164,609,242,91),Rect2(1260,154,117,196),Rect2(1403,190,98,196),Rect2(304,178,66,94)]},
+	3:{"asset":"arena-eingangshalle","source_size":Vector2(1660,948),"floor":Rect2(98,234,1465,502),"objects":[Rect2(158,248,315,90),Rect2(175,155,63,88),Rect2(236,190,46,55),Rect2(1295,147,129,126),Rect2(1430,177,94,96),Rect2(99,436,56,195),Rect2(1505,437,63,195)]},
+	4:{"asset":"schmiede","source_size":Vector2(1659,948),"floor":Rect2(171,284,1319,456),"objects":[Rect2(295,277,219,102),Rect2(553,301,106,133),Rect2(520,278,47,61),Rect2(187,239,78,101),Rect2(209,307,56,57),Rect2(181,385,75,205),Rect2(183,545,448,129),Rect2(355,508,53,38),Rect2(1217,350,263,183),Rect2(1348,505,70, 70),Rect2(1294,218,93,116),Rect2(1390,217,92,123)]},
+	5:{"asset":"fenna-atelier","source_size":Vector2(1660,948),"floor":Rect2(204,308,1310,397),"objects":[Rect2(320,94,259,225),Rect2(644,164,283,140),Rect2(929,97,168,185),Rect2(1182,156,219,152),Rect2(1277,266, 60, 70),Rect2(1385,360,92,145),Rect2(1391,512,88,165),Rect2(205,373,76,222),Rect2(261,572,52,62)]},
+	6:{"asset":"pip","source_size":Vector2(1536,1024),"floor":Rect2(333,321,872,434),"objects":[Rect2(354,208,171,158),Rect2(640,288,255,140),Rect2(953,216,135,156),Rect2(1114,283,89,132),Rect2(350,647, 70,84)]},
+	7:{"asset":"kapelle","source_size":Vector2(1659,948),"floor":Rect2(255,287,1150,466),"objects":[Rect2(306,173,170,168),Rect2(480,271,50,65),Rect2(722,251,216,126),Rect2(1185,205,151,134),Rect2(1340,286,36,64),Rect2(397,418,277,106),Rect2(984,418,280,106),Rect2(397,569,277,102),Rect2(984,569,280,102)]},
+	8:{"asset":"borin-skillhaus","source_size":Vector2(1659,948),"floor":Rect2(262,279,1135,474),"objects":[Rect2(302,122,237,235),Rect2(680,195,305,143),Rect2(795,305,70,85),Rect2(1236,233,130,113),Rect2(1298,442,103,309),Rect2(1230,621,66, 80),Rect2(270,606, 70,120),Rect2(1352,376,46,67)]}
+}
+static var textures:Dictionary={}
+
+static func room(id:int)->Dictionary:
+	return ROOMS.get(1 if id==2 else id,ROOMS[0])
+
+static func room_size(id:int)->Vector2:
+	return Vector2(1344,768) if id==3 else Vector2(896,512)
+
+static func pixel_point(id:int,pixel:Vector2)->Vector2:
+	var size:=room_size(id)
+	return (pixel/Vector2(room(id)["source_size"])*size-size*.5).round()
+
+static func pixel_rect(id:int,rect:Rect2)->Rect2:
+	return Rect2(pixel_point(id,rect.position),pixel_point(id,rect.end)-pixel_point(id,rect.position))
 
 static func furniture(id:int)->Array[Rect2]:
-	# Physical objects only: carpets, healing fields and painted runes stay walkable.
 	var items:Array[Rect2]=[]
-	if id==3:
-		for side in [-1,1]:
-			for row in 6:items.append(Rect2(Vector2(side*590-42,-236+row*80),Vector2(84,32)))
-		for x in [-160,160]:items.append(Rect2(x-10,-257,20,67))
-		return items
-	if id==ELARA_ID:
-		items=[Rect2(-144,-180,288,64),Rect2(246,-124,132,154),Rect2(-366,-112,112,120)]
-		for y in [72,136]:
-			for x in [-330,104]:items.append(Rect2(x,y,226,46))
-		return items
-	items.append(Rect2(-280,-190,560,42))
-	match kind_for_id(id):
-		"inn":
-			for y in [-40,80]:
-				for x in [-270,60]:items.append(Rect2(x,y,210,46))
-			items.append(Rect2(-364,-146,68,68))
-		"elder":
-			items.append(Rect2(-176,-18,352,70))
-			for x in [-144,-48,48,144]:items.append(Rect2(x,58,48,30))
-		"smith":
-			items.append(Rect2(-300,-132,116,86))
-			items.append(Rect2(-310,18,214,54))
-			items.append(Rect2(172,-126,72,48))
-		"style":
-			for x in [-250,-170,170,250]:items.append(Rect2(x,-132,48,72))
-			items.append(Rect2(-54,40,108,54))
-		"apprentice":
-			for x in [-220,-156,-92]:items.append(Rect2(x,-126,44,24))
-			items.append(Rect2(160,-110,104,54))
-		"magic":
-			for x in [-224,-160,160,224]:items.append(Rect2(x-14,-132,28,28))
+	for rect in room(id)["objects"]:items.append(pixel_rect(id,rect))
 	return items
+
+static func actor_offset(id:int,owner:String)->Vector2:
+	var pixels:Dictionary={"Alma":Vector2(850,390),"Mira":Vector2(675,520),"Liora":Vector2(990,520),"Arven":Vector2(540,375),"Torvald":Vector2(695,465),"Fenna":Vector2(835,390),"Pip":Vector2(970,450),"Elara":Vector2(570,369),"Borin":Vector2(670,412)}
+	return pixel_point(id,pixels.get(owner,Vector2(830,430)))
+
+static func link_offset(id:int)->Vector2:
+	return Vector2(-306,-4) if id==8 else Vector2(-100000,-100000)
 
 static func blocked(pos:Vector2,center:Vector2,id:int=-1,radius:float=16.0)->bool:
 	var local:=pos-center
-	if id==3:
-		if absf(local.x)>650.0-radius or absf(local.y)>366.0-radius or local.y< -270.0+radius:return true
-	else:
-		if absf(local.x)>438.0-radius or absf(local.y)>246.0-radius:return true
-		if local.y< -176.0+radius:return true
+	var floor_area:=pixel_rect(id,room(id)["floor"])
+	var exit:=exit_offset(id)
+	var approach:=Rect2(-48,floor_area.end.y-40,96,exit.y-floor_area.end.y+radius+56)
+	if not floor_area.grow(-radius).has_point(local) and not approach.grow(-radius).has_point(local):return true
 	for rect in furniture(id):
 		if rect.grow(radius).has_point(local):return true
 	return false
 
 static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:bool,interact_label:String)->void:
-	if id==3:
-		preload("res://components/arena_interior.gd").lobby(c,center,font,"AKTION" if touch_enabled else interact_label)
-		return
-	var kind:=kind_for_id(id)
-	var accent:Color={
-		"inn":Color("b56f52"),"elder":Color("8d78a9"),"research":Color("668da0"),
-		"arena":Color("a76252"),"smith":Color("b06448"),"style":Color("b47aa0"),
-		"apprentice":Color("8b7dbd"),"healer":Color("69a98b"),"magic":Color("665ca8")
-	}.get(kind,Color("7d8f83"))
-	var origin:=center-Vector2(448,256)
-	# True 32 px floor/wall grid.
-	for tx in 28:
-		for ty in 16:
-			var p:=origin+Vector2(tx*TILE,ty*TILE)
-			var edge:=tx==0 or tx==27 or ty==0 or ty==15
-			var col:=Color("3e4546") if edge else (Color("8e7657") if (tx+ty)%2==0 else Color("967e5e"))
-			if kind in ["magic","research","apprentice"]: col=Color("667174") if edge else (Color("736c7f") if (tx+ty)%2==0 else Color("7e7689"))
-			elif kind=="healer":
-				if edge: col=Color("394b49")
-				elif tx>=11 and tx<=16: col=Color("c6b78f") if (tx+ty)%2==0 else Color("b9aa83")
-				else: col=Color("8f866d") if (tx+ty)%2==0 else Color("989078")
-			c.draw_rect(Rect2(p,Vector2(TILE,TILE)),col)
-			c.draw_rect(Rect2(p,Vector2(TILE,TILE)),Color("252f31",0.25),false,1)
-	# Back counter / shelves. Elara has a dedicated chapel apse instead.
-	if kind!="healer":
-		c.draw_rect(Rect2(center+Vector2(-280,-190),Vector2(560,42)),accent.darkened(0.35))
-		for x in range(-256,257,64):
-			c.draw_rect(Rect2(center+Vector2(x,-180),Vector2(42,12)),accent.lightened(0.22))
-	# Theme props, kept on 32px rhythm.
-	match kind:
-		"magic":
-			for rect in furniture(id).slice(1):c.draw_rect(Rect2(center+rect.position,rect.size),Color("4b3b51"))
-			for x in [-224,-160,160,224]: c.draw_circle(center+Vector2(x,-118),12,Color("8fe9ff"))
-			c.draw_arc(center+Vector2(0,32),74,0,TAU,32,Color("c1a9ff"),5)
-		"apprentice":
-			for x in [-220,-156,-92]: c.draw_rect(Rect2(center+Vector2(x,-126),Vector2(44,24)),Color("6d5aa6"))
-			c.draw_rect(Rect2(center+Vector2(160,-110),Vector2(104,54)),Color("4b3b51"))
-		"healer":
-			# Elara-Kapelle nach art/concepts/map0/elara_church_interior_32px.webp.
-			# Apsis und zweistufiges Podest auf echtem 32px-Rhythmus.
-			c.draw_rect(Rect2(center+Vector2(-192,-208),Vector2(384,32)),Color("53645b"))
-			c.draw_rect(Rect2(center+Vector2(-160,-176),Vector2(320,32)),Color("a79775"))
-			c.draw_rect(Rect2(center+Vector2(-128,-144),Vector2(256,32)),Color("baa982"))
-			for x in range(-128,129,32):
-				c.draw_rect(Rect2(center+Vector2(x,-143),Vector2(31,31)),Color("c7b992") if int(x/32)%2==0 else Color("b8aa84"))
-			# Altar mit Tuch, Heilstein und Kerzen.
-			c.draw_rect(Rect2(center+Vector2(-80,-184),Vector2(160,52)),Color("5a5044"))
-			c.draw_rect(Rect2(center+Vector2(-72,-180),Vector2(144,38)),Color("d9d0b5"))
-			c.draw_rect(Rect2(center+Vector2(-18,-174),Vector2(36,30)),Color("8bd8cf"))
-			c.draw_colored_polygon(PackedVector2Array([
-				center+Vector2(0,-176),center+Vector2(18,-159),center+Vector2(0,-142),center+Vector2(-18,-159)
-			]),Color("b6f2e7"))
-			for x in [-62,62]:
-				c.draw_rect(Rect2(center+Vector2(x-3,-200),Vector2(6,20)),Color("d3b46d"))
-				c.draw_circle(center+Vector2(x,-204),7,Color("ffd98a",0.92))
-				c.draw_circle(center+Vector2(x,-204),22,Color("ffd98a",0.08))
-			# Heilungsfeld direkt vor dem Altar.
-			var field:=healing_field_pos(center,id)
-			c.draw_circle(field,58,Color("75d8c2",0.09))
-			c.draw_arc(field,58,0,TAU,40,Color("91ead4",0.70),3)
-			c.draw_arc(field,42,0,TAU,32,Color("d8fff2",0.42),2)
-			for a in 8:
-				var dir:=Vector2.RIGHT.rotated(float(a)*TAU/8.0)
-				c.draw_rect(Rect2(field+dir*50-Vector2(4,4),Vector2(8,8)),Color("b8f4df",0.82))
-			c.draw_rect(Rect2(field+Vector2(-4,-24),Vector2(8,48)),Color("e8fff6",0.78))
-			c.draw_rect(Rect2(field+Vector2(-24,-4),Vector2(48,8)),Color("e8fff6",0.78))
-			# Linke Alchemie-Nische.
-			c.draw_rect(Rect2(center+Vector2(-366,-112),Vector2(112,120)),Color("4c5d55"))
-			for y in [-94,-58,-22]:
-				c.draw_rect(Rect2(center+Vector2(-354,y),Vector2(88,8)),Color("7a674f"))
-			for p in [Vector2(-338,-106),Vector2(-306,-106),Vector2(-338,-70),Vector2(-306,-70),Vector2(-338,-34),Vector2(-306,-34)]:
-				c.draw_rect(Rect2(center+p,Vector2(14,20)),Color("77b991"))
-				c.draw_rect(Rect2(center+p+Vector2(3,-5),Vector2(8,7)),Color("d8d2a8"))
-			# Rechtes Lager: Regal, Kisten, Fässer und Vorräte.
-			c.draw_rect(Rect2(center+Vector2(246,-124),Vector2(132,154)),Color("48564f"))
-			for y in [-106,-62,-18]:
-				c.draw_rect(Rect2(center+Vector2(256,y),Vector2(110,9)),Color("80664a"))
-			for p in [Vector2(260,-98),Vector2(310,-98),Vector2(260,-54),Vector2(310,-54)]:
-				c.draw_rect(Rect2(center+p,Vector2(38,30)),Color("8b6545"))
-				c.draw_rect(Rect2(center+p+Vector2(5,5),Vector2(28,4)),Color("b88a55"))
-			for x in [268,334]:
-				c.draw_circle(center+Vector2(x,13),18,Color("6e533c"))
-				c.draw_rect(Rect2(center+Vector2(x-17,5),Vector2(34,5)),Color("a78054"))
-			# Zwei Kirchenbank-Reihen, Mittelgang bleibt frei.
-			for y in [72,136]:
-				for x in [-330,104]:
-					c.draw_rect(Rect2(center+Vector2(x,y),Vector2(226,20)),Color("6c543e"))
-					c.draw_rect(Rect2(center+Vector2(x+8,y+4),Vector2(210,5)),Color("a17b53"))
-					for leg in [18,190]:
-						c.draw_rect(Rect2(center+Vector2(x+leg,y+20),Vector2(8,26)),Color("4d3b31"))
-			# Wandkerzen entlang der Apsis.
-			for x in [-224,-160,160,224]:
-				c.draw_rect(Rect2(center+Vector2(x-3,-156),Vector2(6,18)),Color("806b50"))
-				c.draw_circle(center+Vector2(x,-162),6,Color("ffd18a",0.9))
-				c.draw_circle(center+Vector2(x,-162),20,Color("ffd18a",0.05))
-		"style":
-			for x in [-250,-170,170,250]:
-				c.draw_rect(Rect2(center+Vector2(x,-132),Vector2(48,72)),Color("5a4654"))
-				c.draw_rect(Rect2(center+Vector2(x+7,-124),Vector2(34,48)),accent.lightened(0.28))
-			c.draw_rect(Rect2(center+Vector2(-54,40),Vector2(108,54)),Color("cab493"))
-		"smith":
-			# Torvalds Verkauf ist klar links gebündelt: Esse, Verkaufstisch und Waffenständer.
-			c.draw_rect(Rect2(center+Vector2(-300,-132),Vector2(116,86)),Color("533d37"))
-			c.draw_circle(center+Vector2(-242,-88),30,Color("ef8c4c"))
-			c.draw_rect(Rect2(center+Vector2(-310,18),Vector2(214,54)),Color("4d382f"))
-			c.draw_rect(Rect2(center+Vector2(-302,24),Vector2(198,12)),accent.lightened(0.18))
-			for x in [-276,-230,-184,-138]:
-				c.draw_line(center+Vector2(x,6),center+Vector2(x+18,-38),Color("d5d9ce"),5)
-				c.draw_line(center+Vector2(x-5,-14),center+Vector2(x+15,-8),Color("d4aa66"),3)
-			c.draw_rect(Rect2(center+Vector2(172,-112),Vector2(72,24)),Color("3e484c"))
-			c.draw_line(center+Vector2(184,-126),center+Vector2(224,-78),Color("d6b46f"),6)
-		"research":
-			for x in [-246,-182,-118,118,182,246]: c.draw_rect(Rect2(center+Vector2(x,-132),Vector2(40,76)),Color("4b4d55"))
-			c.draw_circle(center+Vector2(0,54),42,Color("5a6f7a"))
-			c.draw_arc(center+Vector2(0,54),34,0,TAU,24,Color("b9e4e7"),3)
-		"elder":
-			c.draw_rect(Rect2(center+Vector2(-176,-18),Vector2(352,70)),Color("5b493e"))
-			for x in [-144,-48,48,144]: c.draw_rect(Rect2(center+Vector2(x,58),Vector2(48,30)),Color("684f42"))
-		"arena":
-			for x in [-240,-180,180,240]:
-				c.draw_line(center+Vector2(x,-122),center+Vector2(x+24,-68),Color("c9cfc6"),5)
-			c.draw_rect(Rect2(center+Vector2(-170,52),Vector2(340,22)),Color("6d4a37"))
-		"inn":
-			for y in [-40,80]:
-				c.draw_rect(Rect2(center+Vector2(-270,y),Vector2(210,46)),Color("684e3b"))
-				c.draw_rect(Rect2(center+Vector2(60,y),Vector2(210,46)),Color("684e3b"))
-			c.draw_circle(center+Vector2(-330,-112),34,Color("ef9855",0.8))
-	# Exit door.
-	c.draw_rect(Rect2(center+Vector2(-32,202),Vector2(64,54)),Color("3d3029"))
-	c.draw_rect(Rect2(center+Vector2(-26,208),Vector2(52,48)),accent.darkened(0.45))
-	var title:="Mira & Liora · Rathaus · Quests & Wissen" if name_for_id(id) in ["Mira","Liora"] else ("%s · Kapelle der Heilung · Tränke & Alchemie" % name_for_id(id) if id==ELARA_ID else "%s · %s" % [name_for_id(id),role_for_id(id)])
-	c.draw_string(font,center+Vector2(-320,-220),title,HORIZONTAL_ALIGNMENT_CENTER,640,18,Color("ffe8b4"))
-	c.draw_string(font,center+Vector2(-130,238),("%s · ZURÜCK" % ("AKTION" if touch_enabled else interact_label)),HORIZONTAL_ALIGNMENT_CENTER,260,13,Color("fff0c9"))
+	var asset:String=room(id)["asset"]
+	if not textures.has(asset):textures[asset]=load("res://art/village/interiors/%s.png" % asset)
+	c.draw_texture_rect(textures[asset],Rect2(center-room_size(id)*.5,room_size(id)),false)
+	if id==8:
+		var p:=center+link_offset(id)
+		c.draw_rect(Rect2(p+Vector2(-12,-42),Vector2(24,54)),Color("352e35"))
+		c.draw_rect(Rect2(p+Vector2(-9,-39),Vector2(18,48)),Color("875c3d"))
+		c.draw_rect(Rect2(p+Vector2(3,-14),Vector2(4,4)),Color("e0ba68"))
+		c.draw_string(font,p+Vector2(-28,26),"PIP",HORIZONTAL_ALIGNMENT_CENTER,56,11,Color("e2cda4"))
+	var title:="Mira & Liora · Ratshalle" if id in [1,2] else "%s · %s" % [name_for_id(id),role_for_id(id)]
+	c.draw_string(font,center+Vector2(-320,-room_size(id).y*.5+20),title,HORIZONTAL_ALIGNMENT_CENTER,640,16,Color("ffe8b4"))
+	var label:="ZU BORIN" if id==6 else "ZURÜCK INS DORF"
+	c.draw_string(font,center+exit_offset(id)+Vector2(-140,28),"%s · %s" % ["AKTION" if touch_enabled else interact_label,label],HORIZONTAL_ALIGNMENT_CENTER,280,12,Color("fff0c9"))

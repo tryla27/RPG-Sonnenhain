@@ -1,6 +1,6 @@
 extends RefCounted
 
-const LAMPS:=[Vector2(544,1056),Vector2(1120,1056),Vector2(1305,1200),Vector2(1430,1200),Vector2(480,1530)]
+const LAMPS:=[Vector2(768,1248),Vector2(1056,1280),Vector2(1576,1200),Vector2(1696,1200),Vector2(640,1530)]
 
 static func lamp(c:CanvasItem,p:Vector2)->void:
 	var iron:=Color("30353c")

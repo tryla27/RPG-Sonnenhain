@@ -21,10 +21,10 @@ func run():
 		await process_frame
 	var a:int=left_peer.get_unique_id();var b:int=right_peer.get_unique_id()
 	var center:Vector2=server.WAYSTONES[0]
-	left.player_pos=center+Vector2(0,80);right.player_pos=center+Vector2(160,80)
+	left.player_pos=center+Vector2(0,80);right.player_pos=center+Vector2(104,80)
 	left.rpc_player_presence.rpc_id(1,left.local_player_state());right.rpc_player_presence.rpc_id(1,right.local_player_state());await settle()
 	left.player_pos=center+Vector2(0,-10);left.push_vital_state()
-	right.player_pos=center+Vector2(160,-10);right.push_vital_state();await settle()
+	right.player_pos=center+Vector2(104,-10);right.push_vital_state();await settle()
 	var accepted:Vector2=server.network_player_position(a)
 	assert(accepted.y>=center.y+47 and not server.SpawnStoneBody.blocks(accepted-center,0,15))
 	var observer:Array=right.remote_players[a]["pos"]

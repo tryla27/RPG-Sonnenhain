@@ -11,12 +11,14 @@ func _initialize()->void:
 func run()->void:
 	var g:=TestGame.new()
 	root.add_child(g)
-	assert(g.REFERENCE_TREES.is_empty(),"Map 0 reference trees must stay removed until replacement art is ready")
+	assert(g.REFERENCE_TREES.size()==5,"Only the five approved replacement trees belong in Map 0")
 	var kinds:Array=[]
 	for prop in g.village_props():kinds.append(str(prop.get("kind","")))
-	assert("tree" not in kinds,"Map 0 must not spawn normal trees")
+	assert(kinds.count("tree")==5,"Map 0 must use the new authored tree sites")
 	assert("barrel" not in kinds,"Map 0 must not spawn barrels")
 	assert("magic_tree" in kinds,"Borin's authored magic tree stays")
-	print("MAP0_SCENERY_CLEANUP_OK trees=0 barrels=0 magic_tree=kept")
+	for name in g.StartScenery32.SCENERY:
+		assert(ResourceLoader.exists("res://art/village/objects/%s.png" % name),"Missing approved scenery sprite")
+	print("MAP0_SCENERY_CLEANUP_OK replacement_trees=5 barrels=0 magic_tree=replaced")
 	g.queue_free()
 	quit()

@@ -47,7 +47,7 @@ const FOODS = [
  {"name":"Blauer Mondkuchen","color":"547bd1","heal":0,"regen":0.0,"duration":0,"price":20,"instant_mana_full":true},
  {"name":"Roter Sonnenkuchen","color":"c84f55","heal":0,"regen":0.0,"duration":0,"price":20,"instant_hp_full":true}
 ]
-const BUSHES=[Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]
+const BUSHES=preload("res://components/village_layout.gd").BUSHES
 const TREES=[Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680)]
 const REGROW_SECONDS=300
 const REGION_FOOD=[-1,6,30,29,23,5,7,3,24,25,26,27,28]

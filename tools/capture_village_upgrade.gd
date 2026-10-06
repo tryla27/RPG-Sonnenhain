@@ -23,6 +23,15 @@ class Board:
 				var door:=village_house_door(house)
 				draw_character_sprite(door+Vector2(0,40),0,false,Vector2.DOWN,WORLD_CHARACTER_SCALE,false,0,0)
 				text_at(door+Vector2(-64,78),str(house["name"]),16,Color.WHITE)
+		elif mode.begins_with("room_"):
+			interior_id=int(mode.trim_prefix("room_"))
+			var center:Vector2=VillageInteriors32.room_size(interior_id)*.5
+			VillageInteriors32.paint(self,center,interior_id,font,false,"E")
+			for actor in interior_actors():
+				var local_actor:Dictionary=actor.duplicate()
+				local_actor["pos"]=center+VillageInteriors32.actor_offset(interior_id,actor["name"])
+				draw_npc(local_actor)
+			draw_character_sprite(center+VillageInteriors32.exit_offset(interior_id)-Vector2(0,40),0,false,Vector2.UP,WORLD_CHARACTER_SCALE,false,0,0)
 		elif mode=="arena":
 			ArenaInterior.paint(self,Vector2(1024,1024),640)
 			draw_character_sprite(Vector2(1024,1024),0,false,Vector2.DOWN,WORLD_CHARACTER_SCALE,false,0,0)
@@ -56,14 +65,16 @@ func _initialize()->void:
 
 func capture()->void:
 	DirAccess.make_dir_recursive_absolute("res://.godot/qa")
-	for mode in ["village","arena","lobby","heads","badges","motion","fusion"]:
+	for mode in ["village","room_0","room_1","room_3","room_4","room_5","room_6","room_7","room_8","arena","lobby","heads","badges","motion","fusion"]:
 		var vp:=SubViewport.new()
 		vp.size=Vector2i(1780,2600) if mode=="village" else (Vector2i(2048,2048) if mode=="arena" else (Vector2i(1152,648) if mode=="fusion" else Vector2i(1600,1600)))
 		if mode=="lobby":vp.size=Vector2i(1344,768)
+		if mode.begins_with("room_"):vp.size=Vector2i(preload("res://components/village_interiors_32.gd").room_size(int(mode.trim_prefix("room_"))))
 		vp.render_target_update_mode=SubViewport.UPDATE_ALWAYS
 		root.add_child(vp)
 		var board:=Board.new()
 		board.mode=mode;board.reset_class_skills();board.level=50;board.gold=100000
+		for quest in board.QUESTS:board.quests.append({"state":0,"progress":0})
 		board.learned[0]=true;board.learned[1]=true;board.skill_levels[0]=1;board.skill_levels[1]=1
 		if mode=="village":
 			var map=load("res://components/start_tilemap_32.gd").new()

@@ -212,9 +212,10 @@ for chapel_token in [
     'const ELARA_ID := 7',
     'ELARA_CONCEPT := "res://art/concepts/map0/elara_church_interior_32px.webp"',
     'static func healing_field_pos',
-    'for y in [72,136]:',
-    'Heilungsfeld direkt vor dem Altar',
-    'Zwei Kirchenbank-Reihen',
+    '"asset":"kapelle"',
+    'Rect2(397,418,277,106)',
+    'Rect2(984,569,280,102)',
+    'pixel_point(id,Vector2(830,433))',
 ]:
     assert chapel_token in interiors32, f'missing Elara chapel feature: {chapel_token}'
 for runtime_token in [
@@ -223,7 +224,7 @@ for runtime_token in [
     'func update_elara_healing_field',
     'VOLLSTÄNDIG GEHEILT',
     'Heilungsfeld am Altar · HP & Energie auffüllen',
-    'elif room_name=="Elara": pos=INTERIOR_CENTER+Vector2(-235,-55)',
+    'VillageInteriors32.actor_offset(interior_id,room_name)',
 ]:
     assert runtime_token in source, f'missing Elara healing runtime: {runtime_token}'
 assert (root / 'art' / 'concepts' / 'map0' / 'elara_church_interior_32px.webp').exists(), 'Elara chapel concept asset missing'

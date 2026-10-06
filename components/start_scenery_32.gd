@@ -1,11 +1,51 @@
 extends RefCounted
 ## Individual transparent reference-style sprites, composed into the existing game world.
 const VillageHouseTiles32 = preload("res://components/village_house_tiles_32.gd")
-const VillageWellTiles32 = preload("res://components/village_well_tiles_32.gd")
 static var objects:Texture2D
 static var props:Texture2D
 static var terrain:Texture2D
 static var art_initialized := false
+const SCENERY := {
+	"dorfeiche":{"source":Rect2(20,69,1082,1266),"size":Vector2(192,224),"offset":Vector2(-96,-208)},
+	"ahorn":{"source":Rect2(86,70,983,1273),"size":Vector2(176,224),"offset":Vector2(-88,-208)},
+	"tanne":{"source":Rect2(190,109,745,1197),"size":Vector2(96,160),"offset":Vector2(-48,-144)},
+	"borin-runenbaum":{"source":Rect2(72,97,991,1217),"size":Vector2(192,224),"offset":Vector2(-96,-208)},
+	"brunnen":{"source":Rect2(281,153,780,983),"size":Vector2(128,160),"offset":Vector2(-64,-128)},
+	"busch-oliv":{"source":Rect2(339,335,771,515),"size":Vector2(96,64),"offset":Vector2(-48,-48)},
+	"busch-herbst":{"source":Rect2(273,205,937,674),"size":Vector2(96,64),"offset":Vector2(-48,-48)},
+	"busch-blumen":{"source":Rect2(255,208,936,672),"size":Vector2(96,64),"offset":Vector2(-48,-48)}
+}
+static var scenery_textures:Dictionary={}
+
+static func tree_variant(p:Vector2)->String:
+	if p.x<160:return "tanne"
+	return "ahorn" if p.x>1000 else "dorfeiche"
+
+static func bush_variant(p:Vector2)->String:
+	return ["busch-oliv","busch-herbst","busch-blumen"][posmod(int(p.x+p.y)/10,3)]
+
+static func scenery_bounds(p:Vector2,asset:String)->Rect2:
+	var spec:Dictionary=SCENERY[asset]
+	return Rect2(p+Vector2(spec["offset"]),Vector2(spec["size"]))
+
+static func scenery_texture(asset:String)->Texture2D:
+	if not scenery_textures.has(asset):
+		var original:Texture2D=load("res://art/village/objects/%s.png" % asset)
+		var image:Image=original.get_image()
+		if image.is_compressed():image.decompress()
+		image=image.get_region(Rect2i(SCENERY[asset]["source"]))
+		image.resize(int(SCENERY[asset]["size"].x),int(SCENERY[asset]["size"].y),Image.INTERPOLATE_NEAREST)
+		image.convert(Image.FORMAT_RGBA8)
+		# Runtime cutout: keep source PNGs intact, suppress generated translucent
+		# fringes before nearest-neighbour rendering on the village floor.
+		var pixels:PackedByteArray=image.get_data()
+		for i in range(3,pixels.size(),4):pixels[i]=255 if pixels[i]>=230 else 0
+		image=Image.create_from_data(image.get_width(),image.get_height(),false,Image.FORMAT_RGBA8,pixels)
+		scenery_textures[asset]=ImageTexture.create_from_image(image)
+	return scenery_textures[asset]
+
+static func scenery(c:CanvasItem,p:Vector2,asset:String)->void:
+	c.draw_texture_rect(scenery_texture(asset),scenery_bounds(p,asset),false)
 static func init_art()->void:
 	if art_initialized: return
 	art_initialized = true
@@ -31,48 +71,17 @@ static func arena_building(c:CanvasItem,p:Vector2)->void:
 	preload("res://components/village_buildings.gd").paint(c,p,"arena")
 
 static func tree(c:CanvasItem,p:Vector2,_key:int)->void:
-	init_art()
-	if objects != null:
-		sprite(c,objects,Rect2(5,510,550,495),Rect2(p+Vector2(-88,-176),Vector2(176,208)))
-		return
-	c.draw_rect(Rect2(p+Vector2(-8,-54),Vector2(16,66)),Color("5c4634"))
-	c.draw_circle(p+Vector2(0,-83),44,Color("406b49"))
-	c.draw_circle(p+Vector2(-28,-62),30,Color("4d7b52"))
-	c.draw_circle(p+Vector2(28,-60),29,Color("4a7550"))
+	scenery(c,p,tree_variant(p))
 
 # Eigener Zauberbaum fuer Borins Skillbereich: groesser, blau-violett und mit Runen.
 static func magic_tree(c:CanvasItem,p:Vector2)->void:
-	init_art()
-	if objects != null:
-		sprite(c,objects,Rect2(5,510,550,495),Rect2(p+Vector2(-104,-216),Vector2(208,248)))
-	else:
-		c.draw_rect(Rect2(p+Vector2(-10,-76),Vector2(20,92)),Color("574035"))
-		c.draw_circle(p+Vector2(0,-120),56,Color("76599b"))
-		c.draw_circle(p+Vector2(-38,-91),38,Color("8b66ad"))
-		c.draw_circle(p+Vector2(39,-90),37,Color("6654a1"))
-	for i in 4:
-		var rune:=p+Vector2(0,-58-i*24)
-		c.draw_circle(rune,8,Color("5ed7ff",0.22),false,3.0)
-		c.draw_line(rune+Vector2(-5,0),rune+Vector2(5,0),Color("9be9ff"),2)
-	for side in [-1,1]:
-		for i in 3:
-			var lamp:=p+Vector2(side*(38+i*13),-116+i*28)
-			c.draw_line(lamp-Vector2(0,14),lamp,Color("69548e"),2)
-			c.draw_colored_polygon(PackedVector2Array([lamp+Vector2(0,-6),lamp+Vector2(5,0),lamp+Vector2(0,9),lamp+Vector2(-5,0)]),Color("8be6ff"))
-	c.draw_circle(p+Vector2(0,8),38,Color("6d64be",0.16))
-	c.draw_arc(p+Vector2(0,8),31,0,TAU,24,Color("91e7ff"),3)
+	scenery(c,p,"borin-runenbaum")
 
 static func well(c:CanvasItem,p:Vector2)->void:
-	VillageWellTiles32.paint(c,p)
+	scenery(c,p,"brunnen")
 
 static func bush(c:CanvasItem,p:Vector2,_key:int)->void:
-	init_art()
-	if props != null:
-		sprite(c,props,Rect2(585,85,420,355),Rect2(p+Vector2(-46,-44),Vector2(92,78)))
-		return
-	c.draw_circle(p+Vector2(-22,0),25,Color("4f7d4f"))
-	c.draw_circle(p+Vector2(6,-10),31,Color("5a8a57"))
-	c.draw_circle(p+Vector2(29,2),23,Color("477548"))
+	scenery(c,p,bush_variant(p))
 static func barrel(c:CanvasItem,p:Vector2)->void:
 	init_art()
 	if props != null:

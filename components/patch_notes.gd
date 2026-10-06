@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 06.10.2026"
 const NOTES=[
+["Dorf · Acht neue Innenräume", "Schmiede, Kapelle, Steinrose, Arena-Halle, Atelier, Ratshalle, Borins Haus und Pips Nebenraum verwenden die abgestimmten Pixelgrafiken. Möbel und Wände besitzen zur Grafik passende Hitboxen. Pips Werkstatt ist durch die Seitentür bei Borin erreichbar."],
+["Dorf · Spawn, Brunnen und Pflanzen", "Der Kristall-Spawn besitzt eine große Steinplattform mit freier Treppe und festen Mauern. Brunnen, Herbstbäume, Runenbaum und drei Buscharten passen zu den Häusern. Pflanzen, Laternen und Zäune stehen außerhalb der Gebäude; der 2-Meter-Held bleibt die Größenreferenz."],
 ["Welt · Freiere Begehbarkeit", "Bäume blockieren nur noch am Stamm, Büsche sind durchgehbar und große prozedurale Hindernisse haben kleinere faire Kollisionsflächen. Hauptwege werden jetzt automatisch auf freie Begehbarkeit geprüft."],
 ["Map 0 · Szenerie bereinigt", "Die bisherigen normalen Bäume und Fässer wurden aus Sonnenhain entfernt. Borins eigener Zauberbaum bleibt bestehen; neue normale Bäume folgen erst mit der neuen Stilvorlage."],
 ["Kamera · Herauszoomen", "Im Spiel gibt es jetzt drei feste Zoomstufen: 100 %, 85 % und 70 %. Mausrad oder +/- ändern den sichtbaren Weltraum; HUD und Menüs bleiben in Originalgröße."],

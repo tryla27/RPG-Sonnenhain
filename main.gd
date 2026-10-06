@@ -77,8 +77,8 @@ const Wagon32 = preload("res://components/wagon_32.gd")
 const StartTileMap32 = preload("res://components/start_tilemap_32.gd")
 var start_tilemap_32_attached := false
 var live_reconnect_timer := 0.0
-# Map 0: normale Bäume vorerst vollständig entfernt, bis die neue Stilvorlage eingesetzt wird.
-const REFERENCE_TREES: Array = []
+# Map 0: approved replacement sprites with crown clearance around the buildings.
+const REFERENCE_TREES: Array = VillageLayout.TREES
 const REFERENCE_WELL := Vector2(1184, 832)
 
 # Sonnenhain: ein eigenständiger, erweiterbarer Godot-4-Prototyp.
@@ -273,7 +273,7 @@ const DUNGEON_CENTER := Vector2(8000, 4800)
 const DUNGEON_ENTRANCES := [2, 3, 8]
 const DUNGEON_NAMES := ["Turmgewölbe", "Kristallgruft", "Versunkene Krypta"]
 const DUNGEON_ENEMIES := [[4, 5], [6, 7], [21, 22]]
-const TAVERN_HOUSE := Vector2(160, 1888)
+const TAVERN_HOUSE := Vector2(96, 1888)
 const VILLAGE_REF_ORIGIN := Vector2(0, 550)
 const VILLAGE_REF_RECT := Rect2(0, 550, 1672, 840)
 const VILLAGE_REF_SOLIDS := [Rect2(-40, 548, 1752, 112), Rect2(15, 805, 310, 140), Rect2(305, 1025, 310, 145), Rect2(1295, 1015, 365, 145), Rect2(12, 1012, 95, 95), Rect2(325, 825, 345, 30), Rect2(995, 825, 350, 30), Rect2(890, 870, 105, 45), Rect2(1625, 950, 50, 250)]
@@ -2413,8 +2413,10 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 		if pos.distance_to(tree) < 18.0: return true
 	if pos.distance_to(BORIN_MAGIC_TREE_POS) < 42.0:return true
 	if Rect2(REFERENCE_WELL + Vector2(-44, -22), Vector2(88, 54)).grow(12).has_point(pos): return true
-	if Rect2(Vector2(596,1248),Vector2(74,22)).grow(10).has_point(pos):return true
-	for origin in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]:
+	for lamp in VillageFixtures.LAMPS:
+		if Rect2(lamp+Vector2(-10,2),Vector2(20,8)).grow(hero_collision_radius()).has_point(pos):return true
+	if Rect2(VillageLayout.BOARD+Vector2(-34,-2),Vector2(74,22)).grow(10).has_point(pos):return true
+	for origin in VillageLayout.FENCES:
 		if Rect2(origin+Vector2(-6,-4),Vector2(112,12)).grow(12).has_point(pos):return true
 	for house in house_positions():
 		var house_info:Dictionary={}
@@ -4302,6 +4304,13 @@ func enter_tavern() -> void:
 	enter_village_house("Alma")
 
 func leave_village_house() -> void:
+	if interior_id==6:
+		interior_id=8
+		player_pos=INTERIOR_CENTER+VillageInteriors32.link_offset(8)+Vector2(64,0)
+		play_sound("door_close")
+		message("Du kehrst aus Pips Werkstatt zu Borin zurück.")
+		announce_multiplayer_context()
+		return
 	var left_name:=VillageInteriors32.name_for_id(interior_id)
 	interior_id=-1
 	player_pos=interior_return_pos
@@ -4349,17 +4358,14 @@ func interior_actors() -> Array:
 	var room_name:=VillageInteriors32.name_for_id(interior_id)
 	if room_name in ["Mira","Liora"]:
 		return [
-			{"name":"Mira","role":"Älteste · alle Sonnenhain-Quests","pos":INTERIOR_CENTER+Vector2(-135,-90),"color":Color("a77ccb"),"kind":"quest"},
-			{"name":"Liora","role":"Forscherin · Wissen & Quest-Hinweise","pos":INTERIOR_CENTER+Vector2(135,-90),"color":Color("6bbba4"),"kind":"quest"}
+			{"name":"Mira","role":"Älteste · alle Sonnenhain-Quests","pos":INTERIOR_CENTER+VillageInteriors32.actor_offset(interior_id,"Mira"),"color":Color("a77ccb"),"kind":"quest"},
+			{"name":"Liora","role":"Forscherin · Wissen & Quest-Hinweise","pos":INTERIOR_CENTER+VillageInteriors32.actor_offset(interior_id,"Liora"),"color":Color("6bbba4"),"kind":"quest"}
 		]
 	if room_name=="Borin":
 		return [
-			{"name":"Borin","role":"Skillzauberer · Fähigkeiten & Prüfungen","pos":INTERIOR_CENTER+Vector2(-120,-90),"color":Color("6783bd"),"kind":"quest"},
-			{"name":"Pip","role":"Arkanhändler · Stäbe & Magie","pos":INTERIOR_CENTER+Vector2(130,-65),"color":Color("9f8bcc"),"kind":"arcane_merchant"}
+			{"name":"Borin","role":"Skillzauberer · Fähigkeiten & Prüfungen","pos":INTERIOR_CENTER+VillageInteriors32.actor_offset(interior_id,"Borin"),"color":Color("6783bd"),"kind":"quest"}
 		]
-	var pos:=INTERIOR_CENTER+Vector2(0,-95)
-	if room_name=="Torvald": pos=INTERIOR_CENTER+Vector2(-140,-85)
-	elif room_name=="Elara": pos=INTERIOR_CENTER+Vector2(-235,-55)
+	var pos:=INTERIOR_CENTER+VillageInteriors32.actor_offset(interior_id,room_name)
 	var npc_kind:="innkeeper" if room_name=="Alma" else ("smith" if room_name=="Torvald" else ("stylist" if room_name=="Fenna" else ("apprentice" if room_name=="Pip" else ("healer_alchemy" if room_name=="Elara" else ("arena" if room_name=="Arven" else "quest")))))
 	return [{"name":room_name,"role":VillageInteriors32.role_for_id(interior_id),"pos":pos,"color":Color("c9b58a"),"kind":npc_kind}]
 
@@ -5043,7 +5049,15 @@ func interact() -> void:
 				return
 	if arena_mode != "": return
 	if interior_id >= 0:
-		if player_pos.distance_to(INTERIOR_CENTER + VillageInteriors32.exit_offset(interior_id)) < 100:
+		if interior_id==8 and player_pos.distance_to(INTERIOR_CENTER+VillageInteriors32.link_offset(8))<76:
+			interior_id=6
+			player_pos=INTERIOR_CENTER+VillageInteriors32.exit_offset(6)-Vector2(0,40)
+			play_sound("door_open")
+			message("Pips Werkstatt · Stäbe, Magie & Leihwaffen")
+			announce_multiplayer_context()
+		elif interior_id==3 and player_pos.distance_to(INTERIOR_CENTER+Vector2(0,-184))<90:
+			interact_interior_owner("Arven")
+		elif player_pos.distance_to(INTERIOR_CENTER + VillageInteriors32.exit_offset(interior_id)) < 100:
 			leave_village_house()
 		elif in_elara_healing_field(72.0):
 			hp=max_hp()
@@ -9499,7 +9513,7 @@ func draw_hud() -> void:
 	else:
 		var map_center := Vector2(1035, 116)
 		draw_ref_panel(Rect2(918, 8, 234, 30))
-		text_at(Vector2(935, 29), ("KONFLUX · "+(KonfluxMap.BIOMES[konflux.room] if konflux.room>=0 else KonfluxMap.BIOMES[KonfluxMap.biome(player_pos)])) if konflux.active else (("LETZTE WACHE" if arena_mode == "final" else "ENDLOSE ARENA") if arena_mode != "" else ("ZUR STEINROSE" if interior_id >= 0 else (DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "%s · LV %d" % [region_name(region_at(player_pos)), region_level(region_at(player_pos))]))), 13, Color("fff0bf"), HORIZONTAL_ALIGNMENT_CENTER, 200)
+		text_at(Vector2(935, 29), ("KONFLUX · "+(KonfluxMap.BIOMES[konflux.room] if konflux.room>=0 else KonfluxMap.BIOMES[KonfluxMap.biome(player_pos)])) if konflux.active else (("LETZTE WACHE" if arena_mode == "final" else "ENDLOSE ARENA") if arena_mode != "" else (VillageInteriors32.name_for_id(interior_id).to_upper() if interior_id >= 0 else (DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "%s · LV %d" % [region_name(region_at(player_pos)), region_level(region_at(player_pos))]))), 13, Color("fff0bf"), HORIZONTAL_ALIGNMENT_CENTER, 200)
 		draw_minimap(Rect2(980, 61, 110, 110), true)
 		draw_arc(map_center, 70, 0, TAU, 64, Color("0b1220"), 16)
 		draw_arc(map_center, 70, 0, TAU, 64, Color("c9a45e"), 4)
@@ -9552,8 +9566,12 @@ func draw_hud() -> void:
 	if dungeon_id >= 0:
 		nearest = "E  ·  Gewölbe verlassen" if player_pos.distance_to(DUNGEON_CENTER + Vector2(-570, 0)) < 110 else ("E  ·  Versiegelte Truhe" if player_pos.distance_to(DUNGEON_CENTER + Vector2(555, 0)) < 105 and dungeon_chest_ready(dungeon_id) else "")
 	elif interior_id >= 0:
-		nearest = "E  ·  Gebäude verlassen" if player_pos.distance_to(INTERIOR_CENTER + VillageInteriors32.exit_offset(interior_id)) < 95 else ""
-		if in_elara_healing_field(92.0):
+		nearest = ("E  ·  Zu Borin zurück" if interior_id==6 else "E  ·  Gebäude verlassen") if player_pos.distance_to(INTERIOR_CENTER + VillageInteriors32.exit_offset(interior_id)) < 95 else ""
+		if interior_id==8 and player_pos.distance_to(INTERIOR_CENTER+VillageInteriors32.link_offset(8))<76:
+			nearest="E  ·  Pips Werkstatt betreten"
+		elif interior_id==3 and player_pos.distance_to(INTERIOR_CENTER+Vector2(0,-184))<90:
+			nearest="E  ·  Arena betreten"
+		elif in_elara_healing_field(92.0):
 			nearest="E  ·  Heilungsfeld am Altar · HP & Energie auffüllen"
 		else:
 			var interior_actor:=nearby_interior_actor(150.0)
@@ -11516,10 +11534,10 @@ func village_props() -> Array:
 	for tree in REFERENCE_TREES: props.append({"kind":"tree","point":tree,"depth":tree.y+9})
 	props.append({"kind":"magic_tree","point":BORIN_MAGIC_TREE_POS,"depth":BORIN_MAGIC_TREE_POS.y+18})
 	props.append({"kind":"well","point":REFERENCE_WELL,"depth":REFERENCE_WELL.y+32})
-	props.append({"kind":"board","point":Vector2(630,1250),"depth":1272.0})
-	for p in [Vector2(350,1700),Vector2(1050,1900),Vector2(1320,2230)]: props.append({"kind":"fence","point":p,"depth":p.y+12})
+	props.append({"kind":"board","point":VillageLayout.BOARD,"depth":VillageLayout.BOARD.y+22})
+	for p in VillageLayout.FENCES: props.append({"kind":"fence","point":p,"depth":p.y+12})
 	for p in VillageFixtures.LAMPS: props.append({"kind":"lamp","point":p,"depth":p.y+8})
-	for p in [Vector2(510,880),Vector2(360,1180),Vector2(1300,750),Vector2(1580,1660),Vector2(430,1720)]: props.append({"kind":"bush","point":p,"depth":p.y+28})
+	for p in VillageLayout.BUSHES: props.append({"kind":"bush","point":p,"depth":p.y+16})
 	for shop in VillageLayout.SHOPS:
 		if shop["kind"]=="smith":props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
 	return props
@@ -11530,14 +11548,15 @@ func prop_bounds(prop: Dictionary) -> Rect2:
 		"house":
 			var house_kind:=str(prop.get("house_kind","home"))
 			return VillageBuildings.bounds(p,house_kind)
-		"tree": return Rect2(p+Vector2(-88,-176),Vector2(176,208))
-		"magic_tree": return Rect2(p+Vector2(-112,-224),Vector2(224,264))
+		"tree": return StartScenery32.scenery_bounds(p,StartScenery32.tree_variant(p))
+		"magic_tree": return StartScenery32.scenery_bounds(p,"borin-runenbaum")
 		"lamp": return Rect2(p+Vector2(-20,-104),Vector2(40,120))
 		"barrel": return Rect2(p+Vector2(-24,-40),Vector2(48,80))
 		"cart": return Rect2(p+Vector2(-52,-68),Vector2(132,108))
-		"fence": return Rect2(p+Vector2(-16,-48),Vector2(144,80))
+		"fence": return Rect2(p+Vector2(-8,-30),Vector2(116,36))
 		"board": return Rect2(p+Vector2(-48,-94),Vector2(96,128))
-		"well": return Rect2(p+Vector2(-64,-96),Vector2(128,144))
+		"well": return StartScenery32.scenery_bounds(p,"brunnen")
+		"bush": return StartScenery32.scenery_bounds(p,StartScenery32.bush_variant(p))
 		_: return Rect2(p+Vector2(-64,-48),Vector2(128,96))
 
 func paint_village_prop(prop: Dictionary) -> void:
