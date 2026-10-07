@@ -1,9 +1,9 @@
 extends RefCounted
-## Visual terrain families for Map 0. Logical terrain remains owned by map0_ground_plan_32.gd.
+## Production PNG terrain families for Map 0. Logical terrain remains owned by map0_ground_plan_32.gd.
 const TILE:=32
-const GROUND_ATLAS:="res://art/terrain/map0_ground_32.svg"
-const OVERLAY_ATLAS:="res://art/terrain/map0_overlays_32.svg"
-const TRANSITION_ATLAS:="res://art/terrain/map0_transitions_32.svg"
+const GROUND_ATLAS:="res://art/terrain/sonnenhain/sonnenhain_ground_32.png"
+const OVERLAY_ATLAS:="res://art/terrain/sonnenhain/sonnenhain_overlays_32.png"
+const TRANSITION_ATLAS:="res://art/terrain/sonnenhain/sonnenhain_transitions_32.png"
 const HEIGHT_ATLAS:="res://art/terrain/map0_heights_32.svg"
 
 const FAMILY_ORDER:=[
