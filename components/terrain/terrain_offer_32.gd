@@ -1,8 +1,13 @@
 extends RefCounted
-## Maps the existing logical Map-0 material to a coherent visual family without changing collision/path geometry.
+## Map 0 visual zoning. Changes only the rendered floor; logical materials, collision and navigation stay untouched.
 const Plan=preload("res://components/map0_ground_plan_32.gd")
+const Profile=preload("res://components/terrain/overworld_ground_profile_32.gd")
 const VillageLayout=preload("res://components/village_layout.gd")
 const VillageBuildings=preload("res://components/village_buildings.gd")
+
+const SPAWN_CENTER:=Vector2(832,1024)
+const SPAWN_STONE_RADIUS:=252.0
+const SPAWN_PATH_RADIUS:=338.0
 
 static var door_points:Array=[]
 static var arena_door:=Vector2.ZERO
@@ -17,13 +22,13 @@ static func prepare()->void:
 		door_points.append({"door":door,"kind":kind})
 		if kind=="arena":arena_door=door
 
-static func near_normal_door(p:Vector2)->bool:
+static func nearest_normal_door(p:Vector2)->float:
 	prepare()
+	var nearest:=INF
 	for row in door_points:
 		if str(row["kind"])=="arena":continue
-		var door:Vector2=row["door"]
-		if absf(p.x-door.x)<=112.0 and p.y>=door.y-26.0 and p.y<=door.y+112.0:return true
-	return false
+		nearest=minf(nearest,p.distance_to(Vector2(row["door"])))
+	return nearest
 
 static func arena_edge_distance(p:Vector2)->float:
 	var r:Rect2=Plan.ARENA_YARD
@@ -33,34 +38,49 @@ static func resolve(legacy_id:String,cell:Vector2i,route_distance:float)->String
 	prepare()
 	var p:=Plan.center(cell)
 
-	# Arena: actual ground in the yard, border only at the perimeter.
+	# Arena keeps its existing geometry, but only uses floor families.
 	if Plan.ARENA_YARD.has_point(p):
 		if arena_door!=Vector2.ZERO and absf(p.x-arena_door.x)<=192.0 and p.y>=arena_door.y-48.0 and p.y<=arena_door.y+224.0:
-			return "arena_entry_stone"
-		if arena_edge_distance(p)<48.0:
-			return "arena_border"
-		return "arena_ground"
+			return Profile.ARENA_ENTRY
+		if arena_edge_distance(p)<42.0:
+			return Profile.ARENA_BORDER
+		return Profile.ARENA_GROUND
 
-	if near_normal_door(p):return "building_apron"
+	# The spawn is a coherent large-stone courtyard, feathered into paths instead of a hard rectangle.
+	if Profile.soft_radius(p,SPAWN_CENTER,SPAWN_STONE_RADIUS,cell,48.0):
+		return Profile.PLAZA
+	if Profile.soft_radius(p,SPAWN_CENTER,SPAWN_PATH_RADIUS,cell,42.0):
+		return Profile.PATH
 
-	# Plaza stays visually coherent. Legacy cobble speckles no longer create dark single-cell noise.
-	if Plan.PLAZA.has_point(p) and not Plan.is_garden(cell):
-		return "plaza_stone"
+	# Each house receives a readable stone apron that naturally joins the path network.
+	var door_d:=nearest_normal_door(p)
+	if door_d<104.0:
+		return Profile.APRON
+	if door_d<154.0 and route_distance<118.0:
+		return Profile.PATH
 
+	# Gardens stay green; only their actual walking line becomes a soft garden path.
 	if Plan.is_garden(cell):
-		return "garden_path" if route_distance<104.0 else "village_grass"
+		return Profile.GARDEN_PATH if route_distance<80.0+Profile.edge_noise(cell,4)*3.0 else Profile.GRASS
 
-	# Property pads are warm paths/aprons rather than random dark cobble cells.
+	# Main village circulation: a narrow stone backbone, then a broader warm dirt path.
+	if route_distance<38.0+Profile.edge_noise(cell,3)*2.0:
+		return Profile.STONE
+	if route_distance<104.0+Profile.edge_noise(cell,4)*3.0:
+		return Profile.PATH
+
+	# Property pads no longer become rectangular dirt fields. Away from doors they blend back into grass.
 	if Plan.is_property(cell):
-		if route_distance<76.0:return "building_apron"
-		return "village_path"
+		if route_distance<136.0:
+			return Profile.PATH
+		return Profile.GRASS
 
-	match legacy_id:
-		"grass_meadow":return "village_grass"
-		"grass_moss":return "moss_grass"
-		"forest_floor":return "forest_ground"
-		"earth_path":return "village_path"
-		"village_stone":return "village_stone"
-		"old_cobble":return "village_stone"
-		"arcane_floor":return "plaza_stone"
-	return "village_grass"
+	# Outer village/nature bands.
+	var edge:=Plan.edge_distance(p)
+	if edge<76.0:return Profile.MOSS
+	if edge<148.0 and Plan.seed_at(cell)%4!=0:return Profile.FOREST
+
+	# Sparse calm variation only in natural ground; no random stone/cobble cells.
+	if legacy_id=="grass_moss":return Profile.MOSS
+	if legacy_id=="forest_floor" and Plan.seed_at(cell)%3==0:return Profile.FOREST
+	return Profile.GRASS
