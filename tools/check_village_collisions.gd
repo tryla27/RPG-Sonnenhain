@@ -7,6 +7,11 @@ func _initialize()->void:
 		if prop["kind"]=="house":houses.append(game.prop_bounds(prop))
 	for prop in game.village_props():
 		if prop["kind"]=="house":continue
+		if prop["kind"]=="lamp":
+			for shop in game.VillageLayout.SHOPS:
+				if shop.has("shared_with"):continue
+				assert(not game.VillageBuildings.solid(shop["house"],shop["kind"]).intersects(Rect2(prop["point"]+Vector2(-10,2),Vector2(20,8))),"Lantern base overlaps solid building")
+			continue
 		for house in houses:assert(not game.prop_bounds(prop).intersects(house),"Tree art overlaps house art")
 	var spawn:Rect2=game.SpawnPlatform32.bounds(game.WAYSTONES[0])
 	for prop in game.village_props():

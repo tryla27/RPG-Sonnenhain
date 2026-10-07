@@ -1,4 +1,5 @@
 extends RefCounted
+const Elevation=preload("res://components/village_elevation.gd")
 
 # Hero body ≈64 world pixels = 2 m. Doors stay larger than the hero.
 const PIXELS_PER_METRE:=32.0
@@ -18,18 +19,24 @@ static func door(p:Vector2,kind:String)->Vector2:
 	return p+Vector2(128,240) if kind=="borin" else p+Vector2(96,180)
 
 static func bounds(p:Vector2,kind:String)->Rect2:
-	if SPECS.has(kind):return Rect2(p,SPECS[kind]["size"])
+	if SPECS.has(kind):return Rect2(p-Vector2(0,Elevation.lift(kind)),SPECS[kind]["size"])
 	return Rect2(p+Vector2(-16,-64),Vector2(288,320) if kind=="borin" else Vector2(224,256))
 
 static func solid(p:Vector2,kind:String)->Rect2:
 	var local:Rect2=SPECS[kind]["solid"] if SPECS.has(kind) else (Rect2(12,105,232,110) if kind=="borin" else Rect2(8,73,176,75))
 	return Rect2(p+local.position,local.size)
 
+static func visual_bounds(p:Vector2,kind:String)->Rect2:
+	var image:=bounds(p,kind)
+	var foundation:=Elevation.visual_bounds(p,kind)
+	return image.merge(foundation) if foundation.has_area() else image
+
 static func depth(p:Vector2,kind:String)->float:
 	return solid(p,kind).end.y
 
 static func paint(c:CanvasItem,p:Vector2,kind:String)->bool:
 	if not SPECS.has(kind):return false
+	Elevation.paint(c,p,kind)
 	if not textures.has(kind):textures[kind]=load("res://art/village/%s.png" % SPECS[kind]["asset"])
 	c.draw_texture_rect(textures[kind],bounds(p,kind),false)
 	return true

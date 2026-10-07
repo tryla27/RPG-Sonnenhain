@@ -1,6 +1,7 @@
 extends RefCounted
 
-const LAMPS:=[Vector2(768,1248),Vector2(1056,1280),Vector2(1576,1200),Vector2(1696,1200),Vector2(640,1530)]
+const Paths=preload("res://components/village_paths.gd")
+const LAMPS:=[Vector2(592,560),Vector2(608,1280),Vector2(496,1712),Vector2(496,1840),Vector2(496,2448),Vector2(880,1280),Vector2(1040,1360),Vector2(1712,1520),Vector2(1712,1840),Vector2(1712,2240),Vector2(1200,2590),Vector2(880,560)]
 
 static func lamp(c:CanvasItem,p:Vector2)->void:
 	var iron:=Color("30353c")
@@ -18,9 +19,10 @@ static func lamp(c:CanvasItem,p:Vector2)->void:
 
 static func glow(c:CanvasItem,p:Vector2,night:float,phase:float)->void:
 	var flicker:=1.0+0.04*sin(phase*5.0+p.x)
+	var illuminated:=Paths.closest(p)
 	for ring in range(5,0,-1):
-		c.draw_circle(p+Vector2(0,-70),float(ring)*13.0*flicker,Color(1.0,0.62,0.23,(0.018+0.028*night)*flicker))
-	c.draw_circle(p+Vector2(0,4),34.0,Color(1.0,0.67,0.30,0.03+0.06*night))
+		c.draw_circle(illuminated,float(ring)*13.0*flicker,Color(1.0,0.62,0.23,(0.018+0.028*night)*flicker))
+	c.draw_circle(illuminated,34.0,Color(1.0,0.67,0.30,0.03+0.06*night))
 
 static func board(c:CanvasItem,p:Vector2)->void:
 	for x in [-35,29]:

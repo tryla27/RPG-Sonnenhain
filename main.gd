@@ -142,6 +142,7 @@ const ENEMY_TYPES := [
 	{"name":"Sternenwächterin", "region":12, "hp":560, "damage":69, "speed":85, "xp":180, "color":Color("e4d4b5")}
 ]
 const VillageBuildings=preload("res://components/village_buildings.gd")
+const VillageElevation=preload("res://components/village_elevation.gd")
 const VillageFixtures=preload("res://components/village_fixtures.gd")
 const CharacterAdornments=preload("res://components/character_adornments.gd")
 const ArenaInterior=preload("res://components/arena_interior.gd")
@@ -205,7 +206,7 @@ var fusion_page:=0
 const COSMETIC_ACCENT_HEX := ["be5368","557fc0","5f9b68","b7894f","8d62aa","55a5a5","cf6f59","c94f7e","6a6fd1","4e9ad6","4ca6a0","5caf7a","86b84d","c2b14a","d48c4f","a86b4e","8c6a58","9a7acb","c36db5","d7d7d7"]
 const FUSION_IMPACT_PROFILES := FusionCatalog.IMPACT_PROFILES
 const BORIN_HOUSE_POS := Vector2(1248,64)
-const BORIN_MAGIC_TREE_POS := Vector2(1120,616)
+const BORIN_MAGIC_TREE_POS := Vector2(1120,480)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
 const WORLD_CHARACTER_SCALE := 0.84
 const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14300,1200)] # Map 06 / 07 / 08
@@ -251,13 +252,13 @@ const BORIN_QUESTS := [
 ]
 const NPCS := [
 	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1312, 1394), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1472, 498), "color":Color("6783bd"), "kind":"quest"},
+	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1472, 486), "color":Color("6783bd"), "kind":"quest"},
 	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1312, 1394), "color":Color("6bbba4"), "kind":"quest"},
-	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(374, 577), "color":Color("ab6e60"), "kind":"smith"},
+	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(374, 565), "color":Color("ab6e60"), "kind":"smith"},
 	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(384, 1074), "color":Color("c080aa"), "kind":"stylist"},
-	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1472, 498), "color":Color("9f8bcc"), "kind":"apprentice"},
-	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(380, 1557), "color":Color("e2bc91"), "kind":"healer_alchemy"},
-	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1209,2460), "color":Color("a48cbd"), "kind":"arena"}
+	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1472, 486), "color":Color("9f8bcc"), "kind":"apprentice"},
+	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(380, 1577), "color":Color("e2bc91"), "kind":"healer_alchemy"},
+	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1081,2460), "color":Color("a48cbd"), "kind":"arena"}
 ]
 const SHOPS := {
 	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
@@ -2426,6 +2427,7 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 				break
 		var house_kind:=str(house_info.get("kind","home"))
 		if VillageBuildings.solid(house,house_kind).grow(hero_collision_radius()).has_point(pos):return true
+	if VillageElevation.blocked(pos,from_pos,hero_collision_radius()):return true
 	for solid in (VILLAGE_REF_SOLIDS if USE_VILLAGE_REFERENCE_BACKGROUND else []):
 		if solid.has_point(pos):
 			return true
@@ -8707,6 +8709,7 @@ func draw_house(p: Vector2) -> void:
 	StartScenery32.themed_house(self,p,kind)
 func draw_npc(npc: Dictionary) -> void:
 	var p: Vector2 = npc["pos"]
+	if interior_id<0 and dungeon_id<0 and arena_mode=="":p-=Vector2(0,VillageElevation.height_at(p))
 	var kind: String = str(npc["kind"])
 	var name: String = str(npc["name"])
 	var baked := USE_VILLAGE_REFERENCE_BACKGROUND and panel == "" and VILLAGE_REF_RECT.has_point(p) and (name == "Mira" or name == "Liora" or name == "Arven")
@@ -11544,6 +11547,7 @@ func village_props() -> Array:
 	for p in VillageLayout.FENCES: props.append({"kind":"fence","point":p,"depth":p.y+12})
 	for p in VillageFixtures.LAMPS: props.append({"kind":"lamp","point":p,"depth":p.y+8})
 	for p in VillageLayout.BUSHES: props.append({"kind":"bush","point":p,"depth":p.y+16})
+	for p in VillageLayout.FLOWER_BUSHES: props.append({"kind":"flower_bush","point":p,"depth":p.y+16})
 	for shop in VillageLayout.SHOPS:
 		if shop["kind"]=="smith":props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
 	return props
@@ -11553,7 +11557,7 @@ func prop_bounds(prop: Dictionary) -> Rect2:
 	match prop["kind"]:
 		"house":
 			var house_kind:=str(prop.get("house_kind","home"))
-			return VillageBuildings.bounds(p,house_kind)
+			return VillageBuildings.visual_bounds(p,house_kind)
 		"tree": return StartScenery32.scenery_bounds(p,StartScenery32.tree_variant(p))
 		"magic_tree": return StartScenery32.scenery_bounds(p,"borin-runenbaum")
 		"lamp": return Rect2(p+Vector2(-20,-104),Vector2(40,120))
@@ -11563,6 +11567,7 @@ func prop_bounds(prop: Dictionary) -> Rect2:
 		"board": return Rect2(p+Vector2(-48,-94),Vector2(96,128))
 		"well": return StartScenery32.scenery_bounds(p,"brunnen")
 		"bush": return StartScenery32.scenery_bounds(p,StartScenery32.bush_variant(p))
+		"flower_bush": return StartScenery32.scenery_bounds(p,"busch-blumen")
 		_: return Rect2(p+Vector2(-64,-48),Vector2(128,96))
 
 func paint_village_prop(prop: Dictionary) -> void:
@@ -11583,7 +11588,8 @@ func paint_village_prop(prop: Dictionary) -> void:
 		"lamp": StartScenery32.lamp(self,p)
 		"barrel": StartScenery32.barrel(self,p)
 		"fence": StartScenery32.fence(self,p,p+Vector2(100,0))
-		"bush": food_system.bush(self,p)
+		"bush": StartScenery32.bush(self,p,int(p.x+p.y))
+		"flower_bush": StartScenery32.scenery(self,p,"busch-blumen")
 		"cart": Wagon32.paint(self,p,prop["goods"])
 
 func prop_cache_key(prop: Dictionary) -> String:
@@ -13677,7 +13683,7 @@ func draw_local_player_label() -> void:
 
 func draw_spawn_elevated_actor(peer:int)->void:
 	var point:Vector2=player_pos if peer<0 else network_player_position(peer)
-	var height:float=SpawnPlatform32.height_at(point,WAYSTONES[0]) if multiplayer_context()=="world" else 0
+	var height:float=maxf(SpawnPlatform32.height_at(point,WAYSTONES[0]),VillageElevation.height_at(point)) if multiplayer_context()=="world" else 0
 	var old_offset:Vector2=character_canvas_offset
 	character_canvas_offset=old_offset-Vector2(0,height)
 	draw_set_transform(character_canvas_offset)

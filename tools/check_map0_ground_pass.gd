@@ -15,7 +15,7 @@ func _initialize()->void:
 	assert(FileAccess.file_exists(Catalog.OVERLAY_ATLAS))
 	assert(FileAccess.file_exists(Catalog.TRANSITION_ATLAS))
 	assert(Catalog.VARIANTS==16)
-	assert(Catalog.FAMILY_ORDER.size()==12)
+	assert(Catalog.FAMILY_ORDER.size()==13)
 
 	var total:=0
 	var materials:Dictionary={}
@@ -32,7 +32,7 @@ func _initialize()->void:
 	assert(total==4592)
 	for required in ["grass_meadow","grass_moss","forest_floor","earth_path","village_stone","old_cobble","arcane_floor"]:
 		assert(materials.has(required),"missing logical Map 0 material: "+required)
-	for required in ["village_grass","village_path","village_stone","plaza_stone","building_apron","garden_path","arena_entry_stone","arena_border","arena_ground"]:
+	for required in ["village_grass","village_stone","plaza_stone","spawn_crossing","building_apron","arena_entry_stone"]:
 		assert(families.has(required),"missing visual Map 0 family: "+required)
 
 	for gate in [Plan.EAST_GATE,Plan.SOUTH_GATE]:
@@ -49,7 +49,8 @@ func _initialize()->void:
 		assert(bool(summary["complete"]))
 		assert(int(summary["missing"])==0)
 	assert(builder.validate_map0_ground().is_empty())
-	assert(int(families.get("arena_ground",0))>int(families.get("arena_border",0))*2,"arena yard must be ground-dominant, not border-filled")
+	for rejected in ["village_path","garden_path","arena_ground"]:
+		assert(int(families.get(rejected,0))==0,"yellow soil must be replaced by meadow: "+rejected)
 	assert(int(families.get("old_cobble_rework",0))==0,"dark cobble speckles must not leak into coherent Map 0 zones")
 	assert(Map0.transition_cells.size()>0,"new Map 0 terrain needs transition cells")
 	assert(Map0.overlay_cells.size()>0,"new Map 0 terrain needs detail overlays")

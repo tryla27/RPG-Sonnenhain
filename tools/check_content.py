@@ -204,8 +204,8 @@ for connection in [
 village_layout = (root / 'components' / 'village_layout.gd').read_text(encoding='utf8')
 for resident in ['Mira','Liora','Arven','Torvald','Fenna','Pip','Elara','Alma','Borin']:
     assert f'"name":"{resident}"' in village_layout, f'missing village house: {resident}'
-assert '"name":"Borin","house":Vector2(1248,64)' in village_layout, 'Borin house anchor moved'
-assert 'const BORIN_MAGIC_TREE_POS := Vector2(1120,616)' in source, 'Borin magic tree anchor moved'
+assert '"name":"Borin","house":Vector2(1248,64)' in village_layout, 'Borin house must remain at ground level'
+assert 'const BORIN_MAGIC_TREE_POS := Vector2(1120,480)' in source, 'Borin magic tree must use its approved grass placement'
 assert 'const BORIN_CRYSTAL_POS := Vector2(1512,736)' in source, 'Borin fusion crystal anchor moved'
 interiors32 = (root / 'components' / 'village_interiors_32.gd').read_text(encoding='utf8')
 for chapel_token in [
