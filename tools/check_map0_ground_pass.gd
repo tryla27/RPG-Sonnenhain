@@ -14,7 +14,6 @@ func _initialize()->void:
 	assert(FileAccess.file_exists(Catalog.GROUND_ATLAS))
 	assert(FileAccess.file_exists(Catalog.OVERLAY_ATLAS))
 	assert(FileAccess.file_exists(Catalog.TRANSITION_ATLAS))
-	assert(FileAccess.file_exists(Catalog.HEIGHT_ATLAS))
 	assert(Catalog.VARIANTS==16)
 	assert(Catalog.FAMILY_ORDER.size()==12)
 
@@ -54,6 +53,8 @@ func _initialize()->void:
 	assert(int(families.get("old_cobble_rework",0))==0,"dark cobble speckles must not leak into coherent Map 0 zones")
 	assert(Map0.transition_cells.size()>0,"new Map 0 terrain needs transition cells")
 	assert(Map0.overlay_cells.size()>0,"new Map 0 terrain needs detail overlays")
-	assert(Map0.height_cells.size()>0,"new Map 0 terrain needs visual height accents")
-	print("MAP0_GROUND_PASS_OK coherent plaza/property/arena zones, broad transitions, no dark cobble speckles")
+	assert(Map0.visual_family_at(Vector2(832,1024))=="plaza_stone","spawn center must use large plaza stones")
+	assert(Map0.visual_family_at(Vector2(825,1020))=="plaza_stone","live spawn route sample must stay on plaza stone")
+	assert(not ("VisualHeights32" in str(Map0)),"Map 0 ground profile must not add visual height layers")
+	print("MAP0_GROUND_PASS_OK floor-only Sonnenhain profile, coherent spawn plaza, house aprons and organic paths")
 	quit()
