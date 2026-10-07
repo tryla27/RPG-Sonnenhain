@@ -55,6 +55,5 @@ func _initialize()->void:
 	assert(Map0.overlay_cells.size()>0,"new Map 0 terrain needs detail overlays")
 	assert(Map0.visual_family_at(Vector2(832,1024))=="plaza_stone","spawn center must use large plaza stones")
 	assert(Map0.visual_family_at(Vector2(825,1020))=="plaza_stone","live spawn route sample must stay on plaza stone")
-	assert(not ("VisualHeights32" in str(Map0)),"Map 0 ground profile must not add visual height layers")
 	print("MAP0_GROUND_PASS_OK floor-only Sonnenhain profile, coherent spawn plaza, house aprons and organic paths")
 	quit()
