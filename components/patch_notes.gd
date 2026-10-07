@@ -1,6 +1,7 @@
 extends RefCounted
-const VERSION="PATCH 06.10.2026"
+const VERSION="PATCH 07.10.2026"
 const NOTES=[
+["Sonnenhain · Neues Bodenprofil", "Map 0 wurde ausschließlich am Boden neu gestaltet: großer heller Spawnplatz, warme Dorfwege, zusammenhängende Hausvorplätze und ruhige Gras-/Moosflächen mit organischen Übergängen. Die visuelle Höhen-/Treppenschicht wurde aus dem Map-0-Boden entfernt. Gebäude, Objekte, Kollisionen, Navigation und Gameplay bleiben unverändert."],
 ["Map 0 · Terrain-Polish", "Arenaflächen verwenden nun echten Boden statt einer vollflächigen Randkachel. Grundstücke und Plaza sind zusammenhängender, dunkle Einzelpflaster-Flecken entfallen und Übergänge zwischen Gras, Erde und Stein sind breiter und organischer."],
 ["Map 0 · Neues Terrain", "Sonnenhain verwendet neue 32px-Bodenfamilien für Gras, Wege, Pflaster, Hausvorplätze und Arena. Übergänge, dezente Details und visuelle Höhenstufen werden deterministisch gewählt; Gebäude, Türen, Kollisionen, Navigation, Saves und Multiplayer bleiben unverändert."],
 ["Kamera · Zielen beim Zoom", "Mauszielen bleibt bei 100 %, 85 % und 70 % Kamera-Zoom exakt am Cursor. Bildschirmkoordinaten werden wieder korrekt in Weltkoordinaten umgerechnet."],

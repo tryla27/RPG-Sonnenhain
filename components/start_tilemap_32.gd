@@ -5,7 +5,6 @@ const Catalog=preload("res://components/terrain/terrain_catalog_32.gd")
 const Offer=preload("res://components/terrain/terrain_offer_32.gd")
 const Selector=preload("res://components/terrain/terrain_selector_32.gd")
 const TransitionRules=preload("res://components/terrain/terrain_transition_rules_32.gd")
-const HeightRules=preload("res://components/terrain/terrain_height_rules_32.gd")
 const TILE:=32
 const BOUNDS:=Plan.BOUNDS
 const EAST_EXIT:=Plan.EAST_GATE
@@ -18,21 +17,18 @@ static var shared_tileset:TileSet
 static var ground_source_id:=-1
 static var overlay_source_id:=-1
 static var transition_source_id:=-1
-static var height_source_id:=-1
 static var source_ids:Dictionary={}
 static var material_cells:Dictionary={}
 static var visual_cells:Dictionary={}
 static var visual_coords:Dictionary={}
 static var transition_cells:Dictionary={}
 static var overlay_cells:Dictionary={}
-static var height_cells:Dictionary={}
 static var terrain:Dictionary={}
 var world_bounds:=BOUNDS
 var road_distance:Callable
 var ground:TileMapLayer
 var paths:TileMapLayer
 var decoration:TileMapLayer
-var heights:TileMapLayer
 
 static func seed_at(cell:Vector2i)->int:return Plan.seed_at(cell)
 
@@ -53,7 +49,6 @@ static func prepare(_distance:Callable)->void:
 	ground_source_id=make_source(Catalog.GROUND_ATLAS,16,12)
 	overlay_source_id=make_source(Catalog.OVERLAY_ATLAS,16,8)
 	transition_source_id=make_source(Catalog.TRANSITION_ATLAS,16,16)
-	height_source_id=make_source(Catalog.HEIGHT_ATLAS,8,8)
 	for id in Catalog.FAMILY_ORDER:source_ids[id]=ground_source_id
 	for id in MATERIAL_IDS:source_ids[id]=ground_source_id
 
@@ -74,12 +69,10 @@ static func prepare(_distance:Callable)->void:
 		elif door.x>1184:entry=Vector2(1248,clampf(door.y,640,2208))
 		routes.append(PackedVector2Array([door,door.lerp(entry,0.5)+Vector2(0,16),entry]))
 
-	var route_by_cell:Dictionary={}
 	for x in Plan.GRID.x:
 		for y in Plan.GRID.y:
 			var cell:=Vector2i(x,y)
 			var route_d:=route_distance(Plan.center(cell),routes)
-			route_by_cell[cell]=route_d
 			var legacy:String=Plan.material_for(cell,route_d)
 			var visual:String=Offer.resolve(legacy,cell,route_d)
 			material_cells[cell]=legacy
@@ -104,8 +97,6 @@ static func prepare(_distance:Callable)->void:
 		elif family in ["village_grass","moss_grass","forest_ground"] and Selector.chance("flora",cell,9):overlay_cells[cell]=Vector2i(Selector.variant_index("flowers",cell,16),0)
 		elif family in ["village_path","garden_path","arena_ground"] and Selector.chance("tracks",cell,11):overlay_cells[cell]=Vector2i(Selector.variant_index("tracks",cell,16),4)
 		elif family in ["village_stone","plaza_stone","old_cobble_rework","building_apron","arena_entry_stone","arena_border"] and Selector.chance("wear",cell,10):overlay_cells[cell]=Vector2i(Selector.variant_index("wear",cell,16),5)
-		var hc:=HeightRules.coord(cell,float(route_by_cell[cell]))
-		if hc.x>=0:height_cells[cell]=hc
 
 static func route_distance(p:Vector2,routes:Array)->float:
 	var nearest:=100000.0
@@ -147,7 +138,6 @@ func _ready()->void:
 	ground=make_layer(clip,"Ground32")
 	paths=make_layer(clip,"Transitions32")
 	decoration=make_layer(clip,"Details32")
-	heights=make_layer(clip,"VisualHeights32")
 	var area:=world_bounds.intersection(BOUNDS)
 	for x in range(maxi(0,floori(area.position.x/TILE)),mini(Plan.GRID.x,ceili(area.end.x/TILE))):
 		for y in range(maxi(0,floori(area.position.y/TILE)),mini(Plan.GRID.y,ceili(area.end.y/TILE))):
@@ -155,8 +145,7 @@ func _ready()->void:
 			ground.set_cell(cell,ground_source_id,visual_coords[cell])
 			if transition_cells.has(cell):paths.set_cell(cell,transition_source_id,transition_cells[cell])
 			if overlay_cells.has(cell):decoration.set_cell(cell,overlay_source_id,overlay_cells[cell])
-			if height_cells.has(cell):heights.set_cell(cell,height_source_id,height_cells[cell])
-	ground.update_internals();paths.update_internals();decoration.update_internals();heights.update_internals()
+	ground.update_internals();paths.update_internals();decoration.update_internals()
 
 func make_layer(parent:Node,title:String)->TileMapLayer:
 	var layer:=TileMapLayer.new();layer.name=title;layer.tile_set=shared_tileset;layer.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST;layer.collision_enabled=false;layer.navigation_enabled=false;parent.add_child(layer);return layer

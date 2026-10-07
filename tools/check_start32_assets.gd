@@ -6,9 +6,9 @@ func _initialize()->void:
 	map.prepare(Callable(g,"distance_to_trail"))
 	assert(map.shared_tileset.tile_size==Vector2i(32,32))
 	assert(map.terrain.size()==4592)
-	assert(map.shared_tileset.get_source_count()==4)
+	assert(map.shared_tileset.get_source_count()==3)
 	assert(catalog.VARIANTS==16)
-	for path in [catalog.GROUND_ATLAS,catalog.OVERLAY_ATLAS,catalog.TRANSITION_ATLAS,catalog.HEIGHT_ATLAS]:
+	for path in [catalog.GROUND_ATLAS,catalog.OVERLAY_ATLAS,catalog.TRANSITION_ATLAS]:
 		var texture:Texture2D=load(path)
 		assert(texture!=null,"Missing Map 0 terrain atlas: "+path)
 	for file in ["objects-faithful.webp","props-faithful.webp"]:
@@ -18,6 +18,6 @@ func _initialize()->void:
 		assert(im.get_pixel(0,0).a<0.01,"Non-transparent sprite background")
 		assert(im.get_pixel(1535,1023).a<0.01,"Non-transparent sprite corner")
 	assert(not g.is_blocked(g.village_house_door(g.village_house("Alma")),g.village_house_door(g.village_house("Alma"))+Vector2(0,25)))
-	print("FAITHFUL_START32_OK 640 terrain slots across ground/overlay/transition/height sources, 4592 cells, tavern approach")
+	print("FAITHFUL_START32_OK floor-only ground/overlay/transition sources, 4592 cells, reusable overworld profile")
 	g.free()
 	quit()
