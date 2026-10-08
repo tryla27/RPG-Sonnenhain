@@ -9,8 +9,8 @@ Waldschleims, ohne die ursprünglichen Designtafeln zu überschreiben.
 - Unser einfachster, einfältigster Mob und der erste Gegner des Spielers.
 - Kleiner grüner, glibbriger Slime: gedrungene runde Kuppel, breite weiche Basis
   und wenige unregelmäßige Glibberlappen.
-- Zwei kleine dunkle Augen und ein winziger schlaffer Mund. Der Ausdruck wirkt
-  schlicht und etwas begriffsstutzig; keine aggressiven Zähne oder Grimassen.
+- Etwas größere dunkle Augen mit Glanzpixeln, ein kleines freundliches Lächeln
+  und dezente warme Wangenpixel. Der Ausdruck bleibt naiv und unkompliziert.
 - Keine Blätter, Blüten, Moosbüschel, Ausrüstung, Waffen oder anderen Anhänger.
 - Glibber durch klare Glanzpixel und wenige Grünabstufungen darstellen.
 - Warme apfel-/blattgrüne Hauptfarbe, olivbraune Kontur, gelbgrüner Glanz.
@@ -37,7 +37,9 @@ Richtungs- oder Animationsatlas.
 
 ## Referenz
 
-![Neuer Frontentwurf](waldschleim-v2-front.png)
+![Aktueller süßer Frontentwurf](waldschleim-v3-suess.png)
+
+[Vorheriger neutraler Entwurf](waldschleim-v2-front.png) bleibt als ältere Variante erhalten.
 
 Die bisherigen Kampfwerte und die Live-Grafik bleiben während der Designarbeit
 unverändert. Nächster Schritt: Grundform abstimmen, dann Richtungssatz und
