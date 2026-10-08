@@ -24,7 +24,7 @@ func _initialize() -> void:
 	for n in g.NPCS:
 		check(not g.is_blocked(n["pos"],n["pos"]),"NPC inside collision: %s"%n["name"])
 		check(n["pos"].y>g.npc_position(n["name"]).y-1,"NPC lookup mismatch")
-	for p in [Vector2(825,1020),Vector2(900,1300),Vector2(656,1750)]: check(not g.is_blocked(p,p),"Spawn or main path blocked")
+	for p in [Vector2(825,1020),Vector2(825,1300),Vector2(560,1750)]: check(not g.is_blocked(p,p),"Spawn or main path blocked: %s" % p)
 	for p in [Vector2(1779,1120),Vector2(1781,1120),Vector2(874,2599),Vector2(874,2601),Vector2(4999,3000),Vector2(5001,3000)]: check(g.visual_region_at(p)==g.region_at(p),"Art crosses region border")
 	g.player_pos=Vector2(1680,1120)
 	g.move_with_collision(Vector2(240,0))
