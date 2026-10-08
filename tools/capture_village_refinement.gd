@@ -90,4 +90,3 @@ func capture()->void:
 		await process_frame
 	print("VILLAGE_RENDER_QA_OK")
 	quit()
-
