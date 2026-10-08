@@ -372,6 +372,12 @@ var rune_auto_shield_cooldown := 0.0
 const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
 var equipped_ring2_uid := -1
+var equipped_necklace_uid := -1
+var necklace_equip_serial:=0
+const ArcaneNecklaces=preload("res://components/arcane_necklaces.gd")
+var necklaces=ArcaneNecklaces.new()
+var necklace_heal_mult:=1.0
+
 var next_uid := 1
 var selected_item := -1
 var inventory_page := 0
@@ -931,7 +937,7 @@ func _on_peer_connected(id: int) -> void:
 	if network_mode == "host":
 		push_world_snapshot()
 		if not dedicated_server_mode:
-			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id,"mage_rift_blink":mage_rift_blink_unlocked(),"ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id,"mage_rift_blink":mage_rift_blink_unlocked(),"ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"necklace":necklace_visual(),"necklace_serial":necklace_equip_serial,"normal_power":normal_attack_power(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
@@ -1271,6 +1277,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"running":bool(state.get("running",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
+		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,5), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
@@ -1282,6 +1289,8 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 	clean["death_progress"]=clampf(float(state.get("death_progress",0)),0,1) if float(clean["hp"])<=0 else -1.0
 	clean["konflux"] = in_konflux
 	clean["room"] = room_id
+	if int(clean.get("necklace_serial",0))!=int(remote_players.get(sender,{}).get("necklace_serial",-1)) or int(clean.get("necklace",-1))!=int(remote_players.get(sender,{}).get("necklace",-1)):
+		necklaces.reset_charges(sender,int(clean.get("necklace",-1)),Time.get_ticks_msec())
 	remote_players[sender] = clean
 	if context_changed:
 		send_server_session_status(sender)
@@ -1668,7 +1677,7 @@ func equipment_power(uid: int) -> int:
 	return 0
 
 func equipped_item_uids() -> Array:
-	var ids := [equipped_uid,equipped_armor_uid,equipped_head_uid,equipped_ring_uid]
+	var ids := [equipped_uid,equipped_armor_uid,equipped_head_uid,equipped_ring_uid,equipped_necklace_uid]
 	if class_id == 1 and equipped_ring2_uid >= 0 and equipped_ring2_uid != equipped_ring_uid: ids.append(equipped_ring2_uid)
 	return ids
 
@@ -2035,6 +2044,7 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 	return result
 
 func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
+	necklaces.tick_enemy(enemy,delta,Callable(self,"necklace_visual"))
 	if int(enemy.get("type",-1)) in [12,13,14] and float(enemy.get("boss_spawn_timer",0.0))>0.0:
 		enemy["boss_spawn_timer"]=maxf(0.0,float(enemy["boss_spawn_timer"])-delta)
 		enemy["walking"]=false
@@ -2077,7 +2087,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 	var moved:=false
 	var movement:Vector2=action["move"]
 	if movement.length_squared()>.001:
-		var speed:float=float(profile["movement_speed"])*(.45 if float(enemy.get("slow",0))>0 else 1.0)
+		var speed:float=float(profile["movement_speed"])*(.45 if float(enemy.get("slow",0))>0 else (float(enemy.get("necklace_frost_mult",1.0)) if float(enemy.get("necklace_frost",0))>0 else 1.0))
 		var origin:Vector2=enemy["pos"]
 		var separation:=Vector2.ZERO
 		for other in enemies:
@@ -3408,7 +3418,7 @@ func rune_rank(tree:int,talent:int,source_peer:int=0)->int:
 
 func heal_player(amount:float,magical:bool=false)->void:
 	if amount<=0.0 or hp<=0.0 or death_timer>0.0:return
-	hp=minf(max_hp(),hp+maxf(0.0,amount)*essence.healing_mult()*(essence.ability_power_mult() if magical else 1.0))
+	hp=minf(max_hp(),hp+maxf(0.0,amount)*necklace_heal_mult*essence.healing_mult()*(essence.ability_power_mult() if magical else 1.0))
 
 func update_rune_effects(delta:float)->void:
 	rune_emergency_timer=maxf(0.0,rune_emergency_timer-delta)
@@ -3574,7 +3584,7 @@ func move_enemy_with_collision(enemy: Dictionary, displacement: Vector2) -> void
 		if not valid: break
 		enemy["pos"]=next
 
-func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0, apply_runes:bool=true) -> void:
+func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0, apply_runes:bool=true,direct_hit:bool=true) -> void:
 	if index < 0 or index >= enemies.size(): return
 	play_sound("hit")
 	var enemy: Dictionary = enemies[index]
@@ -3628,6 +3638,11 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 			enemy["poison_tick"] = 1.0
 			if source_peer > 0: enemy["poison_owner_peer"] = source_peer
 			effect(enemy["pos"] + Vector2(0, -44), "GIFT", Color("b7e885"), 0.8)
+	if apply_runes and direct_hit:
+		var neck:=necklace_visual(source_peer)
+		var reference:=normal_attack_power() if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("normal_power",1)),1,140+attacker_level*30)
+		amount=necklaces.direct_hit(neck,source_peer,enemy,reference,amount,Time.get_ticks_msec())
+		if source_peer>0:sync_necklace_progress(source_peer)
 	enemy["hp"] = float(enemy["hp"]) - amount
 	enemy["flash"] = 0.16
 	if source_peer > 0 and network_mode == "host":
@@ -3687,6 +3702,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
+	if necklace_cast_eligible(id) and necklaces.cast(necklace_visual(sender),sender,Time.get_ticks_msec()):power=roundi(power*1.2)
 	server_ability_effects(id,origin,dir,remote_class,power,rank,sender)
 
 func server_ability_effects(id:int,origin:Vector2,dir:Vector2,remote_class:int,power:int,rank:int,sender:int)->void:
@@ -3769,7 +3785,14 @@ func use_ability(slot: int) -> void:
 	var cast_dir := facing
 	if uses_server_world():
 		rpc_client_ability.rpc_id(1, id, [cast_pos.x,cast_pos.y], [cast_dir.x,cast_dir.y], power, rank)
-	execute_ability_effects(id,rank,power,cast_pos,cast_dir)
+	var empowered:=necklace_cast_eligible(id) and necklaces.cast(necklace_visual(),0,Time.get_ticks_msec())
+	if empowered:
+		power=roundi(power*1.2)
+		energy=minf(max_energy(),energy+float(ability["cost"])*0.2)
+		necklace_heal_mult=1.2
+		execute_ability_effects(id,rank,power,cast_pos,cast_dir)
+		necklace_heal_mult=1.0
+	else:execute_ability_effects(id,rank,power,cast_pos,cast_dir)
 
 func execute_ability_effects(id:int,rank:int,power:int,cast_pos:Vector2,cast_dir:Vector2)->void:
 	if id>=BASE_ABILITIES.size():
@@ -3994,7 +4017,7 @@ func update_poison_clouds(delta: float) -> void:
 		cloud["tick"] = 0.75
 		for e in range(enemies.size() - 1, -1, -1):
 			if cloud["pos"].distance_to(enemies[e]["pos"]) < 86:
-				damage_enemy(e, int(cloud["damage"]), Vector2.ZERO, false, "gift")
+				damage_enemy(e, int(cloud["damage"]), Vector2.ZERO, false, "gift",0,true,false)
 
 func iceball_chain(center:Vector2,damage:int,main_uid:int,jumps:int,stun_enabled:bool,source_peer:int=0)->void:
 	var seen:Array=[main_uid]
@@ -4087,7 +4110,7 @@ func update_impact_zones(delta: float) -> void:
 		for e in range(enemies.size() - 1, -1, -1):
 			var offset: Vector2 = enemies[e]["pos"] - zone["pos"]
 			if offset.length() < float(zone["radius"]):
-				damage_enemy(e, int(zone["damage"]), offset.normalized(), false, str(zone["element"]))
+				damage_enemy(e, int(zone["damage"]), offset.normalized(), false, str(zone["element"]),0,true,false)
 		spell_visuals.append({"kind":int(zone["kind"]), "pos":zone["pos"], "end":zone["pos"], "dir":Vector2.RIGHT, "rank":1, "life":0.62, "max":0.62})
 		if int(zone["kind"]) == 22: create_burning_ground(zone["pos"], int(zone["damage"] * 0.18), 5.0)
 		impact_zones.remove_at(i)
@@ -4113,7 +4136,7 @@ func update_battle_zones(delta: float) -> void:
 		zone["tick"] = 0.65
 		for e in range(enemies.size() - 1, -1, -1):
 			if enemies[e]["pos"].distance_to(zone["pos"]) < float(zone["radius"]):
-				damage_enemy(e, int(zone["damage"]), Vector2.ZERO, false, "feuer")
+				damage_enemy(e, int(zone["damage"]), Vector2.ZERO, false, "feuer",0,true,false)
 
 func enter_arena(mode: String) -> void:
 	if arena_mode != "": return
@@ -4327,14 +4350,18 @@ func leave_tavern() -> void:
 	leave_village_house()
 
 func sanitize_role_shop_stock() -> void:
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	if shop_stock.has("alchemy"):
 		shop_stock["alchemy"]=(shop_stock["alchemy"] as Array).filter(func(item): return str(item.get("icon","")) in ["potion","herb","essence"])
 	if shop_stock.has("smith"):
 		shop_stock["smith"]=(shop_stock["smith"] as Array).filter(func(item): return str(item.get("icon","")) in ["sword","armor","head"])
 	if shop_stock.has("arcane"):
-		shop_stock["arcane"]=(shop_stock["arcane"] as Array).filter(func(item): return str(item.get("icon","")) in ["staff","armor","ring","head","essence"])
+		shop_stock["arcane"]=(shop_stock["arcane"] as Array).filter(func(item): return str(item.get("icon","")) in ["staff","armor","ring","head","essence","necklace"])
 
 func open_elara_alchemy() -> void:
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	sanitize_role_shop_stock()
 	merchant_kind="alchemy"
 	shop_page=0
@@ -4346,6 +4373,8 @@ func open_elara_alchemy() -> void:
 	pending_purchase_item={}
 
 func open_pip_arcane_shop() -> void:
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	sanitize_role_shop_stock()
 	merchant_kind="arcane"
 	shop_page=0
@@ -4821,6 +4850,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	if type in [12, 13, 14]:
 		boss_cooldowns[type - 12] = 90.0
 		bosses_defeated[type - 12] = true
+		drops.append({"pos":safe_drop_position(pos,Vector2(0,-25)),"item":boss_necklace_item(type-12),"life":180.0})
 		var relic:=class_relic_item(type-12)
 		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)),"item":relic,"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		drops.append({"pos":safe_drop_position(pos,Vector2(-25,8)),"item":class_boss_hat_item(type-12),"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
@@ -4921,13 +4951,14 @@ func make_item(name: String, icon: String, rarity: int, power: int, value: int, 
 		item["value"] = value
 		item["design"] = maxi(0,FoodSystem.index_for(name))
 	next_uid += 1
+	ArcaneNecklaces.normalize(item)
 	return item
 
 func stack_limit(item: Dictionary) -> int:
 	var icon: String = str(item.get("icon", ""))
 	if icon == "food": return 30
 	if icon == "potion": return 16
-	if icon in ["gem", "herb", "essence"]: return 1000000000
+	if icon in ["gem", "herb", "essence", "necklace"]: return 1000000000
 	return 1
 
 func stack_matches(a: Dictionary, b: Dictionary) -> bool:
@@ -4944,6 +4975,7 @@ func can_add_item(item: Dictionary) -> bool:
 	return capacity >= maxi(1, int(item.get("count", 1)))
 
 func add_item(item: Dictionary) -> bool:
+	ArcaneNecklaces.normalize(item)
 	if not can_add_item(item): return false
 	var remaining := maxi(1, int(item.get("count", 1)))
 	var remaining_value := item_sale_value(item)
@@ -5488,7 +5520,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "skill_level_points_granted":skill_level_points_granted, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_rotation":shop_rotation,"shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "skill_level_points_granted":skill_level_points_granted, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "equipped_necklace_uid":equipped_necklace_uid,"necklace_cooldown_ms":maxi(0,int(necklaces.state(0,necklace_visual(),Time.get_ticks_msec())["ready"])-Time.get_ticks_msec()), "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_rotation":shop_rotation,"shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5682,6 +5714,12 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	ranger_hunt_meter = clampf(float(data.get("ranger_hunt_meter",0.0)),0.0,100.0)
 	ranger_hunt_buff = clampf(float(data.get("ranger_hunt_buff",0.0)),0.0,60.0)
 	ranger_falcon_rune = bool(data.get("ranger_falcon_rune",false))
+	equipped_necklace_uid = int(data.get("equipped_necklace_uid", -1))
+	necklaces=ArcaneNecklaces.new()
+	necklaces.state(0,-1,Time.get_ticks_msec())["ready"]=Time.get_ticks_msec()+clampi(int(data.get("necklace_cooldown_ms",0)),0,6000)
+	for item in inventory:ArcaneNecklaces.normalize(item)
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
 	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1)) if class_id == 1 else -1
 	last_waystone = clampi(int(data.get("last_waystone", 1)), 1, WAYSTONES.size() - 1)
@@ -5694,6 +5732,8 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if stored_shop is Dictionary and stored_shop.has("smith"):
 		shop_stock = stored_shop.duplicate(true)
 		for role in shop_stock:shop_stock[role]=shop_stock[role].slice(maxi(0,shop_stock[role].size()-30))
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	sanitize_role_shop_stock()
 	var stored_chests: Array = data.get("opened_chests", [])
 	var stored_chest_until: Array = data.get("chest_respawn_until", [])
@@ -6140,6 +6180,8 @@ func start_new_game() -> void:
 	equipped_armor_uid = -1
 	equipped_ring_uid = -1
 	equipped_ring2_uid = -1
+	equipped_necklace_uid = -1
+	necklaces=ArcaneNecklaces.new()
 	next_uid = 1
 	selected_item = -1
 	pip_loan_received = false
@@ -6773,6 +6815,7 @@ func drop_inventory_item(index:int)->bool:
 		if uid==equipped_head_uid:equipped_head_uid=-1
 		if uid==equipped_ring_uid:equipped_ring_uid=-1
 		if uid==equipped_ring2_uid:equipped_ring2_uid=-1
+		if uid==equipped_necklace_uid:equipped_necklace_uid=-1
 	var dropped:=item.duplicate(true)
 	if int(item.get("count",1))>1:
 		item["count"]=int(item["count"])-1
@@ -6812,6 +6855,9 @@ func click_inventory(mouse: Vector2) -> void:
 		return
 	if Rect2(180,275,98,77).has_point(mouse) and equipped_uid >= 0:
 		unequip_slot("weapon")
+		return
+	if Rect2(501,325,98,77).has_point(mouse) and equipped_necklace_uid>=0:
+		unequip_slot("necklace")
 		return
 	if Rect2(501,235,98,77).has_point(mouse) and equipped_armor_uid >= 0:
 		unequip_slot("armor")
@@ -6910,6 +6956,8 @@ func sell_all_unequipped() -> void:
 	save_game()
 
 func item_skill_unlock_id(item:Dictionary)->int:
+	ArcaneNecklaces.normalize(item)
+	if ArcaneNecklaces.index(item)>=0:return -1
 	var explicit:=int(item.get("skill_unlock",-1))
 	if explicit>=0:return explicit
 	var item_name:=str(item.get("name",""))
@@ -6921,6 +6969,10 @@ func item_skill_unlock_id(item:Dictionary)->int:
 
 func use_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
+	ArcaneNecklaces.normalize(inventory[index])
+	if ArcaneNecklaces.index(inventory[index])>=0:
+		toggle_equipment_item(index)
+		return
 	if food_system.eat(self,index): return
 	var item: Dictionary = inventory[index]
 	var name: String = item["name"]
@@ -7019,6 +7071,8 @@ func refresh_shop_stock() -> void:
 			{"name":"Umhang %s" % suffix, "icon":"armor", "power":1 + int(tier / 4.0), "price":65 + tier * 14, "rarity":rarity, "level":tier},
 			{"name":"Meister-%s %s" % [weapon_word, suffix], "icon":weapon, "power":10 + tier * 3, "price":680 + tier * 83, "rarity":mini(3, rarity + 1), "level":tier, "element":shop_element}]
 	}
+	for offers in shop_stock.values():
+		for offer in offers:ArcaneNecklaces.normalize(offer)
 	append_new_equipment()
 	# Elara's ten deliveries include known regional herbs and elemental essences.
 	for region in range(1,FoodSystem.REGIONAL_HERBS.size()+1):
@@ -7061,12 +7115,13 @@ func append_new_equipment() -> void:
 		if not exists: shop_stock["merchant"].append(offer)
 
 func buy_item(stock_item: Dictionary) -> void:
+	ArcaneNecklaces.normalize(stock_item)
 	var price := maxi(0,int(stock_item.get("price",0)))
 	if gold < price:
 		message("Dafür fehlen dir %d Gold." % (price-gold))
 		return
 	var icon := str(stock_item.get("icon","gem"))
-	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food","head"]:
+	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food","head","necklace"]:
 		message("Dieses Angebot ist ungültig.")
 		return
 	var purchased := make_item(String(stock_item.get("name","Fundstück")), icon, clampi(int(stock_item.get("rarity",1)),0,4), maxi(0,int(stock_item.get("power",0))), int(price/2.0), String(stock_item.get("element","")), maxi(1,int(stock_item.get("level",level))))
@@ -7626,7 +7681,7 @@ func armor_visual() -> int:
 			return clampi(int(item.get("design",0)),0,5)
 	return -1
 
-func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2,rings_override:int=-2,running_override:bool=false) -> void:
+func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2,rings_override:int=-2,running_override:bool=false,necklace_override:int=-2) -> void:
 	var local := p.is_equal_approx(player_pos) and panel not in ["creation","creation_review"]
 	var roll := 1.0-dash_timer/dodge_duration if local and dash_timer > 0 else -1.0
 	var death := 1.0-death_timer/DEATH_DURATION if local and death_timer > 0 else death_override
@@ -7640,7 +7695,9 @@ func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: V
 	if local and visual_class==0 and warrior_jump_timer>0.0:
 		jump_progress=1.0-warrior_jump_timer/maxf(warrior_jump_duration,0.01)
 		look=warrior_jump_direction
-	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override),jump_progress)
+	var neck:=necklace_visual() if necklace_override==-2 else necklace_override
+	if panel in ["creation","creation_review"]:neck=-1
+	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override),jump_progress,neck)
 
 func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2, scale_factor: float, race: int, gender: int) -> void:
 	var accent: Color = [Color('e5bd77'),Color('8fcde6'),Color('91c787')][clampi(visual_class,0,2)]
@@ -9299,7 +9356,8 @@ func equipped_weapon_stage() -> int:
 	return 0
 
 func item_design(item: Dictionary) -> int:
-	if item.get("icon") == "food": return maxi(0,FoodSystem.index_for(str(item.get("name",""))))
+	if item.get("icon")=="necklace":return maxi(0,ArcaneNecklaces.index(item))
+	if item.get("icon")=="food": return maxi(0,FoodSystem.index_for(str(item.get("name",""))))
 	return clampi(int(item.get("design", absi(hash(String(item.get("name", "Ausrüstung")))) % 12)), 0, 11)
 
 func equipped_item_design(uid: int) -> int:
@@ -9314,6 +9372,16 @@ func equipped_weapon_design() -> int:
 func draw_item_icon(origin: Vector2, kind: String, accent: Color, scale_factor: float = 1.0, stage: int = 0, design: int = 0) -> void:
 	var p := origin
 	var s := scale_factor
+	if kind=="necklace":
+		var tint:=Color(ArcaneNecklaces.COLORS[clampi(design,0,5)])
+		PixelStyle32.line(self,p+Vector2(5,3)*s,p+Vector2(8,17)*s,Color("bca372"),2*s)
+		PixelStyle32.line(self,p+Vector2(27,3)*s,p+Vector2(24,17)*s,Color("bca372"),2*s)
+		PixelStyle32.line(self,p+Vector2(8,17)*s,p+Vector2(16,24)*s,Color("bca372"),2*s)
+		PixelStyle32.line(self,p+Vector2(24,17)*s,p+Vector2(16,24)*s,Color("bca372"),2*s)
+		PixelStyle32.rect(self,Rect2(p+Vector2(11,21)*s,Vector2(11,12)*s),Color("493e49"))
+		PixelStyle32.rect(self,Rect2(p+Vector2(13,23)*s,Vector2(7,8)*s),tint)
+		PixelStyle32.rect(self,Rect2(p+Vector2(13,23)*s,Vector2(3,3)*s),tint.lightened(.3))
+		return
 	if kind=="head":
 		PixelStyle32.rect(self,Rect2(p+Vector2(3,22)*s,Vector2(28,6)*s),accent)
 		PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(7,22)*s,p+Vector2(16,2)*s,p+Vector2(25,22)*s]),[Color("718d9b"),Color("796292"),Color("658956")][clampi(design,0,2)])
@@ -10878,6 +10946,8 @@ func draw_inventory_panel() -> void:
 	draw_equipment_slot(Vector2(180,205),"KOPF",equipped_head_uid,"head")
 	draw_equipment_slot(Vector2(180, 275), "WAFFE", equipped_uid, class_weapon_icon())
 	draw_equipment_slot(Vector2(501, 235), "RÜSTUNG", equipped_armor_uid, "armor")
+	draw_equipment_slot(Vector2(501,325),"HALSKETTE",equipped_necklace_uid,"necklace")
+	if necklace_visual()>=0:text_at(Vector2(186,558),necklaces.progress(necklace_visual(),0,Time.get_ticks_msec()),13,Color("d8c5ff"))
 	draw_equipment_slot(Vector2(300, 440), "RING 1" if class_id == 1 else "RING", equipped_ring_uid, "ring")
 	if class_id == 1: draw_equipment_slot(Vector2(405,440),"RING 2",equipped_ring2_uid,"ring")
 	text_at(Vector2(186, 534), "HP %d  ·  ANGRIFF %d  ·  SCHUTZ %d" % [int(max_hp()), normal_attack_power(), equipment_power(equipped_armor_uid)], 15, Color("e6efdd"))
@@ -10916,6 +10986,7 @@ func draw_inventory_panel() -> void:
 		var action_label := "MEISTERGABE NUTZEN" if bool(item.get("class_relic",false)) else ("ESSEN" if item["icon"] == "food" else "BENUTZEN")
 		if item["icon"] in ["sword","staff","bow","armor","ring","head"]:
 			action_label = "AUSZIEHEN" if is_equipped_uid(int(item.get("uid",-1))) else "AUSRÜSTEN"
+		if ArcaneNecklaces.index(item)>=0:action_label="ABLEGEN" if is_equipped_uid(int(item.get("uid",-1))) else ("WECHSELN" if equipped_necklace_uid>=0 else "ANLEGEN")
 		ui_button(Rect2(643, 538, 320, 42), action_label, inventory_item_usable(item))
 	else:
 		text_at(Vector2(643, 508), "Wähle einen Gegenstand aus dem Inventar.", 14, Color("dbe8d5"))
@@ -10927,7 +10998,7 @@ func draw_inventory_panel() -> void:
 			break
 
 func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1) -> void:
-	ui_box(Rect2(pos, Vector2(246, 190)), Color("354a4a"))
+	ui_box(Rect2(pos, Vector2(246, 210)), Color("354a4a"))
 	draw_rect(Rect2(pos + Vector2(7, 7), Vector2(232, 3)), RARITY_COLORS[int(item["rarity"])])
 	draw_item_icon(pos + Vector2(15, 22), String(item["icon"]), RARITY_COLORS[int(item["rarity"])], 1.0, weapon_visual_stage(item), item_design(item))
 	draw_item_signature(pos + Vector2(15, 22), item)
@@ -10950,7 +11021,17 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var color := Color("83e4a0") if diff > 0 else (Color("ee8a86") if diff < 0 else Color("dfdcc3"))
 		var stat_name := "Schaden" if icon in ["sword", "staff", "bow"] else ("Schutz" if icon == "armor" else "Leben")
 		text_at(pos + Vector2(14, 93), "%s %d   %s%d" % [stat_name, int(item["power"]), "▲ +" if diff > 0 else ("▼ " if diff < 0 else "= "), diff], 14, color)
-	if icon in ["potion", "gem", "herb", "essence", "food"]:
+	if icon=="necklace":
+		var description:String=ArcaneNecklaces.TEXT[ArcaneNecklaces.index(item)]
+		text_at(pos+Vector2(14,94),"Alle Klassen · wirkt beim Tragen",12,Color("d8c5ff"))
+		var line:=""
+		var y:=116
+		for word in description.split(" "):
+			if (line+word).length()>31:
+				text_at(pos+Vector2(14,y),line,11,Color("bfe4d8"));y+=16;line=""
+			line+=word+" "
+		text_at(pos+Vector2(14,y),line,11,Color("bfe4d8"))
+	elif icon in ["potion", "gem", "herb", "essence", "food"]:
 		var effect_name: String = "%s +65" % ("Mana" if class_id == 1 else "Energie") if String(item["name"]) in ["Energietrank", "Manatrank"] else ("+80% maximale HP" if String(item["name"]) == "Großer Heiltrank" else ("+50% maximale HP" if icon == "potion" else "Wertvolles Material"))
 		if icon == "food":
 			var nutrition := FoodSystem.by_name(str(item["name"]))
@@ -10970,10 +11051,10 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 	elif bool(item.get("locked",false)):
 		text_at(pos+Vector2(14,168),"UNVERKÄUFLICH · Doppelklick zum Entsperren",10,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
 	var price_text := "Kaufpreis: %d Gold" % purchase_price if purchase_price >= 0 else "Verkauf: %d Gold" % item_sale_value(item)
-	text_at(pos + Vector2(14, 190), price_text, 13, Color("f0d69b"))
+	text_at(pos + Vector2(14, 198), price_text, 13, Color("f0d69b"))
 
 func draw_item_signature(p: Vector2, item: Dictionary) -> void:
-	if item.get("icon") == "food": return
+	if item.get("icon") in ["food","necklace"]: return
 	var signature := absi(String(item["name"]).hash())
 	var tint: Color = element_color(String(item.get("element", ""))) if str(item.get("element", "")) != "" else RARITY_COLORS[int(item["rarity"])]
 	var center := p + Vector2(27, 25)
@@ -11004,6 +11085,7 @@ func draw_equipment_slot(p: Vector2, label: String, uid: int, icon: String) -> v
 
 func item_type(icon: String) -> String:
 	match icon:
+		"necklace": return "Arkanhalskette"
 		"sword": return "Waffe"
 		"staff": return "Stab"
 		"bow": return "Bogen"
@@ -11766,6 +11848,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
+		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,5), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
@@ -11773,6 +11856,8 @@ func rpc_player_presence(state: Dictionary) -> void:
 	}
 	clean["konflux"] = in_konflux
 	clean["room"] = room_id
+	if int(clean.get("necklace_serial",0))!=int(remote_players.get(sender,{}).get("necklace_serial",-1)) or int(clean.get("necklace",-1))!=int(remote_players.get(sender,{}).get("necklace",-1)):
+		necklaces.reset_charges(sender,int(clean.get("necklace",-1)),Time.get_ticks_msec())
 	remote_players[sender] = clean
 	server_restore_party_reconnect(sender)
 	send_server_session_status(sender)
@@ -12459,7 +12544,7 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		var cloth:=int(state.get("cosmetic_cloak",0))
 		var accent:=int(state.get("cosmetic_accent",0))
 		draw_character_cloak_back(rp,rdir,WORLD_CHARACTER_SCALE,cloth,accent,bool(state.get("walking",false)),bool(state.get("running",false)),false,float(state.get("hp",1))<=0,world_time,float(state.get("death_progress",-1.0)),cls,race)
-		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, WORLD_CHARACTER_SCALE, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)))
+		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, WORLD_CHARACTER_SCALE, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)),clampi(int(state.get("necklace",-1)),-1,5))
 		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5*WORLD_CHARACTER_SCALE), cls, clampi(int(state.get("weapon",0)),0,11), rdir, WORLD_CHARACTER_SCALE)
 		draw_character_cloak_foreground(rp,rdir,WORLD_CHARACTER_SCALE,cloth,accent,bool(state.get("walking",false)),bool(state.get("running",false)),false,float(state.get("hp",1))<=0,world_time,float(state.get("death_progress",-1.0)),cls,race)
 		adornment_transform(rp,rdir,WORLD_CHARACTER_SCALE,float(state.get("death_progress",-1.0)),-1.0,cls,race)
@@ -12565,12 +12650,16 @@ func run_inventory_consistency_smoke() -> bool:
 	var old_armor := equipped_armor_uid
 	var old_ring := equipped_ring_uid
 	var old_ring2 := equipped_ring2_uid
+	var old_necklace:=equipped_necklace_uid
+	var old_necklaces=necklaces
 	var old_next := next_uid
 	inventory = []
 	equipped_uid = -1
 	equipped_armor_uid = -1
 	equipped_ring_uid = -1
 	equipped_ring2_uid = -1
+	equipped_necklace_uid = -1
+	necklaces=ArcaneNecklaces.new()
 	next_uid = 1
 	var armor := make_item("Smoke Rüstung","armor",1,4,10)
 	var ring := make_item("Smoke Ring","ring",1,8,10)
@@ -12623,6 +12712,8 @@ func run_inventory_consistency_smoke() -> bool:
 	equipped_armor_uid = old_armor
 	equipped_ring_uid = old_ring
 	equipped_ring2_uid = old_ring2
+	equipped_necklace_uid=old_necklace
+	necklaces=old_necklaces
 	next_uid = old_next
 	validate_equipment_slots()
 	print("INVENTORY_SMOKE_OK unique_uids=true toggle_armor=true buy=true equipped_sell_block=true server_loot_local_uid=true loadout_state=true tx_dedupe=persistent")
@@ -12736,6 +12827,8 @@ func item_icon_for_uid(uid: int) -> String:
 	return ""
 
 func inventory_item_usable(item:Dictionary)->bool:
+	ArcaneNecklaces.normalize(item)
+	if ArcaneNecklaces.index(item)>=0:return true
 	if item_skill_unlock_id(item)>=0:return true
 	return bool(item.get("class_relic",false)) or item.get("icon","") in ["potion","food",class_weapon_icon(),"armor","ring"] or preload("res://components/headgear_rules.gd").allowed(item,class_id)
 
@@ -12749,6 +12842,8 @@ func equipped_head_allowed() -> bool:
 	return false
 
 func validate_equipment_slots() -> void:
+	for item in inventory:ArcaneNecklaces.normalize(item)
+	if equipped_necklace_uid>=0 and necklace_visual()<0:equipped_necklace_uid=-1
 	for item in inventory:preload("res://components/headgear_rules.gd").normalize(item)
 	if not equipped_head_allowed():equipped_head_uid=-1
 	var weapon_icon := item_icon_for_uid(equipped_uid)
@@ -12785,9 +12880,19 @@ func make_class_head(item_level:int) -> Dictionary:
 
 func toggle_equipment_item(index: int) -> bool:
 	if index < 0 or index >= inventory.size(): return false
+	ArcaneNecklaces.normalize(inventory[index])
 	var item: Dictionary = inventory[index]
 	var uid := int(item.get("uid",-1))
 	var icon := str(item.get("icon",""))
+	if icon=="necklace":
+		var removing:=equipped_necklace_uid==uid
+		equipped_necklace_uid=-1 if removing else uid
+		necklace_equip_serial+=1
+		necklaces.reset_charges(0,necklace_visual(),Time.get_ticks_msec())
+		play_sound("unequip" if removing else "equip")
+		message(("Abgelegt: " if removing else "Angelegt: ")+str(item["name"]))
+		save_game();announce_multiplayer_context()
+		return true
 	if icon=="head":
 		if not preload("res://components/headgear_rules.gd").allowed(item,class_id):
 			message("Diese Kopfbedeckung gehört einer anderen Klasse.")
@@ -12845,6 +12950,10 @@ func toggle_equipment_item(index: int) -> bool:
 
 func unequip_slot(slot: String) -> void:
 	match slot:
+		"necklace":
+			equipped_necklace_uid=-1
+			necklace_equip_serial+=1
+			necklaces.reset_charges(0,-1,Time.get_ticks_msec())
 		"weapon": equipped_uid = -1
 		"head": equipped_head_uid = -1
 		"armor": equipped_armor_uid = -1
@@ -12858,9 +12967,11 @@ func unequip_slot(slot: String) -> void:
 
 func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	var item: Dictionary = raw.duplicate(true)
+	ArcaneNecklaces.normalize(item)
+	if item.get("icon","")=="necklace" and ArcaneNecklaces.index(item)<0:item["icon"]="gem"
 	item.erase("uid")
 	var icon := str(item.get("icon","gem"))
-	if icon not in ["sword","staff","bow","armor","ring","head","potion","gem","herb","essence","food"]:
+	if icon not in ["sword","staff","bow","armor","ring","head","potion","gem","herb","essence","food","necklace"]:
 		item["icon"] = "gem"
 	item["rarity"] = clampi(int(item.get("rarity",0)),0,4)
 	item["power"] = clampi(int(item.get("power",0)),0,10000)
@@ -12979,7 +13090,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "rune_ranks":essence.ranks.duplicate(true), "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "cosmetic_hair":cosmetic_hair,"cosmetic_cloak":cosmetic_cloak,"cosmetic_jewelry":cosmetic_jewelry,"cosmetic_accent":cosmetic_accent, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "rune_ranks":essence.ranks.duplicate(true), "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "cosmetic_hair":cosmetic_hair,"cosmetic_cloak":cosmetic_cloak,"cosmetic_jewelry":cosmetic_jewelry,"cosmetic_accent":cosmetic_accent, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"necklace":necklace_visual(),"necklace_serial":necklace_equip_serial,"normal_power":normal_attack_power(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
@@ -13281,6 +13392,7 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	# Beute gehört der gemeinsamen Welt: genau ein Relikt pro Klassenboss und
 	# auch normale Itemdrops können von jedem Spieler aufgehoben werden.
 	if is_boss:
+		server_spawn_world_drop(boss_necklace_item(type-12),Vector2(enemy["pos"])+Vector2(0,-25),-1,180.0)
 		server_spawn_world_drop(class_relic_item(type-12),Vector2(enemy["pos"])+Vector2(25,0),type-12,180.0)
 		server_spawn_world_drop(class_boss_hat_item(type-12),Vector2(enemy["pos"])+Vector2(-25,8),type-12,180.0)
 		if type==14:server_spawn_world_drop(ranger_falcon_rune_item(),Vector2(enemy["pos"])+Vector2(0,34),2,180.0)
@@ -13693,3 +13805,37 @@ func draw_spawn_elevated_actor(peer:int)->void:
 	else:draw_remote_players(peer)
 	character_canvas_offset=old_offset
 	draw_set_transform(old_offset)
+
+func necklace_visual(peer:int=0)->int:
+	if peer>0:return clampi(int(remote_players.get(peer,{}).get("necklace",-1)),-1,5)
+	for item in inventory:
+		if int(item.get("uid",-1))==equipped_necklace_uid:return ArcaneNecklaces.index(item)
+	return -1
+
+func boss_necklace_item(boss:int)->Dictionary:
+	var i:=clampi(boss,0,2)+3
+	return make_item(ArcaneNecklaces.NAMES[i],"necklace",3,0,0,"",maxi(1,level))
+
+func necklace_cast_eligible(id:int)->bool:
+	if id<0 or id>=ABILITIES.size():return false
+	if id>=BASE_ABILITIES.size():
+		var definition:=fusion_definition_by_id(id)
+		return not definition.is_empty() and (necklace_cast_eligible(int(definition["a"])) or necklace_cast_eligible(int(definition["b"])))
+	return bool(FusionRules.metadata(id).get("damage",false)) or id in [8,15,24,33,35]
+
+func sync_necklace_progress(peer:int)->void:
+	if network_mode!="host" or peer not in multiplayer.get_peers():return
+	var now:=Time.get_ticks_msec()
+	var s:Dictionary=necklaces.state(peer,necklace_visual(peer),now)
+	var payload:Dictionary={"id":s["id"],"rage":s["rage"],"hits":s["hits"],"target":s["target"],"ready":maxi(0,int(s["ready"])-now),"rage_until":maxi(0,int(s["rage_until"])-now),"hunt_until":maxi(0,int(s["hunt_until"])-now)}
+	rpc_necklace_progress.rpc_id(peer,payload)
+
+@rpc("authority","call_remote","reliable")
+func rpc_necklace_progress(payload:Dictionary)->void:
+	if network_mode!="client" or int(payload.get("id",-1))!=necklace_visual():return
+	var now:=Time.get_ticks_msec()
+	var s:Dictionary=necklaces.state(0,necklace_visual(),now)
+	s["rage"]=clampi(int(payload.get("rage",0)),0,5)
+	s["hits"]=clampi(int(payload.get("hits",0)),0,2)
+	s["target"]=int(payload.get("target",-1))
+	for key in ["ready","rage_until","hunt_until"]:s[key]=now+clampi(int(payload.get(key,0)),0,6000)

@@ -15,7 +15,7 @@ func run()->void:
 	for q in g.QUESTS:g.quests.append({"state":0,"progress":0})
 	for q in g.BORIN_QUESTS:g.borin_quests.append({"state":0,"progress":0})
 	for e in g.WORLD_EVENTS:g.event_states.append(0);g.event_progress.append(0)
-	var allowed={"smith":["sword","armor","head"],"arcane":["staff","armor","ring","head","essence"],"alchemy":["potion","herb","essence"],"merchant":["sword","staff","bow","armor","ring","food"]}
+	var allowed={"smith":["sword","armor","head"],"arcane":["staff","armor","ring","head","essence","necklace"],"alchemy":["potion","herb","essence"],"merchant":["sword","staff","bow","armor","ring","food"]}
 	for hero_class in 3:
 		g.class_id=hero_class;g.shop_stock.clear();g.shop_rotation=-1
 		for cycle in 23:

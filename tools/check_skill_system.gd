@@ -84,20 +84,16 @@ func run():
 	g.use_item(0)
 	assert(g.class_mastery_unlocked and g.mage_rift_blink_unlocked() and g.inventory.is_empty())
 	assert(g.skill_points==mastery_points_before)
-	# Arkankern · Blitz behaves like an attack-skill item and teaches Blitzlanze.
+	# Legacy cores migrate to necklaces and never teach or consume skills.
 	g.reset_class_skills();g.level=40;g.skill_points=7;g.inventory.clear()
 	var core:=g.make_item("Arkankern · Blitz","essence",3,0,443,"blitz",30)
 	g.inventory.append(core)
-	var core_points_before:=g.skill_points
-	assert(not g.learned[18] and g.item_skill_unlock_id(core)==18)
-	assert(g.inventory_item_usable(core), "Arkankern-Skillitems müssen im Inventar einen aktiven BENUTZEN-Button haben")
+	assert(g.inventory_item_usable(core) and g.item_skill_unlock_id(core)==-1)
 	g.use_item(0)
-	assert(g.learned[18] and int(g.skill_levels[18])==1)
-	assert(g.inventory.is_empty() and g.skill_points==core_points_before)
-	# Already learned skills do not consume a duplicate core.
-	g.inventory.append(g.make_item("Arkankern · Blitz","essence",3,0,443,"blitz",30))
+	assert(not g.learned[18] and g.inventory.size()==1 and g.skill_points==7)
+	assert(g.equipped_necklace_uid==int(core["uid"]))
 	g.use_item(0)
-	assert(g.inventory.size()==1 and g.learned[18])
+	assert(g.equipped_necklace_uid==-1 and g.inventory.size()==1)
 	g.inventory.clear()
 	# Reservierung schützt die ersten 15 Sekunden nur die passende Klasse.
 	var reserved_drop:Dictionary={"reserved_class":2,"reserve_until_ms":Time.get_ticks_msec()+10000}

@@ -1,9 +1,9 @@
 # Sonnenhain – nächste Ziele
 
-Stand: 8. Oktober 2026. Planung, noch keine Umsetzung des Halskettensystems.
+Stand: 8. Oktober 2026. Arkanhalsketten lokal umgesetzt und geprüft; Veröffentlichung noch offen.
 Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzepten.
 
-## 1. Arkanhalsketten – nächstes Gameplay-Ziel
+## 1. Arkanhalsketten – umgesetzt, Veröffentlichung offen
 
 ### Verbindliche Regeln
 
