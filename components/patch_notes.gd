@@ -1,6 +1,10 @@
 extends RefCounted
-const VERSION="PATCH 07.10.2026"
+const VERSION="PATCH 08.10.2026"
 const NOTES=[
+["Arkanhalsketten · Für alle Klassen", "Eis-, Blitz- und Giftkerne werden zu tragbaren Arkanhalsketten. Ein eigener Halskettenplatz aktiviert ausschließlich den besonderen Effekt; keine zusätzlichen Grundwerte und kein Verbrauch. Bereits gelernte Blitzlanze bleibt erhalten."],
+["Bossbeute · Drei besondere Halsketten", "Kriegsherr, Arkanhüter und Jagdmeister lassen zusätzlich ihre besondere Halskette fallen. Jede Klasse kann jede Halskette tragen. Die Anhänger sind sichtbar und werden im Koop übertragen."],
+["Zoom · Feste Menüs", "ESC-Menü, Figurenansichten und Ausrüstungsdarstellung behalten bei 100 %, 85 % und 70 % ihre Größe und Position. Mausradereignisse werden nur im passenden Kamera- oder Menükontext verarbeitet."],
+["Zoom · Vollständige Atmosphäre", "Nebel, Wolken und Dungeon-Dunkelheit decken auch beim Herauszoomen den gesamten sichtbaren Weltbereich ab."],
 ["Sonnenhain · Neues Bodenprofil", "Map 0 wurde ausschließlich am Boden neu gestaltet: großer heller Spawnplatz, warme Dorfwege, zusammenhängende Hausvorplätze und ruhige Gras-/Moosflächen mit organischen Übergängen. Die visuelle Höhen-/Treppenschicht wurde aus dem Map-0-Boden entfernt. Gebäude, Objekte, Kollisionen, Navigation und Gameplay bleiben unverändert."],
 ["Map 0 · Terrain-Polish", "Arenaflächen verwenden nun echten Boden statt einer vollflächigen Randkachel. Grundstücke und Plaza sind zusammenhängender, dunkle Einzelpflaster-Flecken entfallen und Übergänge zwischen Gras, Erde und Stein sind breiter und organischer."],
 ["Map 0 · Neues Terrain", "Sonnenhain verwendet neue 32px-Bodenfamilien für Gras, Wege, Pflaster, Hausvorplätze und Arena. Übergänge, dezente Details und visuelle Höhenstufen werden deterministisch gewählt; Gebäude, Türen, Kollisionen, Navigation, Saves und Multiplayer bleiben unverändert."],
