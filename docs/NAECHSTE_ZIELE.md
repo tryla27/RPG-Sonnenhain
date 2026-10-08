@@ -71,6 +71,8 @@ sind bereits umgesetzt; vor Arbeitsbeginn den aktuellen Live-Stand prüfen.
 
 ### Vollständige Pixelart-Spriteumstellung
 
+**Jetzt ausschließlich Waldschleim:** [einfacher grüner Glibber, erster Gegner](waldschleim-v2/README.md). Die 27 ursprünglichen Monsterentwürfe bleiben für die Zukunft archiviert; die übrigen 26 werden vorerst nicht weiterbearbeitet.
+
 Aktueller Arbeitsschritt: [vollständige Designsammlung für alle 27 Monster](monster-design-v1/README.md). Drei Designtafeln und ein Katalog mit stabilen Monster-IDs, Gebieten, Silhouetten, Paletten, Größen und Animationsmotiven. Nach der visuellen Abstimmung folgen die Richtungs- und Animationssprites.
 
 - Hochwertige Bitmap-Sprites für 18 Spieleridentitäten (3 Klassen × 3 Völker ×
