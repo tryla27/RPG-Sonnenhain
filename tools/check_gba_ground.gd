@@ -49,6 +49,10 @@ func run()->void:
 		if coord.y==1:flower_count+=1
 	assert(flower_count>400,"meadow needs substantially more flowers")
 	var paths=preload("res://components/village_paths.gd")
+	for x in range(1200,1649,32):
+		for y in [880,912,944]:assert(Map0.visual_family_at(Vector2(x,y))=="village_stone","east gate must join the spawn courtyard with continuous cobbles")
+	for y in range(656,1185,32):
+		for x in [1616,1648,1680]:assert(Map0.visual_family_at(Vector2(x,y))=="village_stone","east gate to Borin must have continuous three-tile cobbles")
 	for x in [1616,1648,1680]:assert(Map0.visual_family_at(Vector2(x,1936))=="village_stone","east arena lane must be three complete tiles wide")
 	for x in [528,560,592]:assert(Map0.visual_family_at(Vector2(x,1936))=="village_stone","west arena lane must match the east lane width")
 	for lamp:Vector2 in preload("res://components/village_fixtures.gd").LAMPS:
@@ -72,10 +76,19 @@ func run()->void:
 	for gate:Vector2 in game.VILLAGE_GATES:game.opened_village_gates[gate]=true
 	game.player_pos=game.waystone_arrival(0)
 	var elevations=preload("res://components/village_elevation.gd")
+	var mountain=elevations.Mountain
+	assert(mountain.height_at(mountain.SUMMIT)==96,"northwest summit must be six 16px levels high")
+	for tier in mountain.LEVELS:
+		var terrace:Vector2=Vector2([Vector2(518,182),Vector2(456,180),Vector2(406,180),Vector2(342,184),Vector2(300,180),mountain.SUMMIT][tier])
+		assert(mountain.height_at(terrace)==(tier+1)*16,"each grass terrace must have its own physical height")
+	assert(elevations.blocked(Vector2(548,180),Vector2(590,180),18),"mountain cliff cannot be walked through")
 	elevations.prepare()
 	assert(elevations.entries.size()==1)
 	for entry in elevations.entries:
 		var door:Vector2=entry["door"]
+		var footprint:Rect2=preload("res://components/village_buildings.gd").solid(entry["home"],"healer")
+		assert(Rect2(entry["upper"]).position==footprint.position)
+		assert(Rect2(entry["upper"]).size.x==footprint.size.x and Rect2(entry["lower"]).size.x==footprint.size.x,"chapel foundation cannot protrude sideways")
 		assert(elevations.height_at(door)==32)
 		assert(elevations.height_at(door+Vector2(0,20))==16)
 		assert(elevations.height_at(door+Vector2(0,120))==0)

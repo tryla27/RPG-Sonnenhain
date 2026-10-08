@@ -7,7 +7,7 @@ const SPECS:={
 	"smith":{"asset":"smith","size":Vector2(448,448),"door":Vector2(214,397),"solid":Rect2(24,220,400,154)},
 	"healer":{"asset":"chapel","size":Vector2(448,448),"door":Vector2(220,417),"solid":Rect2(44,240,340,150)},
 	"innkeeper":{"asset":"tavern","size":Vector2(448,448),"door":Vector2(225,394),"solid":Rect2(32,220,352,152)},
-	"style":{"asset":"atelier","size":Vector2(448,448),"door":Vector2(224,414),"solid":Rect2(32,220,384,174)},
+	"style":{"asset":"atelier","size":Vector2(384,384),"door":Vector2(192,355),"solid":Rect2(27,189,330,149)},
 	"borin":{"asset":"skillhaus","size":Vector2(448,448),"door":Vector2(224,414),"solid":Rect2(32,220,384,174)},
 	"elder":{"asset":"ratshalle","size":Vector2(448,448),"door":Vector2(224,414),"solid":Rect2(44,250,360,144)},
 	"arena":{"asset":"arena","size":Vector2(1088,1088),"door":Vector2(537,980),"solid":Rect2(64,320,960,618)}

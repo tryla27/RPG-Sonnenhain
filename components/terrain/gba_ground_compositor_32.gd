@@ -2,19 +2,19 @@ extends RefCounted
 const Plan=preload("res://components/map0_ground_plan_32.gd")
 const Catalog=preload("res://components/terrain/terrain_catalog_32.gd")
 const Rules=preload("res://components/terrain/gba_transition_rules_32.gd")
-const REVISION:=3
+const REVISION:=4
 
 static func crossing_family(world:Vector2i)->String:
 	# Broad irregular joints follow the courtyard boundary, never a repeating plaid.
 	# Quantized contours keep hard pixel edges and group stones into useful patches.
 	var p:=Vector2(world)
-	var q:=(p-Vector2(825,895)).abs()-Vector2(288,272)
-	var distance:=maxf(q.x,q.y)
+	var q:=(p-Vector2(825,895)).abs()-Vector2(224,208)
+	var distance:=Vector2(maxf(q.x,0),maxf(q.y,0)).length()+minf(maxf(q.x,q.y),0)-64.0
 	var joint:=floorf((sin(p.x*0.039+p.y*0.013)*13.0+sin(p.y*0.047-p.x*0.019)*9.0+cos(p.x*0.017+p.y*0.029)*7.0)/4.0)*4.0
 	return "plaza_stone" if distance<joint else "village_stone"
 
 static func sample(source:Image,family:String,world:Vector2i)->Color:
-	var material:=crossing_family(world) if family=="spawn_crossing" else family
+	var material:=crossing_family(world) if family in Rules.CONNECTED_PAVING else family
 	return source.get_pixelv(Catalog.pixel_coord(material,world))
 
 static func compose(source:Image,families:Dictionary)->Dictionary:
@@ -28,7 +28,7 @@ static func compose(source:Image,families:Dictionary)->Dictionary:
 		if mask!=255:transitions[cell]=mask
 		var origin:Vector2i=Catalog.atlas_coord(current,Catalog.coherent_variant(cell))*32
 		output.blit_rect(source,Rect2i(origin,Vector2i(32,32)),cell*32)
-		if current=="spawn_crossing":
+		if current in Rules.CONNECTED_PAVING:
 			for y in 32:
 				for x in 32:
 					var world:=cell*32+Vector2i(x,y)

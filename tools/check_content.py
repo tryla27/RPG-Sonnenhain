@@ -247,6 +247,8 @@ for name, xs, ys, kind in shop_rows:
     seen_houses.add(key)
     if kind == 'arena':
         rect = (x + 72, y + 472, 944, 445)
+    elif kind == 'style':
+        rect = (x, y, 384, 384)
     elif kind in ['smith','healer','innkeeper','style','elder','borin']:
         rect = (x, y, 448, 448)
     elif kind == 'borin':

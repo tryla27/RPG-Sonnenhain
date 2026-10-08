@@ -2,11 +2,40 @@ extends SceneTree
 
 func _initialize()->void:
 	var game=load("res://main.gd").new()
+	var forecourts=preload("res://components/village_forecourts.gd")
+	for shop in game.VillageLayout.SHOPS:
+		if shop.has("shared_with"):continue
+		var count:=0
+		for item in forecourts.ITEMS:
+			if item["owner"]==shop["kind"]:count+=1
+		assert(count>=1 and count<=2,"each unique house needs one or two themed objects")
+		var door:Vector2=game.village_house_door(shop)
+		assert(not forecourts.blocked(door+Vector2(0,48),18),"exterior objects must leave the doorway clear")
+	for item in forecourts.ITEMS:assert(game.is_blocked(item["point"],item["point"]),"exterior object is missing collision")
 	var houses:Array[Rect2]=[]
 	for prop in game.village_props():
 		if prop["kind"]=="house":houses.append(game.prop_bounds(prop))
 	for prop in game.village_props():
 		if prop["kind"]=="house":continue
+		if prop["kind"]=="forecourt":
+			# Large building PNGs include transparent space above their roof silhouettes.
+			# Forecourt objects must clear their own facade and every physical building floor.
+			for item in forecourts.ITEMS:
+				if item["point"]!=prop["point"]:continue
+				for shop in game.VillageLayout.SHOPS:
+					if shop.has("shared_with"):continue
+					assert(not game.prop_bounds(prop).intersects(game.VillageBuildings.solid(shop["house"],shop["kind"])),"Forecourt overlaps building footprint")
+					if shop["kind"]==item["owner"]:assert(not game.prop_bounds(prop).intersects(game.VillageBuildings.bounds(shop["house"],shop["kind"])),"Object overlaps its own facade")
+			continue
+		if prop["kind"]=="mountain":
+			# The hill is a backdrop behind roofs; its physical ground must remain clear of buildings.
+			game.VillageElevation.Mountain.prepare()
+			for shop in game.VillageLayout.SHOPS:
+				if shop.has("shared_with"):continue
+				var floor_rect:Rect2=game.VillageBuildings.solid(shop["house"],shop["kind"])
+				var footprint:=PackedVector2Array([floor_rect.position,Vector2(floor_rect.end.x,floor_rect.position.y),floor_rect.end,Vector2(floor_rect.position.x,floor_rect.end.y)])
+				assert(Geometry2D.intersect_polygons(game.VillageElevation.Mountain.contours[0],footprint).is_empty(),"Mountain overlaps building footprint")
+			continue
 		if prop["kind"]=="lamp":
 			for shop in game.VillageLayout.SHOPS:
 				if shop.has("shared_with"):continue

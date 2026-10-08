@@ -1,6 +1,7 @@
 extends RefCounted
 const Layout=preload("res://components/village_layout.gd")
 const Catalog=preload("res://components/terrain/terrain_catalog_32.gd")
+const Mountain=preload("res://components/village_mountain.gd")
 const LEVEL_HEIGHT:=16.0
 const STAIR_WIDTH:=128.0
 const KINDS:=["healer"]
@@ -16,7 +17,9 @@ static func prepare()->void:
 		if shop.has("shared_with") or str(shop["kind"]) not in KINDS:continue
 		var home:Vector2=shop["house"]
 		var door:Vector2=buildings.door(home,shop["kind"])
-		entries.append({"kind":shop["kind"],"home":home,"door":door,"upper":Rect2(home+Vector2(8,200),Vector2(432,door.y+16-home.y-200)),"lower":Rect2(Vector2(home.x,door.y+16),Vector2(448,16))})
+		# Match the chapel's ground footprint, rather than its transparent image bounds.
+		var footprint:Rect2=buildings.solid(home,shop["kind"])
+		entries.append({"kind":shop["kind"],"home":home,"door":door,"upper":Rect2(footprint.position,Vector2(footprint.size.x,door.y+16-footprint.position.y)),"lower":Rect2(Vector2(footprint.position.x,door.y+16),Vector2(footprint.size.x,16))})
 
 static func height_at(p:Vector2)->float:
 	prepare()
@@ -27,7 +30,7 @@ static func height_at(p:Vector2)->float:
 			if p.y>=door.y+24 and p.y<door.y+40:return lerpf(16,0,(p.y-door.y-24)/16.0)
 		if Rect2(entry["upper"]).has_point(p):return 32
 		if Rect2(entry["lower"]).has_point(p):return 16
-	return 0
+	return Mountain.height_at(p)
 
 static func paved(p:Vector2)->bool:
 	prepare()
@@ -44,7 +47,7 @@ static func visual_bounds(home:Vector2,kind:String)->Rect2:
 		if entry["home"]!=home:continue
 		var upper:Rect2=entry["upper"]
 		var door:Vector2=entry["door"]
-		return Rect2(Vector2(home.x,upper.position.y-32),Vector2(448,door.y+40-(upper.position.y-32)))
+		return Rect2(Vector2(upper.position.x,upper.position.y-32),Vector2(upper.size.x,door.y+40-(upper.position.y-32)))
 	return Rect2()
 
 static func blocked(p:Vector2,origin:Vector2,radius:float)->bool:

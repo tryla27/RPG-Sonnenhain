@@ -6,11 +6,15 @@ static var ROUTES:=[
 	PackedVector2Array([Vector2(544,608),Vector2(1536,608)]),
 	PackedVector2Array([Vector2(310,589),Vector2(310,688),Vector2(544,688)]),
 	PackedVector2Array([Vector2(1472,510),Vector2(1472,624),Vector2(1536,624)]),
-	PackedVector2Array([Vector2(320,1054),Vector2(320,1104),Vector2(544,1104)]),
+	PackedVector2Array([Vector2(240,995),Vector2(240,1120),Vector2(544,1120)]),
 	PackedVector2Array([Vector2(316,1569),Vector2(316,1664),Vector2(544,1664)]),
 	PackedVector2Array([Vector2(321,2282),Vector2(321,2368),Vector2(544,2368)]),
 	PackedVector2Array([Vector2(825,1136),Vector2(825,1408),Vector2(544,1408)]),
 	PackedVector2Array([Vector2(825,1408),Vector2(1648,1408),Vector2(1648,1184),Vector2(1780,1120)]),
+	# Northern branch from the east gate to Borin's existing entrance path.
+	PackedVector2Array([Vector2(1648,1184),Vector2(1648,624),Vector2(1472,624)]),
+	# Direct east-gate branch joins the spawn courtyard below the well, above the town hall.
+	PackedVector2Array([Vector2(1648,896),Vector2(1088,896),Vector2(1008,896)]),
 	PackedVector2Array([Vector2(1312,1374),Vector2(1312,1408)]),
 	PackedVector2Array([Vector2(1648,1408),Vector2(1648,2544),Vector2(544,2544)]),
 	PackedVector2Array([Vector2(1081,2420),Vector2(1081,2544)])

@@ -255,7 +255,7 @@ const NPCS := [
 	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1472, 486), "color":Color("6783bd"), "kind":"quest"},
 	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1312, 1394), "color":Color("6bbba4"), "kind":"quest"},
 	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(374, 565), "color":Color("ab6e60"), "kind":"smith"},
-	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(384, 1074), "color":Color("c080aa"), "kind":"stylist"},
+	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(240, 1043), "color":Color("c080aa"), "kind":"stylist"},
 	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1472, 486), "color":Color("9f8bcc"), "kind":"apprentice"},
 	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(380, 1577), "color":Color("e2bc91"), "kind":"healer_alchemy"},
 	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1081,2460), "color":Color("a48cbd"), "kind":"arena"}
@@ -2418,9 +2418,7 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 		if Rect2(stone+Vector2(-58,-82),Vector2(116,142)).grow(12).has_point(pos): return true
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
-	for shop in VillageLayout.SHOPS:
-		if shop["kind"]!="smith":continue
-		if Rect2(shop["cart"]+Vector2(-45,-24),Vector2(110,49)).grow(10).has_point(pos): return true
+	if preload("res://components/village_forecourts.gd").blocked(pos,hero_collision_radius()):return true
 	for tree in REFERENCE_TREES:
 		if pos.distance_to(tree) < 18.0: return true
 	if pos.distance_to(BORIN_MAGIC_TREE_POS) < 42.0:return true
@@ -11622,6 +11620,7 @@ func invalidate_static_cache() -> void:
 
 func village_props() -> Array:
 	var props: Array = []
+	props.append({"kind":"mountain","point":VillageElevation.Mountain.CENTER,"depth":324.0})
 	for house in house_positions():
 		var kind:="home"
 		for info in VillageLayout.SHOPS:
@@ -11635,14 +11634,19 @@ func village_props() -> Array:
 	for p in VillageLayout.FENCES: props.append({"kind":"fence","point":p,"depth":p.y+12})
 	for p in VillageFixtures.LAMPS: props.append({"kind":"lamp","point":p,"depth":p.y+8})
 	for p in VillageLayout.BUSHES: props.append({"kind":"bush","point":p,"depth":p.y+16})
-	for p in VillageLayout.FLOWER_BUSHES: props.append({"kind":"flower_bush","point":p,"depth":p.y+16})
-	for shop in VillageLayout.SHOPS:
-		if shop["kind"]=="smith":props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
+	for p in VillageLayout.FLOWER_BUSHES:
+		# Ground-level shrubs must not show through the raised northwest terraces.
+		if VillageElevation.Mountain.height_at(p)>0 or VillageElevation.Mountain.height_at(p+Vector2(0,32))>0:continue
+		props.append({"kind":"flower_bush","point":p,"depth":p.y+16})
+	for item in preload("res://components/village_forecourts.gd").ITEMS:
+		props.append({"kind":"forecourt","point":item["point"],"depth":item["point"].y+8,"item":item["item"]})
 	return props
 
 func prop_bounds(prop: Dictionary) -> Rect2:
 	var p: Vector2 = prop["point"]
 	match prop["kind"]:
+		"mountain": return VillageElevation.Mountain.BOUNDS
+		"forecourt":return preload("res://components/village_forecourts.gd").bounds(p,str(prop["item"]))
 		"house":
 			var house_kind:=str(prop.get("house_kind","home"))
 			return VillageBuildings.visual_bounds(p,house_kind)
@@ -11661,6 +11665,8 @@ func prop_bounds(prop: Dictionary) -> Rect2:
 func paint_village_prop(prop: Dictionary) -> void:
 	var p: Vector2 = prop["point"]
 	match prop["kind"]:
+		"mountain": VillageElevation.Mountain.paint(self)
+		"forecourt":preload("res://components/village_forecourts.gd").paint(self,p,str(prop["item"]))
 		"house":
 			draw_house(p)
 			for shop in VillageLayout.SHOPS:

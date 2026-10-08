@@ -1,7 +1,7 @@
 extends RefCounted
 const H = preload("res://components/reference_house.gd")
 # Replacement art is ready: compact crowns stay outside all building rectangles.
-const TREES := [Vector2(672,320),Vector2(1056,208),Vector2(48,736),Vector2(64,1776),Vector2(384,2544)]
+const TREES := [Vector2(672,320),Vector2(1056,208),Vector2(48,1168),Vector2(64,1776),Vector2(384,2544)]
 const BUSHES := [Vector2(1232,848),Vector2(1552,944)]
 const FLOWER_BUSHES := [Vector2(64,80),Vector2(208,112),Vector2(416,96),Vector2(144,1728),Vector2(288,1760),Vector2(416,1728),Vector2(80,2544),Vector2(192,2496),Vector2(1712,48),Vector2(1552,48),Vector2(1408,48),Vector2(1744,656),Vector2(1488,864)]
 const FENCES := [Vector2(350,1700),Vector2(1256,2576),Vector2(1460,2576)]
@@ -11,7 +11,7 @@ const BOARD := Vector2(688,1248)
 # ohne die bestehende Regionsgrenze oder Hausrenderer umzubauen.
 const SHOPS := [
 	{"name":"Liora","house":Vector2(1088,960),"kind":"elder","sign":"RATSHALLE","cart":Vector2(1498,1376),"shared_with":"Mira"},
-	{"name":"Fenna","house":Vector2(96,640),"kind":"style","sign":"ATELIER","cart":Vector2(288,896)},
+	{"name":"Fenna","house":Vector2(48,640),"kind":"style","sign":"ATELIER","cart":Vector2(288,896)},
 	{"name":"Elara","house":Vector2(96,1152),"kind":"healer","sign":"HEILHAUS","cart":Vector2(288,1376)},
 	{"name":"Alma","house":Vector2(96,1888),"kind":"innkeeper","sign":"STEINROSE","cart":Vector2(288,1824)},
 	{"name":"Mira","house":Vector2(1088,960),"kind":"elder","sign":"RAT & QUESTS","cart":Vector2(1498,1376)},

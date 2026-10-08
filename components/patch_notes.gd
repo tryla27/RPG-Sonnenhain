@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 08.10.2026"
 const NOTES=[
+["Sonnenhain · Dorfvorplätze", "Das Atelier ist kleiner und nach links versetzt; Tür und Pflasteranschluss passen dazu. Alle sieben Häuser besitzen zwei passende Gegenstände vor dem Haus, mit freien Eingängen und geprüften Objektkollisionen."],
+["Sonnenhain · Wege und Höhen", "Der rechte Dorfeingang ist direkt mit Borin und dem Spawnplatz verbunden. Pflasterübergänge sind abgerundet, das Kirchenfundament folgt der Gebäudebodenbreite. Im Nordwesten liegt ein grasbewachsener Berg mit sechs unregelmäßigen Höhenstufen, Felsen und Moos."],
 ["Arkanhalsketten · Für alle Klassen", "Eis-, Blitz- und Giftkerne werden zu tragbaren Arkanhalsketten. Ein eigener Halskettenplatz aktiviert ausschließlich den besonderen Effekt; keine zusätzlichen Grundwerte und kein Verbrauch. Bereits gelernte Blitzlanze bleibt erhalten."],
 ["Bossbeute · Drei besondere Halsketten", "Kriegsherr, Arkanhüter und Jagdmeister lassen zusätzlich ihre besondere Halskette fallen. Jede Klasse kann jede Halskette tragen. Die Anhänger sind sichtbar und werden im Koop übertragen."],
 ["Zoom · Feste Menüs", "ESC-Menü, Figurenansichten und Ausrüstungsdarstellung behalten bei 100 %, 85 % und 70 % ihre Größe und Position. Mausradereignisse werden nur im passenden Kamera- oder Menükontext verarbeitet."],

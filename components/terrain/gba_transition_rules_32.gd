@@ -5,6 +5,7 @@ const DIRECTIONS:=[Vector2i(0,-1),Vector2i(1,0),Vector2i(0,1),Vector2i(-1,0),Vec
 const PRIORITY:={"arena_border":1,"arena_entry_stone":2,"plaza_stone":3,"spawn_crossing":3,"building_apron":4,"village_stone":5,"old_cobble_rework":5,"village_path":6,"garden_path":6,"arena_ground":6,"forest_ground":7,"village_grass":8,"moss_grass":9}
 
 static func rank(id:String)->int:return int(PRIORITY.get(id,0))
+const CONNECTED_PAVING:=["arena_border","arena_entry_stone","plaza_stone","spawn_crossing","building_apron","village_stone"]
 
 static func normalize(mask:int)->int:
 	# N,E,S,W then NE,SE,SW,NW. Diagonals need both adjoining sides.
@@ -25,7 +26,7 @@ static func mask_for(current:String,cell:Vector2i,families:Dictionary)->int:
 	var mask:=0
 	for i in 8:
 		var neighbor:String=str(families.get(cell+DIRECTIONS[i],current))
-		if rank(neighbor)>=rank(current):mask|=1<<i
+		if rank(neighbor)>=rank(current) or (current in CONNECTED_PAVING and neighbor in CONNECTED_PAVING):mask|=1<<i
 	return normalize(mask)
 
 static func verge_width(position:int)->int:
@@ -43,8 +44,11 @@ static func foreground_pixel(mask:int,p:Vector2i,cell:Vector2i)->bool:
 		var b:int=int(distances[(corner+1)%4])
 		var side_a:bool=bool(mask&(1<<corner))
 		var side_b:bool=bool(mask&(1<<((corner+1)%4)))
-		if side_a and side_b and not (mask&(1<<(4+corner))) and a+b<8:return false
-		if not side_a and not side_b and a+b<int(widths[corner])+int(widths[(corner+1)%4])+3:return false
+		if side_a and side_b and not (mask&(1<<(4+corner))) and a*a+b*b<144:return false
+		if not side_a and not side_b:
+			var dx:=maxi(12+int(widths[corner])-a,0)
+			var dy:=maxi(12+int(widths[(corner+1)%4])-b,0)
+			if dx*dx+dy*dy>144:return false
 	return true
 
 static func background_family(current:String,cell:Vector2i,p:Vector2i,families:Dictionary)->String:
@@ -52,7 +56,7 @@ static func background_family(current:String,cell:Vector2i,p:Vector2i,families:D
 	var nearest:=INF
 	for i in 8:
 		var neighbor:String=str(families.get(cell+DIRECTIONS[i],current))
-		if rank(neighbor)>=rank(current):continue
+		if rank(neighbor)>=rank(current) or (current in CONNECTED_PAVING and neighbor in CONNECTED_PAVING):continue
 		var delta:Vector2i=DIRECTIONS[i]
 		var dx:=0.0 if delta.x==0 else float(p.x+1 if delta.x<0 else 32-p.x)
 		var dy:=0.0 if delta.y==0 else float(p.y+1 if delta.y<0 else 32-p.y)
