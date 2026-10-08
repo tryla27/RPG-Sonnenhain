@@ -6,7 +6,7 @@ func _initialize()->void:
 	map.prepare(Callable(g,"distance_to_trail"))
 	assert(map.shared_tileset.tile_size==Vector2i(32,32))
 	assert(map.terrain.size()==4592)
-	assert(map.shared_tileset.get_source_count()==3)
+	assert(map.shared_tileset.get_source_count()==3+(map.Plan.CHUNK_ORDER.size() if map.gba_enabled else 0))
 	assert(catalog.VARIANTS==16)
 	for path in [catalog.GROUND_ATLAS,catalog.OVERLAY_ATLAS,catalog.TRANSITION_ATLAS]:
 		var texture:Texture2D=load(path)
