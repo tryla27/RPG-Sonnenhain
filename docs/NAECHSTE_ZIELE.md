@@ -71,6 +71,8 @@ sind bereits umgesetzt; vor Arbeitsbeginn den aktuellen Live-Stand prüfen.
 
 ### Vollständige Pixelart-Spriteumstellung
 
+Aktueller Arbeitsschritt: [vollständige Designsammlung für alle 27 Monster](monster-design-v1/README.md). Drei Designtafeln und ein Katalog mit stabilen Monster-IDs, Gebieten, Silhouetten, Paletten, Größen und Animationsmotiven. Nach der visuellen Abstimmung folgen die Richtungs- und Animationssprites.
+
 - Hochwertige Bitmap-Sprites für 18 Spieleridentitäten (3 Klassen × 3 Völker ×
   2 Erscheinungen), 27 Mobtypen und anschließend wichtige NPCs.
 - Acht echte Blickrichtungen, konsistente Identität und vollständige Animationen.
