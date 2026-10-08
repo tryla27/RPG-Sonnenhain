@@ -11658,7 +11658,7 @@ func prop_bounds(prop: Dictionary) -> Rect2:
 		"fence": return Rect2(p+Vector2(-8,-30),Vector2(116,36))
 		"board": return Rect2(p+Vector2(-48,-94),Vector2(96,128))
 		"well": return StartScenery32.scenery_bounds(p,"brunnen")
-		"bush": return StartScenery32.scenery_bounds(p,StartScenery32.bush_variant(p))
+		"bush": return StartScenery32.scenery_bounds(p,"busch-oliv")
 		"flower_bush": return StartScenery32.scenery_bounds(p,"busch-blumen")
 		_: return Rect2(p+Vector2(-64,-48),Vector2(128,96))
 
@@ -11682,7 +11682,7 @@ func paint_village_prop(prop: Dictionary) -> void:
 		"lamp": StartScenery32.lamp(self,p)
 		"barrel": StartScenery32.barrel(self,p)
 		"fence": StartScenery32.fence(self,p,p+Vector2(100,0))
-		"bush": StartScenery32.bush(self,p,int(p.x+p.y))
+		"bush": StartScenery32.scenery(self,p,"busch-oliv")
 		"flower_bush": StartScenery32.scenery(self,p,"busch-blumen")
 		"cart": Wagon32.paint(self,p,prop["goods"])
 

@@ -2,7 +2,7 @@ extends RefCounted
 const H = preload("res://components/reference_house.gd")
 # Replacement art is ready: compact crowns stay outside all building rectangles.
 const TREES := [Vector2(672,320),Vector2(1056,208),Vector2(48,1168),Vector2(64,1776),Vector2(384,2544)]
-const BUSHES := [Vector2(1232,848),Vector2(1552,944)]
+const BUSHES := [Vector2(736,464),Vector2(1360,800),Vector2(208,1840),Vector2(416,1824)]
 const FLOWER_BUSHES := [Vector2(64,80),Vector2(208,112),Vector2(416,96),Vector2(144,1728),Vector2(288,1760),Vector2(416,1728),Vector2(80,2544),Vector2(192,2496),Vector2(1712,48),Vector2(1552,48),Vector2(1408,48),Vector2(1744,656),Vector2(1488,864)]
 # No isolated fence fragments: add fences only when they enclose an authored garden or yard.
 const FENCES: Array[Vector2] = []

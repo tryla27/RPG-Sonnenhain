@@ -17,12 +17,30 @@ static func lamp(c:CanvasItem,p:Vector2)->void:
 	c.draw_rect(Rect2(p+Vector2(-8,-94),Vector2(16,6)),Color("484850"))
 	c.draw_rect(Rect2(p+Vector2(-3,-98),Vector2(6,4)),Color("c69b52"))
 
+const GLOW_SIZE:=128
+static var glow_map:Texture2D
+static func glow_texture()->Texture2D:
+	if glow_map!=null:return glow_map
+	var image:=Image.create(GLOW_SIZE,GLOW_SIZE,false,Image.FORMAT_RGBA8)
+	var center:=Vector2.ONE*(GLOW_SIZE-1)*0.5
+	for y in GLOW_SIZE:
+		for x in GLOW_SIZE:
+			var distance:=Vector2(x,y).distance_to(center)/(GLOW_SIZE*0.5-1.0)
+			var falloff:=pow(maxf(0.0,1.0-distance*distance),3.0)
+			image.set_pixel(x,y,Color(1.0,0.84,0.54,falloff))
+	glow_map=ImageTexture.create_from_image(image)
+	return glow_map
+static func glow_strength(night:float)->float:
+	# No painted light patches in daylight. At night, one gentle cream-colored falloff.
+	return 0.13*smoothstep(0.12,1.0,clampf(night,0.0,1.0))
 static func glow(c:CanvasItem,p:Vector2,night:float,phase:float)->void:
-	var flicker:=1.0+0.04*sin(phase*5.0+p.x)
+	var strength:=glow_strength(night)
+	if strength<=0.001:return
+	var flicker:=1.0+0.015*sin(phase*5.0+p.x)
 	var illuminated:=Paths.closest(p)
-	for ring in range(5,0,-1):
-		c.draw_circle(illuminated,float(ring)*13.0*flicker,Color(1.0,0.62,0.23,(0.018+0.028*night)*flicker))
-	c.draw_circle(illuminated,34.0,Color(1.0,0.67,0.30,0.03+0.06*night))
+	var size:=Vector2.ONE*GLOW_SIZE
+	# Transparent corners and rim prevent any colored quad boundary in WebGL.
+	c.draw_texture_rect(glow_texture(),Rect2((illuminated-size*0.5).round(),size),false,Color(1,1,1,strength*flicker))
 
 static func board(c:CanvasItem,p:Vector2)->void:
 	for x in [-35,29]:

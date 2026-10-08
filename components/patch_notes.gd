@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 08.10.2026"
 const NOTES=[
+["Sonnenhain · Laternen und Büsche", "Die orangefarbenen Lichtflecken an den Laternen wurden durch einen einzelnen sanft auslaufenden warmen Lichtschein ersetzt; tagsüber bleibt der Boden unverfärbt. Der orange Busch am Brunnen entfällt. Vier feste grüne Büsche stehen jetzt auf anderen freien Rasenflächen."],
 ["Sonnenhain · Zäune und Türen", "Die drei freistehenden Zaunreste ohne Grundstücksfunktion wurden samt ihren Kollisionen entfernt. Türen verwenden jetzt getrennte kurze Holzgeräusche zum Öffnen und Schließen statt synthetischer Töne, mit Riegel, Scharnier und gedämpftem Anschlag."],
 ["Sonnenhain · Hausgegenstände im Dorfstil", "Die zwei Gegenstände pro Haus verwenden jetzt detaillierte transparente Pixelart passend zu den neuen Gebäuden: Stoffe, Bücher, Holz, Metall und Stein mit klaren Materialschattierungen. Sie stehen dicht an den Fassaden und seitlich der freien Eingänge statt verstreut im Vorgarten."],
 ["Sonnenhain · Dorfvorplätze", "Das Atelier ist kleiner und nach links versetzt; Tür und Pflasteranschluss passen dazu. Alle sieben Häuser besitzen zwei passende Gegenstände vor dem Haus, mit freien Eingängen und geprüften Objektkollisionen."],
