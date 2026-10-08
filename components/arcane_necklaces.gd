@@ -125,4 +125,3 @@ static func paint_actor(c:CanvasItem,p:Vector2,look:Vector2,id:int,scale:float,p
 	if not side and id>=3:
 		var mark:=Vector2(0,2) if id==3 else (Vector2(0,3) if id==4 else Vector2(1,2))
 		c.draw_rect(Rect2(origin+mark*scale,Vector2.ONE*scale),metal)
-
