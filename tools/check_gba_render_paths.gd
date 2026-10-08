@@ -5,6 +5,10 @@ class Painted extends Node2D:
 		preload("res://components/start_tilemap_32.gd").paint(self,Rect2(0,0,1780,2600),Callable())
 func _initialize()->void:call_deferred("run")
 func run()->void:
+	if DisplayServer.get_name()=="headless":
+		print("GBA_RENDER_PATHS_SKIPPED graphical renderer required; run without --headless for pixel comparison")
+		quit()
+		return
 	var viewports:Array[SubViewport]=[]
 	for mode in 2:
 		var vp:=SubViewport.new()
