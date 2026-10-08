@@ -320,6 +320,7 @@ var camera_context := ""
 const CAMERA_ZOOM_LEVELS := [1.0,0.85,0.70]
 var camera_zoom_index := 0
 var camera_zoom := 1.0
+var drawing_ui:=false
 const STATIC_CHUNK_SIZE := 512
 const STATIC_CACHE_LIMIT := 32
 var static_chunks: Dictionary = {}
@@ -3202,6 +3203,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		menu_scroll = 0
 		return
 	if event is InputEventMouseButton and panel != "":
+		get_viewport().set_input_as_handled()
+		if not event.pressed:return
 		if event.button_index == MOUSE_BUTTON_LEFT: handle_panel_click(event.position)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "skill_loadout", "journal"]:
 			var skill_scroll_max := maxi(0, ceili(float(SKILL_TREES[skill_tree_tab].size()-6)/3.0)) if panel=="skills" else (maxi(0, learned_loadout_skills().size()-7) if panel=="skill_loadout" else 0)
@@ -7165,6 +7168,7 @@ func sell_item(index: int) -> void:
 	save_game()
 
 func _draw() -> void:
+	drawing_ui=false
 	if panel in ["account_gate","account_login","account_register","account_migrate","start","creation","creation_review"] and not dedicated_server_mode:
 		character_canvas_offset=Vector2.ZERO
 		apply_ui_transform()
@@ -7453,7 +7457,7 @@ func draw_spell_visual(visual: Dictionary) -> void:
 	local["end"]=Vector2(visual["end"])-origin
 	draw_set_transform(origin+character_canvas_offset)
 	draw_spell_local(local)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func draw_spell_local(visual: Dictionary) -> void:
 	var id: int = int(visual["kind"])
@@ -7619,6 +7623,7 @@ func mouse_world_position()->Vector2:
 	return screen_to_world(get_viewport().get_mouse_position())
 
 func apply_ui_transform()->void:
+	drawing_ui=true
 	var z:=effective_camera_zoom()
 	draw_set_transform(Vector2.ZERO,0,Vector2.ONE/z)
 
@@ -7697,7 +7702,10 @@ func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: V
 		look=warrior_jump_direction
 	var neck:=necklace_visual() if necklace_override==-2 else necklace_override
 	if panel in ["creation","creation_review"]:neck=-1
-	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override),jump_progress,neck)
+	var canvas_zoom:=effective_camera_zoom() if drawing_ui else 1.0
+	if drawing_ui:draw_set_transform(Vector2.ZERO)
+	ReferenceScenery.Hero.paint(self,p/canvas_zoom,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor/canvas_zoom,character_canvas_offset/canvas_zoom,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override),jump_progress,neck)
+	restore_canvas_transform()
 
 func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2, scale_factor: float, race: int, gender: int) -> void:
 	var accent: Color = [Color('e5bd77'),Color('8fcde6'),Color('91c787')][clampi(visual_class,0,2)]
@@ -7776,9 +7784,9 @@ func draw_npc_sprite(p: Vector2, kind: String, name: String) -> void:
 
 func draw_weapon_world(p: Vector2, family: int, design: int, look: Vector2, scale_factor: float = 1.0, attack_progress: float = -1.0) -> void:
 	# Keep small polygons near zero: triangulation loses precision at 80k.
-	draw_set_transform(p+character_canvas_offset)
+	set_local_canvas_transform(p+character_canvas_offset)
 	draw_weapon_local(Vector2.ZERO,family,design,look,scale_factor,attack_progress)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scale_factor: float = 1.0, attack_progress: float = -1.0) -> void:
 	var base_dir: Vector2 = look.normalized() if look.length() > 0.01 else Vector2.DOWN
@@ -8228,8 +8236,8 @@ func draw_dungeon_atmosphere() -> void:
 	var torch_points := dungeon_torches()
 	# Weiche, leicht unregelmäßige Vignette: vorn bleibt der Weg lesbar,
 	# am unteren Bildrand schließt sich der Schatten wie im Pixelart-Vorbild.
-	for gx in 24:
-		for gy in 14:
+	for gx in ceili(camera_view_size().x/48.0):
+		for gy in ceili(camera_view_size().y/48.0):
 			var point := camera_pos + Vector2(gx * 48 + 24, gy * 48 + 24)
 			var offset := point - player_pos
 			if offset.y > 0.0: offset.y *= 1.42
@@ -8253,10 +8261,6 @@ func draw_dungeon_atmosphere() -> void:
 
 func draw_overworld_atmosphere() -> void:
 	var darkness := {2:0.27, 3:0.41, 4:0.39, 5:0.45, 7:0.56, 8:0.48, 10:0.49, 11:0.57, 12:0.44}
-	var has_dark_area := false
-	for corner in [camera_pos, camera_pos + Vector2(VIEW.x, 0), camera_pos + Vector2(0, VIEW.y), camera_pos + VIEW, player_pos]:
-		if darkness.has(visual_region_at(corner)): has_dark_area = true
-	if not has_dark_area: return
 	var torches: Array = []
 	for trail in TRAILS:
 		for i in trail.size():
@@ -8265,8 +8269,8 @@ func draw_overworld_atmosphere() -> void:
 		if landmark["kind"] in ["tower", "gate", "shrine"] and darkness.has(region_at(landmark["pos"])) and visible_world(landmark["pos"], 310):
 			torches.append(landmark["pos"] + Vector2(-95, 42))
 			torches.append(landmark["pos"] + Vector2(95, 42))
-	for gx in 24:
-		for gy in 14:
+	for gx in ceili(camera_view_size().x/48.0):
+		for gy in ceili(camera_view_size().y/48.0):
 			var point := camera_pos + Vector2(gx * 48 + 24, gy * 48 + 24)
 			var strength: float = float(darkness.get(visual_region_at(point), 0.0))
 			if strength <= 0.0: continue
@@ -8278,8 +8282,10 @@ func draw_overworld_atmosphere() -> void:
 			for torch_pos in torches:
 				shade = minf(shade, strength * clampf(point.distance_to(torch_pos) / 215.0, 0.11, 1.0))
 			draw_rect(Rect2(camera_pos + Vector2(gx * 48, gy * 48), Vector2(48, 48)), Color("09131b", shade))
-	for cloud in 13:
-		var drift := Vector2(fmod(float(cloud * 157) + world_time * 12.0, VIEW.x + 180.0) - 90.0, float((cloud * 91) % 740) - 60.0)
+	var visible_size:=camera_view_size()
+	var cloud_count:=ceili(13.0*visible_size.x*visible_size.y/(VIEW.x*VIEW.y))
+	for cloud in cloud_count:
+		var drift := Vector2(fposmod(float(cloud * 157) + world_time * 12.0, visible_size.x + 180.0) - 90.0, fposmod(float(cloud * 91),visible_size.y+120.0) - 60.0)
 		var fog_zone := visual_region_at(camera_pos + drift)
 		if darkness.has(fog_zone): draw_circle(camera_pos + drift, 32 + cloud % 5 * 9, Color("c5ced3", 0.028 if fog_zone in [3, 7, 8, 10, 11] else 0.014))
 	for torch_pos in torches:
@@ -8910,7 +8916,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 		draw_class_boss_actor(enemy,model_pos,aim,scale_factor,animation)
 	else:
 		MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 	if float(enemy.get("flash", 0.0)) > 0.0:
 		draw_arc(model_pos, 37.0 * scale_factor, 0.0, TAU, 18, Color("fff7df", 0.72), 3.0)
 	draw_enemy_level(p, type, boss, elite_kind)
@@ -10232,7 +10238,7 @@ func draw_character_cloak_shape(p:Vector2,scale_factor:float,motion:Dictionary,a
 	# Zwei dezente Stofffalten, damit die Fläche als Rückenmantel lesbar bleibt.
 	PixelStyle32.line(self,p+Vector2(-3,-8)*scale_factor,p+(Vector2(-2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.32),1.0*scale_factor)
 	PixelStyle32.line(self,p+Vector2(3,-8)*scale_factor,p+(Vector2(2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.32),1.0*scale_factor)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0,death_progress:float=-1.0,role:int=-1,race:int=-1)->void:
 	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
@@ -10272,7 +10278,7 @@ func draw_character_cloak_foreground(p:Vector2,look:Vector2,scale_factor:float,c
 	var collar_half:=float(motion["neck_half"])+1.2
 	PixelStyle32.line(self,p+Vector2(-collar_half,collar_y)*scale_factor,p+Vector2(collar_half,collar_y)*scale_factor,accent.lightened(0.30),2.0*scale_factor)
 	PixelStyle32.circle(self,p+Vector2(0,collar_y)*scale_factor,1.8*scale_factor,accent.lightened(0.46))
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func adornment_transform(p:Vector2,look:Vector2,scale_factor:float,death:float=-1.0,roll:float=-1.0,role:int=-1,race:int=-1)->void:
 	var local:=p.is_equal_approx(player_pos) and panel not in ["appearance","creation","creation_review"]
@@ -10290,7 +10296,7 @@ func adornment_transform(p:Vector2,look:Vector2,scale_factor:float,death:float=-
 		rotation=fall*(PI*0.40 if use_race==2 else PI*0.46)*(1.0 if look.x>=0 else -1.0)
 	var pivot:=p+Vector2(0,-10)*scale_factor
 	var shift:=Vector2(0,smoothstep(0.0,0.7,death)*19.0*scale_factor) if death>=0 else Vector2.ZERO
-	draw_set_transform(character_canvas_offset+pivot+shift-pivot.rotated(rotation),rotation)
+	set_local_canvas_transform(character_canvas_offset+pivot+shift-pivot.rotated(rotation),rotation)
 
 func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int,hair:int,cloak:int,jewelry:int,accent_index:int)->void:
 	adornment_transform(p,look,scale_factor)
@@ -10303,7 +10309,7 @@ func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int
 			for i in range(-hair,hair+1):
 				PixelStyle32.rect(self,Rect2(p+Vector2(i*5-3,y-abs(i)*2)*scale_factor,Vector2(7,6)*scale_factor),accent.darkened(0.05*abs(i)))
 	CharacterAdornments.badge(self,p,look,scale_factor,jewelry,accent)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func draw_account_gate() -> void:
 	text_at(Vector2(300,190),"SONNENHAIN KONTO",34,Color("ffe2aa"))
@@ -12551,7 +12557,7 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		var color:=cosmetic_accent_color(accent)
 		if race==2:CharacterAdornments.head(self,rp,rdir,WORLD_CHARACTER_SCALE,int(state.get("cosmetic_hair",0)),color)
 		CharacterAdornments.badge(self,rp,rdir,WORLD_CHARACTER_SCALE,int(state.get("cosmetic_jewelry",0)),color)
-		draw_set_transform(character_canvas_offset)
+		restore_canvas_transform()
 		combat_feedback.health(self,"peer:%d"%int(peer_id),rp+Vector2(0,-43),float(state.get("hp",1)),float(state.get("max_hp",1)),60,Color("79caa3"))
 		var party_peer_ids := local_party_peer_ids()
 		var name_color := Color("ffe0a1") if int(peer_id) in party_peer_ids else Color("bfe7ff")
@@ -13771,7 +13777,7 @@ func draw_mob_deaths()->void:
 				draw_rect(Rect2(point-Vector2(3,3),Vector2(6,6)),Color(color,.8*(1.0-progress)))
 		else:
 			MobDesign32.paint(self,p+character_canvas_offset,type,enemy_level(type),Vector2.DOWN,ENEMY_TYPES[type]["color"].darkened(age*.9),0,-1,float(row["scale"])*(1-age*.75),Vector2(1,1-age*1.6))
-		draw_set_transform(character_canvas_offset)
+		restore_canvas_transform()
 
 func normal_mob_count()->int:
 	var count:=0
@@ -13798,7 +13804,7 @@ func draw_spawn_elevated_actor(peer:int)->void:
 	var height:float=maxf(SpawnPlatform32.height_at(point,WAYSTONES[0]),VillageElevation.height_at(point)) if multiplayer_context()=="world" else 0
 	var old_offset:Vector2=character_canvas_offset
 	character_canvas_offset=old_offset-Vector2(0,height)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 	if peer<0:
 		draw_player()
 		draw_local_player_label()
@@ -13839,3 +13845,11 @@ func rpc_necklace_progress(payload:Dictionary)->void:
 	s["hits"]=clampi(int(payload.get("hits",0)),0,2)
 	s["target"]=int(payload.get("target",-1))
 	for key in ["ready","rage_until","hunt_until"]:s[key]=now+clampi(int(payload.get(key,0)),0,6000)
+
+func restore_canvas_transform()->void:
+	if drawing_ui:apply_ui_transform()
+	else:draw_set_transform(character_canvas_offset)
+
+func set_local_canvas_transform(origin:Vector2,rotation:float=0.0)->void:
+	var z:=effective_camera_zoom() if drawing_ui else 1.0
+	draw_set_transform(origin/z,rotation,Vector2.ONE/z)

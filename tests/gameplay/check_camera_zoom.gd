@@ -2,6 +2,7 @@ extends SceneTree
 
 class TestGame extends "res://main.gd":
 	func _ready()->void:pass
+	func _process(_delta:float)->void:pass
 	func save_game()->void:pass
 	func announce_multiplayer_context()->void:pass
 
@@ -48,6 +49,15 @@ func run()->void:
 	g.world_builder.active=false
 	assert(is_equal_approx(g.effective_camera_zoom(),0.70))
 
+	# Menus own wheel input; a release cannot scroll a second time.
+	var wheel:=InputEventMouseButton.new();wheel.button_index=MOUSE_BUTTON_WHEEL_DOWN;wheel.pressed=true
+	g.panel="pause";g.set_camera_zoom_index(1,false);g._unhandled_input(wheel)
+	assert(g.camera_zoom_index==1 and g.panel=="pause")
+	g.panel="journal";g.menu_scroll=0;g._unhandled_input(wheel)
+	assert(g.camera_zoom_index==1 and g.menu_scroll==1)
+	wheel.pressed=false;g._unhandled_input(wheel);assert(g.menu_scroll==1)
+	g.panel="";wheel.pressed=true;g._unhandled_input(wheel)
+	assert(g.camera_zoom_index==2)
 	print("CAMERA_ZOOM_OK levels=100/85/70 expanded_view=true mouse_aim_world_space=true builder_safe=true")
 	g.queue_free()
 	quit()
