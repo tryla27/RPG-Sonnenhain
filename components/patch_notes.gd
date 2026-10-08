@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 08.10.2026"
 const NOTES=[
+["Sonnenhain · Zäune und Türen", "Die drei freistehenden Zaunreste ohne Grundstücksfunktion wurden samt ihren Kollisionen entfernt. Türen verwenden jetzt getrennte kurze Holzgeräusche zum Öffnen und Schließen statt synthetischer Töne, mit Riegel, Scharnier und gedämpftem Anschlag."],
+["Sonnenhain · Hausgegenstände im Dorfstil", "Die zwei Gegenstände pro Haus verwenden jetzt detaillierte transparente Pixelart passend zu den neuen Gebäuden: Stoffe, Bücher, Holz, Metall und Stein mit klaren Materialschattierungen. Sie stehen dicht an den Fassaden und seitlich der freien Eingänge statt verstreut im Vorgarten."],
 ["Sonnenhain · Dorfvorplätze", "Das Atelier ist kleiner und nach links versetzt; Tür und Pflasteranschluss passen dazu. Alle sieben Häuser besitzen zwei passende Gegenstände vor dem Haus, mit freien Eingängen und geprüften Objektkollisionen."],
 ["Sonnenhain · Wege und Höhen", "Der rechte Dorfeingang ist direkt mit Borin und dem Spawnplatz verbunden. Pflasterübergänge sind abgerundet, das Kirchenfundament folgt der Gebäudebodenbreite. Im Nordwesten liegt ein grasbewachsener Berg mit sechs unregelmäßigen Höhenstufen, Felsen und Moos."],
 ["Arkanhalsketten · Für alle Klassen", "Eis-, Blitz- und Giftkerne werden zu tragbaren Arkanhalsketten. Ein eigener Halskettenplatz aktiviert ausschließlich den besonderen Effekt; keine zusätzlichen Grundwerte und kein Verbrauch. Bereits gelernte Blitzlanze bleibt erhalten."],

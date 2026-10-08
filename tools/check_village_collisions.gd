@@ -12,20 +12,27 @@ func _initialize()->void:
 		var door:Vector2=game.village_house_door(shop)
 		assert(not forecourts.blocked(door+Vector2(0,48),18),"exterior objects must leave the doorway clear")
 	for item in forecourts.ITEMS:assert(game.is_blocked(item["point"],item["point"]),"exterior object is missing collision")
+	for npc in game.NPCS:
+		assert(not forecourts.blocked(npc["pos"],18),"Exterior prop blocks NPC: "+str(npc["name"]))
+	for item in forecourts.ITEMS:
+		var texture:Texture2D=forecourts.sprite(item["item"])
+		assert(texture!=null and texture.get_width()>16 and texture.get_height()>16,"Missing production prop sprite")
+		var limit:Vector2i=forecourts.SPECS[item["item"]]["size"]
+		assert(texture.get_width()<=limit.x and texture.get_height()<=limit.y,"Prop exceeds its game-scale size")
 	var houses:Array[Rect2]=[]
 	for prop in game.village_props():
 		if prop["kind"]=="house":houses.append(game.prop_bounds(prop))
 	for prop in game.village_props():
 		if prop["kind"]=="house":continue
 		if prop["kind"]=="forecourt":
-			# Large building PNGs include transparent space above their roof silhouettes.
-			# Forecourt objects must clear their own facade and every physical building floor.
+			# A tall prop standing in front may cover a wall in the top-down projection.
+			# Its physical base must remain outside building footprints and door lanes.
 			for item in forecourts.ITEMS:
 				if item["point"]!=prop["point"]:continue
 				for shop in game.VillageLayout.SHOPS:
 					if shop.has("shared_with"):continue
-					assert(not game.prop_bounds(prop).intersects(game.VillageBuildings.solid(shop["house"],shop["kind"])),"Forecourt overlaps building footprint")
-					if shop["kind"]==item["owner"]:assert(not game.prop_bounds(prop).intersects(game.VillageBuildings.bounds(shop["house"],shop["kind"])),"Object overlaps its own facade")
+					assert(not forecourts.solid(prop["point"],item["item"]).intersects(game.VillageBuildings.solid(shop["house"],shop["kind"])),"Forecourt base overlaps building footprint")
+					if shop["kind"]==item["owner"]:assert(absf(prop["point"].y-game.village_house_door(shop).y)<80,"Object must stay close to its house")
 			continue
 		if prop["kind"]=="mountain":
 			# The hill is a backdrop behind roofs; its physical ground must remain clear of buildings.

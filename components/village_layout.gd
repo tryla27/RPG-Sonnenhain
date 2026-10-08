@@ -4,7 +4,8 @@ const H = preload("res://components/reference_house.gd")
 const TREES := [Vector2(672,320),Vector2(1056,208),Vector2(48,1168),Vector2(64,1776),Vector2(384,2544)]
 const BUSHES := [Vector2(1232,848),Vector2(1552,944)]
 const FLOWER_BUSHES := [Vector2(64,80),Vector2(208,112),Vector2(416,96),Vector2(144,1728),Vector2(288,1760),Vector2(416,1728),Vector2(80,2544),Vector2(192,2496),Vector2(1712,48),Vector2(1552,48),Vector2(1408,48),Vector2(1744,656),Vector2(1488,864)]
-const FENCES := [Vector2(350,1700),Vector2(1256,2576),Vector2(1460,2576)]
+# No isolated fence fragments: add fences only when they enclose an authored garden or yard.
+const FENCES: Array[Vector2] = []
 const BOARD := Vector2(688,1248)
 # 32px-Top-down-Dorf: Gebäude liegen in klaren Grundstücksblöcken um den
 # zentralen Platz. Die größeren Abstände orientieren sich am neuen World-Board,
