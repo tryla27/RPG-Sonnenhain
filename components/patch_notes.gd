@@ -1,6 +1,9 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Reisen · Weltkarte an Wegsteinen", "Spawn und Wegsteine öffnen die Weltkarte. Ein Klick auf eine Region oder einen aktivierten Wegstein reist direkt dorthin; Aktivierungen und Boss-Siegel bleiben gültig. Wegsteine schicken dich beim Öffnen nicht mehr sofort ins Dorf zurück."],
+["Bossgaben · Zuordnung und Anhänger", "Die drei Meistergaben erkennen ihre Boss- und Klassenzuordnung auch bei älteren Gegenständen zuverlässig. Ungültige Kennungen werden nicht mehr als Kriegergabe behandelt. Anhänger und Amulette tragen Kettenoptik, werden im Halskettenplatz angelegt und behalten ihre Werte."],
+["Kristallmoor · Dunkler Arkanhüter", "Der Arkanhüter heißt jetzt Dunkler Arkanhüter und besitzt sein Kampfgebiet samt Haus im Kristallmoor. Quest- und Kartenangaben folgen dem neuen Standort. In Elaras Kapelle sind die Wege links und rechts am Heilungsfeld breiter."],
 ["Oberfläche · Größere, eckige Minimap", "Die Minimap oben rechts ist größer, quadratisch und schlicht mit goldenem Rahmen; Kompass und Ringe entfallen. Ein Klick darauf öffnet weiter die große Karte. Kartenname und Stufe stehen direkt darunter."],
 ["Oberfläche · Aktionshinweis unter der Minimap", "Hinweise wie „F · Wegstein“ stehen jetzt rechts unter der Minimap, sind nur so breit wie ihr Text und haben einen hellen Rahmen."],
 ["Fehlerbehebung · Kein Ton im Browser", "Im Browser waren seit dem Klang-Update Musik, Effekte und Menüklänge stumm. Die Lautstärkekanäle sind jetzt fest im Spiel angelegt, damit der Browser sie abspielt."],

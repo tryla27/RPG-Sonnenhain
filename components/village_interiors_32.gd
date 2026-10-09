@@ -1,6 +1,9 @@
 extends RefCounted
 const TILE := 32
 const ELARA_ID := 7
+const ELARA_BASE_SIZE:=Vector2(1088,624)
+const ELARA_AISLE_GAP:=32.0
+const ELARA_SPLIT_Y:=395.0
 const ELARA_CONCEPT := "res://art/concepts/map0/elara_church_interior_32px.webp"
 const NAMES := ["Alma","Mira","Liora","Arven","Torvald","Fenna","Pip","Elara","Borin"]
 const KINDS := ["inn","elder","elder","arena","smith","style","apprentice","healer","magic"]
@@ -29,6 +32,7 @@ static func role_for_id(id:int)->String:
 	return ROLES[id] if id>=0 and id<ROLES.size() else ""
 
 static func exit_offset(id:int)->Vector2:
+	if id==ELARA_ID:return Vector2(0,272)
 	return Vector2(0,340) if id==3 else (Vector2(0,168) if id==6 else Vector2(0,210))
 
 ## Erhöhtes, begehbares Steinpodest unter Elaras Heilfeld (vor dem Altar).
@@ -76,9 +80,16 @@ static func room(id:int)->Dictionary:
 	return ROOMS.get(1 if id==2 else id,ROOMS[0])
 
 static func room_size(id:int)->Vector2:
+	# Wider aisles on both sides of the healing platform; art and collision use
+	# the same room transform, while the player's body keeps its normal size.
+	if id==ELARA_ID:return ELARA_BASE_SIZE+Vector2(0,ELARA_AISLE_GAP)
 	return Vector2(1344,768) if id==3 else Vector2(896,512)
 
 static func pixel_point(id:int,pixel:Vector2)->Vector2:
+	if id==ELARA_ID:
+		var point:=pixel/Vector2(room(id)["source_size"])*ELARA_BASE_SIZE-ELARA_BASE_SIZE*.5
+		point.y+=-ELARA_AISLE_GAP*.5 if pixel.y<ELARA_SPLIT_Y else ELARA_AISLE_GAP*.5
+		return point.round()
 	var size:=room_size(id)
 	return (pixel/Vector2(room(id)["source_size"])*size-size*.5).round()
 
@@ -110,7 +121,16 @@ static func blocked(pos:Vector2,center:Vector2,id:int=-1,radius:float=16.0)->boo
 static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:bool,interact_label:String)->void:
 	var asset:String=room(id)["asset"]
 	if not textures.has(asset):textures[asset]=load("res://art/village/interiors/%s.png" % asset)
-	c.draw_texture_rect(textures[asset],Rect2(center-room_size(id)*.5,room_size(id)),false)
+	if id==ELARA_ID:
+		# Extend the floor between altar and front benches, preserving their art.
+		# The same piecewise transform above moves every collision and actor.
+		var source:Vector2=room(id)["source_size"]
+		var top:=center-room_size(id)*.5
+		var upper_height:=ELARA_SPLIT_Y/source.y*ELARA_BASE_SIZE.y
+		c.draw_texture_rect_region(textures[asset],Rect2(top,Vector2(ELARA_BASE_SIZE.x,upper_height)),Rect2(0,0,source.x,ELARA_SPLIT_Y))
+		c.draw_texture_rect_region(textures[asset],Rect2(top+Vector2(0,upper_height),Vector2(ELARA_BASE_SIZE.x,ELARA_AISLE_GAP)),Rect2(0,ELARA_SPLIT_Y-10,source.x,8))
+		c.draw_texture_rect_region(textures[asset],Rect2(top+Vector2(0,upper_height+ELARA_AISLE_GAP),Vector2(ELARA_BASE_SIZE.x,ELARA_BASE_SIZE.y-upper_height)),Rect2(0,ELARA_SPLIT_Y,source.x,source.y-ELARA_SPLIT_Y))
+	else:c.draw_texture_rect(textures[asset],Rect2(center-room_size(id)*.5,room_size(id)),false)
 	if id==ELARA_ID:paint_healing_dais(c,healing_field_pos(center,id))
 	if id==8:
 		var p:=center+link_offset(id)
@@ -121,4 +141,4 @@ static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:boo
 	var title:="Mira & Liora · Ratshalle" if id in [1,2] else "%s · %s" % [name_for_id(id),role_for_id(id)]
 	c.draw_string(font,center+Vector2(-320,-room_size(id).y*.5+20),title,HORIZONTAL_ALIGNMENT_CENTER,640,16,Color("ffe8b4"))
 	var label:="ZU BORIN" if id==6 else "ZURÜCK INS DORF"
-	c.draw_string(font,center+exit_offset(id)+Vector2(-140,28),"%s · %s" % ["AKTION" if touch_enabled else interact_label,label],HORIZONTAL_ALIGNMENT_CENTER,280,12,Color("fff0c9"))
+	c.draw_string(font,center+exit_offset(id)+Vector2(-140,-24 if id==ELARA_ID else 28),"%s · %s" % ["AKTION" if touch_enabled else interact_label,label],HORIZONTAL_ALIGNMENT_CENTER,280,12,Color("fff0c9"))

@@ -1,8 +1,9 @@
 extends RefCounted
 ## One equip rule shared by the client UI and durable server saves.
-const BOSS_NAMES=["Helm des Kriegsherrn","Hut des Arkanhüters","Hut des Jagdmeisters"]
+const BOSS_NAMES=["Helm des Kriegsherrn","Hut des Dunklen Arkanhüters","Hut des Jagdmeisters"]
 static func boss_index(item:Dictionary)->int:
 	if str(item.get("icon",""))!="head":return -1
+	if str(item.get("name",""))=="Hut des Arkanhüters":return 1
 	var named:int=BOSS_NAMES.find(str(item.get("name","")))
 	if named>=0:return named
 	var source:int=int(item.get("head_class",-1))
@@ -15,3 +16,4 @@ static func normalize(item:Dictionary)->void:
 	item["boss_hat"]=true
 	item["head_class"]=source
 	item["design"]=source
+	item["name"]=BOSS_NAMES[source]

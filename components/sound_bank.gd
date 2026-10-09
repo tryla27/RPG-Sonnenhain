@@ -297,7 +297,7 @@ static func windup_sound(type: int, ability_id: String) -> String:
 	match type:
 		0: return "schleim_huepfen"
 		1: return "kaefer_zirpen"
-		2: return "pilz_ankuendigung" if ability_id == "giftstaub" else ""
+		2: return "" # Pilzlinge spielen ausschließlich das Giftzischen bei der Freisetzung.
 		3: return "wolf_knurren"
 	return ""
 

@@ -7,6 +7,8 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 
 ## Entscheidungen
 
+- 9.10.2026: Nutzer bestätigt mit „jetzt“ die Veröffentlichung von Meistergaben-Reparatur, Anhänger-Halsketten, Dunklem Arkanhüter in Kristallmoor, Kartenreisen und breiterem Elara-Durchgang. Umsetzung und Regressionstests im Freigabepaket.
+
 - 9.10.2026: PR-Aufräumen. Geschlossen: #11, #12, #13, #16 (schon in `main`),
   #30, #32 (anders umgesetzt), #58 (überholt durch GBA-Boden), #21 (doppelt
   zu #22). Gemergt: #55 (GitHub Actions auf Node 24). Ebenfalls geschlossen

@@ -1,9 +1,9 @@
 extends RefCounted
 ## Equipment-only arcane effects. Per-attacker state; secondary damage never re-enters procs.
-const IDS:=["frost","storm","venom","warlord","resonance","hunt"]
+const IDS:=["frost","storm","venom","warlord","resonance","hunt","pendant"]
 const NAMES:=["Frosthalskette","Gewitterhalskette","Giftdornhalskette","Halskette des Kriegsherrn","Halskette der Arkanresonanz","Halskette der Jagd"]
-const COLORS:=["9fd8e5","68d4db","a0b65c","bf704b","b29cda","d4b96b"]
-const TEXT:=["Treffer: 20 % langsamer für 2 s. Alle 6 s.","Treffer: 25 % Angriff als Blitz. Alle 5 s.","Treffer: 40 % Angriff als Gift über 4 s. Alle 6 s.","Treffer: bis 5 Zorn, je +2 % Schaden. Verfällt nach 5 s.","Jede dritte Schadens-/Heilfähigkeit: +20 %, 20 % Kosten zurück.","Drei direkte Treffer auf ein Ziel in 6 s: 50 % Zusatztreffer."]
+const COLORS:=["9fd8e5","68d4db","a0b65c","bf704b","b29cda","d4b96b","b7d294"]
+const TEXT:=["Treffer: 20 % langsamer für 2 s. Alle 6 s.","Treffer: 25 % Angriff als Blitz. Alle 5 s.","Treffer: 40 % Angriff als Gift über 4 s. Alle 6 s.","Treffer: bis 5 Zorn, je +2 % Schaden. Verfällt nach 5 s.","Jede dritte Schadens-/Heilfähigkeit: +20 %, 20 % Kosten zurück.","Drei direkte Treffer auf ein Ziel in 6 s: 50 % Zusatztreffer.","Am Hals getragen. Die Werte wirken beim Anlegen."]
 var states:Dictionary={}
 
 static func index(item:Dictionary)->int:
@@ -11,14 +11,23 @@ static func index(item:Dictionary)->int:
 	if id in IDS:return IDS.find(id)
 	var name:=str(item.get("name",""))
 	if name in NAMES:return NAMES.find(name)
+	if pendant_name(name):return 6
 	if name.begins_with("Arkankern") and str(item.get("icon",""))=="essence":
 		return {"eis":0,"blitz":1,"gift":2}.get(str(item.get("element","")),-1)
 	return -1
 
+static func pendant_name(name:String)->bool:
+	var lower:=name.to_lower()
+	return "anhänger" in lower or "anhaenger" in lower or "amulett" in lower
+
 static func normalize(item:Dictionary)->void:
 	var i:=index(item)
+	if i==6:
+		item["icon"]="necklace";item["necklace_id"]="pendant";item["design"]=6
+		item.erase("skill_unlock")
+		return
 	if i<0:
-		if str(item.get("name",""))=="Arkankern" and item.get("icon","") in ["sword","staff","bow"]:item["name"]="Arkanhüter-Waffe"
+		if str(item.get("name","")) in ["Arkankern","Arkanhüter-Waffe"] and item.get("icon","") in ["sword","staff","bow"]:item["name"]="Dunkler-Arkanhüter-Waffe"
 		return
 	item["name"]=NAMES[i];item["icon"]="necklace";item["necklace_id"]=IDS[i]
 	for key in ["power","str","agi","int"]:item[key]=0
@@ -98,6 +107,7 @@ func tick_enemy(enemy:Dictionary,delta:float,active:Callable=Callable())->void:
 	enemy["necklace_dots"]=dots
 
 func progress(id:int,peer:int,now:int)->String:
+	if id==6:return "Anhänger angelegt"
 	var s:=state(peer,id,now)
 	if id==3:return "Zorn %d/5" % int(s["rage"])
 	if id==4:return "Resonanz %d/3" % int(s["casts"])

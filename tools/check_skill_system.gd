@@ -53,7 +53,7 @@ func run():
 	var loadout:Array=g.learned_loadout_skills()
 	assert(int(f["id"]) in loadout and int(f["a"]) not in loadout and int(f["b"]) not in loadout)
 	# Klassenboni kommen aus genau einem Relikt des passenden Bosses.
-	assert(g.region_at(g.CLASS_BOSS_SITES[0])==6 and g.region_at(g.CLASS_BOSS_SITES[1])==7 and g.region_at(g.CLASS_BOSS_SITES[2])==8)
+	assert(g.region_at(g.CLASS_BOSS_SITES[0])==6 and g.region_at(g.CLASS_BOSS_SITES[1])==4 and g.region_at(g.CLASS_BOSS_SITES[2])==8)
 	for boss_index in 3:
 		var relic:Dictionary=g.class_relic_item(boss_index)
 		assert(bool(relic.get("class_relic",false)) and int(relic.get("mastery_class",-1))==boss_index)

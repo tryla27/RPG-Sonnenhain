@@ -9,9 +9,10 @@ extends RefCounted
 
 const GameContent = preload("res://components/game_content.gd")
 const WAYSTONES := [Vector2(825, 915), Vector2(3300, 1900), Vector2(3200, 6200), Vector2(6700, 1950), Vector2(6700, 6250), Vector2(9750, 3900), Vector2(1000, 6100), Vector2(13500, 950), Vector2(13500, 2850), Vector2(13500, 4750), Vector2(13500, 6650), Vector2(13500, 8550)]
-const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14300,1200)] # Map 06 / 07 / 08
+const CLASS_BOSS_REGIONS := [6,4,8]
+const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(7800,7200),Vector2(14300,1200)] # Küste / Kristallmoor / Nebelheide
 const CLASS_BOSS_ARENA_RADIUS := 410.0
-const CLASS_BOSS_HOUSE_POS := [Vector2(430,5940),Vector2(9700,5940),Vector2(14300,640)]
+const CLASS_BOSS_HOUSE_POS := [Vector2(430,5940),Vector2(7800,6640),Vector2(14300,640)]
 const CLASS_BOSS_HOUSE_SIZE := Vector2(192,160)
 
 static func region_at(p: Vector2) -> int:
