@@ -56,7 +56,8 @@ func run()->void:
 	for x in [1616,1648,1680]:assert(Map0.visual_family_at(Vector2(x,1936))=="village_stone","east arena lane must be three complete tiles wide")
 	for x in [528,560,592]:assert(Map0.visual_family_at(Vector2(x,1936))=="village_stone","west arena lane must match the east lane width")
 	for lamp:Vector2 in preload("res://components/village_fixtures.gd").LAMPS:
-		assert(paths.distance(lamp)<=66.0,"lantern must sit beside the road")
+		# Laternen stehen neben dem Weg, aber mit dem Fuß auf Gras, nie auf Pflaster (Angelo, 9.10.2026).
+		assert(paths.distance(lamp)<=96.0,"lantern must sit beside the road")
 		assert(Map0.visual_family_at(paths.closest(lamp)) in ["village_stone","plaza_stone","spawn_crossing","building_apron","arena_entry_stone","arena_border"],"lantern light must land on paving")
 	var sources:Dictionary={}
 	for source_id in Map0.cell_ground_sources.values():sources[source_id]=true

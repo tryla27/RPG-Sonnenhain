@@ -264,6 +264,16 @@ anderen Effekte zünden immer am Trefferort.
 
 ---
 
+## Stand
+
+- **Paket 1 umgesetzt (9.10.2026):** A1 Fenna-Speicherverlust, B3 Wegsteine,
+  B7 Laternen und Büsche, B5 Eingangswege, B2 Kirche. Tests:
+  `check_account_login_keeps_local`, `check_waystone_travel`,
+  `check_village_prop_ground`, `check_trail_gate_cut`, `check_chapel_paths`,
+  dazu `tests/audio/check_sounds_in_game` für die Klänge im Spielablauf.
+  Hinweis B7: Nur die Laterne auf der Südmauer und drei Teile auf Pflaster
+  wurden versetzt; die übrigen Straßenlaternen stehen bewusst am Wegrand.
+
 ## E. Vorgeschlagene Reihenfolge
 
 | Paket | Inhalt | Aufwand |

@@ -362,6 +362,7 @@ var music_player: AudioStreamPlayer
 var sound_bank=SoundBank.new()
 var ui_volume := 0.8
 var rustle_timer := 0.0
+var travel_from := 0
 var last_sound_panel := ""
 var mushroom_sound_seen:Dictionary={}
 var music_incoming: AudioStreamPlayer
@@ -5255,38 +5256,59 @@ func use_waystone() -> void:
 		return
 	for i in WAYSTONES.size():
 		if player_pos.distance_to(WAYSTONES[i]) < 185:
-			if i == 0:
-				panel = "travel"
-				message("Wähle ein freigeschaltetes Ziel.")
-			else:
+			if i > 0 and not waystone_unlocked[i]:
 				waystone_unlocked[i] = true
 				last_waystone = i
-				player_pos = waystone_arrival(0)
-				mark_network_teleport()
-				message("Wegstein %s aktiviert. Reise vom Dorf aus jederzeit zurück." % region_name(region_at(WAYSTONES[i])))
-			enemy_projectiles.clear()
-			save_game()
+				play_sound("wegstein_aktiviert")
+				message("Wegstein %s aktiviert. Von jedem Wegstein aus kannst du jetzt hierher reisen." % region_name(region_at(WAYSTONES[i])))
+				save_game()
+				return
+			# Jeder aktivierte Wegstein öffnet die Reiseauswahl, nicht nur der im Dorf.
+			travel_from = i
+			if i > 0: last_waystone = i
+			panel = "travel"
+			message("Wähle ein Reiseziel.")
 			return
 
+## Reiseziele im Raster: die elf Außen-Wegsteine, dann Sonnenhain.
+func travel_slots() -> Array:
+	var slots: Array = []
+	for i in range(1, WAYSTONES.size()): slots.append(i)
+	slots.append(0)
+	return slots
+
+func travel_slot_rect(slot: int) -> Rect2:
+	return Rect2(166 + (slot % 3) * 271, 175 + (slot / 3) * 96, 255, 79)
+
+func travel_available(i: int) -> bool:
+	return i == 0 or (waystone_unlocked[i] and region_available(region_at(WAYSTONES[i])))
+
+func travel_label(i: int) -> String:
+	return "Sonnenhain" if i == 0 else region_name(region_at(WAYSTONES[i]))
+
 func click_travel(mouse: Vector2) -> void:
-	for i in range(1, WAYSTONES.size()):
-		var col := (i - 1) % 3
-		var row := (i - 1) / 3
-		if Rect2(166 + col * 271, 175 + row * 96, 255, 79).has_point(mouse):
-			if not waystone_unlocked[i] or not region_available(region_at(WAYSTONES[i])):
-				message_error("Diesen Wegstein musst du zunächst vor Ort aktivieren.")
-				return
-			if dungeon_id >= 0: dungeon_id = -1
-			player_pos = waystone_arrival(i)
-			mark_network_teleport()
-			last_waystone = i
-			panel = ""
-			enemies.clear()
-			enemy_projectiles.clear()
-			play_sound("reise")
-			message("Reise nach %s." % region_name(region_at(player_pos)))
-			save_game()
+	var slots := travel_slots()
+	for slot in slots.size():
+		var i: int = slots[slot]
+		if not travel_slot_rect(slot).has_point(mouse): continue
+		if i == travel_from:
+			message("Du stehst bereits an diesem Wegstein.")
 			return
+		if not travel_available(i):
+			message_error("Diesen Wegstein musst du zunächst vor Ort aktivieren.")
+			return
+		if dungeon_id >= 0: dungeon_id = -1
+		player_pos = waystone_arrival(i)
+		mark_network_teleport()
+		if i > 0: last_waystone = i
+		travel_from = i
+		panel = ""
+		enemies.clear()
+		enemy_projectiles.clear()
+		play_sound("reise")
+		message("Reise nach %s." % travel_label(i))
+		save_game()
+		return
 
 func quick_potion(restore_energy: bool) -> void:
 	if konflux.active:
@@ -5972,7 +5994,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if Rect2(300,510,280,38).has_point(mouse):
 				panel="repair";queue_redraw();return
 			if Rect2(590,510,170,38).has_point(mouse):
-				panel="travel";return
+				travel_from=-1;panel="travel";return
 			if Rect2(770,510,180,38).has_point(mouse):
 				world_builder.active=true
 				panel="world_builder"
@@ -8243,6 +8265,21 @@ func draw_arena_world() -> void:
 func _trail_theme(region: int) -> int:
 	return 1 if region in [3,4,7,10,11,12] else (2 if region in [2,5,9] else (3 if region == 8 else 0))
 
+## Wegstreifen von a nach b. Wo er die Dorffläche berührt, wird er genau an
+## deren Rand (Mauerlinie der Tore) gerade abgeschnitten.
+func draw_trail_band(a: Vector2, b: Vector2, width: float, color: Color) -> void:
+	for piece in trail_band_polygons(a, b, width):
+		draw_colored_polygon(piece, color)
+
+static func trail_band_polygons(a: Vector2, b: Vector2, width: float) -> Array:
+	var side := (b - a).normalized().rotated(PI * 0.5) * width * 0.5
+	var band := PackedVector2Array([a + side, b + side, b - side, a - side])
+	var village: Rect2 = StartTileMap32.BOUNDS
+	var bounds := Rect2(a.min(b) - Vector2(width, width), (b - a).abs() + Vector2(width, width) * 2.0)
+	if not bounds.intersects(village): return [band]
+	var cut := PackedVector2Array([village.position, Vector2(village.end.x, village.position.y), village.end, Vector2(village.position.x, village.end.y)])
+	return Geometry2D.clip_polygons(band, cut)
+
 func draw_trails() -> void:
 	# Drei zusammenhängende Pixel-Farbflächen statt vieler gedrehter Texturquadrate.
 	# Das vermeidet schwebende Kacheln, harte Kachelenden und unnötige Draw Calls.
@@ -8255,7 +8292,8 @@ func draw_trails() -> void:
 		for point_index in trail.size():
 			var point: Vector2 = trail[point_index]
 			if point_index < trail.size() - 1: theme_for_trail = _trail_theme(region_at(point.lerp(trail[point_index + 1], 0.5)))
-			if region_at(point)!=0 and visible_world(point, 90.0):
+			# Keine runde Wegkappe auf oder an der Dorfgrenze: dort endet der Weg gerade.
+			if region_at(point)!=0 and visible_world(point, 90.0) and not StartTileMap32.BOUNDS.grow(60.0).has_point(point):
 				draw_circle(point, 58.0, edge_colors[theme_for_trail])
 				draw_circle(point, 52.0, mid_colors[theme_for_trail])
 				draw_circle(point, 45.0, road_colors[theme_for_trail])
@@ -8272,13 +8310,14 @@ func draw_trails() -> void:
 			var detail_count := maxi(1, int(distance / 132.0))
 			var start_detail := trail_index * 73 + i * 11
 			# Natursteinrand, verdichteter Untergrund und warme, leicht unregelmäßige Fahrspur.
-			draw_line(a, b, edge_colors[theme], 116.0, false)
-			draw_line(a, b, mid_colors[theme], 104.0, false)
-			draw_line(a, b, road_colors[theme], 90.0, false)
+			draw_trail_band(a, b, 116.0, edge_colors[theme])
+			draw_trail_band(a, b, 104.0, mid_colors[theme])
+			draw_trail_band(a, b, 90.0, road_colors[theme])
 			for detail in range(1, detail_count + 1):
 				var t := minf(0.94, float(detail) / float(detail_count + 1))
 				var center := a.lerp(b, t)
 				if not visible_world(center, 100.0): continue
+				if StartTileMap32.BOUNDS.grow(64.0).has_point(center): continue
 				var code := hash_cell(trail_index * 17 + i, start_detail + detail)
 				# Versetzte Fugen und zwei flache Fahrspuren, in großem Abstand gesetzt.
 				if code % 3 != 0:
@@ -10049,6 +10088,13 @@ func draw_appearance_panel() -> void:
 		text_at(Vector2(615,y+44),(CharacterAdornments.HEAD_NAMES[cosmetic_hair] if row==0 and hero_race==2 else (CharacterAdornments.BADGE_NAMES[cosmetic_jewelry] if row==2 else "%d / %d" % [values[row]+1,max_values[row]])),15,Color("f6edda"),HORIZONTAL_ALIGNMENT_CENTER,180)
 		ui_button(Rect2(805,y+18,50,38),">")
 	ui_button(Rect2(555,518,300,44),"FERTIG")
+	text_at(Vector2(555,584),appearance_save_status(),13,Color("cfe6d3"),HORIZONTAL_ALIGNMENT_LEFT,300)
+
+## Sichtbarer Speicherstatus bei Fenna: erst „gespeichert“, wenn der Server bestätigt hat.
+func appearance_save_status()->String:
+	if creative_mode:return "Testmodus · nur lokal gespeichert"
+	if network_mode!="client":return "Lokal gespeichert ✓"
+	return "Auf dem Server gespeichert ✓" if not server_save.dirty else "Speichere auf dem Server …"
 
 func click_appearance(mouse:Vector2) -> void:
 	if Rect2(555,518,300,44).has_point(mouse):
@@ -10360,20 +10406,50 @@ func open_account_character(index:int)->void:
 	var c:Dictionary=account_characters[index]
 	active_save_slot=clampi(int(c.get("slot",1)),1,3)
 	player_uuid=str(c.get("uuid",""))
-	server_save.uuid=player_uuid
-	server_save.token=str(c.get("token",""))
-	server_save.revision=0
-	server_save.dirty=false
+	var account_token:=str(c.get("token",""))
+	# Ein lokaler Stand desselben Charakters, der den Server noch nicht erreicht
+	# hat (z. B. Fenna-Änderung kurz vor dem Schließen), darf beim Login nicht
+	# verloren gehen: er wird geladen und behält seine Revision. Die Server-
+	# Antwort entscheidet dann wie gewohnt (gleiche Revision: lokal hochladen,
+	# Server neuer: Server laden und lokalen Stand als Konfliktkopie sichern).
+	var pending:=unsynced_local_save(player_uuid,account_token)
+	if not pending.is_empty():
+		apply_save_data(pending)
+		server_save.restore(pending)
+		server_save.latest=capture_save_data()
+	else:
+		server_save.uuid=player_uuid
+		server_save.token=account_token
+		server_save.revision=0
+		server_save.dirty=false
+		server_save.latest={}
+		server_save.last_request=""
+		server_save.submitted_hash=""
 	server_save.ready=false
 	server_save.loading=true
-	server_save.latest={}
 	server_save.inflight.clear()
-	server_save.last_request=""
-	server_save.submitted_hash=""
 	account_pending_load=true
 	account_status="Lade deinen Server-Spielstand …"
 	panel="account_characters"
+	request_server_save_open()
+
+func request_server_save_open()->void:
 	rpc_zz_save_open.rpc_id(1,server_save.token,player_uuid)
+
+## Lokaler Spielstand dieses Charakters, der noch nicht vom Server bestätigt ist.
+func unsynced_local_save(uuid:String,token:String)->Dictionary:
+	if uuid=="" or token=="":return {}
+	var slots:Array=[active_save_slot]
+	for slot in range(1,4):
+		if slot not in slots:slots.append(slot)
+	for slot in slots:
+		var data:Dictionary=preload("res://components/local_save_store.gd").read(slot_save_path(slot))
+		if data.is_empty():continue
+		if str(data.get("player_uuid",""))!=uuid or str(data.get("server_save_token",""))!=token:continue
+		if not bool(data.get("server_save_dirty",false)):continue
+		active_save_slot=slot
+		return data
+	return {}
 
 func draw_account_characters()->void:
 	text_at(Vector2(220,145),"DEINE CHARAKTERE",30,Color("ffe2aa"))
@@ -11122,18 +11198,20 @@ func shop_preview_item(stock_item: Dictionary) -> Dictionary:
 	return preview
 
 func draw_travel_panel() -> void:
-	text_at(Vector2(165, 131), "WEGSTEINE · REISE VON SONNENHAIN", 24, Color("ffe5a2"))
-	text_at(Vector2(168, 159), "Berühre einen Wegstein draußen und drücke F, um ihn dauerhaft zu aktivieren.", 15, Color("dcebdc"))
-	for i in range(1, WAYSTONES.size()):
-		var col := (i - 1) % 3
-		var row := (i - 1) / 3
-		var pos := Vector2(166 + col * 271, 175 + row * 96)
-		var zone := region_at(WAYSTONES[i])
-		var available: bool = waystone_unlocked[i] and region_available(zone)
-		ui_box(Rect2(pos, Vector2(255, 79)), Color("59766b") if available else Color("405657"))
-		draw_circle(pos + Vector2(25, 35), 12, Color("9cece7") if available else Color("8d9b9a"))
-		text_at(pos + Vector2(48, 32), region_name(zone), 16, Color("fff1c4") if available else Color("b9c7c1"))
-		text_at(pos + Vector2(48, 57), "EMPF. LV %d · %s" % [region_level(zone), "REISEN" if available else "NICHT AKTIVIERT"], 13, Color("bfeee0") if available else Color("d2c0b6"))
+	text_at(Vector2(165, 131), "WEGSTEINE · REISEN", 24, Color("ffe5a2"))
+	text_at(Vector2(168, 159), "Jeder aktivierte Wegstein bringt dich zu jedem anderen. Neue Wegsteine aktivierst du, indem du sie draußen berührst.", 15, Color("dcebdc"), HORIZONTAL_ALIGNMENT_LEFT, 800)
+	var slots := travel_slots()
+	for slot in slots.size():
+		var i: int = slots[slot]
+		var rect := travel_slot_rect(slot)
+		var here: bool = i == travel_from
+		var available := travel_available(i) and not here
+		var zone := 0 if i == 0 else region_at(WAYSTONES[i])
+		ui_box(rect, Color("59766b") if available else Color("405657"))
+		draw_circle(rect.position + Vector2(25, 35), 12, Color("ffd98a") if here else (Color("9cece7") if available else Color("8d9b9a")))
+		text_at(rect.position + Vector2(48, 32), travel_label(i), 16, Color("fff1c4") if available or here else Color("b9c7c1"))
+		var state := "DU BIST HIER" if here else ("REISEN" if available else "NICHT AKTIVIERT")
+		text_at(rect.position + Vector2(48, 57), ("DORF · %s" % state) if i == 0 else ("EMPF. LV %d · %s" % [region_level(zone), state]), 13, Color("ffe2a8") if here else (Color("bfeee0") if available else Color("d2c6b6")))
 
 func draw_journal_panel() -> void:
 	text_at(Vector2(165, 125), "QUESTBUCH", 26, Color("ffeda9"))

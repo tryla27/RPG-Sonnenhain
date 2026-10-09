@@ -1,6 +1,10 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Fehlerbehebung · Fenna-Änderungen nach dem Login", "Änderungen bei Fenna, die den Server vor dem Schließen nicht mehr erreicht haben, gehen beim nächsten Anmelden nicht mehr verloren. Ist der Server neuer, wird der lokale Stand als Kopie gesichert. Fenna zeigt an, wann der Server gespeichert hat."],
+["Wegsteine · Reisen von überall", "Jeder aktivierte Wegstein öffnet die Reiseauswahl und bringt dich zu jedem anderen aktivierten Wegstein; Sonnenhain ist immer ein Ziel. Ein neuer Wegstein wird beim Berühren aktiviert, ohne dich ins Dorf zu schicken."],
+["Kapelle · Freie Gänge und Heilpodest", "Zwischen den Kirchenbänken kann man jetzt hindurchgehen, und Elara ist bequem erreichbar. Das Heilfeld liegt auf einem erhöhten, begehbaren Steinpodest vor dem Altar."],
+["Sonnenhain · Eingänge, Laternen und Büsche", "Die Wege enden an beiden Dorfeingängen sauber an der Mauer. Die Laterne auf der Mauer unten bei der Arena steht jetzt im Gras daneben; Laternen und Büsche stehen nicht mehr auf Pflaster."],
 ["Klänge · Menüs und Fortschritt", "Knöpfe, Fenster, Gespräche, Kaufen und Verkaufen klingen eigen; was gerade nicht geht, meldet ein kurzer Fehlerton. Quests, Level-Aufstieg, Skillpunkte, Freischaltungen, Wegsteine, Reisen, Truhen, Heilung und Boss-Auftritte haben eigene Klänge im 16-Bit-Märchenstil. Neuer Lautstärkeregler „Oberfläche“ in den Einstellungen."],
 ["Klänge · Büsche", "Wer durch Büsche und Sträucher läuft, hört sie rascheln."],
 ["Klänge · Kampf im 16-Bit-Märchenstil", "Schwert, Stab und Bogen klingen eigen. Treffer hören sich je nach Gegner weich, gepanzert, fellig, steinern, geisterhaft oder metallisch an. Waldschleim, Blütenkäfer, Pilzling und Mooswolf haben eigene Angriffslaute, die ersten drei auch eigene Niederlagenlaute; entfernte Gegner sind leiser. Neue Klänge für Schaden, Ausweichen, Tränke, Niederlage, Rückkehr und das Betreten der Welt sowie Gold und seltene Beute. Unter 25 % Leben schlägt ein Herz, bis du dich erholst."],
