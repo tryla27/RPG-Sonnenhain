@@ -2,11 +2,52 @@ extends SceneTree
 
 func _initialize()->void:
 	var game=load("res://main.gd").new()
+	var forecourts=preload("res://components/village_forecourts.gd")
+	for shop in game.VillageLayout.SHOPS:
+		if shop.has("shared_with"):continue
+		var count:=0
+		for item in forecourts.ITEMS:
+			if item["owner"]==shop["kind"]:count+=1
+		assert(count>=1 and count<=2,"each unique house needs one or two themed objects")
+		var door:Vector2=game.village_house_door(shop)
+		assert(not forecourts.blocked(door+Vector2(0,48),18),"exterior objects must leave the doorway clear")
+	for item in forecourts.ITEMS:assert(game.is_blocked(item["point"],item["point"]),"exterior object is missing collision")
+	for npc in game.NPCS:
+		assert(not forecourts.blocked(npc["pos"],18),"Exterior prop blocks NPC: "+str(npc["name"]))
+	for item in forecourts.ITEMS:
+		var texture:Texture2D=forecourts.sprite(item["item"])
+		assert(texture!=null and texture.get_width()>16 and texture.get_height()>16,"Missing production prop sprite")
+		var limit:Vector2i=forecourts.SPECS[item["item"]]["size"]
+		assert(texture.get_width()<=limit.x and texture.get_height()<=limit.y,"Prop exceeds its game-scale size")
 	var houses:Array[Rect2]=[]
 	for prop in game.village_props():
 		if prop["kind"]=="house":houses.append(game.prop_bounds(prop))
 	for prop in game.village_props():
 		if prop["kind"]=="house":continue
+		if prop["kind"]=="forecourt":
+			# A tall prop standing in front may cover a wall in the top-down projection.
+			# Its physical base must remain outside building footprints and door lanes.
+			for item in forecourts.ITEMS:
+				if item["point"]!=prop["point"]:continue
+				for shop in game.VillageLayout.SHOPS:
+					if shop.has("shared_with"):continue
+					assert(not forecourts.solid(prop["point"],item["item"]).intersects(game.VillageBuildings.solid(shop["house"],shop["kind"])),"Forecourt base overlaps building footprint")
+					if shop["kind"]==item["owner"]:assert(absf(prop["point"].y-game.village_house_door(shop).y)<80,"Object must stay close to its house")
+			continue
+		if prop["kind"]=="mountain":
+			# The hill is a backdrop behind roofs; its physical ground must remain clear of buildings.
+			game.VillageElevation.Mountain.prepare()
+			for shop in game.VillageLayout.SHOPS:
+				if shop.has("shared_with"):continue
+				var floor_rect:Rect2=game.VillageBuildings.solid(shop["house"],shop["kind"])
+				var footprint:=PackedVector2Array([floor_rect.position,Vector2(floor_rect.end.x,floor_rect.position.y),floor_rect.end,Vector2(floor_rect.position.x,floor_rect.end.y)])
+				assert(Geometry2D.intersect_polygons(game.VillageElevation.Mountain.contours[0],footprint).is_empty(),"Mountain overlaps building footprint")
+			continue
+		if prop["kind"]=="lamp":
+			for shop in game.VillageLayout.SHOPS:
+				if shop.has("shared_with"):continue
+				assert(not game.VillageBuildings.solid(shop["house"],shop["kind"]).intersects(Rect2(prop["point"]+Vector2(-10,2),Vector2(20,8))),"Lantern base overlaps solid building")
+			continue
 		for house in houses:assert(not game.prop_bounds(prop).intersects(house),"Tree art overlaps house art")
 	var spawn:Rect2=game.SpawnPlatform32.bounds(game.WAYSTONES[0])
 	for prop in game.village_props():

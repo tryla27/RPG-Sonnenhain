@@ -121,18 +121,25 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 		if uid < 0 or uids.has(uid): return false
 		uids[uid] = true
 		if not item.get("name") is String or String(item["name"]).length() > 160: return false
-		if not item.get("icon") is String or String(item["icon"]) not in ["sword","staff","bow","armor","ring","potion","herb","essence","gem","food","head"]: return false
+		if not item.get("icon") is String or String(item["icon"]) not in ["sword","staff","bow","armor","ring","potion","herb","essence","gem","food","head","necklace"]: return false
 		if item["icon"]=="head" and (not item.get("head_class") is int and not item.get("head_class") is float or int(item.get("head_class",-1)) not in [0,1,2]):return false
+		if item["icon"]=="necklace":
+			if preload("res://components/arcane_necklaces.gd").index(item)<0:return false
+			for stat in ["power","str","agi","int"]:
+				if float(item.get(stat,0))!=0:return false
 		if item["icon"]=="food" and preload("res://components/food_system.gd").by_name(item["name"]).is_empty():return false
 		for field in ["power","rarity","value","count","level","str","agi","int","design"]:
 			var value: Variant = item.get(field,1 if field == "count" else 0)
 			if not (value is int or value is float) or not is_finite(float(value)) or float(value) < 0 or float(value) > 2147483647: return false
 		if int(item.get("rarity",0)) > 4 or int(item.get("count",1)) < 1: return false
-	for field in ["equipped_uid","equipped_armor_uid","equipped_ring_uid","equipped_ring2_uid","equipped_head_uid"]:
+	for field in ["equipped_uid","equipped_armor_uid","equipped_ring_uid","equipped_ring2_uid","equipped_head_uid","equipped_necklace_uid"]:
 		var value: Variant = data.get(field,-1)
 		if not (value is int or value is float): return false
 		if int(value) != -1 and not uids.has(int(value)): return false
 	if int(data.get("equipped_ring2_uid",-1)) >= 0 and (int(data["class_id"]) != 1 or int(data["equipped_ring2_uid"]) == int(data.get("equipped_ring_uid",-1))): return false
+	if int(data.get("equipped_necklace_uid",-1))>=0:
+		for item in data["inventory"]:
+			if int(item["uid"])==int(data["equipped_necklace_uid"]) and item.get("icon","")!="necklace":return false
 	if int(data.get("equipped_head_uid",-1))>=0:
 		for item in data["inventory"]:
 			if int(item["uid"])==int(data["equipped_head_uid"]) and not preload("res://components/headgear_rules.gd").allowed(item,int(data["class_id"])):return false

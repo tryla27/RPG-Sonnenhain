@@ -86,7 +86,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for script in check_region_spawn_matrix check_spawn_network check_combat_feedback_network check_mob_combat_network check_party_xp_network; do
+          for script in check_mushroom_sound check_mob_navigation check_region_spawn_matrix check_spawn_network check_combat_feedback_network check_mob_combat_network check_party_xp_network; do
             echo "::group::$script"
             timeout 120 "$GODOT_BIN" --headless --path . --script "tools/$script.gd"
             echo "::endgroup::"

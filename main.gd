@@ -4,6 +4,7 @@
 # Release marker: production rollout for class bosses, HUD separation, Borin route, harvest timers and boss audiovisual combat.
 extends Node2D
 const PatchNotice = preload("res://components/patch_notice.gd")
+const PatchNotes = preload("res://components/patch_notes.gd")
 var patch_notice = PatchNotice.new()
 const ExperienceRules = preload("res://components/experience_rules.gd")
 const ControllerControls = preload("res://components/controller_controls.gd")
@@ -57,7 +58,10 @@ var boss_attack_sound_seen:Dictionary={}
 var boss_death_end_queue:Array=[]
 var boss_music_hold_timer:=0.0
 var boss_music_hold_theme:=""
-const QUEST_HUD_RECT:=Rect2(10,118,348,46)
+const HudLayout = preload("res://components/hud_layout.gd")
+
+func quest_hud_rect()->Rect2:
+	return HudLayout.quest_rect(touch_enabled)
 
 func hud_action_rect(index:int)->Rect2:
 	return Rect2(18+index*94,610,88,26)
@@ -68,6 +72,10 @@ func hud_action_at(pos:Vector2)->String:
 		if hud_action_rect(i).has_point(pos):return str(actions[i])
 	return ""
 const MobCombat=preload("res://components/mob_combat.gd")
+const MobNavigation=preload("res://components/mob_navigation.gd")
+const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
+const WolfAnimation=preload("res://components/wolf_animation.gd")
+const WoodlandPoseAnimation=preload("res://components/woodland_pose_animation.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
 const ItemStyle32=preload("res://components/item_style_32.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
@@ -101,96 +109,23 @@ const RARITY_COLORS := [Color("d9dfd6"), Color("75d891"), Color("72bafa"), Color
 # Reihenfolge: Dorf, Blütenwiesen, Pilzwald, Ruinen, Kristallmoor, Ascheberge, Küste, Sternenbruch.
 const REGION_LEVELS := [1, 1, 8, 15, 22, 29, 5, 36, 12, 19, 26, 33, 40]
 const NEW_REGION_NAMES := ["Nebelheide", "Bernsteinforst", "Tiefenquell", "Dämmergrat", "Himmelsgarten"]
-const PORTALS := [
-	[Vector2(3690, 6810), Vector2(11850, 930), 8],
-	[Vector2(7590, 2590), Vector2(11850, 2810), 9],
-	[Vector2(7610, 6830), Vector2(11850, 4720), 10],
-	[Vector2(10100, 2750), Vector2(11850, 6630), 11],
-	[Vector2(9820, 6750), Vector2(11850, 8500), 12]
-]
+const GameContent=preload("res://components/game_content.gd")
+const NetworkCodec=preload("res://components/network_codec.gd")
+const WorldGeometry=preload("res://components/world_geometry.gd")
+const ItemRules=preload("res://components/item_rules.gd")
+const SoundBank=preload("res://components/sound_bank.gd")
+const PORTALS := GameContent.PORTALS
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
 const CUSTOM_MUSIC_THEMES := ["dorf", "blumen", "kueste", "pilzwald", "ruinen", "kristall", "asche", "sternen", "taverne"]
 const MUSIC_FADE_SECONDS := 1.35
-const ENEMY_TYPES := [
-	{"name":"Waldschleim", "region":1, "hp":42, "damage":8, "speed":78, "xp":12, "color":Color("73cb88")},
-	{"name":"Blütenkäfer", "region":1, "hp":32, "damage":6, "speed":113, "xp":11, "color":Color("e998b6")},
-	{"name":"Pilzling", "region":2, "hp":65, "damage":11, "speed":65, "xp":19, "color":Color("e3ad77")},
-	{"name":"Mooswolf", "region":2, "hp":72, "damage":14, "speed":132, "xp":24, "color":Color("789983")},
-	{"name":"Steingolem", "region":3, "hp":118, "damage":19, "speed":72, "xp":36, "color":Color("bea78c")},
-	{"name":"Ruinenbeholder", "region":3, "hp":82, "damage":22, "speed":105, "xp":38, "color":Color("a8b9e9")},
-	{"name":"Kristallkrabbe", "region":4, "hp":125, "damage":22, "speed":75, "xp":44, "color":Color("8de0eb")},
-	{"name":"Kristallgolem", "region":4, "hp":165, "damage":29, "speed":66, "xp":58, "color":Color("92ddea")},
-	{"name":"Ascheläufer", "region":5, "hp":145, "damage":29, "speed":138, "xp":57, "color":Color("dc835e")},
-	{"name":"Lavagolem", "region":5, "hp":260, "damage":38, "speed":52, "xp":82, "color":Color("a75c52")},
-	{"name":"Strandkrabbe", "region":6, "hp":57, "damage":9, "speed":93, "xp":15, "color":Color("e9a67e")},
-	{"name":"Wassergeist", "region":6, "hp":90, "damage":16, "speed":117, "xp":26, "color":Color("76bfd2")},
-	{"name":"Kriegsherr", "region":6, "hp":1800, "damage":46, "speed":96, "xp":520, "color":Color("c97b5e")},
-	{"name":"Arkanhüter", "region":7, "hp":2100, "damage":54, "speed":102, "xp":650, "color":Color("8caee8")},
-	{"name":"Jagdmeister", "region":8, "hp":2350, "damage":58, "speed":118, "xp":760, "color":Color("8fbd72")},
-	{"name":"Sternenschatten", "region":7, "hp":320, "damage":48, "speed":128, "xp":230, "color":Color("b5a3d9")},
-	{"name":"Bruchwächter", "region":7, "hp":470, "damage":55, "speed":72, "xp":280, "color":Color("dfac91")},
-	{"name":"Nebelhirsch", "region":8, "hp":91, "damage":17, "speed":123, "xp":28, "color":Color("b9cfcc")},
-	{"name":"Irrlicht", "region":8, "hp":73, "damage":20, "speed":109, "xp":31, "color":Color("a6d8da")},
-	{"name":"Harzbestie", "region":9, "hp":142, "damage":26, "speed":91, "xp":47, "color":Color("caac5a")},
-	{"name":"Wurzelhexe", "region":9, "hp":111, "damage":30, "speed":117, "xp":52, "color":Color("a0b379")},
-	{"name":"Quellkriecher", "region":10, "hp":190, "damage":35, "speed":112, "xp":68, "color":Color("8fbfc6")},
-	{"name":"Perlengeist", "region":10, "hp":155, "damage":39, "speed":134, "xp":75, "color":Color("c5e0e4")},
-	{"name":"Gratgreif", "region":11, "hp":250, "damage":45, "speed":150, "xp":96, "color":Color("a7a0b8")},
-	{"name":"Schattenritter", "region":11, "hp":340, "damage":53, "speed":90, "xp":108, "color":Color("77748f")},
-	{"name":"Himmelsfalter", "region":12, "hp":390, "damage":60, "speed":148, "xp":145, "color":Color("d9c6e8")},
-	{"name":"Sternenwächterin", "region":12, "hp":560, "damage":69, "speed":85, "xp":180, "color":Color("e4d4b5")}
-]
+const ENEMY_TYPES := GameContent.ENEMY_TYPES
 const VillageBuildings=preload("res://components/village_buildings.gd")
+const VillageElevation=preload("res://components/village_elevation.gd")
 const VillageFixtures=preload("res://components/village_fixtures.gd")
 const CharacterAdornments=preload("res://components/character_adornments.gd")
 const ArenaInterior=preload("res://components/arena_interior.gd")
-const BASE_ABILITIES := [
-	{"name":"Wirbelhieb", "desc":"Kreisender Nahkampfschlag", "cost":28, "cd":6.0, "req":3, "kind":0},
-	{"name":"Schildwall", "desc":"Schutz für wenige Sekunden", "cost":24, "cd":12.0, "req":8, "kind":1},
-	{"name":"Sturmsprung", "desc":"Sprung und Betäubung", "cost":30, "cd":9.0, "req":12, "kind":2},
-	{"name":"Klingenwelle", "desc":"Geschoss durch Gegner", "cost":28, "cd":6.0, "req":15, "kind":3},
-	{"name":"Kampfschrei", "desc":"Mehr Schaden für 6 Sekunden", "cost":24, "cd":14.0, "req":3, "kind":4},
-	{"name":"Erdspalter", "desc":"Starker Schlag und Betäubung", "cost":34, "cd":10.0, "req":18, "kind":5},
-	{"name":"Lebensraub", "desc":"Treffer heilen dich", "cost":30, "cd":13.0, "req":5, "kind":6},
-	{"name":"Klingenregen", "desc":"Drei Klingen nach vorn", "cost":38, "cd":11.0, "req":23, "kind":7},
-	{"name":"Eiserne Haut", "desc":"Heilung und Schutz", "cost":35, "cd":18.0, "req":7, "kind":8},
-	{"name":"Klingenmeister", "desc":"Passiv: +5 Schwertschaden", "cost":0, "cd":0.0, "req":2, "kind":9},
-	{"name":"Lebenskraft", "desc":"Passiv: +25 maximales Leben", "cost":0, "cd":0.0, "req":3, "kind":10},
-	{"name":"Ausdauer", "desc":"Passiv: +25 maximale Energie", "cost":0, "cd":0.0, "req":4, "kind":11},
-	{"name":"Frostschlag", "desc":"Eis: Schaden und Verlangsamung", "cost":28, "cd":7.0, "req":28, "kind":12},
-	{"name":"Blitzkette", "desc":"Blitz: springt auf 3 Gegner", "cost":38, "cd":10.0, "req":34, "kind":13},
-	{"name":"Giftklinge", "desc":"Gift: 8 Sek. vergiftete Hiebe", "cost":26, "cd":15.0, "req":35, "kind":14},
-	{"name":"Avatar der Morgenwache", "desc":"Goldene Welle und Schutz", "cost":60, "cd":45.0, "req":20, "kind":15},
-	{"name":"Feuerball", "desc":"Feuerprojektil mit Explosion", "cost":23, "cd":4.0, "req":3, "kind":16},
-	{"name":"Frostnova", "desc":"Eiskreis verlangsamt Gegner", "cost":29, "cd":8.0, "req":8, "kind":17},
-	{"name":"Blitzlanze", "desc":"Blitz durch mehrere Ziele", "cost":34, "cd":7.0, "req":12, "kind":18},
-	{"name":"Rissnova", "desc":"Arkane Druckwelle um den Magier", "cost":27, "cd":9.0, "req":15, "kind":19},
-	{"name":"Sternenfunken", "desc":"Drei magische Geschosse", "cost":32, "cd":8.0, "req":18, "kind":20},
-	{"name":"Eisschild", "desc":"Schützt und friert Angreifer", "cost":30, "cd":15.0, "req":23, "kind":21},
-	{"name":"Meteorschauer", "desc":"Feuer trifft eine Fläche", "cost":44, "cd":18.0, "req":28, "kind":22},
-	{"name":"Elementarwirbel", "desc":"Eis, Blitz und Feuer im Kreis", "cost":49, "cd":21.0, "req":34, "kind":23},
-	{"name":"Arkaner Sturm", "desc":"Ultimate ab Level 40: Elementarwellen", "cost":60, "cd":45.0, "req":40, "kind":24},
-	{"name":"Präzisionsschuss", "desc":"Gezielter Schuss mit Durchschlag", "cost":22, "cd":5.0, "req":3, "kind":25},
-	{"name":"Mehrfachschuss", "desc":"Drei Pfeile im Fächer", "cost":27, "cd":7.0, "req":8, "kind":26},
-	{"name":"Rückwärtssprung", "desc":"Abstand gewinnen und ausweichen", "cost":23, "cd":9.0, "req":12, "kind":27},
-	{"name":"Giftpfeil", "desc":"Giftiger Schuss mit Nachwirkung", "cost":29, "cd":8.0, "req":15, "kind":28},
-	{"name":"Frostpfeil", "desc":"Eisiger Pfeil bremst Gegner", "cost":30, "cd":9.0, "req":18, "kind":29},
-	{"name":"Blitzpfeil", "desc":"Springender Blitz am Ziel", "cost":34, "cd":10.0, "req":23, "kind":30},
-	{"name":"Pfeilhagel", "desc":"Pfeile fallen im Zielbereich", "cost":44, "cd":17.0, "req":28, "kind":31},
-	{"name":"Falkenruf", "desc":"Markiert Feinde und stärkt Treffer", "cost":37, "cd":20.0, "req":34, "kind":32},
-	{"name":"Himmelshagel", "desc":"Klassenfähigkeit: großer Pfeilsturm", "cost":60, "cd":45.0, "req":20, "kind":33},
-	{"name":"Impulsschuss", "desc":"Robotischer Energieschuss", "cost":24, "cd":5.0, "req":3, "kind":34},
-	{"name":"Reparaturmodul", "desc":"Repariert sofort einen Teil deiner Lebenspunkte", "cost":30, "cd":16.0, "req":8, "kind":35},
-	{"name":"Energieschild", "desc":"Technischer Schild reduziert eingehenden Schaden", "cost":32, "cd":15.0, "req":12, "kind":36},
-	{"name":"Teslawelle", "desc":"Elektrische Welle trifft Gegner im Umkreis", "cost":36, "cd":10.0, "req":15, "kind":37},
-	{"name":"Zielmatrix", "desc":"Überclockt Angriffe für kurze Zeit", "cost":28, "cd":18.0, "req":18, "kind":38},
-	{"name":"EMP-Stoß", "desc":"Betäubt Gegner im Umkreis", "cost":42, "cd":18.0, "req":23, "kind":39},
-	{"name":"Flammenwirbel", "desc":"Fusion aus Wirbelhieb und Feuerball", "cost":42, "cd":12.0, "req":15, "kind":40},
-	{"name":"Reaktorwall", "desc":"Fusion aus Schildwall und Energieschild", "cost":38, "cd":20.0, "req":15, "kind":41},
-	{"name":"Blitzkern", "desc":"Fusion aus Blitzlanze und Teslawelle", "cost":48, "cd":16.0, "req":23, "kind":42},
-	{"name":"Eisball", "desc":"Fusion aus Frostnova und Blitzlanze · 4 Entwicklungsstufen", "cost":40, "cd":10.0, "req":12, "kind":43}
-]
+const BASE_ABILITIES := GameContent.BASE_ABILITIES
 const CLASS_NAMES := ["Krieger", "Magier", "Bogenschütze"]
 const CLASS_SKILLS := [[0, 1, 2, 3, 5, 7, 12, 13, 14], [16, 17, 18, 19, 20, 21, 22, 23], [25, 26, 27, 28, 29, 30, 31, 32]]
 const CLASS_ULTIMATES := [15, 24, 33]
@@ -205,67 +140,24 @@ var fusion_page:=0
 const COSMETIC_ACCENT_HEX := ["be5368","557fc0","5f9b68","b7894f","8d62aa","55a5a5","cf6f59","c94f7e","6a6fd1","4e9ad6","4ca6a0","5caf7a","86b84d","c2b14a","d48c4f","a86b4e","8c6a58","9a7acb","c36db5","d7d7d7"]
 const FUSION_IMPACT_PROFILES := FusionCatalog.IMPACT_PROFILES
 const BORIN_HOUSE_POS := Vector2(1248,64)
-const BORIN_MAGIC_TREE_POS := Vector2(1120,616)
+const BORIN_MAGIC_TREE_POS := Vector2(1120,480)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
 const WORLD_CHARACTER_SCALE := 0.84
-const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14300,1200)] # Map 06 / 07 / 08
-const CLASS_BOSS_ARENA_RADIUS := 410.0
+const CLASS_BOSS_SITES := WorldGeometry.CLASS_BOSS_SITES
+const CLASS_BOSS_ARENA_RADIUS := WorldGeometry.CLASS_BOSS_ARENA_RADIUS
 const CLASS_BOSS_ARENA_CLEAR_RADIUS := 475.0
-const CLASS_BOSS_HOUSE_POS := [Vector2(430,5940),Vector2(9700,5940),Vector2(14300,640)]
-const CLASS_BOSS_HOUSE_SIZE := Vector2(192,160)
+const CLASS_BOSS_HOUSE_POS := WorldGeometry.CLASS_BOSS_HOUSE_POS
+const CLASS_BOSS_HOUSE_SIZE := WorldGeometry.CLASS_BOSS_HOUSE_SIZE
 const CLASS_BOSS_MUSIC_THEMES := ["boss_kriegsherr","boss_arkanhueter","boss_jagdmeister"]
 const CLASS_RELIC_NAMES := ["Herz des Kriegsherrn","Arkansplitter","Herz der Jagd"]
 const CLASS_RELIC_SKILLS := ["WUT + BLUTRAUSCH","RISSSPRUNG · LEERTASTE","JAGDRAUSCH + SCHATTENROLLE"]
 const CLASS_RELIC_RESERVE_MS := 15000
-const QUESTS := [
-	{"title":"Schleime im Blütenwald", "npc":"Mira", "target":0, "count":8, "xp":60, "gold":75, "reward":"Waldklinge"},
-	{"title":"Die Käferplage", "npc":"Mira", "target":1, "count":8, "xp":85, "gold":110, "reward":"Blütenanhänger"},
-	{"title":"Pilze auf Beinen", "npc":"Mira", "target":2, "count":9, "xp":110, "gold":130, "reward":"Waldelixier"},
-	{"title":"Wölfe im Pilzwald", "npc":"Mira", "target":3, "count":9, "xp":140, "gold":160, "reward":"Wolfszahn"},
-	{"title":"Die alten Wächter", "npc":"Mira", "target":4, "count":9, "xp":190, "gold":220, "reward":"Wächterschild"},
-	{"title":"Spuk in den Ruinen", "npc":"Mira", "target":5, "count":9, "xp":230, "gold":250, "reward":"Geisterklinge"},
-	{"title":"Kristallfieber", "npc":"Mira", "target":6, "count":10, "xp":270, "gold":300, "reward":"Kristallherz"},
-	{"title":"Splitter im Mondlicht", "npc":"Mira", "target":7, "count":10, "xp":320, "gold":360, "reward":"Splitterkrone"},
-	{"title":"Asche vor den Toren", "npc":"Mira", "target":8, "count":11, "xp":380, "gold":420, "reward":"Aschenklinge"},
-	{"title":"Herz aus Glut", "npc":"Mira", "target":9, "count":11, "xp":550, "gold":600, "reward":"Glutbrecher"},
-	{"title":"Krabben am Strand", "npc":"Mira", "target":10, "count":8, "xp":110, "gold":140, "reward":"Muschelring"},
-	{"title":"Stimmen im Wasser", "npc":"Mira", "target":11, "count":8, "xp":180, "gold":220, "reward":"Gezeitenstein"},
-	{"title":"Der Kriegsherr", "npc":"Mira", "target":12, "count":1, "xp":600, "gold":750, "reward":"Kampfsiegel"},
-	{"title":"Der Arkanhüter", "npc":"Mira", "target":13, "count":1, "xp":800, "gold":950, "reward":"Arkankern"},
-	{"title":"Der Jagdmeister", "npc":"Mira", "target":14, "count":1, "xp":1100, "gold":1300, "reward":"Jagdzeichen"},
-	{"title":"Spuren im Nebel", "npc":"Mira", "target":17, "count":9, "xp":310, "gold":280, "reward":"Nebelamulett"},
-	{"title":"Lichter ohne Namen", "npc":"Mira", "target":18, "count":9, "xp":360, "gold":325, "reward":"Lichtsplitter"},
-	{"title":"Das goldene Harz", "npc":"Mira", "target":19, "count":10, "xp":610, "gold":490, "reward":"Harzpanzer"},
-	{"title":"Wurzeln der Plage", "npc":"Mira", "target":20, "count":10, "xp":680, "gold":540, "reward":"Wurzelring"},
-	{"title":"Die versunkene Quelle", "npc":"Mira", "target":21, "count":11, "xp":880, "gold":760, "reward":"Quellensiegel"},
-	{"title":"Perlen im Dunkel", "npc":"Mira", "target":22, "count":11, "xp":960, "gold":820, "reward":"Perlenring"},
-	{"title":"Ruf vom Dämmergrat", "npc":"Mira", "target":23, "count":12, "xp":1200, "gold":1080, "reward":"Greifenfeder"},
-	{"title":"Ritter der letzten Nacht", "npc":"Mira", "target":24, "count":12, "xp":1380, "gold":1180, "reward":"Dämmerrüstung"},
-	{"title":"Flügel über dem Garten", "npc":"Mira", "target":25, "count":13, "xp":1750, "gold":1500, "reward":"Himmelslicht"},
-	{"title":"Die letzte Wache", "npc":"Mira", "target":26, "count":13, "xp":2100, "gold":1750, "reward":"Sternenring"}
-]
-const BORIN_QUESTS := [
-	{"title":"Borins erste Prüfung","req":3,"target":0,"count":6,"skill_points":1,"item_rarity":1,"item_power":9},
-	{"title":"Borins Meisterprobe","req":20,"target":19,"count":8,"skill_points":2,"item_rarity":2,"item_power":30},
-	{"title":"Borins letzte Lehre","req":39,"target":25,"count":10,"skill_points":3,"item_rarity":3,"item_power":58}
-]
-const NPCS := [
-	{"name":"Mira", "role":"Älteste · alle Sonnenhain-Quests", "pos":Vector2(1312, 1394), "color":Color("a77ccb"), "kind":"quest"},
-	{"name":"Borin", "role":"Skillzauberer · Fähigkeiten", "pos":Vector2(1472, 498), "color":Color("6783bd"), "kind":"quest"},
-	{"name":"Liora", "role":"Forscherin · Wissen & Quest-Hinweise", "pos":Vector2(1312, 1394), "color":Color("6bbba4"), "kind":"quest"},
-	{"name":"Torvald", "role":"Schmied · Waffenmeister", "pos":Vector2(374, 577), "color":Color("ab6e60"), "kind":"smith"},
-	{"name":"Fenna", "role":"Stilistin · Character Editor", "pos":Vector2(384, 1074), "color":Color("c080aa"), "kind":"stylist"},
-	{"name":"Pip", "role":"Borins Lehrling", "pos":Vector2(1472, 498), "color":Color("9f8bcc"), "kind":"apprentice"},
-	{"name":"Elara", "role":"Heilerin · Tränke & Alchemie", "pos":Vector2(380, 1557), "color":Color("e2bc91"), "kind":"healer_alchemy"},
-	{"name":"Arven", "role":"Arenameister · Endlose Prüfung", "pos":Vector2(1209,2460), "color":Color("a48cbd"), "kind":"arena"}
-]
-const SHOPS := {
-	"smith": [{"name":"Frostklinge", "icon":"sword", "power":9, "price":320, "element":"eis"}, {"name":"Blitzsäbel", "icon":"sword", "power":17, "price":750, "element":"blitz"}, {"name":"Giftklinge", "icon":"sword", "power":25, "price":1300, "element":"gift"}],
-	"alchemy": [{"name":"Heiltrank", "icon":"potion", "power":0, "price":35}, {"name":"Großer Heiltrank", "icon":"potion", "power":0, "price":85}, {"name":"Energietrank", "icon":"potion", "power":0, "price":45}],
-	"merchant": [{"name":"Reisenderumhang", "icon":"armor", "power":4, "price":125}, {"name":"Wächterrüstung", "icon":"armor", "power":9, "price":520}, {"name":"Glücksring", "icon":"ring", "power":15, "price":240}]
-}
-const WAYSTONES := [Vector2(825, 915), Vector2(3300, 1900), Vector2(3200, 6200), Vector2(6700, 1950), Vector2(6700, 6250), Vector2(9750, 3900), Vector2(1000, 6100), Vector2(13500, 950), Vector2(13500, 2850), Vector2(13500, 4750), Vector2(13500, 6650), Vector2(13500, 8550)]
-const RESCUE_POS := Vector2(3150, 2350)
+const QUESTS := GameContent.QUESTS
+const BORIN_QUESTS := GameContent.BORIN_QUESTS
+const NPCS := GameContent.NPCS
+const SHOPS := GameContent.SHOPS
+const WAYSTONES := WorldGeometry.WAYSTONES
+const RESCUE_POS := GameContent.RESCUE_POS
 const RESCUE_GOAL := 20
 const ARENA_CENTER := Vector2(8000, 4800)
 const ARENA_RADIUS := 640.0
@@ -278,38 +170,9 @@ const VILLAGE_REF_ORIGIN := Vector2(0, 550)
 const VILLAGE_REF_RECT := Rect2(0, 550, 1672, 840)
 const VILLAGE_REF_SOLIDS := [Rect2(-40, 548, 1752, 112), Rect2(15, 805, 310, 140), Rect2(305, 1025, 310, 145), Rect2(1295, 1015, 365, 145), Rect2(12, 1012, 95, 95), Rect2(325, 825, 345, 30), Rect2(995, 825, 350, 30), Rect2(890, 870, 105, 45), Rect2(1625, 950, 50, 250)]
 const INTERIOR_CENTER := Vector2(8000, 4800)
-const WORLD_EVENTS := [
-	{"name":"Tessa", "role":"Botenläuferin", "pos":Vector2(2470, 1630), "region":1, "goal":3, "xp":90, "gold":40, "story":"Die Dornen folgen dem Rauch aus Blütenweiler. Halte den Weg frei!", "after":"Der Weg ist frei. Ich läute die Glocke im Dorf!"},
-	{"name":"Odo", "role":"Fährmann", "pos":Vector2(1050, 4530), "region":6, "goal":3, "xp":170, "gold":75, "story":"Etwas zieht die Netze in die Tiefe. Beschütze den Anleger!", "after":"Die Netze sind sicher. Im Westen sah ich ein Licht unter dem Wasser."},
-	{"name":"Rika", "role":"Pilzsammlerin", "pos":Vector2(4220, 1590), "region":1, "goal":4, "xp":230, "gold":95, "story":"Sporen kriechen aus dem Pilzwald. Hilf mir, die Lichtung zu halten!", "after":"Die Lichtung lebt wieder. Folge den violetten Sporen zum alten Turm."},
-	{"name":"Serin", "role":"Ruinenkundiger", "pos":Vector2(5950, 1760), "region":3, "goal":4, "xp":490, "gold":160, "story":"Ich fand Siegelzeichen des Turmwächters. Vertreibe seine Streuner!", "after":"Das Siegel stammt vom Kristallaltar. Dort beginnt die nächste Spur."}
-]
-const LANDMARKS := [
-	{"pos":RESCUE_POS, "name":"Blütenweiler", "kind":"hamlet"},
-	{"pos":Vector2(3550, 6500), "name":"Pilzlichtung", "kind":"mushroom"},
-	{"pos":Vector2(7150, 2200), "name":"Verfallener Turm", "kind":"tower"},
-	{"pos":Vector2(7200, 6500), "name":"Kristallaltar", "kind":"shrine"},
-	{"pos":Vector2(9700, 6500), "name":"Sternenbruchtor", "kind":"gate"},
-	{"pos":Vector2(750, 6100), "name":"Alter Hafen", "kind":"dock"},
-	{"pos":Vector2(14100, 1020), "name":"Schlafende Glocke", "kind":"shrine"},
-	{"pos":Vector2(14300, 2970), "name":"Harzkönigsbaum", "kind":"mushroom"},
-	{"pos":Vector2(14000, 4800), "name":"Versunkener Brunnen", "kind":"shrine"},
-	{"pos":Vector2(14500, 6790), "name":"Wachtfeuer am Grat", "kind":"tower"},
-	{"pos":Vector2(14400, 8710), "name":"Himmelskrone", "kind":"gate"}
-]
-const TRAILS := [
-	[Vector2(900, 960), Vector2(1160, 960), Vector2(1450, 950), Vector2(1650, 1010), Vector2(1780, 1120), Vector2(2250, 1280), Vector2(2600, 1740), Vector2(3150, 2350)],
-	[Vector2(3150, 2350), Vector2(3300, 1900), Vector2(3800, 1520), Vector2(4450, 1390), Vector2(5000, 1250), Vector2(5600, 1380), Vector2(6300, 1660), Vector2(6700, 1950), Vector2(7150, 2200), Vector2(7870, 1790), Vector2(8500, 1900), Vector2(9200, 1750), Vector2(9700, 1850)],
-	[Vector2(3150, 2350), Vector2(2990, 2950), Vector2(2720, 3550), Vector2(2900, 4200), Vector2(3150, 4780), Vector2(3000, 5350), Vector2(3200, 6200), Vector2(3550, 6500), Vector2(4210, 6040), Vector2(5000, 6200), Vector2(5600, 5840), Vector2(6700, 6250), Vector2(7200, 6500), Vector2(7900, 6110), Vector2(8500, 6350)],
-	[Vector2(900, 1300), Vector2(875, 2600), Vector2(1040, 3300), Vector2(820, 3950), Vector2(1080, 4770), Vector2(790, 5430), Vector2(750, 6100), Vector2(1170, 5980), Vector2(1780, 6200), Vector2(2350, 5920), Vector2(3200, 6200)],
-	[Vector2(7150, 2200), Vector2(7020, 2940), Vector2(6550, 3510), Vector2(6600, 4200), Vector2(6830, 5060), Vector2(6700, 6250)],
-	[Vector2(9700, 1850), Vector2(10100, 2650), Vector2(9750, 3900), Vector2(9340, 4650), Vector2(9500, 5600), Vector2(8500, 6350)],
-	[Vector2(11850,930),Vector2(12200,720),Vector2(12800,1050),Vector2(13500,950),Vector2(14000,1320),Vector2(15000,1010)],
-	[Vector2(11850,2810),Vector2(12300,3090),Vector2(13000,2720),Vector2(13500,2850),Vector2(14300,2970),Vector2(15100,2780)],
-	[Vector2(11850,4720),Vector2(12500,4450),Vector2(13000,5100),Vector2(13500,4750),Vector2(14000,4800),Vector2(15000,4940)],
-	[Vector2(11850,6630),Vector2(12500,6940),Vector2(13100,6320),Vector2(13500,6650),Vector2(14500,6790),Vector2(15100,6450)],
-	[Vector2(11850,8500),Vector2(12500,8270),Vector2(13200,8860),Vector2(13500,8550),Vector2(14400,8710),Vector2(15200,8460)]
-]
+const WORLD_EVENTS := GameContent.WORLD_EVENTS
+const LANDMARKS := GameContent.LANDMARKS
+const TRAILS := GameContent.TRAILS
 
 var player_pos := Vector2(825, 1020)
 var facing := Vector2.RIGHT
@@ -319,6 +182,7 @@ var camera_context := ""
 const CAMERA_ZOOM_LEVELS := [1.0,0.85,0.70]
 var camera_zoom_index := 0
 var camera_zoom := 1.0
+var drawing_ui:=false
 const STATIC_CHUNK_SIZE := 512
 const STATIC_CACHE_LIMIT := 32
 var static_chunks: Dictionary = {}
@@ -371,6 +235,12 @@ var rune_auto_shield_cooldown := 0.0
 const DEATH_DURATION := 1.15
 var equipped_ring_uid := -1
 var equipped_ring2_uid := -1
+var equipped_necklace_uid := -1
+var necklace_equip_serial:=0
+const ArcaneNecklaces=preload("res://components/arcane_necklaces.gd")
+var necklaces=ArcaneNecklaces.new()
+var necklace_heal_mult:=1.0
+
 var next_uid := 1
 var selected_item := -1
 var inventory_page := 0
@@ -408,6 +278,7 @@ var opened_chests: Array = [false, false, false, false, false, false, false, fal
 var chest_respawn_until: Array = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
 const CHEST_RESPAWN_SECONDS := 360.0
 var obstacle_cache: Dictionary = {}
+var decorative_tree_cache: Dictionary = {}
 var boss_cooldowns: Array = [0.0, 0.0, 0.0]
 var bosses_defeated: Array = [false, false, false]
 var final_completed := false
@@ -475,6 +346,7 @@ var pending_purchase := -1
 var pending_purchase_item: Dictionary = {}
 var merchant_kind := ""
 var menu_scroll := 0
+var patch_view: Dictionary = PatchNotes.new_view()
 var attack_anim := 0.0
 var warrior_jump_timer := 0.0
 var warrior_jump_duration := 0.56
@@ -492,6 +364,12 @@ var sprint_block_timer := 0.0
 var sprint_exhausted := false
 var step_timer := 0.0
 var music_player: AudioStreamPlayer
+var sound_bank=SoundBank.new()
+var ui_volume := 0.8
+var rustle_timer := 0.0
+var travel_from := 0
+var last_sound_panel := ""
+var mushroom_sound_seen:Dictionary={}
 var music_incoming: AudioStreamPlayer
 var music_theme := ""
 var music_fading := false
@@ -838,11 +716,16 @@ func _ready() -> void:
 	sound_streams["magic_break"]=CombatFeedback.break_sound(false)
 	sound_streams["equip"]=EquipmentSfx.make(true)
 	sound_streams["unequip"]=EquipmentSfx.make(false)
+	sound_streams["mushroom_poison"]=load("res://audio/sfx/mushroom_spores_clean.wav")
 	for i in 8:
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -15.0
 		add_child(player)
 		sound_players.append(player)
+	if not dedicated_server_mode:
+		sound_bank.setup(self)
+		music_player.bus = SoundBank.BUS_MUSIC
+		music_incoming.bus = SoundBank.BUS_MUSIC
 	update_music()
 	if multiplayer_smoke_client_mode:
 		enemies.clear()
@@ -930,7 +813,7 @@ func _on_peer_connected(id: int) -> void:
 	if network_mode == "host":
 		push_world_snapshot()
 		if not dedicated_server_mode:
-			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id,"mage_rift_blink":mage_rift_blink_unlocked(),"ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
+			var host_state := {"pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id,"mage_rift_blink":mage_rift_blink_unlocked(),"ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "gender":hero_gender, "name":hero_name, "level":level, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(),"head":head_visual(),"necklace":necklace_visual(),"necklace_serial":necklace_equip_serial,"normal_power":normal_attack_power(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos)}
 			rpc_receive_player_state.rpc_id(id, 1, host_state)
 		for peer_id in remote_players.keys():
 			if int(peer_id) != id:
@@ -973,51 +856,22 @@ func _on_server_disconnected() -> void:
 		live_reconnect_timer = 2.0
 
 func to_base36(value: int) -> String:
-	var chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	var n := maxi(0, value)
-	if n == 0: return "0"
-	var out := ""
-	while n > 0:
-		out = chars.substr(n % 36, 1) + out
-		n = int(n / 36)
-	return out
+	return NetworkCodec.to_base36(value)
 
 func from_base36(value: String) -> int:
-	var chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	var out := 0
-	for i in value.length():
-		var ch := value.to_upper().substr(i, 1)
-		var idx := chars.find(ch)
-		if idx < 0: return -1
-		out = out * 36 + idx
-	return out
+	return NetworkCodec.from_base36(value)
 
 func ipv4_to_int(address: String) -> int:
-	var parts := address.split(".")
-	if parts.size() != 4: return -1
-	var result := 0
-	for part in parts:
-		var octet := int(part)
-		if octet < 0 or octet > 255: return -1
-		result = (result << 8) | octet
-	return result
+	return NetworkCodec.ipv4_to_int(address)
 
 func int_to_ipv4(value: int) -> String:
-	return "%d.%d.%d.%d" % [(value >> 24) & 255, (value >> 16) & 255, (value >> 8) & 255, value & 255]
+	return NetworkCodec.int_to_ipv4(value)
 
 func make_invite_code(address: String, port: int) -> String:
-	var packed := ipv4_to_int(address)
-	if packed < 0: return ""
-	return "SH-%s-%s" % [to_base36(packed), to_base36(port)]
+	return NetworkCodec.make_invite_code(address, port)
 
 func decode_invite_code(code: String) -> Dictionary:
-	var cleaned := code.strip_edges().to_upper()
-	var parts := cleaned.split("-")
-	if parts.size() != 3 or parts[0] != "SH": return {}
-	var packed := from_base36(parts[1])
-	var port := from_base36(parts[2])
-	if packed < 0 or port <= 0 or port > 65535: return {}
-	return {"address":int_to_ipv4(packed), "port":port}
+	return NetworkCodec.decode_invite_code(code)
 
 func preferred_host_address() -> String:
 	# UPnP liefert bei unterstützten Routern direkt die öffentliche IPv4-Adresse und richtet UDP-Portweiterleitung ein.
@@ -1114,7 +968,7 @@ func save_and_return_to_start() -> bool:
 		save_game()
 		pause_status = "Andere Spieler sind noch verbunden. Als Host kannst du erst ins Hauptmenü, wenn sie die Sitzung verlassen haben."
 		message(pause_status)
-		play_sound("menu")
+		play_sound("ui_klick")
 		return false
 	save_game()
 	refresh_save_slot_labels()
@@ -1124,7 +978,7 @@ func save_and_return_to_start() -> bool:
 		disconnect_multiplayer(false)
 	panel = "start"
 	selected_save_slot = active_save_slot
-	play_sound("menu")
+	play_sound("ui_klick")
 	return true
 
 func server_action_allowed(peer_id: int, action_key: String, cooldown_ms: int) -> bool:
@@ -1157,15 +1011,17 @@ func rpc_server_combat_reward(tx_id: String, enemy_type: int, xp_reward: int, go
 		gain_xp(xp_reward)
 	if gold_reward > 0:
 		gold += gold_reward
+	var best_rarity := -1
 	for raw_item in item_rewards:
 		if not raw_item is Dictionary: continue
 		var item: Dictionary = sanitize_network_reward_item(raw_item)
+		best_rarity = maxi(best_rarity, int(item.get("rarity",0)))
 		if not add_item(item):
 			var compensation := maxi(1, item_sale_value(item))
 			gold += compensation
 			message("Inventar voll · Beute automatisch für %d Gold verkauft." % compensation)
 	if xp_reward > 0 or gold_reward > 0 or not item_rewards.is_empty():
-		play_sound("pickup")
+		play_sound(SoundBank.loot_sound_for(best_rarity) if best_rarity >= 0 else "beute_muenzen")
 		message("+%d XP · +%d Gold%s" % [xp_reward, gold_reward, " · Beute erhalten" if not item_rewards.is_empty() else ""])
 		save_game()
 	ack_server_transaction(tx_id)
@@ -1270,6 +1126,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"running":bool(state.get("running",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
+		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,5), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
@@ -1281,6 +1138,8 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 	clean["death_progress"]=clampf(float(state.get("death_progress",0)),0,1) if float(clean["hp"])<=0 else -1.0
 	clean["konflux"] = in_konflux
 	clean["room"] = room_id
+	if int(clean.get("necklace_serial",0))!=int(remote_players.get(sender,{}).get("necklace_serial",-1)) or int(clean.get("necklace",-1))!=int(remote_players.get(sender,{}).get("necklace",-1)):
+		necklaces.reset_charges(sender,int(clean.get("necklace",-1)),Time.get_ticks_msec())
 	remote_players[sender] = clean
 	if context_changed:
 		send_server_session_status(sender)
@@ -1315,7 +1174,7 @@ func push_world_snapshot() -> void:
 		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0),"boss_spawn_timer":enemy.get("boss_spawn_timer",0.0)})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
-		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0)})
+		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0),"kind":shot.get("kind","projectile"),"ability_id":shot.get("ability_id","basic"),"radius":shot.get("radius",0.0),"age":shot.get("age",0.0),"duration":shot.get("duration",0.0)})
 	var drop_rows:Array=[]
 	for drop in drops:
 		if not drop.has("drop_uid") or not drop.has("item"):continue
@@ -1354,6 +1213,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 		if previous_by_uid.has(uid):
 			var old: Dictionary = previous_by_uid[uid]
 			copy["pos"] = old.get("pos",target)
+			copy["gait_phase"]=old.get("gait_phase",fposmod(float(copy.get("seed",0.0))*.73,TAU))
 			copy["flash"]=maxf(float(copy.get("flash",0)),float(old.get("flash",0)))
 			if float(copy.get("hp",1))<float(old.get("hp",1)):copy["flash"]=.18
 			if int(copy.get("type",-1)) in [12,13,14]:
@@ -1369,8 +1229,15 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 			copy["pos"] = target
 			if int(copy.get("type",-1)) in [12,13,14] and float(copy.get("boss_spawn_timer",0.0))>0.0 and not boss_spawn_sound_seen.has(uid):
 				boss_spawn_sound_seen[uid]=true
-				play_sound("menu")
+				play_sound("boss_erscheint")
 		rebuilt.append(copy)
+		if int(copy.get("type",-1))==2:
+			var dust_state:Dictionary=copy.get("attack_state",{})
+			var dust_ability:Dictionary=dust_state.get("ability",{})
+			var dust_id:=int(dust_state.get("id",-1))
+			if str(dust_ability.get("id",""))=="giftstaub" and bool(dust_state.get("fired",false)) and int(mushroom_sound_seen.get(uid,-1))!=dust_id:
+				mushroom_sound_seen[uid]=dust_id
+				if float(dust_state.get("age",10.0))<float(mob_profile(copy)["windup"])+.4:play_mushroom_poison(target)
 	enemies = rebuilt
 	var rebuilt_shots: Array = []
 	for raw in snapshot.get("shots", []):
@@ -1434,7 +1301,7 @@ func rpc_world_drop_granted(drop_uid:int,raw_item:Dictionary) -> void:
 	if not add_item(item):
 		message("Inventar voll · der Fund konnte nicht aufgenommen werden.")
 		return
-	play_sound("pickup")
+	play_sound(SoundBank.loot_sound_for(int(item.get("rarity",0))))
 	message("Aufgehoben: %s · %s" % [item["name"],RARITY_NAMES[int(item["rarity"])]])
 	world_drop_request_times.erase(drop_uid)
 	save_game()
@@ -1470,6 +1337,7 @@ func start_coop_world() -> void:
 		previous_region = region_at(player_pos)
 		panel = ""
 		if network_mode == "host": push_world_snapshot()
+		play_sound("spieler_wiederbeleben")
 		message("Koop-Welt gestartet. Willkommen, %s!" % hero_name)
 	else:
 		begin_character_creation()
@@ -1532,6 +1400,9 @@ func _exit_tree() -> void:
 		player.stream = null
 
 func play_sound(name: String) -> void:
+	if sound_bank.has(name):
+		sound_bank.play(name, ui_volume if SoundBank.is_ui(name) else effects_volume)
+		return
 	if sound_players.is_empty() or not sound_streams.has(name): return
 	var player: AudioStreamPlayer = sound_players[next_sound_player]
 	next_sound_player = (next_sound_player + 1) % sound_players.size()
@@ -1540,6 +1411,65 @@ func play_sound(name: String) -> void:
 	player.volume_db = -80.0 if effects_volume <= 0.0 else ((-29.0 if name == "step" else -11.0) + linear_to_db(effects_volume))
 	player.pitch_scale = 0.92 if name == "step" and next_sound_player % 2 == 0 else 1.0
 	player.play()
+
+## Weltgeräusch am Ort pos: leiser mit Entfernung zur eigenen Figur.
+func play_world_sound(name: String, pos: Vector2) -> void:
+	if dedicated_server_mode: return
+	sound_bank.play(name, effects_volume, pos.distance_to(player_pos))
+
+## Fenster auf/zu: spielt, wenn ein Spielfenster aus der Welt heraus geöffnet
+## oder zurück in die Welt geschlossen wird. Start-, Konto- und Szenenbilder zählen nicht.
+const SILENT_PANELS := ["death","intro","start","creation","creation_review","arena_reward","victory"]
+func sound_panel_kind(value: String) -> String:
+	if value == "": return "world"
+	if value in SILENT_PANELS or value.begins_with("account"): return "scene"
+	return "window"
+
+func update_panel_sounds() -> void:
+	if panel == last_sound_panel: return
+	var before := sound_panel_kind(last_sound_panel)
+	var after := sound_panel_kind(panel)
+	last_sound_panel = panel
+	if before == "world" and after == "window": play_sound("ui_fenster_auf")
+	elif before == "window" and after == "world": play_sound("ui_fenster_zu")
+
+## Steht die Figur in einem begehbaren Busch oder Strauch?
+const FOLIAGE_ZONES := [1, 2, 8, 9]
+func foliage_at(pos: Vector2) -> bool:
+	if interior_id >= 0 or dungeon_id >= 0 or arena_mode != "": return false
+	for bush in VillageLayout.BUSHES:
+		if pos.distance_to(bush) < 30.0: return true
+	for plant in food_system.plants:
+		if str(plant.get("kind","")) == "fruit" and not bool(plant.get("tree",false)) and pos.distance_to(plant["point"]) < 28.0: return true
+	var cx := int(pos.x / 250.0)
+	var cy := int(pos.y / 250.0)
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var obstacle := obstacle_in_cell(cx + dx, cy + dy)
+			if obstacle.is_empty() or int(obstacle["zone"]) not in FOLIAGE_ZONES: continue
+			var radius := float(obstacle["radius"])
+			var distance := pos.distance_to(obstacle["pos"])
+			if distance < radius * 0.95 and distance > obstacle_collision_radius(obstacle): return true
+	return false
+
+## Herzschlag läuft, solange die eigene Figur lebt und unter 25 % Leben hat.
+func low_health_alarm_active() -> bool:
+	return character_created and not creative_mode and death_timer <= 0.0 and hp > 0.0 and hp < max_hp() * 0.25
+
+func normal_attack_sound() -> String:
+	var variant := equipped_weapon_variant()
+	if variant == "crossbow" or (class_id == 2 and variant != "axe"): return "bogen_schuss"
+	if class_id == 1 and variant != "axe": return "stab_schwung"
+	return "schwert_schwung"
+
+func update_mob_voices() -> void:
+	if dedicated_server_mode or not character_created: return
+	for voice in sound_bank.observe_mobs(enemies, player_pos, uses_server_world()):
+		play_world_sound(str(voice[0]), voice[1])
+
+func play_mushroom_poison(position:Vector2)->void:
+	if dedicated_server_mode or position.distance_to(player_pos)>620.0:return
+	play_sound("mushroom_poison")
 
 func desired_music_theme() -> String:
 	if konflux.active:return "dorf"
@@ -1667,7 +1597,7 @@ func equipment_power(uid: int) -> int:
 	return 0
 
 func equipped_item_uids() -> Array:
-	var ids := [equipped_uid,equipped_armor_uid,equipped_head_uid,equipped_ring_uid]
+	var ids := [equipped_uid,equipped_armor_uid,equipped_head_uid,equipped_ring_uid,equipped_necklace_uid]
 	if class_id == 1 and equipped_ring2_uid >= 0 and equipped_ring2_uid != equipped_ring_uid: ids.append(equipped_ring2_uid)
 	return ids
 
@@ -1685,14 +1615,7 @@ func xp_required() -> int:
 	return 120 + (level - 1) * 85 + (level - 1) * (level - 1) * 10
 
 func region_at(p: Vector2) -> int:
-	if p.x >= 11000: return clampi(int(p.y / 1920.0) + 8, 8, 12)
-	if p.x < 1780:
-		return 0 if p.y < 2600 else 6
-	if p.x < 5000:
-		return 1 if p.y < 4200 else 2
-	if p.x < 8500:
-		return 3 if p.y < 4200 else 4
-	return 5 if p.y < 4200 else 7
+	return WorldGeometry.region_at(p)
 
 func region_name(region: int) -> String:
 	if region >= 8: return NEW_REGION_NAMES[region - 8]
@@ -1732,12 +1655,17 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 
 func _process(delta: float) -> void:
 	combat_feedback.step(delta)
+	if not dedicated_server_mode:
+		sound_bank.tick(delta)
+		update_mob_voices()
+		sound_bank.set_loop("spieler_warnung", low_health_alarm_active(), effects_volume)
+		update_panel_sounds()
 	boss_music_hold_timer=maxf(0.0,boss_music_hold_timer-delta)
 	if boss_music_hold_timer<=0.0:boss_music_hold_theme=""
 	for boss_fx_index in range(boss_death_end_queue.size()-1,-1,-1):
 		boss_death_end_queue[boss_fx_index]["remaining"]=float(boss_death_end_queue[boss_fx_index].get("remaining",0.0))-delta
 		if float(boss_death_end_queue[boss_fx_index]["remaining"])<=0.0:
-			play_sound("level")
+			play_sound("quest_abgeschlossen")
 			boss_death_end_queue.remove_at(boss_fx_index)
 	if character_created and Vector2(hp,max_hp())!=last_vitals:push_vital_state()
 	if not dedicated_server_mode: food_system.tick(self,delta)
@@ -1820,6 +1748,7 @@ func _process(delta: float) -> void:
 	attack_anim = maxf(0.0, attack_anim - delta)
 	warrior_jump_timer = maxf(0.0, warrior_jump_timer - delta)
 	step_timer = maxf(0.0, step_timer - delta)
+	rustle_timer = maxf(0.0, rustle_timer - delta)
 	for i in cooldowns.size():
 		cooldowns[i] = maxf(0.0, float(cooldowns[i]) - delta * food_system.cooldown_recovery_mult())
 	for i in boss_cooldowns.size():
@@ -2033,7 +1962,18 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 			result.append({"id":0,"pos":player_pos,"hp":hp,"max_hp":maxf(1.0,hp),"detection_mult":1.0-.08*essence.rank(3,3)})
 	return result
 
+func mob_walkable(point:Vector2,origin:Vector2,enemy:Dictionary,server:bool)->bool:
+	if terrain_blocked(point,mob_hit_radius(enemy)) or blocked_by_region_wall(point) or region_at(point)!=region_at(origin):return false
+	if server or (arena_mode=="" and dungeon_id<0):
+		if waystone_safe_at(point):return false
+	if not server and arena_mode!="":return point.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
+	if not server and dungeon_id>=0:return not dungeon_blocked(point)
+	if int(enemy["type"]) in [12,13,14]:
+		return point.distance_to(CLASS_BOSS_SITES[int(enemy["type"])-12])<CLASS_BOSS_ARENA_RADIUS-38.0
+	return true
+
 func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
+	necklaces.tick_enemy(enemy,delta,Callable(self,"necklace_visual"))
 	if int(enemy.get("type",-1)) in [12,13,14] and float(enemy.get("boss_spawn_timer",0.0))>0.0:
 		enemy["boss_spawn_timer"]=maxf(0.0,float(enemy["boss_spawn_timer"])-delta)
 		enemy["walking"]=false
@@ -2064,7 +2004,21 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		MobCombat.cancel(enemy);return false
 	var profile:=mob_profile(enemy)
 	var targets:=mob_targets(enemy,server)
+	# Check attack sight only for nearby candidates; cache until either endpoint moves.
+	var sight:Dictionary=enemy.get("attack_sight",{})
+	enemy["sight_wait"]=maxf(0.0,float(enemy.get("sight_wait",0.0))-delta)
+	for candidate in targets:
+		if Vector2(enemy["pos"]).distance_to(candidate["pos"])>400.0:continue
+		var id:int=candidate["id"]
+		var cached:Dictionary=sight.get(id,{})
+		if cached.is_empty() or float(enemy["sight_wait"])<=0.0 or Vector2(cached["from"]).distance_to(enemy["pos"])>16.0 or Vector2(cached["to"]).distance_to(candidate["pos"])>16.0:
+			cached={"from":enemy["pos"],"to":candidate["pos"],"clear":not projectile_collision(enemy["pos"],candidate["pos"],server)["hit"]}
+			sight[id]=cached
+		candidate["attack_clear"]=cached["clear"]
+	if float(enemy["sight_wait"])<=0.0:enemy["sight_wait"]=.25
+	enemy["attack_sight"]=sight
 	var previous_attack_state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
+	var gait_origin:Vector2=enemy["pos"]
 	var action:=MobCombat.step(enemy,profile,targets,delta)
 	if not server and int(enemy.get("type",-1)) in [12,13,14]:
 		var current_attack:Dictionary=enemy.get("attack_state",{})
@@ -2076,7 +2030,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 	var moved:=false
 	var movement:Vector2=action["move"]
 	if movement.length_squared()>.001:
-		var speed:float=float(profile["movement_speed"])*(.45 if float(enemy.get("slow",0))>0 else 1.0)
+		var speed:float=float(profile["movement_speed"])*(.45 if float(enemy.get("slow",0))>0 else (float(enemy.get("necklace_frost_mult",1.0)) if float(enemy.get("necklace_frost",0))>0 else 1.0))
 		var origin:Vector2=enemy["pos"]
 		var separation:=Vector2.ZERO
 		for other in enemies:
@@ -2084,34 +2038,26 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			var away:Vector2=origin-Vector2(other["pos"])
 			var spacing:float=mob_hit_radius(enemy)+mob_hit_radius(other)+8
 			if away.length_squared()>.01 and away.length()<spacing:separation+=away.normalized()*(spacing-away.length())/spacing
-		if separation.length_squared()>.01:movement=(movement+separation.normalized()*.6).normalized()
-		for angle in [0.0,.52,-.52,.92,-.92,1.35,-1.35,PI]:
-			var next:Vector2=origin+movement.rotated(angle)*speed*delta
-			var valid:bool=not terrain_blocked(next,mob_hit_radius(enemy)) and not blocked_by_region_wall(next) and region_at(next)==region_at(origin)
-			if server or (arena_mode=="" and dungeon_id<0): valid = valid and not waystone_safe_at(next)
-			if not server and arena_mode!="":valid=next.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
-			elif not server and dungeon_id>=0:valid=not dungeon_blocked(next)
-			if valid:
-				enemy["pos"]=next
-				enemy["walking"]=true
-				moved=true;break
-	else:enemy["walking"]=false
-	if movement.length_squared()>.001 and not moved:
-		enemy["stuck_time"]=float(enemy.get("stuck_time",0.0))+delta
-		if float(enemy["stuck_time"])>=0.35:
-			var origin_retry:Vector2=enemy["pos"]
-			var seed_angle:=float(enemy.get("seed",0.0))+float(Time.get_ticks_msec()%997)*0.001
-			for step in 12:
-				var dir:=Vector2.RIGHT.rotated(seed_angle+float(step)*TAU/12.0)
-				var candidate:=origin_retry+dir*float(profile["movement_speed"])*delta*1.35
-				var ok:=not terrain_blocked(candidate,mob_hit_radius(enemy)) and not blocked_by_region_wall(candidate) and region_at(candidate)==region_at(origin_retry)
-				if ok and (server or not waystone_safe_at(candidate)):
-					enemy["pos"]=candidate
-					enemy["walking"]=true
-					moved=true
-					break
-			enemy["stuck_time"]=0.0
+		var walkable:=func(point:Vector2)->bool:return mob_walkable(point,origin,enemy,server)
+		var destination:Vector2=enemy.get("pursuit_target",origin+movement*240.0) if not bool(enemy.get("returning",false)) else enemy["home"]
+		var routed:=MobNavigation.direction(enemy,destination,delta,walkable)
+		if routed.length_squared()>.001:
+			# Separation only influences a route when the resulting segment remains clear.
+			var direction:=routed
+			if separation.length_squared()>.01:
+				var spaced:Vector2=(routed+separation.normalized()*.3).normalized()
+				if MobNavigation.clear_segment(origin,origin+spaced*maxf(32.0,speed*delta),walkable):direction=spaced
+			var path:Array=enemy.get("nav_path",[])
+			var distance:=speed*delta
+			if not path.is_empty():distance=minf(distance,origin.distance_to(path[0]))
+			var next:=origin+direction*distance
+			if MobNavigation.clear_segment(origin,next,walkable):
+				enemy["pos"]=next;moved=distance>.001
+			else:enemy["nav_wait"]=0.0
+		enemy["walking"]=moved
+		enemy["stuck_time"]=0.0 if moved else float(enemy.get("stuck_time",0.0))+delta
 	else:
+		enemy["walking"]=false
 		enemy["stuck_time"]=0.0
 	# Klassenbosse dürfen sich weder aus ihrer Kampflichtung ziehen lassen noch
 	# dauerhaft an prozeduralen Kanten festfahren.
@@ -2134,8 +2080,33 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			MobCombat.cancel(enemy,.35)
 	for event in action["events"]:
 		if event["kind"]=="projectile":
-			enemy_projectiles.append({"pos":enemy["pos"],"dir":event["dir"],"speed":profile["projectile_speed"],"life":2.3,"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"hit_radius":profile["hit_radius"],"source_region":region_at(enemy["pos"])})
+			var spawn:Vector2=enemy["pos"]+Vector2(event["dir"])*float(event.get("origin_offset",0.0))+(Vector2(0,-8) if str(event.get("ability_id",""))=="druesensekret" else Vector2.ZERO)
+			if is_zero_approx(float(event.get("origin_offset",0.0))) or not projectile_collision(enemy["pos"],spawn,server)["hit"]:
+				enemy_projectiles.append({"pos":spawn,"dir":event["dir"],"speed":profile["projectile_speed"],"life":event.get("life",2.3),"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"hit_radius":profile["hit_radius"],"source_region":region_at(enemy["pos"]),"ability_id":event.get("ability_id","basic")})
+		elif event["kind"]=="cloud":
+			play_mushroom_poison(enemy["pos"])
+			enemy_projectiles.append({"kind":"cloud","ability_id":"giftstaub","pos":enemy["pos"],"dir":Vector2.ZERO,"speed":0.0,"life":event["duration"],"duration":event["duration"],"age":0.0,"next_pulse":0.0,"pulse_interval":event["pulse_interval"],"radius":event["radius"],"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"source_region":region_at(enemy["pos"])})
+		elif event["kind"]=="leap_move":
+			enemy["nav_wait"]=0.0;enemy["nav_path"]=[]
+			var distance:float=event["distance"]
+			var steps:=maxi(1,ceili(distance/8.0))
+			for part in steps:
+				var next:Vector2=enemy["pos"]+Vector2(event["dir"])*distance/steps
+				if terrain_blocked(next,mob_hit_radius(enemy)) or blocked_by_region_wall(next) or region_at(next)!=region_at(enemy["pos"]) or waystone_safe_at(next) or (not server and dungeon_id>=0 and dungeon_blocked(next)) or (not server and arena_mode!="" and next.distance_to(ARENA_CENTER)>=ARENA_RADIUS-16):
+					if not enemy.get("attack_state",{}).is_empty():enemy["attack_state"]["leap_blocked"]=true
+					break
+				enemy["pos"]=next
+				enemy["walking"]=true
+				moved=true
+		elif event["kind"]=="leap_land":
+			var bite:Dictionary=event["ability"].duplicate()
+			bite["range"]=bite["landing_range"]
+			for victim in targets:
+				if MobCombat.hits(enemy["pos"],event["dir"],victim["pos"],bite,float(profile["hit_radius"])) and not projectile_collision(enemy["pos"],victim["pos"],server)["hit"]:
+					if server:rpc_server_damage.rpc_id(int(victim["id"]),int(event["damage"]))
+					elif invulnerable<=0:apply_player_damage(int(event["damage"]))
 		elif event["kind"]=="boss_move":
+			enemy["nav_wait"]=0.0;enemy["nav_path"]=[]
 			var move_dir:Vector2=Vector2(event.get("dir",Vector2.ZERO)).normalized()
 			var desired:Vector2=Vector2(enemy["pos"])+move_dir*float(event.get("distance",0.0))
 			if (int(enemy["type"]) not in [12,13,14] or class_boss_arena_walkable(desired,mob_hit_radius(enemy))) and region_at(desired)==region_at(enemy["pos"]) and not terrain_blocked(desired,mob_hit_radius(enemy)) and not blocked_by_region_wall(desired) and not waystone_safe_at(desired):
@@ -2145,6 +2116,12 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			rpc_server_damage.rpc_id(int(event["target"]),int(event["damage"]))
 		elif invulnerable<=0:
 			apply_player_damage(int(event["damage"]))
+	if int(enemy["type"]) in [0,1,2,3]:
+		enemy["walking"]=moved
+		if moved and str(previous_attack_state.get("ability",{}).get("shape",""))!="leap":
+			var previous_phase:=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU)))
+			var distance:=Vector2(enemy["pos"]).distance_to(gait_origin)
+			enemy["gait_phase"]=WolfAnimation.advance_gait(previous_phase,distance) if int(enemy["type"])==3 else WoodlandPoseAnimation.advance_gait(int(enemy["type"]),previous_phase,distance)
 	return moved
 
 func update_dedicated_enemies(delta:float)->void:
@@ -2197,6 +2174,15 @@ func advance_mob_shots(delta:float,server:bool)->void:
 				if str(state.get("context","world"))=="world" and not bool(state.get("konflux",false)) and not konflux.fighter_stats.has(peer) and float(state.get("hp",1))>0 and region_at(pos)==int(shot.get("source_region",region_at(previous))) and region_at(pos)!=0 and not waystone_safe_at(pos):
 					candidates.append({"id":int(peer),"pos":pos})
 		elif hp>0 and death_timer<=0 and not waystone_safe_at(player_pos):candidates.append({"id":0,"pos":player_pos})
+		if str(shot.get("kind",""))=="cloud":
+			var pulses:=MobCombat.cloud_pulses(shot,delta)
+			if pulses==0:continue
+			for candidate in candidates:
+				if Vector2(candidate["pos"]).distance_to(shot["pos"])>float(shot["radius"])+10.0 or projectile_collision(shot["pos"],candidate["pos"],server)["hit"]:continue
+				for pulse in pulses:
+					if server:rpc_server_damage.rpc_id(int(candidate["id"]),int(shot["damage"]))
+					elif invulnerable<=0:apply_player_damage(int(shot["damage"]))
+			continue
 		var nearest:Dictionary={}
 		var distance:float=INF
 		for candidate in candidates:
@@ -2207,7 +2193,9 @@ func advance_mob_shots(delta:float,server:bool)->void:
 			var damage:int=int(shot["damage"])
 			enemy_projectiles.remove_at(i)
 			if server:rpc_server_damage.rpc_id(int(nearest["id"]),damage)
-			elif invulnerable<=0:apply_player_damage(damage)
+			elif invulnerable<=0:
+				if int(shot.get("type",-1))==1:play_sound("kaefer_sekret")
+				apply_player_damage(damage)
 			if not server and panel=="arena_reward":return
 
 func update_dedicated_enemy_projectiles(delta:float)->void:
@@ -2323,6 +2311,9 @@ func update_player(delta: float) -> void:
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
 		play_sound("step")
+		if foliage_at(player_pos) and rustle_timer <= 0.0:
+			rustle_timer = 0.45
+			play_sound("busch_rascheln")
 		step_timer = (lerpf(0.43,0.29,sprint_blend) if dash_timer<=0 else 0.25)
 	if controller.used:
 		var stick_aim: Vector2 = controller.stick(true)
@@ -2406,9 +2397,7 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 		if Rect2(stone+Vector2(-58,-82),Vector2(116,142)).grow(12).has_point(pos): return true
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
-	for shop in VillageLayout.SHOPS:
-		if shop["kind"]!="smith":continue
-		if Rect2(shop["cart"]+Vector2(-45,-24),Vector2(110,49)).grow(10).has_point(pos): return true
+	if preload("res://components/village_forecourts.gd").blocked(pos,hero_collision_radius()):return true
 	for tree in REFERENCE_TREES:
 		if pos.distance_to(tree) < 18.0: return true
 	if pos.distance_to(BORIN_MAGIC_TREE_POS) < 42.0:return true
@@ -2426,6 +2415,7 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 				break
 		var house_kind:=str(house_info.get("kind","home"))
 		if VillageBuildings.solid(house,house_kind).grow(hero_collision_radius()).has_point(pos):return true
+	if VillageElevation.blocked(pos,from_pos,hero_collision_radius()):return true
 	for solid in (VILLAGE_REF_SOLIDS if USE_VILLAGE_REFERENCE_BACKGROUND else []):
 		if solid.has_point(pos):
 			return true
@@ -2457,20 +2447,10 @@ func blocked_by_region_wall(pos: Vector2) -> bool:
 	return false
 
 func distance_to_trail(p: Vector2) -> float:
-	var best := INF
-	for trail in TRAILS:
-		for i in range(trail.size() - 1):
-			var a: Vector2 = trail[i]
-			var b: Vector2 = trail[i + 1]
-			var segment := b - a
-			var t := clampf((p - a).dot(segment) / segment.length_squared(), 0.0, 1.0)
-			best = minf(best, p.distance_to(a + segment * t))
-	return best
+	return WorldGeometry.distance_to_trail(p)
 
 func class_boss_arena_index_at(p:Vector2,extra:float=0.0) -> int:
-	for i in CLASS_BOSS_SITES.size():
-		if p.distance_to(CLASS_BOSS_SITES[i]) <= CLASS_BOSS_ARENA_RADIUS+extra:return i
-	return -1
+	return WorldGeometry.class_boss_arena_index_at(p,extra)
 
 func class_boss_arena_walkable(p:Vector2,radius:float=0.0) -> bool:
 	var index:=class_boss_arena_index_at(p,0.0)
@@ -2493,13 +2473,10 @@ func class_boss_recovery_point(enemy:Dictionary) -> Vector2:
 	return center
 
 func class_boss_house_rect(index:int)->Rect2:
-	var center:Vector2=CLASS_BOSS_HOUSE_POS[clampi(index,0,2)]
-	return Rect2(center-Vector2(CLASS_BOSS_HOUSE_SIZE.x*.5,CLASS_BOSS_HOUSE_SIZE.y),CLASS_BOSS_HOUSE_SIZE)
+	return WorldGeometry.class_boss_house_rect(index)
 
 func point_near_class_boss_house(p:Vector2,margin:float=0.0)->bool:
-	for i in CLASS_BOSS_HOUSE_POS.size():
-		if class_boss_house_rect(i).grow(margin).has_point(p):return true
-	return false
+	return WorldGeometry.point_near_class_boss_house(p,margin)
 
 func boss_spell_sound(ability_id:String)->String:
 	match ability_id:
@@ -2569,6 +2546,14 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	return {"pos":p, "radius":radius, "zone":zone, "key":key}
 
 func decorative_tree_in_cell(tx:int,ty:int) -> Dictionary:
+	var cell:=Vector2i(tx,ty)
+	if decorative_tree_cache.has(cell):return decorative_tree_cache[cell]
+	if decorative_tree_cache.size()>=8192:decorative_tree_cache.clear()
+	var tree:=make_decorative_tree(tx,ty)
+	decorative_tree_cache[cell]=tree
+	return tree
+
+func make_decorative_tree(tx:int,ty:int) -> Dictionary:
 	var key := hash_cell(tx,ty)
 	var tile_origin := Vector2(tx*64,ty*64)
 	var center := tile_origin+Vector2(32,32)
@@ -2884,7 +2869,7 @@ func handle_touch_event(event: InputEvent) -> bool:
 
 		if party_widget_rect().has_point(pos) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 			panel = "party"
-			play_sound("menu")
+			play_sound("ui_klick")
 			queue_redraw()
 			return true
 
@@ -3033,7 +3018,7 @@ func handle_account_key(event:InputEventKey)->void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		var hud_hovered:=panel=="" and (hud_action_at(event.position)!="" or QUEST_HUD_RECT.has_point(event.position))
+		var hud_hovered:=panel=="" and (hud_action_at(event.position)!="" or quest_hud_rect().has_point(event.position))
 		Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if hud_hovered else Input.CURSOR_ARROW)
 	if server_save.loading: return
 	if world_builder.active and world_builder.input(self,event):return
@@ -3177,12 +3162,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				toggle_panel(hud_action)
 			return
-		if QUEST_HUD_RECT.has_point(event.position):
+		if quest_hud_rect().has_point(event.position):
 			quest_guide.open(self,quest_guide.current_id(self),"")
 			return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and party_widget_rect().has_point(event.position) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 		panel = "party"
-		play_sound("menu")
+		play_sound("ui_klick")
 		queue_redraw()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and (event.position.distance_to(Vector2(1035,116)) <= 90.0 or (touch_enabled and Rect2(984,16,145,105).has_point(event.position))):
@@ -3190,7 +3175,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		menu_scroll = 0
 		return
 	if event is InputEventMouseButton and panel != "":
+		get_viewport().set_input_as_handled()
+		if not event.pressed:return
 		if event.button_index == MOUSE_BUTTON_LEFT: handle_panel_click(event.position)
+		elif panel=="patches" and event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN]:
+			PatchNotes.scroll(patch_view,-1 if event.button_index==MOUSE_BUTTON_WHEEL_UP else 1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "skill_loadout", "journal"]:
 			var skill_scroll_max := maxi(0, ceili(float(SKILL_TREES[skill_tree_tab].size()-6)/3.0)) if panel=="skills" else (maxi(0, learned_loadout_skills().size()-7) if panel=="skill_loadout" else 0)
 			menu_scroll = mini(maxi(0, QUESTS.size() - 6) if panel == "journal" else skill_scroll_max, menu_scroll + 1)
@@ -3205,6 +3194,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif panel == "controls": panel = controls_return_panel
 		elif panel == "controller": panel = "pause"
 		elif panel == "quest_details": panel = quest_guide.return_panel
+		elif panel == "patches" and PatchNotes.back(patch_view): pass
 		else: panel = ""
 		return
 	if panel in ["pause", "start", "controls", "arena_reward", "victory"]: return
@@ -3281,7 +3271,7 @@ func mage_rift_blink() -> bool:
 	invulnerable=0.22
 	spell_visuals.append({"kind":19,"pos":origin,"end":player_pos,"dir":dir,"rank":1,"life":0.55,"max":0.55})
 	effect(player_pos+Vector2(0,-48),"RISSSPRUNG",Color("c7b5ff"),0.7)
-	play_sound("dodge")
+	play_sound("spieler_ausweichen")
 	return true
 
 func dodge() -> void:
@@ -3312,7 +3302,7 @@ func dodge() -> void:
 		effect(player_pos+Vector2(0,-60),"ORK-SPRUNG",Color("d8b47a"),0.65)
 	else:
 		effect(player_pos+Vector2(0,-60),"SCHATTENROLLE" if class_id == 2 and class_mastery_unlocked else "ROLLE",Color("d8f3ff"),0.65)
-	play_sound("dodge")
+	play_sound("spieler_ausweichen")
 
 
 @rpc("any_peer","call_remote","reliable")
@@ -3406,7 +3396,7 @@ func rune_rank(tree:int,talent:int,source_peer:int=0)->int:
 
 func heal_player(amount:float,magical:bool=false)->void:
 	if amount<=0.0 or hp<=0.0 or death_timer>0.0:return
-	hp=minf(max_hp(),hp+maxf(0.0,amount)*essence.healing_mult()*(essence.ability_power_mult() if magical else 1.0))
+	hp=minf(max_hp(),hp+maxf(0.0,amount)*necklace_heal_mult*essence.healing_mult()*(essence.ability_power_mult() if magical else 1.0))
 
 func update_rune_effects(delta:float)->void:
 	rune_emergency_timer=maxf(0.0,rune_emergency_timer-delta)
@@ -3499,7 +3489,7 @@ func normal_attack() -> void:
 	swing_duration = 0.29 if variant == "axe" else (0.20 if variant == "crossbow" else (0.24 if class_id == 0 else 0.32))
 	swing_timer = swing_duration
 	attack_anim = swing_timer
-	play_sound("swing")
+	play_sound(normal_attack_sound())
 	var power := normal_attack_power()
 	rune_attack_count+=1
 	if essence.rank(0,2)==4 and rune_attack_count%4==0:power=roundi(power*1.30)
@@ -3572,10 +3562,10 @@ func move_enemy_with_collision(enemy: Dictionary, displacement: Vector2) -> void
 		if not valid: break
 		enemy["pos"]=next
 
-func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0, apply_runes:bool=true) -> void:
+func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0, apply_runes:bool=true,direct_hit:bool=true) -> void:
 	if index < 0 or index >= enemies.size(): return
-	play_sound("hit")
 	var enemy: Dictionary = enemies[index]
+	play_world_sound(SoundBank.hit_sound_for(int(enemy.get("type",-1))), enemy["pos"])
 	if source_peer > 0:
 		enemy["last_hit_peer"] = source_peer
 		var damage_by_peer: Dictionary = enemy.get("damage_by_peer",{})
@@ -3596,6 +3586,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	if critical:
 		amount=maxi(1,roundi(float(amount)*(warrior_crit_multiplier()+(.25 if apply_runes and rune_rank(0,0,source_peer)==4 else 0.0))))
 		effect(enemy["pos"]+Vector2(0,-48),"KRIT!",Color("ffd36f"),0.7)
+		play_world_sound("krit", enemy["pos"])
 	var falcon_active:=ranger_falcon_rune if source_peer<=0 else bool(remote_players.get(source_peer,{}).get("ranger_falcon_rune",false))
 	if apply_runes and falcon_active and (class_id==2 or source_peer>0):
 		if float(enemy.get("falcon_mark",0.0))>0.0:
@@ -3626,6 +3617,11 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 			enemy["poison_tick"] = 1.0
 			if source_peer > 0: enemy["poison_owner_peer"] = source_peer
 			effect(enemy["pos"] + Vector2(0, -44), "GIFT", Color("b7e885"), 0.8)
+	if apply_runes and direct_hit:
+		var neck:=necklace_visual(source_peer)
+		var reference:=normal_attack_power() if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("normal_power",1)),1,140+attacker_level*30)
+		amount=necklaces.direct_hit(neck,source_peer,enemy,reference,amount,Time.get_ticks_msec())
+		if source_peer>0:sync_necklace_progress(source_peer)
 	enemy["hp"] = float(enemy["hp"]) - amount
 	enemy["flash"] = 0.16
 	if source_peer > 0 and network_mode == "host":
@@ -3685,6 +3681,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
+	if necklace_cast_eligible(id) and necklaces.cast(necklace_visual(sender),sender,Time.get_ticks_msec()):power=roundi(power*1.2)
 	server_ability_effects(id,origin,dir,remote_class,power,rank,sender)
 
 func server_ability_effects(id:int,origin:Vector2,dir:Vector2,remote_class:int,power:int,rank:int,sender:int)->void:
@@ -3767,7 +3764,14 @@ func use_ability(slot: int) -> void:
 	var cast_dir := facing
 	if uses_server_world():
 		rpc_client_ability.rpc_id(1, id, [cast_pos.x,cast_pos.y], [cast_dir.x,cast_dir.y], power, rank)
-	execute_ability_effects(id,rank,power,cast_pos,cast_dir)
+	var empowered:=necklace_cast_eligible(id) and necklaces.cast(necklace_visual(),0,Time.get_ticks_msec())
+	if empowered:
+		power=roundi(power*1.2)
+		energy=minf(max_energy(),energy+float(ability["cost"])*0.2)
+		necklace_heal_mult=1.2
+		execute_ability_effects(id,rank,power,cast_pos,cast_dir)
+		necklace_heal_mult=1.0
+	else:execute_ability_effects(id,rank,power,cast_pos,cast_dir)
 
 func execute_ability_effects(id:int,rank:int,power:int,cast_pos:Vector2,cast_dir:Vector2)->void:
 	if id>=BASE_ABILITIES.size():
@@ -3992,7 +3996,7 @@ func update_poison_clouds(delta: float) -> void:
 		cloud["tick"] = 0.75
 		for e in range(enemies.size() - 1, -1, -1):
 			if cloud["pos"].distance_to(enemies[e]["pos"]) < 86:
-				damage_enemy(e, int(cloud["damage"]), Vector2.ZERO, false, "gift")
+				damage_enemy(e, int(cloud["damage"]), Vector2.ZERO, false, "gift",0,true,false)
 
 func iceball_chain(center:Vector2,damage:int,main_uid:int,jumps:int,stun_enabled:bool,source_peer:int=0)->void:
 	var seen:Array=[main_uid]
@@ -4085,7 +4089,7 @@ func update_impact_zones(delta: float) -> void:
 		for e in range(enemies.size() - 1, -1, -1):
 			var offset: Vector2 = enemies[e]["pos"] - zone["pos"]
 			if offset.length() < float(zone["radius"]):
-				damage_enemy(e, int(zone["damage"]), offset.normalized(), false, str(zone["element"]))
+				damage_enemy(e, int(zone["damage"]), offset.normalized(), false, str(zone["element"]),0,true,false)
 		spell_visuals.append({"kind":int(zone["kind"]), "pos":zone["pos"], "end":zone["pos"], "dir":Vector2.RIGHT, "rank":1, "life":0.62, "max":0.62})
 		if int(zone["kind"]) == 22: create_burning_ground(zone["pos"], int(zone["damage"] * 0.18), 5.0)
 		impact_zones.remove_at(i)
@@ -4111,7 +4115,7 @@ func update_battle_zones(delta: float) -> void:
 		zone["tick"] = 0.65
 		for e in range(enemies.size() - 1, -1, -1):
 			if enemies[e]["pos"].distance_to(zone["pos"]) < float(zone["radius"]):
-				damage_enemy(e, int(zone["damage"]), Vector2.ZERO, false, "feuer")
+				damage_enemy(e, int(zone["damage"]), Vector2.ZERO, false, "feuer",0,true,false)
 
 func enter_arena(mode: String) -> void:
 	if arena_mode != "": return
@@ -4142,7 +4146,7 @@ func enter_arena(mode: String) -> void:
 	hp = max_hp()
 	energy = max_energy()
 	message("%s · Die erste Welle naht!" % ("LETZTE WACHE" if mode == "final" else "ARENA DER EWIGEN WACHT"))
-	play_sound("level")
+	play_sound("reise")
 	announce_multiplayer_context()
 
 func update_arena(delta: float) -> void:
@@ -4178,14 +4182,14 @@ func update_arena(delta: float) -> void:
 			enemy["arena"] = true
 			enemies.append(enemy)
 		message("WELLE %d%s · %d Feinde!" % [arena_wave, "/10" if arena_mode == "final" else "", count])
-		play_sound("menu")
+		play_sound("ui_hinweis")
 
 func finish_final_arena() -> void:
 	final_completed = true
 	arena_return_pos = Vector2(900, 1050)
 	panel = "victory"
 	enemies.clear()
-	play_sound("level")
+	play_sound("quest_abgeschlossen")
 	save_game()
 
 func finish_survival_run() -> void:
@@ -4199,7 +4203,7 @@ func finish_survival_run() -> void:
 	enemy_projectiles.clear()
 	ensure_arena_reward_item()
 	panel = "arena_reward"
-	play_sound("level")
+	play_sound("quest_abgeschlossen")
 	save_game()
 
 func arena_new_weapon_chance(wave:int) -> float:
@@ -4325,14 +4329,18 @@ func leave_tavern() -> void:
 	leave_village_house()
 
 func sanitize_role_shop_stock() -> void:
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	if shop_stock.has("alchemy"):
 		shop_stock["alchemy"]=(shop_stock["alchemy"] as Array).filter(func(item): return str(item.get("icon","")) in ["potion","herb","essence"])
 	if shop_stock.has("smith"):
 		shop_stock["smith"]=(shop_stock["smith"] as Array).filter(func(item): return str(item.get("icon","")) in ["sword","armor","head"])
 	if shop_stock.has("arcane"):
-		shop_stock["arcane"]=(shop_stock["arcane"] as Array).filter(func(item): return str(item.get("icon","")) in ["staff","armor","ring","head","essence"])
+		shop_stock["arcane"]=(shop_stock["arcane"] as Array).filter(func(item): return str(item.get("icon","")) in ["staff","armor","ring","head","essence","necklace"])
 
 func open_elara_alchemy() -> void:
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	sanitize_role_shop_stock()
 	merchant_kind="alchemy"
 	shop_page=0
@@ -4344,6 +4352,8 @@ func open_elara_alchemy() -> void:
 	pending_purchase_item={}
 
 func open_pip_arcane_shop() -> void:
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	sanitize_role_shop_stock()
 	merchant_kind="arcane"
 	shop_page=0
@@ -4432,7 +4442,7 @@ func enter_dungeon(index: int) -> void:
 		if dungeon_blocked(position): position.y = DUNGEON_CENTER.y + (85 if i % 2 == 0 else -85)
 		enemies.append(make_enemy(int(DUNGEON_ENEMIES[index][i % 2]), position, 2 if i == 7 + index * 2 else (1 if i % 5 == 0 else 0)))
 	message("%s · Die Fackeln weisen dir den Weg. E an der Tür führt hinaus." % DUNGEON_NAMES[index])
-	play_sound("menu")
+	play_sound("reise")
 	announce_multiplayer_context()
 
 func reset_combat_transition_state() -> void:
@@ -4459,7 +4469,7 @@ func leave_dungeon() -> void:
 	battle_zones.clear()
 	previous_region = region_at(player_pos)
 	message("Du kehrst ans Tageslicht zurück.")
-	play_sound("dodge")
+	play_sound("reise")
 	save_game()
 	announce_multiplayer_context()
 
@@ -4479,7 +4489,7 @@ func open_dungeon_chest() -> void:
 	add_item(treasure)
 	dungeon_chests_opened[dungeon_id] = true
 	dungeon_chest_respawn_until[dungeon_id] = Time.get_unix_time_from_system()+CHEST_RESPAWN_SECONDS
-	play_sound("level")
+	play_sound("truhe_auf")
 	message("Gewölbe geräumt! %s erhalten." % treasure["name"])
 	save_game()
 
@@ -4512,14 +4522,7 @@ func waystone_safe_at(p: Vector2) -> bool:
 	return false
 
 func nearest_waystone(p: Vector2) -> Vector2:
-	var best := WAYSTONES[0]
-	var best_distance := INF
-	for stone in WAYSTONES:
-		var distance := p.distance_to(stone)
-		if distance < best_distance:
-			best_distance = distance
-			best = stone
-	return best
+	return WorldGeometry.nearest_waystone(p)
 
 func flee_from_safe_zone(enemy: Dictionary, delta: float) -> bool:
 	if arena_mode != "" or dungeon_id >= 0: return false
@@ -4599,7 +4602,7 @@ func spawn_nearby_boss() -> void:
 		var boss_hp: float = boss_max_hp(boss_type)
 		enemies.append({"uid":randi(), "type":boss_type, "pos":site, "home":site, "facing":Vector2.DOWN, "hp":boss_hp, "max_hp":boss_hp, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":1.5, "seed":randf() * 6.28,"boss_spawn_timer":1.6})
 		spawn_tower_guardians(enemies.back())
-		play_sound("menu")
+		play_sound("boss_erscheint")
 		message("Boss erscheint: %s!" % info["name"])
 
 func update_rescue() -> void:
@@ -4610,7 +4613,7 @@ func update_rescue() -> void:
 		rescue_banner_timer = 5.0
 		effect(RESCUE_POS + Vector2(0, -210), "DORF IN GEFAHR", Color("ffcf72"), 5.0)
 		message("Alarm! Blütenweiler wird angegriffen. Die Bewohner rufen um Hilfe!")
-		play_sound("menu")
+		play_sound("ui_hinweis")
 		save_game()
 		if uses_server_world():
 			announce_multiplayer_context()
@@ -4641,7 +4644,7 @@ func update_enemies(delta:float)->void:
 		if float(enemy.get("hp",0))<=0:
 			MobCombat.cancel(enemy);defeat_enemy(i);continue
 		var despawn_range:=3600.0 if int(enemy.get("type",-1)) in [12,13,14] else 1250.0
-		if enemy["pos"].distance_to(player_pos)>despawn_range and arena_mode=="":
+		if enemy["pos"].distance_to(player_pos)>despawn_range and arena_mode=="" and int(enemy.get("target_peer",-1))<0:
 			enemies.remove_at(i);continue
 		advance_mob(enemy,delta,false)
 		if panel=="arena_reward":return
@@ -4670,7 +4673,7 @@ func apply_player_damage(raw: int) -> void:
 	hurt_until=combat_feedback.clock+.18
 	invulnerable = 0.5
 	effect(player_pos + Vector2(0, -30), "-%d" % dealt, Color("ff888d"), 0.75)
-	play_sound("hit")
+	play_sound("spieler_tod" if hp <= 0 else "spieler_schaden")
 	if hp <= 0:
 		hp = 0
 		death_timer = DEATH_DURATION
@@ -4703,6 +4706,7 @@ func respawn() -> void:
 	death_timer = 0.0
 	dash_timer = 0.0
 	invulnerable = 1.0
+	play_sound("spieler_wiederbeleben")
 	if arena_mode == "survival":
 		finish_survival_run()
 		return
@@ -4796,6 +4800,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var invasion: bool = bool(enemy.get("invasion", false))
 	var type: int = int(enemy["type"])
 	var pos: Vector2 = enemy["pos"]
+	play_world_sound(SoundBank.death_sound_for(type), pos)
 	enemies.remove_at(index)
 	if type==12:
 		for j in range(enemies.size()-1,-1,-1):
@@ -4813,12 +4818,13 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 		if event_progress[event_index] >= int(WORLD_EVENTS[event_index]["goal"]):
 			event_states[event_index] = 2
 			message("%s ist in Sicherheit! Sprich erneut mit %s (E)." % [WORLD_EVENTS[event_index]["role"], WORLD_EVENTS[event_index]["name"]])
-			play_sound("level")
+			play_sound("quest_bereit")
 	if invasion and rescue_state == 1:
 		apply_rescue_progress(1,false)
 	if type in [12, 13, 14]:
 		boss_cooldowns[type - 12] = 90.0
 		bosses_defeated[type - 12] = true
+		drops.append({"pos":safe_drop_position(pos,Vector2(0,-25)),"item":boss_necklace_item(type-12),"life":180.0})
 		var relic:=class_relic_item(type-12)
 		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)),"item":relic,"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		drops.append({"pos":safe_drop_position(pos,Vector2(-25,8)),"item":class_boss_hat_item(type-12),"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
@@ -4840,6 +4846,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 			if int(bstate["progress"])>=int(bq["count"]):
 				bstate["state"]=2
 				message("Borins Prüfung geschafft: %s. Kehre zu Borin zurück!" % bq["title"])
+				play_sound("quest_bereit")
 	for qindex in quests.size():
 		var quest: Dictionary = quests[qindex]
 		if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == type:
@@ -4847,6 +4854,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 			if quest["progress"] >= QUESTS[qindex]["count"]:
 				quest["state"] = 2
 				message("Questziel erreicht: %s. Kehre zurück!" % QUESTS[qindex]["title"])
+				play_sound("quest_bereit")
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
 		var item: Dictionary = random_loot(type)
 		drops.append({"pos":safe_drop_position(pos), "item":item, "life":90.0})
@@ -4881,7 +4889,7 @@ func gain_xp(amount: int) -> void:
 		hp = max_hp()
 		energy = max_energy()
 		message("LEVEL %d! +1 SKILLPUNKT · +1 ESSENZ · %d/%d Essenz frei" % [level,essence.available(level),essence.total_for_level(level)])
-		play_sound("level")
+		play_sound("level_auf")
 
 func restore_level_skill_point_progress(data:Dictionary)->int:
 	var expected:=maxi(0,level-1)
@@ -4908,31 +4916,18 @@ func can_upgrade_skill(index:int)->bool:
 	return level>=skill_rank_level(index,next_rank) and skill_points>=skill_upgrade_cost(index,next_rank)
 
 func make_item(name: String, icon: String, rarity: int, power: int, value: int, element: String = "", item_level: int = -1) -> Dictionary:
-	var ilvl := maxi(1, level if item_level < 0 else item_level)
-	var bonus: int = maxi(0, rarity + int(ilvl / 9.0))
-	var strength: int = bonus if icon == "sword" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	var agility: int = bonus if icon == "bow" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	var intellect: int = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	var fair_value := value if icon == "potion" else 10 + ilvl * 4 + maxi(0, power) * (3 if icon in ["sword", "staff", "bow"] else 2) + rarity * rarity * 32 + (25 if element != "" else 0) + (strength + agility + intellect) * 5
-	var item := {"uid":next_uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4, "locked":false}
-	if icon == "food":
-		item["value"] = value
-		item["design"] = maxi(0,FoodSystem.index_for(name))
+	var item := ItemRules.build_item(next_uid, name, icon, rarity, power, value, element, level if item_level < 0 else item_level)
 	next_uid += 1
 	return item
 
 func stack_limit(item: Dictionary) -> int:
-	var icon: String = str(item.get("icon", ""))
-	if icon == "food": return 30
-	if icon == "potion": return 16
-	if icon in ["gem", "herb", "essence"]: return 1000000000
-	return 1
+	return ItemRules.stack_limit(item)
 
 func stack_matches(a: Dictionary, b: Dictionary) -> bool:
 	return a.get("icon") == b.get("icon") and a.get("name") == b.get("name") and a.get("rarity") == b.get("rarity") and a.get("element", "") == b.get("element", "") and bool(a.get("locked",false)) == bool(b.get("locked",false))
 
 func item_sale_value(item: Dictionary) -> int:
-	return int(item.get("stack_value", int(item.get("value", 0)) * int(item.get("count", 1))))
+	return ItemRules.item_sale_value(item)
 
 func can_add_item(item: Dictionary) -> bool:
 	var limit := stack_limit(item)
@@ -4942,6 +4937,7 @@ func can_add_item(item: Dictionary) -> bool:
 	return capacity >= maxi(1, int(item.get("count", 1)))
 
 func add_item(item: Dictionary) -> bool:
+	ArcaneNecklaces.normalize(item)
 	if not can_add_item(item): return false
 	var remaining := maxi(1, int(item.get("count", 1)))
 	var remaining_value := item_sale_value(item)
@@ -4974,29 +4970,10 @@ func add_item(item: Dictionary) -> bool:
 	return remaining == 0
 
 func random_loot(type: int, loot_class: int = -1) -> Dictionary:
-	var chance := randf()
-	var rarity := 0
 	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
-	if area_level >= 30 and chance < 0.0008: rarity = 4
-	elif area_level >= 16 and chance < 0.025: rarity = 3
-	elif chance < 0.13: rarity = 2
-	elif chance < 0.47: rarity = 1
-	var name: String = ENEMY_TYPES[type]["name"]
-	var rank: String = ["Alte", "Feine", "Seltene", "Epische", "Legendäre"][rarity]
 	var loot_weapon := class_weapon_icon_for(loot_class) if loot_class >= 0 else class_weapon_icon()
-	var icon: String = [loot_weapon, "gem", "ring", "armor", "herb"][randi_range(0, 4)]
-	var item_name: String = "%s %s" % [rank, {"sword":"Klinge", "staff":"Stab", "bow":"Bogen", "gem":"Essenz", "ring":"Ring", "armor":"Rüstung", "herb":"Kräuter"}[icon]]
-	if icon=="herb":
-		var herb_info:Dictionary=FoodSystem.herb_for_region(int(ENEMY_TYPES[type]["region"]))
-		if not herb_info.is_empty():item_name=str(herb_info["name"])
-	elif rarity >= 3:
-		item_name = "%s des %s" % [item_name, name]
-	var strength: int = (3 + area_level * 2 + rarity * 5 if icon in ["sword", "staff", "bow"] else (1 + int(area_level / 5) + rarity * 2 if icon == "armor" else (8 + area_level + rarity * 4 if icon == "ring" else 0)))
-	var element := ""
-	if icon in ["sword", "staff", "bow"] and rarity >= 1 and randf() < 0.32:
-		element = "gift" if type in [2, 3, 10] else ("eis" if type in [6, 7, 11] else ("blitz" if type in [5, 8, 9] else ["eis", "blitz", "gift"].pick_random()))
-		item_name = "%s · %s" % [item_name, element.capitalize()]
-	return make_item(item_name, icon, rarity, strength, 0, element, area_level)
+	var spec := ItemRules.roll_loot(type, area_level, loot_weapon)
+	return make_item(spec["name"], spec["icon"], spec["rarity"], spec["power"], 0, spec["element"], spec["level"])
 
 func collect_drops() -> void:
 	for i in range(drops.size() - 1, -1, -1):
@@ -5014,23 +4991,23 @@ func collect_drops() -> void:
 			var amount: int = int(drops[i]["gold"])
 			gold += amount
 			drops.remove_at(i)
-			play_sound("pickup")
+			play_sound("beute_muenzen")
 			effect(player_pos + Vector2(0, -36), "+%d Gold" % amount, Color("ffdb83"), 1.0)
 			continue
 		var item: Dictionary = drops[i]["item"]
 		if class_relic_locked_for_player(drops[i],class_id):continue
 		if not can_add_item(item):
-			message("Inventar voll! Verkaufe Gegenstände im Dorf.")
+			message_error("Inventar voll! Verkaufe Gegenstände im Dorf.")
 			continue
 		add_item(item)
 		drops.remove_at(i)
-		play_sound("pickup")
+		play_sound(SoundBank.loot_sound_for(int(item.get("rarity",0))))
 		message("Gefunden: %s · %s" % [item["name"], RARITY_NAMES[int(item["rarity"])]])
 		save_game()
 
 func interact() -> void:
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and player_pos.distance_to(BORIN_CRYSTAL_POS) < 95.0:
-		panel="fusion";play_sound("menu");return
+		panel="fusion";play_sound("ui_dialog");return
 	if konflux.active:
 		konflux.interact(self)
 		return
@@ -5062,7 +5039,7 @@ func interact() -> void:
 		elif in_elara_healing_field(72.0):
 			hp=max_hp()
 			energy=max_energy()
-			play_sound("level")
+			play_sound("heilen")
 			effect(player_pos+Vector2(0,-48),"VOLLSTÄNDIG GEHEILT",Color("b7f7de"),1.2)
 			message("Elaras Heilungsfeld füllt Leben und Energie vollständig auf.")
 			save_game()
@@ -5105,7 +5082,7 @@ func interact() -> void:
 			enemies.clear()
 			enemy_projectiles.clear()
 			message("Der alte Torbogen führt nach %s." % region_name(region_at(player_pos)))
-			play_sound("dodge")
+			play_sound("reise")
 			save_game()
 			return
 	if rescue_state >= 2 and player_pos.distance_to(RESCUE_POS + Vector2(0, 120)) < 120:
@@ -5119,7 +5096,7 @@ func interact() -> void:
 			rescue_state = 3
 			gain_xp(160)
 			reward_scene_timer = 7.0
-			play_sound("level")
+			play_sound("quest_abgeschlossen")
 			message("Nela: Danke! Die Dornen kamen aus den Alten Ruinen. +160 XP, +80 Gold und eine seltene Klassenwaffe.")
 			save_game()
 			announce_quest_state()
@@ -5145,7 +5122,7 @@ func interact() -> void:
 	if closest.is_empty():
 		food_system.harvest(self)
 		return
-	play_sound("menu")
+	play_sound("ui_dialog")
 	if closest["kind"] == "quest":
 		if String(closest["name"])=="Borin": panel="essence";essence.selected_tree=0;menu_scroll=0
 		else: quest_dialogue(String(closest["name"]))
@@ -5183,7 +5160,7 @@ func interact_world_event(index: int) -> void:
 		gold += int(encounter["gold"])
 		hp = minf(max_hp(), hp + 28.0)
 		message("%s: %s +%d XP, +%d Gold, +28 HP." % [encounter["name"], encounter["after"], encounter["xp"], encounter["gold"]])
-		play_sound("level")
+		play_sound("quest_abgeschlossen")
 	else:
 		message("%s: %s" % [encounter["name"], encounter["after"]])
 	save_game()
@@ -5202,7 +5179,7 @@ func visit_healer() -> void:
 		return
 	gold -= cost
 	hp = max_hp()
-	play_sound("level")
+	play_sound("heilen")
 	message("Elara hat deine Wunden geheilt. -%d Gold · HP vollständig." % cost)
 	save_game()
 
@@ -5234,11 +5211,11 @@ func open_chest(index: int) -> void:
 		message("Die Truhe erscheint in %ds erneut." % chest_cooldown_seconds(index))
 		return
 	if inventory.size() >= 42:
-		message("Inventar voll — verkaufe erst etwas im Dorf.")
+		message_error("Inventar voll — verkaufe erst etwas im Dorf.")
 		return
 	opened_chests[index] = true
 	chest_respawn_until[index] = Time.get_unix_time_from_system()+CHEST_RESPAWN_SECONDS
-	play_sound("pickup")
+	play_sound("truhe_auf")
 	var element: String = ["eis", "gift", "blitz"][index % 3]
 	var region := region_at(chest_position(index))
 	var rarity := 3 if region_level(region) >= 30 else 2
@@ -5276,7 +5253,7 @@ func update_waystone_activation() -> void:
 			waystone_unlocked[i]=true
 			last_waystone=i
 			message("Wegstein %s aktiviert. Reise vom Dorf aus dorthin." % region_name(region_at(WAYSTONES[i])))
-			play_sound("level")
+			play_sound("wegstein_aktiviert")
 			save_game()
 			break
 
@@ -5287,38 +5264,59 @@ func use_waystone() -> void:
 		return
 	for i in WAYSTONES.size():
 		if player_pos.distance_to(WAYSTONES[i]) < 185:
-			if i == 0:
-				panel = "travel"
-				message("Wähle ein freigeschaltetes Ziel.")
-			else:
+			if i > 0 and not waystone_unlocked[i]:
 				waystone_unlocked[i] = true
 				last_waystone = i
-				player_pos = waystone_arrival(0)
-				mark_network_teleport()
-				message("Wegstein %s aktiviert. Reise vom Dorf aus jederzeit zurück." % region_name(region_at(WAYSTONES[i])))
-			enemy_projectiles.clear()
-			save_game()
+				play_sound("wegstein_aktiviert")
+				message("Wegstein %s aktiviert. Von jedem Wegstein aus kannst du jetzt hierher reisen." % region_name(region_at(WAYSTONES[i])))
+				save_game()
+				return
+			# Jeder aktivierte Wegstein öffnet die Reiseauswahl, nicht nur der im Dorf.
+			travel_from = i
+			if i > 0: last_waystone = i
+			panel = "travel"
+			message("Wähle ein Reiseziel.")
 			return
 
+## Reiseziele im Raster: die elf Außen-Wegsteine, dann Sonnenhain.
+func travel_slots() -> Array:
+	var slots: Array = []
+	for i in range(1, WAYSTONES.size()): slots.append(i)
+	slots.append(0)
+	return slots
+
+func travel_slot_rect(slot: int) -> Rect2:
+	return Rect2(166 + (slot % 3) * 271, 175 + (slot / 3) * 96, 255, 79)
+
+func travel_available(i: int) -> bool:
+	return i == 0 or (waystone_unlocked[i] and region_available(region_at(WAYSTONES[i])))
+
+func travel_label(i: int) -> String:
+	return "Sonnenhain" if i == 0 else region_name(region_at(WAYSTONES[i]))
+
 func click_travel(mouse: Vector2) -> void:
-	for i in range(1, WAYSTONES.size()):
-		var col := (i - 1) % 3
-		var row := (i - 1) / 3
-		if Rect2(166 + col * 271, 175 + row * 96, 255, 79).has_point(mouse):
-			if not waystone_unlocked[i] or not region_available(region_at(WAYSTONES[i])):
-				message("Diesen Wegstein musst du zunächst vor Ort aktivieren.")
-				return
-			if dungeon_id >= 0: dungeon_id = -1
-			player_pos = waystone_arrival(i)
-			mark_network_teleport()
-			last_waystone = i
-			panel = ""
-			enemies.clear()
-			enemy_projectiles.clear()
-			play_sound("dodge")
-			message("Reise nach %s." % region_name(region_at(player_pos)))
-			save_game()
+	var slots := travel_slots()
+	for slot in slots.size():
+		var i: int = slots[slot]
+		if not travel_slot_rect(slot).has_point(mouse): continue
+		if i == travel_from:
+			message("Du stehst bereits an diesem Wegstein.")
 			return
+		if not travel_available(i):
+			message_error("Diesen Wegstein musst du zunächst vor Ort aktivieren.")
+			return
+		if dungeon_id >= 0: dungeon_id = -1
+		player_pos = waystone_arrival(i)
+		mark_network_teleport()
+		if i > 0: last_waystone = i
+		travel_from = i
+		panel = ""
+		enemies.clear()
+		enemy_projectiles.clear()
+		play_sound("reise")
+		message("Reise nach %s." % travel_label(i))
+		save_game()
+		return
 
 func quick_potion(restore_energy: bool) -> void:
 	if konflux.active:
@@ -5330,7 +5328,7 @@ func quick_potion(restore_energy: bool) -> void:
 		if (item["name"] in ["Energietrank", "Manatrank"]) == restore_energy:
 			use_item(i)
 			return
-	message("Kein passender Trank im Inventar.")
+	message_error("Kein passender Trank im Inventar.")
 
 func borin_reward_item(quest_index:int)->Dictionary:
 	var q:Dictionary=BORIN_QUESTS[quest_index]
@@ -5352,12 +5350,13 @@ func borin_quest_dialogue()->void:
 			skill_points+=int(q["skill_points"])
 			add_item(reward)
 			message("Borin: Prüfung bestanden! +%d Skillpunkte · %s" % [int(q["skill_points"]),reward["name"]])
-			play_sound("level");save_game();return
+			play_sound("quest_abgeschlossen");save_game();return
 	for i in BORIN_QUESTS.size():
 		var q:Dictionary=BORIN_QUESTS[i]
 		if int(borin_quests[i]["state"])==0 and level>=int(q["req"]):
 			borin_quests[i]["state"]=1
 			message("Borin: %s — besiege %d %s." % [q["title"],int(q["count"]),ENEMY_TYPES[int(q["target"])]["name"]])
+			play_sound("quest_angenommen")
 			save_game();return
 	var next_req:=-1
 	for i in BORIN_QUESTS.size():
@@ -5387,7 +5386,7 @@ func pip_return_loan_weapon()->String:
 	validate_equipment_slots()
 	pip_loan_received=false
 	pip_loan_level=0
-	play_sound("pickup")
+	play_sound("beute_aufheben")
 	save_game()
 	return item_name
 
@@ -5425,7 +5424,7 @@ func pip_dialogue()->void:
 	pip_loan_received=true
 	pip_loan_level=level
 	message("Pip: Für den Anfang leihe ich dir %s. Nach deinem nächsten Level brauche ich sie zurück." % loan["name"])
-	play_sound("pickup");save_game()
+	play_sound("beute_aufheben");save_game()
 
 func quest_dialogue(npc_name: String) -> void:
 	for i in QUESTS.size():
@@ -5436,13 +5435,14 @@ func quest_dialogue(npc_name: String) -> void:
 			var reward_power := (6 + i * 3) if reward_icon in ["sword", "staff", "bow"] else (4 + int(i / 2.0) if reward_icon == "armor" else (12 + i * 2 if reward_icon == "ring" else 0))
 			var reward_item := make_item(reward_name, reward_icon, mini(4, 1 + i / 3), reward_power, 75 + i * 30, "blitz" if i == 12 else ("gift" if i == 14 else ""))
 			if not can_add_item(reward_item):
-				message("Dein Inventar ist voll. Verkaufe erst etwas und hole dann die Questbelohnung ab.")
+				message_error("Dein Inventar ist voll. Verkaufe erst etwas und hole dann die Questbelohnung ab.")
 				return
 			quests[i]["state"] = 3
 			gold += int(QUESTS[i]["gold"])
 			gain_xp(int(QUESTS[i]["xp"]))
 			add_item(reward_item)
 			message("Quest abgeschlossen: %s! +%d XP, +%d Gold" % [QUESTS[i]["title"], QUESTS[i]["xp"], QUESTS[i]["gold"]])
+			play_sound("quest_abgeschlossen")
 			save_game()
 			announce_quest_state()
 			return
@@ -5450,6 +5450,7 @@ func quest_dialogue(npc_name: String) -> void:
 		if QUESTS[i]["npc"] == npc_name and quests[i]["state"] == 0 and level + 3 >= region_level(int(ENEMY_TYPES[int(QUESTS[i]["target"])]["region"])):
 			quests[i]["state"] = 1
 			message("%s: %s — besiege %d %s!" % [npc_name, QUESTS[i]["title"], QUESTS[i]["count"], ENEMY_TYPES[int(QUESTS[i]["target"])]["name"]])
+			play_sound("quest_angenommen")
 			save_game()
 			announce_quest_state()
 			return
@@ -5458,6 +5459,11 @@ func quest_dialogue(npc_name: String) -> void:
 func message(value: String) -> void:
 	notice = value
 	notice_timer = 5.0
+
+## Meldung für etwas, das gerade nicht geht: mit kurzem Fehlerklang.
+func message_error(value: String) -> void:
+	message(value)
+	play_sound("ui_fehler")
 
 func effect(pos: Vector2, value: String, color: Color, life: float) -> void:
 	effects.append({"pos":pos, "text":value, "color":color, "life":life, "max":life})
@@ -5486,7 +5492,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "skill_level_points_granted":skill_level_points_granted, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_rotation":shop_rotation,"shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "skill_level_points_granted":skill_level_points_granted, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "equipped_necklace_uid":equipped_necklace_uid,"necklace_cooldown_ms":maxi(0,int(necklaces.state(0,necklace_visual(),Time.get_ticks_msec())["ready"])-Time.get_ticks_msec()), "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_rotation":shop_rotation,"shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "ui_volume":ui_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5627,6 +5633,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	music_enabled = bool(data.get("music_enabled", true))
 	music_volume = clampf(float(data.get("music_volume", 0.90)), 0.0, 1.0)
 	effects_volume = clampf(float(data.get("effects_volume", 0.75)), 0.0, 1.0)
+	ui_volume = clampf(float(data.get("ui_volume", 0.8)), 0.0, 1.0)
 	if not music_enabled:
 		music_volume = 0.0
 		music_enabled = true
@@ -5680,6 +5687,12 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	ranger_hunt_meter = clampf(float(data.get("ranger_hunt_meter",0.0)),0.0,100.0)
 	ranger_hunt_buff = clampf(float(data.get("ranger_hunt_buff",0.0)),0.0,60.0)
 	ranger_falcon_rune = bool(data.get("ranger_falcon_rune",false))
+	equipped_necklace_uid = int(data.get("equipped_necklace_uid", -1))
+	necklaces=ArcaneNecklaces.new()
+	necklaces.state(0,-1,Time.get_ticks_msec())["ready"]=Time.get_ticks_msec()+clampi(int(data.get("necklace_cooldown_ms",0)),0,6000)
+	for item in inventory:ArcaneNecklaces.normalize(item)
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
 	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1)) if class_id == 1 else -1
 	last_waystone = clampi(int(data.get("last_waystone", 1)), 1, WAYSTONES.size() - 1)
@@ -5692,6 +5705,8 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if stored_shop is Dictionary and stored_shop.has("smith"):
 		shop_stock = stored_shop.duplicate(true)
 		for role in shop_stock:shop_stock[role]=shop_stock[role].slice(maxi(0,shop_stock[role].size()-30))
+	for offers in shop_stock.values():
+		for item in offers:ArcaneNecklaces.normalize(item)
 	sanitize_role_shop_stock()
 	var stored_chests: Array = data.get("opened_chests", [])
 	var stored_chest_until: Array = data.get("chest_respawn_until", [])
@@ -5772,6 +5787,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 	if panel=="repair":
 		click_repair_panel(mouse)
 		return
+	if panel=="patches" and PatchNotes.click(patch_view,mouse):
+		play_sound("ui_klick")
+		queue_redraw()
+		return
 	if panel == "pause" and Rect2(860,319,130,42).has_point(mouse):
 		panel = "controller"
 		return
@@ -5817,17 +5836,17 @@ func handle_panel_click(mouse: Vector2) -> void:
 		for candidate in 3:
 			if Rect2(168 + candidate * 273, 530, 260, 57).has_point(mouse):
 				selected_save_slot = candidate + 1
-				play_sound("menu")
+				play_sound("ui_klick")
 				return
 		if Rect2(300, 378, 550, 54).has_point(mouse):
-			play_sound("menu")
+			play_sound("ui_klick")
 			active_save_slot = selected_save_slot
 			begin_character_creation()
 		elif Rect2(300, 448, 550, 54).has_point(mouse):
 			if not FileAccess.file_exists(slot_save_path(selected_save_slot)):
-				message("Noch kein Spielstand vorhanden. Wähle eine Klasse und starte ein neues Spiel.")
+				message_error("Noch kein Spielstand vorhanden. Wähle eine Klasse und starte ein neues Spiel.")
 				return
-			play_sound("menu")
+			play_sound("ui_klick")
 			active_save_slot = selected_save_slot
 			load_game()
 			enemies.clear()
@@ -5842,6 +5861,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 				arena_pending_loaded = false
 			else: panel = ""
 			ensure_live_multiplayer()
+			play_sound("spieler_wiederbeleben")
 			message("Spielstand %d geladen. Willkommen zurück!" % active_save_slot)
 		return
 	if panel == "creation_review":
@@ -5851,7 +5871,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(590,540,365,44).has_point(mouse):
 			if FileAccess.file_exists(slot_save_path(active_save_slot)) and not creation_replace_confirmed:
 				creation_replace_confirmed=true
-				play_sound("menu")
+				play_sound("ui_klick")
 			else:
 				start_new_game()
 		return
@@ -5860,7 +5880,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if Rect2(245+cls*225,414,205,100).has_point(mouse):
 				pending_class=cls
 				creation_class_selected=true
-				play_sound("menu")
+				play_sound("ui_klick")
 				queue_redraw()
 				return
 		if Rect2(300, 228, 550, 48).has_point(mouse):
@@ -5870,11 +5890,11 @@ func handle_panel_click(mouse: Vector2) -> void:
 		for i in 2:
 			if Rect2(300 + i * 210, 300, 195, 40).has_point(mouse):
 				pending_gender = i
-				play_sound("menu")
+				play_sound("ui_klick")
 		for i in 3:
 			if Rect2(245 + i * 220, 365, 205, 44).has_point(mouse):
 				pending_race = i
-				play_sound("menu")
+				play_sound("ui_klick")
 		if Rect2(300, 520, 550, 52).has_point(mouse) and creation_name.strip_edges().length() >= 2 and creation_class_selected:
 			review_character_creation()
 		elif Rect2(165, 520, 110, 52).has_point(mouse):
@@ -5915,7 +5935,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		for tab in 4:
 			if Rect2(190 + tab * 195, 142, 180, 38).has_point(mouse):
 				mechanics_page = tab
-				play_sound("menu")
+				play_sound("ui_klick")
 				return
 		if Rect2(820, 548, 160, 38).has_point(mouse):
 			panel = ""
@@ -5924,10 +5944,11 @@ func handle_panel_click(mouse: Vector2) -> void:
 	if panel == "pause":
 		if Rect2(190,485,300,36).has_point(mouse):
 			panel="patches"
+			patch_view=PatchNotes.new_view()
 			return
 		if Rect2(540,512,410,42).has_point(mouse):
 			save_game()
-			play_sound("menu")
+			play_sound("ui_klick")
 			return
 		var destinations:Array=["","party","settings","settings"]
 		for i in destinations.size():
@@ -5936,7 +5957,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 				if i==3 and not creative_mode:
 					toggle_creative_mode()
 					panel="settings"
-				play_sound("menu")
+				play_sound("ui_klick")
 				return
 		if Rect2(190,540,300,44).has_point(mouse):
 			save_and_return_to_start()
@@ -5947,20 +5968,20 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(860, 221, 130, 42).has_point(mouse):
 			controls_return_panel = "pause"
 			panel = "controls"
-			play_sound("menu")
+			play_sound("ui_klick")
 		elif Rect2(300, 221, 550, 42).has_point(mouse):
-			play_sound("menu")
+			play_sound("ui_klick")
 			panel = ""
 		elif Rect2(860, 270, 130, 42).has_point(mouse):
 			mechanics_page = 0
 			panel = "mechanics"
-			play_sound("menu")
+			play_sound("ui_klick")
 		elif Rect2(300, 270, 550, 42).has_point(mouse):
-			play_sound("menu")
+			play_sound("ui_klick")
 			save_game()
 
 		elif Rect2(300, 432, 550, 42).has_point(mouse):
-			play_sound("menu")
+			play_sound("ui_klick")
 			toggle_creative_mode()
 		elif not creative_mode and Rect2(300,480,260,38).has_point(mouse):
 			export_save_backup()
@@ -5986,7 +6007,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if Rect2(300,510,280,38).has_point(mouse):
 				panel="repair";queue_redraw();return
 			if Rect2(590,510,170,38).has_point(mouse):
-				panel="travel";return
+				travel_from=-1;panel="travel";return
 			if Rect2(770,510,180,38).has_point(mouse):
 				world_builder.active=true
 				panel="world_builder"
@@ -6003,15 +6024,15 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if Rect2(170 + column * 420, 195 + row * 29, 390, 30).has_point(mouse):
 				awaiting_bind = BIND_ACTIONS[index]
 				controls_status = "%s: neue Taste oder Maustaste drücken · ESC bricht ab." % BIND_NAMES[index]
-				play_sound("menu")
+				play_sound("ui_klick")
 				return
 		if Rect2(175, 562, 385, 36).has_point(mouse):
 			reset_bindings()
-			play_sound("menu")
+			play_sound("ui_klick")
 		elif Rect2(585, 562, 385, 36).has_point(mouse):
 			panel = controls_return_panel
 			awaiting_bind = ""
-			play_sound("menu")
+			play_sound("ui_klick")
 		return
 	if panel == "arena_entry":
 		if Rect2(307, 391, 260, 48).has_point(mouse):
@@ -6046,13 +6067,16 @@ func handle_panel_click(mouse: Vector2) -> void:
 		"quest_details": quest_guide.click_details(self,mouse)
 
 func set_volume_from_mouse(mouse: Vector2) -> bool:
-	if Rect2(300, 337, 550, 25).has_point(mouse):
+	if Rect2(300, 339, 550, 21).has_point(mouse):
 		music_volume = clampf((mouse.x - 315.0) / 520.0, 0.0, 1.0)
 		music_enabled = true
 		update_music()
 		return true
-	if Rect2(300, 391, 550, 25).has_point(mouse):
+	if Rect2(300, 375, 550, 21).has_point(mouse):
 		effects_volume = clampf((mouse.x - 315.0) / 520.0, 0.0, 1.0)
+		return true
+	if Rect2(300, 411, 550, 21).has_point(mouse):
+		ui_volume = clampf((mouse.x - 315.0) / 520.0, 0.0, 1.0)
 		return true
 	return false
 
@@ -6064,7 +6088,7 @@ func begin_character_creation() -> void:
 	pending_race = 0
 	character_created = false
 	panel = "creation"
-	play_sound("menu")
+	play_sound("ui_klick")
 
 func start_new_game() -> void:
 	arena_reward_item.clear()
@@ -6138,6 +6162,8 @@ func start_new_game() -> void:
 	equipped_armor_uid = -1
 	equipped_ring_uid = -1
 	equipped_ring2_uid = -1
+	equipped_necklace_uid = -1
+	necklaces=ArcaneNecklaces.new()
 	next_uid = 1
 	selected_item = -1
 	pip_loan_received = false
@@ -6182,6 +6208,7 @@ func finish_intro() -> void:
 		ensure_live_multiplayer()
 		if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 			rpc_player_presence.rpc_id(1, local_player_state())
+	play_sound("spieler_wiederbeleben")
 	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
 
 func begin_repair_session()->void:
@@ -6639,12 +6666,12 @@ func buy_fusion(index:int) -> bool:
 
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
-		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("menu");return
+		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("ui_klick");return
 	if Rect2(718,145,118,38).has_point(mouse):
 		if near_borin():borin_quest_dialogue()
 		else:message("Borins Prüfungen besprichst du bei Borin; Spells kannst du hier überall skillen.")
 		return
-	if Rect2(848,145,118,38).has_point(mouse): panel="skill_loadout";menu_scroll=0;play_sound("menu");return
+	if Rect2(848,145,118,38).has_point(mouse): panel="skill_loadout";menu_scroll=0;play_sound("ui_klick");return
 	for slot in 3:
 		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -6687,7 +6714,7 @@ func click_skill_loadout(mouse:Vector2)->void:
 				if slots[s]==id:slots[s]=-1
 			slots[selected_slot]=id
 			save_game()
-			play_sound("menu")
+			play_sound("ui_klick")
 			return
 
 func upgrade_skill(index:int)->bool:
@@ -6717,7 +6744,7 @@ func upgrade_skill(index:int)->bool:
 	skill_points-=price
 	skill_levels[index]=next_rank
 	message("%s verbessert · STUFE %d/4 · -%d SP" % [ABILITIES[index]["name"],next_rank,price])
-	play_sound("level")
+	play_sound("skillpunkt")
 	save_game()
 	return true
 
@@ -6771,6 +6798,7 @@ func drop_inventory_item(index:int)->bool:
 		if uid==equipped_head_uid:equipped_head_uid=-1
 		if uid==equipped_ring_uid:equipped_ring_uid=-1
 		if uid==equipped_ring2_uid:equipped_ring2_uid=-1
+		if uid==equipped_necklace_uid:equipped_necklace_uid=-1
 	var dropped:=item.duplicate(true)
 	if int(item.get("count",1))>1:
 		item["count"]=int(item["count"])-1
@@ -6810,6 +6838,9 @@ func click_inventory(mouse: Vector2) -> void:
 		return
 	if Rect2(180,275,98,77).has_point(mouse) and equipped_uid >= 0:
 		unequip_slot("weapon")
+		return
+	if Rect2(501,325,98,77).has_point(mouse) and equipped_necklace_uid>=0:
+		unequip_slot("necklace")
 		return
 	if Rect2(501,235,98,77).has_point(mouse) and equipped_armor_uid >= 0:
 		unequip_slot("armor")
@@ -6904,21 +6935,19 @@ func sell_all_unequipped() -> void:
 	gold += total
 	selected_item = -1
 	sell_all_confirm = false
+	if count > 0: play_sound("verkaufen")
 	message("%d Items verkauft: +%d Gold. Ausrüstung behalten." % [count, total])
 	save_game()
 
 func item_skill_unlock_id(item:Dictionary)->int:
-	var explicit:=int(item.get("skill_unlock",-1))
-	if explicit>=0:return explicit
-	var item_name:=str(item.get("name",""))
-	var element:=str(item.get("element","")).to_lower()
-	# Backward compatibility for already-owned Arkankern items from older saves.
-	if item_name.begins_with("Arkankern") and element=="blitz":
-		return 18 # Blitzlanze
-	return -1
+	return ItemRules.item_skill_unlock_id(item)
 
 func use_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
+	ArcaneNecklaces.normalize(inventory[index])
+	if ArcaneNecklaces.index(inventory[index])>=0:
+		toggle_equipment_item(index)
+		return
 	if food_system.eat(self,index): return
 	var item: Dictionary = inventory[index]
 	var name: String = item["name"]
@@ -6932,7 +6961,7 @@ func use_item(index: int) -> void:
 		ranger_falcon_rune=true
 		inventory.remove_at(index);selected_item=-1
 		message("Rune des Falken gebunden: Pfeile markieren Ziele.")
-		play_sound("level");save_game();return
+		play_sound("freischaltung");save_game();return
 	if bool(item.get("class_relic",false)):
 		var required:=clampi(int(item.get("mastery_class",-1)),0,2)
 		if class_id!=required:
@@ -6945,7 +6974,7 @@ func use_item(index: int) -> void:
 		arcane_step_learned=class_id==1
 		inventory.remove_at(index);selected_item=-1
 		message("%s freigeschaltet: %s" % [CLASS_NAMES[class_id],CLASS_RELIC_SKILLS[class_id]])
-		play_sound("level");save_game();return
+		play_sound("freischaltung");save_game();return
 	var unlock_id:=item_skill_unlock_id(item)
 	if unlock_id>=0:
 		ensure_skill_state_size()
@@ -6963,8 +6992,9 @@ func use_item(index: int) -> void:
 		skill_levels[unlock_id]=maxi(1,int(skill_levels[unlock_id]))
 		inventory.remove_at(index);selected_item=-1
 		message("%s gelernt · durch %s" % [ABILITIES[unlock_id]["name"],name])
-		play_sound("level");save_game();return
+		play_sound("freischaltung");save_game();return
 	if item["icon"] == "potion":
+		play_sound("spieler_trank")
 		if name in ["Energietrank", "Manatrank"]: energy = minf(max_energy(), energy + 65)
 		else: heal_player(max_hp() * (0.8 if name == "Großer Heiltrank" else 0.5))
 		if int(item.get("count", 1)) > 1:
@@ -7017,6 +7047,8 @@ func refresh_shop_stock() -> void:
 			{"name":"Umhang %s" % suffix, "icon":"armor", "power":1 + int(tier / 4.0), "price":65 + tier * 14, "rarity":rarity, "level":tier},
 			{"name":"Meister-%s %s" % [weapon_word, suffix], "icon":weapon, "power":10 + tier * 3, "price":680 + tier * 83, "rarity":mini(3, rarity + 1), "level":tier, "element":shop_element}]
 	}
+	for offers in shop_stock.values():
+		for offer in offers:ArcaneNecklaces.normalize(offer)
 	append_new_equipment()
 	# Elara's ten deliveries include known regional herbs and elemental essences.
 	for region in range(1,FoodSystem.REGIONAL_HERBS.size()+1):
@@ -7059,12 +7091,13 @@ func append_new_equipment() -> void:
 		if not exists: shop_stock["merchant"].append(offer)
 
 func buy_item(stock_item: Dictionary) -> void:
+	ArcaneNecklaces.normalize(stock_item)
 	var price := maxi(0,int(stock_item.get("price",0)))
 	if gold < price:
-		message("Dafür fehlen dir %d Gold." % (price-gold))
+		message_error("Dafür fehlen dir %d Gold." % (price-gold))
 		return
 	var icon := str(stock_item.get("icon","gem"))
-	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food","head"]:
+	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food","head","necklace"]:
 		message("Dieses Angebot ist ungültig.")
 		return
 	var purchased := make_item(String(stock_item.get("name","Fundstück")), icon, clampi(int(stock_item.get("rarity",1)),0,4), maxi(0,int(stock_item.get("power",0))), int(price/2.0), String(stock_item.get("element","")), maxi(1,int(stock_item.get("level",level))))
@@ -7075,7 +7108,7 @@ func buy_item(stock_item: Dictionary) -> void:
 		purchased["skill_unlock"]=int(stock_item["skill_unlock"])
 		purchased["tooltip"]="Lernen: %s" % ABILITIES[int(stock_item["skill_unlock"])]["name"]
 	if not can_add_item(purchased):
-		message("Dein Inventar ist voll.")
+		message_error("Dein Inventar ist voll.")
 		return
 	var gold_before := gold
 	gold -= price
@@ -7084,20 +7117,22 @@ func buy_item(stock_item: Dictionary) -> void:
 		message("Kauf abgebrochen · Inventar konnte nicht aktualisiert werden.")
 		return
 	validate_equipment_slots()
+	play_sound("kaufen")
 	message("Gekauft: %s" % stock_item.get("name","Fundstück"))
 	save_game()
 
 func sell_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
 	if bool(inventory[index].get("locked",false)):
-		message("Dieses Item ist als unverkäuflich markiert.")
+		message_error("Dieses Item ist als unverkäuflich markiert.")
 		return
 	var item: Dictionary = inventory[index]
 	if is_equipped_uid(int(item.get("uid",-1))):
-		message("Ausgerüstete Gegenstände können nicht verkauft werden. Erst ausziehen.")
+		message_error("Ausgerüstete Gegenstände können nicht verkauft werden. Erst ausziehen.")
 		return
 	var gain := int(round(float(item_sale_value(item)) / maxi(1, int(item.get("count", 1)))))
 	gold += gain
+	play_sound("verkaufen")
 	message("Verkauft: %s für %d Gold" % [item["name"], gain])
 	if int(item.get("count", 1)) > 1:
 		item["count"] = int(item["count"]) - 1
@@ -7108,6 +7143,7 @@ func sell_item(index: int) -> void:
 	save_game()
 
 func _draw() -> void:
+	drawing_ui=false
 	if panel in ["account_gate","account_login","account_register","account_migrate","start","creation","creation_review"] and not dedicated_server_mode:
 		character_canvas_offset=Vector2.ZERO
 		apply_ui_transform()
@@ -7161,8 +7197,14 @@ func _draw() -> void:
 				var point := center + Vector2.RIGHT.rotated(angle) * (19 + bubble % 4 * 16)
 				draw_circle(point + Vector2(0, sin(world_time * 3.0 + bubble) * 6), 5 + bubble % 3, Color(0.62, 0.88, 0.35, 0.55 * fade))
 	for shot in enemy_projectiles:
-		if visible_world(shot["pos"], 45):
+		if visible_world(shot["pos"], maxf(45.0,float(shot.get("radius",0.0)))):
 			var p: Vector2 = shot["pos"]
+			if str(shot.get("kind",""))=="cloud":
+				WoodlandAttackVFX.cloud(self,p,float(shot["radius"]),float(shot.get("age",0)),float(shot["life"]))
+				continue
+			if str(shot.get("ability_id",""))=="druesensekret":
+				WoodlandAttackVFX.secretion(self,p,shot["dir"])
+				continue
 			var c := Color("b6e5fa") if shot["type"] == 11 else Color("d5acf3")
 			draw_line(p - shot["dir"] * 16, p, c.darkened(0.3), 8)
 			draw_vfx_sprite(1 if int(shot["type"]) in [11,13,22] else (0 if int(shot["type"]) in [14] else 4), p, 28.0)
@@ -7396,7 +7438,7 @@ func draw_spell_visual(visual: Dictionary) -> void:
 	local["end"]=Vector2(visual["end"])-origin
 	draw_set_transform(origin+character_canvas_offset)
 	draw_spell_local(local)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func draw_spell_local(visual: Dictionary) -> void:
 	var id: int = int(visual["kind"])
@@ -7562,6 +7604,7 @@ func mouse_world_position()->Vector2:
 	return screen_to_world(get_viewport().get_mouse_position())
 
 func apply_ui_transform()->void:
+	drawing_ui=true
 	var z:=effective_camera_zoom()
 	draw_set_transform(Vector2.ZERO,0,Vector2.ONE/z)
 
@@ -7585,8 +7628,7 @@ func visible_world(pos: Vector2, margin: float = 100.0) -> bool:
 	return camera_world_rect().grow(margin).has_point(pos)
 
 func hash_cell(x: int, y: int) -> int:
-	var n := x * 92821 + y * 68917 + x * y * 31
-	return absi(n ^ (n >> 11)) % 997
+	return WorldGeometry.hash_cell(x, y)
 
 func visual_region_at(p: Vector2) -> int:
 	return region_at(p)
@@ -7624,7 +7666,7 @@ func armor_visual() -> int:
 			return clampi(int(item.get("design",0)),0,5)
 	return -1
 
-func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2,rings_override:int=-2,running_override:bool=false) -> void:
+func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: Vector2, scale_factor: float = 1.0, _attack: bool = false, race_override: int = -1, gender_override: int = -1, armor_override: int=-2, death_override: float=-1.0, hurt:float=0.0,head_override:int=-2,rings_override:int=-2,running_override:bool=false,necklace_override:int=-2) -> void:
 	var local := p.is_equal_approx(player_pos) and panel not in ["creation","creation_review"]
 	var roll := 1.0-dash_timer/dodge_duration if local and dash_timer > 0 else -1.0
 	var death := 1.0-death_timer/DEATH_DURATION if local and death_timer > 0 else death_override
@@ -7638,7 +7680,12 @@ func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: V
 	if local and visual_class==0 and warrior_jump_timer>0.0:
 		jump_progress=1.0-warrior_jump_timer/maxf(warrior_jump_duration,0.01)
 		look=warrior_jump_direction
-	ReferenceScenery.Hero.paint(self,p,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor,character_canvas_offset,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override),jump_progress)
+	var neck:=necklace_visual() if necklace_override==-2 else necklace_override
+	if panel in ["creation","creation_review"]:neck=-1
+	var canvas_zoom:=effective_camera_zoom() if drawing_ui else 1.0
+	if drawing_ui:draw_set_transform(Vector2.ZERO)
+	ReferenceScenery.Hero.paint(self,p/canvas_zoom,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor/canvas_zoom,character_canvas_offset/canvas_zoom,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override),jump_progress,neck)
+	restore_canvas_transform()
 
 func draw_character_detail_overlay(p: Vector2, visual_class: int, look: Vector2, scale_factor: float, race: int, gender: int) -> void:
 	var accent: Color = [Color('e5bd77'),Color('8fcde6'),Color('91c787')][clampi(visual_class,0,2)]
@@ -7717,9 +7764,9 @@ func draw_npc_sprite(p: Vector2, kind: String, name: String) -> void:
 
 func draw_weapon_world(p: Vector2, family: int, design: int, look: Vector2, scale_factor: float = 1.0, attack_progress: float = -1.0) -> void:
 	# Keep small polygons near zero: triangulation loses precision at 80k.
-	draw_set_transform(p+character_canvas_offset)
+	set_local_canvas_transform(p+character_canvas_offset)
 	draw_weapon_local(Vector2.ZERO,family,design,look,scale_factor,attack_progress)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func draw_weapon_local(p: Vector2, family: int, design: int, look: Vector2, scale_factor: float = 1.0, attack_progress: float = -1.0) -> void:
 	var base_dir: Vector2 = look.normalized() if look.length() > 0.01 else Vector2.DOWN
@@ -8169,8 +8216,8 @@ func draw_dungeon_atmosphere() -> void:
 	var torch_points := dungeon_torches()
 	# Weiche, leicht unregelmäßige Vignette: vorn bleibt der Weg lesbar,
 	# am unteren Bildrand schließt sich der Schatten wie im Pixelart-Vorbild.
-	for gx in 24:
-		for gy in 14:
+	for gx in ceili(camera_view_size().x/48.0):
+		for gy in ceili(camera_view_size().y/48.0):
 			var point := camera_pos + Vector2(gx * 48 + 24, gy * 48 + 24)
 			var offset := point - player_pos
 			if offset.y > 0.0: offset.y *= 1.42
@@ -8194,10 +8241,6 @@ func draw_dungeon_atmosphere() -> void:
 
 func draw_overworld_atmosphere() -> void:
 	var darkness := {2:0.27, 3:0.41, 4:0.39, 5:0.45, 7:0.56, 8:0.48, 10:0.49, 11:0.57, 12:0.44}
-	var has_dark_area := false
-	for corner in [camera_pos, camera_pos + Vector2(VIEW.x, 0), camera_pos + Vector2(0, VIEW.y), camera_pos + VIEW, player_pos]:
-		if darkness.has(visual_region_at(corner)): has_dark_area = true
-	if not has_dark_area: return
 	var torches: Array = []
 	for trail in TRAILS:
 		for i in trail.size():
@@ -8206,8 +8249,8 @@ func draw_overworld_atmosphere() -> void:
 		if landmark["kind"] in ["tower", "gate", "shrine"] and darkness.has(region_at(landmark["pos"])) and visible_world(landmark["pos"], 310):
 			torches.append(landmark["pos"] + Vector2(-95, 42))
 			torches.append(landmark["pos"] + Vector2(95, 42))
-	for gx in 24:
-		for gy in 14:
+	for gx in ceili(camera_view_size().x/48.0):
+		for gy in ceili(camera_view_size().y/48.0):
 			var point := camera_pos + Vector2(gx * 48 + 24, gy * 48 + 24)
 			var strength: float = float(darkness.get(visual_region_at(point), 0.0))
 			if strength <= 0.0: continue
@@ -8219,8 +8262,10 @@ func draw_overworld_atmosphere() -> void:
 			for torch_pos in torches:
 				shade = minf(shade, strength * clampf(point.distance_to(torch_pos) / 215.0, 0.11, 1.0))
 			draw_rect(Rect2(camera_pos + Vector2(gx * 48, gy * 48), Vector2(48, 48)), Color("09131b", shade))
-	for cloud in 13:
-		var drift := Vector2(fmod(float(cloud * 157) + world_time * 12.0, VIEW.x + 180.0) - 90.0, float((cloud * 91) % 740) - 60.0)
+	var visible_size:=camera_view_size()
+	var cloud_count:=ceili(13.0*visible_size.x*visible_size.y/(VIEW.x*VIEW.y))
+	for cloud in cloud_count:
+		var drift := Vector2(fposmod(float(cloud * 157) + world_time * 12.0, visible_size.x + 180.0) - 90.0, fposmod(float(cloud * 91),visible_size.y+120.0) - 60.0)
 		var fog_zone := visual_region_at(camera_pos + drift)
 		if darkness.has(fog_zone): draw_circle(camera_pos + drift, 32 + cloud % 5 * 9, Color("c5ced3", 0.028 if fog_zone in [3, 7, 8, 10, 11] else 0.014))
 	for torch_pos in torches:
@@ -8232,6 +8277,21 @@ func draw_arena_world() -> void:
 
 func _trail_theme(region: int) -> int:
 	return 1 if region in [3,4,7,10,11,12] else (2 if region in [2,5,9] else (3 if region == 8 else 0))
+
+## Wegstreifen von a nach b. Wo er die Dorffläche berührt, wird er genau an
+## deren Rand (Mauerlinie der Tore) gerade abgeschnitten.
+func draw_trail_band(a: Vector2, b: Vector2, width: float, color: Color) -> void:
+	for piece in trail_band_polygons(a, b, width):
+		draw_colored_polygon(piece, color)
+
+static func trail_band_polygons(a: Vector2, b: Vector2, width: float) -> Array:
+	var side := (b - a).normalized().rotated(PI * 0.5) * width * 0.5
+	var band := PackedVector2Array([a + side, b + side, b - side, a - side])
+	var village: Rect2 = StartTileMap32.BOUNDS
+	var bounds := Rect2(a.min(b) - Vector2(width, width), (b - a).abs() + Vector2(width, width) * 2.0)
+	if not bounds.intersects(village): return [band]
+	var cut := PackedVector2Array([village.position, Vector2(village.end.x, village.position.y), village.end, Vector2(village.position.x, village.end.y)])
+	return Geometry2D.clip_polygons(band, cut)
 
 func draw_trails() -> void:
 	# Drei zusammenhängende Pixel-Farbflächen statt vieler gedrehter Texturquadrate.
@@ -8245,7 +8305,8 @@ func draw_trails() -> void:
 		for point_index in trail.size():
 			var point: Vector2 = trail[point_index]
 			if point_index < trail.size() - 1: theme_for_trail = _trail_theme(region_at(point.lerp(trail[point_index + 1], 0.5)))
-			if region_at(point)!=0 and visible_world(point, 90.0):
+			# Keine runde Wegkappe auf oder an der Dorfgrenze: dort endet der Weg gerade.
+			if region_at(point)!=0 and visible_world(point, 90.0) and not StartTileMap32.BOUNDS.grow(60.0).has_point(point):
 				draw_circle(point, 58.0, edge_colors[theme_for_trail])
 				draw_circle(point, 52.0, mid_colors[theme_for_trail])
 				draw_circle(point, 45.0, road_colors[theme_for_trail])
@@ -8262,13 +8323,14 @@ func draw_trails() -> void:
 			var detail_count := maxi(1, int(distance / 132.0))
 			var start_detail := trail_index * 73 + i * 11
 			# Natursteinrand, verdichteter Untergrund und warme, leicht unregelmäßige Fahrspur.
-			draw_line(a, b, edge_colors[theme], 116.0, false)
-			draw_line(a, b, mid_colors[theme], 104.0, false)
-			draw_line(a, b, road_colors[theme], 90.0, false)
+			draw_trail_band(a, b, 116.0, edge_colors[theme])
+			draw_trail_band(a, b, 104.0, mid_colors[theme])
+			draw_trail_band(a, b, 90.0, road_colors[theme])
 			for detail in range(1, detail_count + 1):
 				var t := minf(0.94, float(detail) / float(detail_count + 1))
 				var center := a.lerp(b, t)
 				if not visible_world(center, 100.0): continue
+				if StartTileMap32.BOUNDS.grow(64.0).has_point(center): continue
 				var code := hash_cell(trail_index * 17 + i, start_detail + detail)
 				# Versetzte Fugen und zwei flache Fahrspuren, in großem Abstand gesetzt.
 				if code % 3 != 0:
@@ -8356,16 +8418,7 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 			draw_circle(p, r, Color("53666c"))
 
 func region_rect(id: int) -> Rect2:
-	if id >= 8: return Rect2(11000, (id - 8) * 1920, 5000, 1920)
-	match id:
-		0: return Rect2(0, 0, 1780, 2600)
-		1: return Rect2(1780, 0, 3220, 4200)
-		2: return Rect2(1780, 4200, 3220, 4300)
-		3: return Rect2(5000, 0, 3500, 4200)
-		4: return Rect2(5000, 4200, 3500, 4300)
-		5: return Rect2(8500, 0, 2500, 4200)
-		6: return Rect2(0, 2600, 1780, 5900)
-		_: return Rect2(8500, 4200, 2500, 4300)
+	return WorldGeometry.region_rect(id)
 
 func draw_region_gates() -> void:
 	draw_line(Vector2(11070, 0), Vector2(11070, 9600), Color("536c70"), 145)
@@ -8707,6 +8760,7 @@ func draw_house(p: Vector2) -> void:
 	StartScenery32.themed_house(self,p,kind)
 func draw_npc(npc: Dictionary) -> void:
 	var p: Vector2 = npc["pos"]
+	if interior_id<0 and dungeon_id<0 and arena_mode=="":p-=Vector2(0,VillageElevation.height_at(p))
 	var kind: String = str(npc["kind"])
 	var name: String = str(npc["name"])
 	var baked := USE_VILLAGE_REFERENCE_BACKGROUND and panel == "" and VILLAGE_REF_RECT.has_point(p) and (name == "Mira" or name == "Liora" or name == "Arven")
@@ -8796,6 +8850,12 @@ func draw_class_boss_actor(enemy:Dictionary,p:Vector2,look:Vector2,scale_factor:
 	if ratio<=.38:
 		PixelStyle32.arc(self,p+Vector2(0,4),42*scale_factor,0,TAU,24,[Color("ff5c4d",.48),Color("cf73ff",.5),Color("b7f16d",.48)][boss_index],3.5*scale_factor)
 
+func mob_attack_target_position(enemy:Dictionary)->Vector2:
+	var peer:=int(enemy.get("target_peer",0))
+	if peer<=0 or peer==multiplayer.get_unique_id():return player_pos
+	if remote_players.has(peer):return network_player_position(peer)
+	return Vector2(enemy["pos"])+Vector2(enemy.get("facing",Vector2.DOWN))*165.0
+
 func draw_enemy(enemy: Dictionary) -> void:
 	var p: Vector2 = enemy["pos"]
 	var type: int = int(enemy["type"])
@@ -8814,10 +8874,14 @@ func draw_enemy(enemy: Dictionary) -> void:
 	if not state.is_empty():
 		aim=state.get("dir",aim)
 		animation=MobCombat.visual_progress(state,profile)
-		if float(state.get("age",0))<float(profile["windup"]):
+		if float(state.get("age",0))<float(MobCombat.attack_timing(profile,state.get("ability",{}))["windup"]):
 			var ability:Dictionary=state["ability"]
 			var warn:Color=[Color("f36f5d",.72),Color("ba7cff",.72),Color("9cdd72",.72)][type-12] if boss else Color("efd49a",.6)
-			if ability["shape"]=="line":
+			if ability["shape"]=="cloud":
+				draw_arc(p,float(ability["range"]),0,TAU,48,Color("b9d965",.75),2)
+			elif ability["shape"]=="leap":
+				pass # Wolf anticipation is shown by its pose, without a target marker.
+			elif ability["shape"]=="line":
 				PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.25),20)
 			elif ability["shape"]=="arc":
 				PixelStyle32.arc(self,p,float(ability["range"]),aim.angle()-float(ability["half_angle"]),aim.angle()+float(ability["half_angle"]),18,warn,2)
@@ -8825,6 +8889,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 	var enemy_color:Color=ENEMY_TYPES[type]["color"]
 	var model_pos:Vector2=p
 	var stride:float=world_time*(3.5 if bool(profile["heavy"]) else 7.0) if bool(enemy.get("walking",false)) else 0.0
+	if type in [0,1,2,3]:stride=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU))) if bool(enemy.get("walking",false)) else 0.0
 	if boss and float(enemy.get("boss_spawn_timer",0.0))>0.0:
 		var spawn_left:float=clampf(float(enemy["boss_spawn_timer"])/1.6,0.0,1.0)
 		var appear:float=1.0-spawn_left
@@ -8840,21 +8905,25 @@ func draw_enemy(enemy: Dictionary) -> void:
 			draw_rect(Rect2(sp-Vector2(3,3),Vector2(6,6)),Color(spawn_color,.7))
 	draw_set_transform(Vector2.ZERO)
 	var motion:=Vector2.ONE
-	if type==0:
+	if type==0 and not WoodlandPoseAnimation.available(type,MobDesign32.WoodlandArt.direction_index(aim)):
 		var creep:=sin(world_time*6+float(enemy.get("seed",0)))
 		motion=Vector2(1+creep*.1,1-creep*.08)
-	if type==1:
-		model_pos.y-=9+sin(world_time*7+float(enemy.get("seed",0)))*3
-		stride=world_time*18
 	if boss:
 		draw_class_boss_actor(enemy,model_pos,aim,scale_factor,animation)
 	else:
-		MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion)
-	draw_set_transform(character_canvas_offset)
+		MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion,str(state.get("ability",{}).get("id","")),{"walking":bool(enemy.get("walking",false)),"clock":world_time,"seed":enemy.get("seed",0.0),"hurt":float(enemy.get("flash",0.0))})
+	restore_canvas_transform()
+	if type==1:WoodlandAttackVFX.glands(self,model_pos,aim.normalized(),scale_factor,animation)
 	if float(enemy.get("flash", 0.0)) > 0.0:
 		draw_arc(model_pos, 37.0 * scale_factor, 0.0, TAU, 18, Color("fff7df", 0.72), 3.0)
-	draw_enemy_level(p, type, boss, elite_kind)
-	combat_feedback.health(self,"mob:%d"%int(enemy["uid"]),p+Vector2(0,-135 if type==12 else (-104 if boss else -54)),float(enemy["hp"]),float(enemy["max_hp"]),106 if boss else 54)
+	var label_pos:=p
+	if type==3:
+		var leap_lift:=WoodlandAttackVFX.leap_height(animation)*scale_factor if str(state.get("ability",{}).get("id",""))=="sprungbiss" else 0.0
+		label_pos.y-=maxf(0.0,88.0*scale_factor+leap_lift+12.0-54.0)
+	elif type==2 and WoodlandPoseAnimation.available(type,MobDesign32.WoodlandArt.direction_index(aim)):
+		label_pos.y-=maxf(0.0,100.0*MobDesign32.WoodlandArt.SCALES[type]*scale_factor+12.0-54.0)
+	draw_enemy_level(label_pos, type, boss, elite_kind)
+	combat_feedback.health(self,"mob:%d"%int(enemy["uid"]),label_pos+Vector2(0,-135 if type==12 else (-104 if boss else -54)),float(enemy["hp"]),float(enemy["max_hp"]),106 if boss else 54)
 
 func draw_enemy_level(p: Vector2, type: int, boss: bool, elite_kind: int = 0) -> void:
 	var y := (-170.0 if type==12 else -139.0) if boss else (-103.0 if elite_kind > 0 else -82.0)
@@ -9286,8 +9355,7 @@ func draw_hero_sword(hand: Vector2, blade_dir: Vector2, preview: bool = false) -
 			draw_circle(shoulder + blade_dir * 12, 3, element_color(weapon_element()))
 
 func weapon_visual_stage(item: Dictionary) -> int:
-	# Jede neue Ausrüstungsstufe verfeinert Form und Verzierung, nicht nur den Farbton.
-	return clampi(int((int(item.get("level", 1)) + int(item.get("rarity", 0)) * 2) / 10.0), 0, 4)
+	return ItemRules.weapon_visual_stage(item)
 
 func equipped_weapon_stage() -> int:
 	for item in inventory:
@@ -9296,8 +9364,7 @@ func equipped_weapon_stage() -> int:
 	return 0
 
 func item_design(item: Dictionary) -> int:
-	if item.get("icon") == "food": return maxi(0,FoodSystem.index_for(str(item.get("name",""))))
-	return clampi(int(item.get("design", absi(hash(String(item.get("name", "Ausrüstung")))) % 12)), 0, 11)
+	return ItemRules.item_design(item)
 
 func equipped_item_design(uid: int) -> int:
 	for item in inventory:
@@ -9311,6 +9378,16 @@ func equipped_weapon_design() -> int:
 func draw_item_icon(origin: Vector2, kind: String, accent: Color, scale_factor: float = 1.0, stage: int = 0, design: int = 0) -> void:
 	var p := origin
 	var s := scale_factor
+	if kind=="necklace":
+		var tint:=Color(ArcaneNecklaces.COLORS[clampi(design,0,5)])
+		PixelStyle32.line(self,p+Vector2(5,3)*s,p+Vector2(8,17)*s,Color("bca372"),2*s)
+		PixelStyle32.line(self,p+Vector2(27,3)*s,p+Vector2(24,17)*s,Color("bca372"),2*s)
+		PixelStyle32.line(self,p+Vector2(8,17)*s,p+Vector2(16,24)*s,Color("bca372"),2*s)
+		PixelStyle32.line(self,p+Vector2(24,17)*s,p+Vector2(16,24)*s,Color("bca372"),2*s)
+		PixelStyle32.rect(self,Rect2(p+Vector2(11,21)*s,Vector2(11,12)*s),Color("493e49"))
+		PixelStyle32.rect(self,Rect2(p+Vector2(13,23)*s,Vector2(7,8)*s),tint)
+		PixelStyle32.rect(self,Rect2(p+Vector2(13,23)*s,Vector2(3,3)*s),tint.lightened(.3))
+		return
 	if kind=="head":
 		PixelStyle32.rect(self,Rect2(p+Vector2(3,22)*s,Vector2(28,6)*s),accent)
 		PixelStyle32.polygon(self,PackedVector2Array([p+Vector2(7,22)*s,p+Vector2(16,2)*s,p+Vector2(25,22)*s]),[Color("718d9b"),Color("796292"),Color("658956")][clampi(design,0,2)])
@@ -9469,42 +9546,38 @@ func ui_button(rect: Rect2, label: String, enabled: bool = true, active: bool = 
 
 func draw_hud() -> void:
 	var nearby_food := food_system.nearest(self)
-	draw_ref_panel(Rect2(10, 8, 348, 104))
-	draw_rect(Rect2(22, 16, 5, 17), [Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id])
-	text_at(Vector2(34, 32), "%s · %s · STUFE %d" % [hero_name if hero_name != "" else CLASS_NAMES[class_id].to_upper(), RACE_NAMES[hero_race], level], 15, Color("ffe9b8"))
-	if creative_mode:
-		draw_rect(Rect2(301, 17, 46, 17), Color("806a4e"))
-		text_at(Vector2(304, 30), "TEST", 12, Color("fff1cb"))
-	bar(Rect2(23, 40, 324, 20), hp, max_hp(), Color("d94f4f"), "HP  %d / %d" % [ceili(hp), ceili(max_hp())])
-	bar(Rect2(23, 63, 324, 15), energy, max_energy(), Color("3f7fd9") if class_id == 1 else Color("35b381"), "%s  %d / %d" % ["MANA" if class_id == 1 else "ENERGIE", ceili(energy), ceili(max_energy())])
+	var mouse_now:=get_viewport().get_mouse_position()
+	var energy_color:=Color("3f7fd9") if class_id == 1 else Color("35b381")
 	var stamina_color:=Color("e5bd62") if stamina/maxf(1.0,max_stamina())>=0.20 else (Color("f08a63") if int(world_time*6.0)%2==0 else Color("d75f52"))
-	bar(Rect2(23, 81, 324, 11), stamina, max_stamina(), stamina_color, "AUSDAUER  %d / %d%s" % [ceili(stamina),ceili(max_stamina())," · RENNEN" if is_sprinting else ""])
-	bar(Rect2(23, 95, 324, 10), float(xp), float(xp_required()), Color("d9932e"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
+	HudLayout.draw_status(self,"%s · %s · Stufe %d%s" % [hero_name if hero_name != "" else CLASS_NAMES[class_id], RACE_NAMES[hero_race], level, " · TEST" if creative_mode else ""],[Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id],hp,max_hp(),energy,max_energy(),energy_color,stamina,max_stamina(),stamina_color)
+	HudLayout.draw_xp_line(self,float(xp),float(xp_required()),mouse_now,"XP %d / %d" % [xp, xp_required()])
 	if party_reward_notice_timer>0.0 and party_reward_notice!="":
 		draw_ref_panel(Rect2(365,8,410,42))
 		text_at(Vector2(378,35),party_reward_notice,13,Color("bfe8ad"),HORIZONTAL_ALIGNMENT_CENTER,384)
 	if class_mastery_unlocked and class_id==0: text_at(Vector2(365,30),"WUT %.0f%%" % warrior_rage,12,Color("efaa75"))
 	elif class_mastery_unlocked and class_id==2: text_at(Vector2(365,30),"JAGD %.0f%%%s" % [ranger_hunt_meter," · %.0fs" % ranger_hunt_buff if ranger_hunt_buff>0 else ""],12,Color("f3d68e"))
 	elif class_mastery_unlocked and class_id==1: text_at(Vector2(365,30),"LEERTASTE · ARKANER SCHRITT",12,Color("cdbaff"))
-	draw_ref_panel(QUEST_HUD_RECT)
-	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL · HOVER FÜR INFOS", 13, Color("f0cf92"))
-	text_at(Vector2(23, 155), tracked_quest().substr(0, 44), 14, Color("fff2d9"))
-	if not touch_enabled and QUEST_HUD_RECT.has_point(get_viewport().get_mouse_position()):
-		quest_guide.draw_hud_hover(self)
+	var quest_rect:=quest_hud_rect()
+	var quest_hovered:=not touch_enabled and quest_rect.has_point(mouse_now)
+	HudLayout.draw_quest_line(self,quest_rect,tracked_quest(),quest_hovered)
+	var food_y:=HudLayout.food_top(touch_enabled)
+	var status_bottom:=food_y
 	if food_system.meal_active():
 		var food_index:int=FoodSystem.index_for(food_system.active_food_name)
-		draw_ref_panel(Rect2(10,168,348,58))
-		if food_index>=0: FoodSystem.icon(self,Vector2(18,174),food_index,0.95)
+		draw_ref_panel(Rect2(10,food_y,348,58))
+		if food_index>=0: FoodSystem.icon(self,Vector2(18,food_y+6),food_index,0.95)
 		var remain:int=food_system.meal_remaining()
-		text_at(Vector2(58,188),food_system.active_food_name,12,Color("ffe5b5"))
-		text_at(Vector2(58,205),food_system.meal_effect_text(),10,Color("bde8bd"))
-		text_at(Vector2(300,188),"%02d:%02d" % [int(remain/60),remain%60],11,Color("d8e7ff"))
+		text_at(Vector2(58,food_y+20),food_system.active_food_name,12,Color("ffe5b5"))
+		text_at(Vector2(58,food_y+37),food_system.meal_effect_text(),10,Color("bde8bd"))
+		text_at(Vector2(300,food_y+20),"%02d:%02d" % [int(remain/60),remain%60],11,Color("d8e7ff"))
 		var progress:float=clampf(float(remain)/360.0,0.0,1.0)
-		draw_rect(Rect2(58,212,276,5),Color("1b2f35"))
-		draw_rect(Rect2(58,212,276*progress,5),Color("6fbf79") if food_system.meal_mana_regen<=0 else Color("4f8bd8"))
+		draw_rect(Rect2(58,food_y+44,276,5),Color("1b2f35"))
+		draw_rect(Rect2(58,food_y+44,276*progress,5),Color("6fbf79") if food_system.meal_mana_regen<=0 else Color("4f8bd8"))
+		status_bottom=food_y+62
 	elif food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system():
-		draw_ref_panel(Rect2(10,168,348,30))
-		text_at(Vector2(23,188),"SNACK · +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],10,Color("aed48c"))
+		draw_ref_panel(Rect2(10,food_y,348,30))
+		text_at(Vector2(23,food_y+20),"SNACK · +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],10,Color("aed48c"))
+		status_bottom=food_y+34
 	for enemy in enemies:
 		if int(enemy["type"]) in [12, 13, 14] and enemy["pos"].distance_to(player_pos) < 620:
 			ui_box(Rect2(430, 10, 480, 64), Color("5b4547"))
@@ -9517,9 +9590,8 @@ func draw_hud() -> void:
 		text_at(Vector2(966, 98), "WELLE %d%s" % [arena_wave, "/10" if arena_mode == "final" else ""], 19, Color("ffecbc"), HORIZONTAL_ALIGNMENT_CENTER, 150)
 		text_at(Vector2(970, 126), "%d Gegner" % enemies.size(), 15, Color("e4d3b0"), HORIZONTAL_ALIGNMENT_CENTER, 140)
 	else:
-		var map_center := Vector2(1035, 116)
-		draw_ref_panel(Rect2(918, 8, 234, 30))
-		text_at(Vector2(935, 29), ("KONFLUX · "+(KonfluxMap.BIOMES[konflux.room] if konflux.room>=0 else KonfluxMap.BIOMES[KonfluxMap.biome(player_pos)])) if konflux.active else (("LETZTE WACHE" if arena_mode == "final" else "ENDLOSE ARENA") if arena_mode != "" else (VillageInteriors32.name_for_id(interior_id).to_upper() if interior_id >= 0 else (DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "%s · LV %d" % [region_name(region_at(player_pos)), region_level(region_at(player_pos))]))), 13, Color("fff0bf"), HORIZONTAL_ALIGNMENT_CENTER, 200)
+		var map_center := HudLayout.MAP_CENTER
+		HudLayout.draw_map_label(self, ("KONFLUX · "+(KonfluxMap.BIOMES[konflux.room] if konflux.room>=0 else KonfluxMap.BIOMES[KonfluxMap.biome(player_pos)])) if konflux.active else (("LETZTE WACHE" if arena_mode == "final" else "ENDLOSE ARENA") if arena_mode != "" else (VillageInteriors32.name_for_id(interior_id).to_upper() if interior_id >= 0 else (DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "%s · LV %d" % [region_name(region_at(player_pos)), region_level(region_at(player_pos))]))))
 		draw_minimap(Rect2(980, 61, 110, 110), true)
 		draw_arc(map_center, 70, 0, TAU, 64, Color("0b1220"), 16)
 		draw_arc(map_center, 70, 0, TAU, 64, Color("c9a45e"), 4)
@@ -9531,16 +9603,15 @@ func draw_hud() -> void:
 		text_at(map_center + Vector2(-6, 81), "+", 14, Color("ffe9b0"))
 	if network_mode != "offline":
 		var ping_text := " · %d ms" % network_ping_ms if network_ping_ms >= 0 else ""
-		text_at(Vector2(925, 188), "KOOP %d/4%s" % [remote_players.size()+1,ping_text], 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, 180)
-	if character_created and not creative_mode:
-		var save_status_y:float=239.0 if food_system.meal_active() else (207.0 if food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system() else 181.0)
-		text_at(Vector2(14,save_status_y),server_save.status,10,Color("c9f0c4") if not server_save.dirty and server_save.ready else Color("ffe498"))
+		text_at(Vector2(925, HudLayout.KOOP_Y), "KOOP %d/4%s" % [remote_players.size()+1,ping_text], 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+	if HudLayout.save_status_visible(server_save.problem,creative_mode,character_created):
+		HudLayout.shadow_text(self,Vector2(14,status_bottom+12),server_save.status,11,Color("ffe498"))
 	if save_notice_timer > 0.0:
-		text_at(Vector2(925, 204), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+		text_at(Vector2(925, HudLayout.SAVE_NOTICE_Y), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, 180)
 	if notice_timer > 0:
-		ui_box(Rect2(12, 549, 510, 36), Color("415f59"))
+		ui_box(HudLayout.NOTICE_RECT, Color("415f59"))
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
-		text_at(Vector2(23, 573), short_notice, 15, Color("fff3c3"))
+		text_at(HudLayout.NOTICE_RECT.position+Vector2(11, 23), short_notice, 15, Color("fff3c3"))
 	var nearest := ""
 	if not nearby_food.is_empty():
 		var nearby_food_info:Dictionary=FoodSystem.FOODS[int(nearby_food["food"])]
@@ -9621,6 +9692,10 @@ func draw_hud() -> void:
 				if float(cooldowns[id]) > 0:
 					draw_rect(Rect2(x + 3, 596, 68, 38), Color(0.1, 0.16, 0.2, 0.7))
 					text_at(Vector2(x + 23, 620), "%.1f" % float(cooldowns[id]), 15)
+	if not touch_enabled and HudLayout.STATUS_RECT.has_point(mouse_now):
+		HudLayout.draw_status_numbers(self,["Leben  %d / %d" % [ceili(hp), ceili(max_hp())],"%s  %d / %d" % ["Mana" if class_id == 1 else "Energie", ceili(energy), ceili(max_energy())],"Ausdauer  %d / %d%s" % [ceili(stamina),ceili(max_stamina())," · rennt" if is_sprinting else ""],"XP  %d / %d" % [xp, xp_required()],"Gold  %d" % gold])
+	if quest_hovered:
+		quest_guide.draw_hud_hover(self,Vector2(quest_rect.position.x,quest_rect.position.y-186))
 
 func draw_touch_controls() -> void:
 	# Klassisches Mobile-Layout: Bewegung links, Skills unten mittig,
@@ -9914,7 +9989,7 @@ func draw_panel() -> void:
 		"creation_review": draw_creation_review_panel()
 		"multiplayer": draw_multiplayer_panel()
 		"intro": draw_intro_panel()
-		"patches": preload("res://components/patch_notes.gd").draw(self)
+		"patches": PatchNotes.draw(self)
 		"pause": draw_game_menu()
 		"settings": draw_pause_panel()
 		"repair": draw_repair_panel()
@@ -10024,14 +10099,21 @@ func draw_appearance_panel() -> void:
 		text_at(Vector2(615,y+44),(CharacterAdornments.HEAD_NAMES[cosmetic_hair] if row==0 and hero_race==2 else (CharacterAdornments.BADGE_NAMES[cosmetic_jewelry] if row==2 else "%d / %d" % [values[row]+1,max_values[row]])),15,Color("f6edda"),HORIZONTAL_ALIGNMENT_CENTER,180)
 		ui_button(Rect2(805,y+18,50,38),">")
 	ui_button(Rect2(555,518,300,44),"FERTIG")
+	text_at(Vector2(555,584),appearance_save_status(),13,Color("cfe6d3"),HORIZONTAL_ALIGNMENT_LEFT,300)
+
+## Sichtbarer Speicherstatus bei Fenna: erst „gespeichert“, wenn der Server bestätigt hat.
+func appearance_save_status()->String:
+	if creative_mode:return "Testmodus · nur lokal gespeichert"
+	if network_mode!="client":return "Lokal gespeichert ✓"
+	return "Auf dem Server gespeichert ✓" if not server_save.dirty else "Speichere auf dem Server …"
 
 func click_appearance(mouse:Vector2) -> void:
 	if Rect2(555,518,300,44).has_point(mouse):
 		save_game();panel="";return
 	if Rect2(205,494,62,36).has_point(mouse):
-		appearance_preview_dir=posmod(appearance_preview_dir-1,4);play_sound("menu");queue_redraw();return
+		appearance_preview_dir=posmod(appearance_preview_dir-1,4);play_sound("ui_klick");queue_redraw();return
 	if Rect2(413,494,62,36).has_point(mouse):
-		appearance_preview_dir=posmod(appearance_preview_dir+1,4);play_sound("menu");queue_redraw();return
+		appearance_preview_dir=posmod(appearance_preview_dir+1,4);play_sound("ui_klick");queue_redraw();return
 	var limits:=[11 if hero_race==2 else 4,4,11,COSMETIC_ACCENT_HEX.size()]
 	for row in 4:
 		var y:=220+row*72
@@ -10044,7 +10126,7 @@ func click_appearance(mouse:Vector2) -> void:
 			1: cosmetic_cloak=posmod(cosmetic_cloak+delta,limits[row])
 			2: cosmetic_jewelry=posmod(cosmetic_jewelry+delta,limits[row])
 			3: cosmetic_accent=posmod(cosmetic_accent+delta,limits[row])
-		play_sound("menu")
+		play_sound("ui_klick")
 		save_game()
 		return
 
@@ -10161,7 +10243,7 @@ func draw_character_cloak_shape(p:Vector2,scale_factor:float,motion:Dictionary,a
 	# Zwei dezente Stofffalten, damit die Fläche als Rückenmantel lesbar bleibt.
 	PixelStyle32.line(self,p+Vector2(-3,-8)*scale_factor,p+(Vector2(-2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.32),1.0*scale_factor)
 	PixelStyle32.line(self,p+Vector2(3,-8)*scale_factor,p+(Vector2(2,length-lift-4)+trail*0.35)*scale_factor,accent.darkened(0.32),1.0*scale_factor)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func draw_character_cloak_back(p:Vector2,look:Vector2,scale_factor:float,cloak:int,accent_index:int,walking:bool=false,sprinting:bool=false,dashing:bool=false,dead:bool=false,phase:float=0.0,death_progress:float=-1.0,role:int=-1,race:int=-1)->void:
 	var motion:=cloak_motion_profile(cloak,look,walking,sprinting,dashing,dead,phase)
@@ -10201,7 +10283,7 @@ func draw_character_cloak_foreground(p:Vector2,look:Vector2,scale_factor:float,c
 	var collar_half:=float(motion["neck_half"])+1.2
 	PixelStyle32.line(self,p+Vector2(-collar_half,collar_y)*scale_factor,p+Vector2(collar_half,collar_y)*scale_factor,accent.lightened(0.30),2.0*scale_factor)
 	PixelStyle32.circle(self,p+Vector2(0,collar_y)*scale_factor,1.8*scale_factor,accent.lightened(0.46))
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func adornment_transform(p:Vector2,look:Vector2,scale_factor:float,death:float=-1.0,roll:float=-1.0,role:int=-1,race:int=-1)->void:
 	var local:=p.is_equal_approx(player_pos) and panel not in ["appearance","creation","creation_review"]
@@ -10219,7 +10301,7 @@ func adornment_transform(p:Vector2,look:Vector2,scale_factor:float,death:float=-
 		rotation=fall*(PI*0.40 if use_race==2 else PI*0.46)*(1.0 if look.x>=0 else -1.0)
 	var pivot:=p+Vector2(0,-10)*scale_factor
 	var shift:=Vector2(0,smoothstep(0.0,0.7,death)*19.0*scale_factor) if death>=0 else Vector2.ZERO
-	draw_set_transform(character_canvas_offset+pivot+shift-pivot.rotated(rotation),rotation)
+	set_local_canvas_transform(character_canvas_offset+pivot+shift-pivot.rotated(rotation),rotation)
 
 func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int,hair:int,cloak:int,jewelry:int,accent_index:int)->void:
 	adornment_transform(p,look,scale_factor)
@@ -10232,7 +10314,7 @@ func draw_character_cosmetics(p:Vector2,look:Vector2,scale_factor:float,race:int
 			for i in range(-hair,hair+1):
 				PixelStyle32.rect(self,Rect2(p+Vector2(i*5-3,y-abs(i)*2)*scale_factor,Vector2(7,6)*scale_factor),accent.darkened(0.05*abs(i)))
 	CharacterAdornments.badge(self,p,look,scale_factor,jewelry,accent)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 
 func draw_account_gate() -> void:
 	text_at(Vector2(300,190),"SONNENHAIN KONTO",34,Color("ffe2aa"))
@@ -10335,20 +10417,50 @@ func open_account_character(index:int)->void:
 	var c:Dictionary=account_characters[index]
 	active_save_slot=clampi(int(c.get("slot",1)),1,3)
 	player_uuid=str(c.get("uuid",""))
-	server_save.uuid=player_uuid
-	server_save.token=str(c.get("token",""))
-	server_save.revision=0
-	server_save.dirty=false
+	var account_token:=str(c.get("token",""))
+	# Ein lokaler Stand desselben Charakters, der den Server noch nicht erreicht
+	# hat (z. B. Fenna-Änderung kurz vor dem Schließen), darf beim Login nicht
+	# verloren gehen: er wird geladen und behält seine Revision. Die Server-
+	# Antwort entscheidet dann wie gewohnt (gleiche Revision: lokal hochladen,
+	# Server neuer: Server laden und lokalen Stand als Konfliktkopie sichern).
+	var pending:=unsynced_local_save(player_uuid,account_token)
+	if not pending.is_empty():
+		apply_save_data(pending)
+		server_save.restore(pending)
+		server_save.latest=capture_save_data()
+	else:
+		server_save.uuid=player_uuid
+		server_save.token=account_token
+		server_save.revision=0
+		server_save.dirty=false
+		server_save.latest={}
+		server_save.last_request=""
+		server_save.submitted_hash=""
 	server_save.ready=false
 	server_save.loading=true
-	server_save.latest={}
 	server_save.inflight.clear()
-	server_save.last_request=""
-	server_save.submitted_hash=""
 	account_pending_load=true
 	account_status="Lade deinen Server-Spielstand …"
 	panel="account_characters"
+	request_server_save_open()
+
+func request_server_save_open()->void:
 	rpc_zz_save_open.rpc_id(1,server_save.token,player_uuid)
+
+## Lokaler Spielstand dieses Charakters, der noch nicht vom Server bestätigt ist.
+func unsynced_local_save(uuid:String,token:String)->Dictionary:
+	if uuid=="" or token=="":return {}
+	var slots:Array=[active_save_slot]
+	for slot in range(1,4):
+		if slot not in slots:slots.append(slot)
+	for slot in slots:
+		var data:Dictionary=preload("res://components/local_save_store.gd").read(slot_save_path(slot))
+		if data.is_empty():continue
+		if str(data.get("player_uuid",""))!=uuid or str(data.get("server_save_token",""))!=token:continue
+		if not bool(data.get("server_save_dirty",false)):continue
+		active_save_slot=slot
+		return data
+	return {}
 
 func draw_account_characters()->void:
 	text_at(Vector2(220,145),"DEINE CHARAKTERE",30,Color("ffe2aa"))
@@ -10490,8 +10602,9 @@ func draw_pause_panel() -> void:
 	ui_button(Rect2(860, 221, 130, 42), "TOUCH" if touch_enabled else "TASTEN")
 	ui_button(Rect2(860, 270, 130, 42), "MECHANIK")
 	ui_button(Rect2(300, 270, 550, 42), "TESTSTAND SPEICHERN" if creative_mode else "SPIEL SPEICHERN")
-	draw_volume_slider(Vector2(300, 326), "MUSIK", music_volume, Color("d9b67b"))
-	draw_volume_slider(Vector2(300, 380), "EFFEKTE", effects_volume, Color("9bcfd0"))
+	draw_volume_slider(Vector2(300, 328), "MUSIK", music_volume, Color("d9b67b"))
+	draw_volume_slider(Vector2(300, 364), "EFFEKTE", effects_volume, Color("9bcfd0"))
+	draw_volume_slider(Vector2(300, 400), "OBERFLÄCHE", ui_volume, Color("c7b3e2"))
 	ui_button(Rect2(300, 432, 550, 42), "TESTMODUS VERLASSEN" if creative_mode else "TESTMODUS STARTEN")
 	if not creative_mode:
 		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
@@ -10640,7 +10753,7 @@ func click_essence(mouse:Vector2)->void:
 	for tree in EssenceSystem.TREE_COUNT:
 		if Rect2(165+tree*162,148,152,36).has_point(mouse):
 			essence.selected_tree=tree
-			play_sound("menu")
+			play_sound("ui_klick")
 			queue_redraw()
 			return
 	for talent in EssenceSystem.TALENTS_PER_TREE:
@@ -10648,7 +10761,7 @@ func click_essence(mouse:Vector2)->void:
 			if essence.invest(level,essence.selected_tree,talent):
 				var info:Dictionary=EssenceSystem.TALENTS[essence.selected_tree][talent]
 				message("%s · Rang %d/4" % [info["name"],essence.rank(essence.selected_tree,talent)])
-				play_sound("level")
+				play_sound("skillpunkt")
 				save_game()
 			else:
 				message("Dafür fehlt freie Essenz oder mehr Bindung an diesen Baum.")
@@ -10875,6 +10988,8 @@ func draw_inventory_panel() -> void:
 	draw_equipment_slot(Vector2(180,205),"KOPF",equipped_head_uid,"head")
 	draw_equipment_slot(Vector2(180, 275), "WAFFE", equipped_uid, class_weapon_icon())
 	draw_equipment_slot(Vector2(501, 235), "RÜSTUNG", equipped_armor_uid, "armor")
+	draw_equipment_slot(Vector2(501,325),"HALSKETTE",equipped_necklace_uid,"necklace")
+	if necklace_visual()>=0:text_at(Vector2(186,558),necklaces.progress(necklace_visual(),0,Time.get_ticks_msec()),13,Color("d8c5ff"))
 	draw_equipment_slot(Vector2(300, 440), "RING 1" if class_id == 1 else "RING", equipped_ring_uid, "ring")
 	if class_id == 1: draw_equipment_slot(Vector2(405,440),"RING 2",equipped_ring2_uid,"ring")
 	text_at(Vector2(186, 534), "HP %d  ·  ANGRIFF %d  ·  SCHUTZ %d" % [int(max_hp()), normal_attack_power(), equipment_power(equipped_armor_uid)], 15, Color("e6efdd"))
@@ -10913,6 +11028,7 @@ func draw_inventory_panel() -> void:
 		var action_label := "MEISTERGABE NUTZEN" if bool(item.get("class_relic",false)) else ("ESSEN" if item["icon"] == "food" else "BENUTZEN")
 		if item["icon"] in ["sword","staff","bow","armor","ring","head"]:
 			action_label = "AUSZIEHEN" if is_equipped_uid(int(item.get("uid",-1))) else "AUSRÜSTEN"
+		if ArcaneNecklaces.index(item)>=0:action_label="ABLEGEN" if is_equipped_uid(int(item.get("uid",-1))) else ("WECHSELN" if equipped_necklace_uid>=0 else "ANLEGEN")
 		ui_button(Rect2(643, 538, 320, 42), action_label, inventory_item_usable(item))
 	else:
 		text_at(Vector2(643, 508), "Wähle einen Gegenstand aus dem Inventar.", 14, Color("dbe8d5"))
@@ -10924,7 +11040,7 @@ func draw_inventory_panel() -> void:
 			break
 
 func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1) -> void:
-	ui_box(Rect2(pos, Vector2(246, 190)), Color("354a4a"))
+	ui_box(Rect2(pos, Vector2(246, 210)), Color("354a4a"))
 	draw_rect(Rect2(pos + Vector2(7, 7), Vector2(232, 3)), RARITY_COLORS[int(item["rarity"])])
 	draw_item_icon(pos + Vector2(15, 22), String(item["icon"]), RARITY_COLORS[int(item["rarity"])], 1.0, weapon_visual_stage(item), item_design(item))
 	draw_item_signature(pos + Vector2(15, 22), item)
@@ -10947,7 +11063,17 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var color := Color("83e4a0") if diff > 0 else (Color("ee8a86") if diff < 0 else Color("dfdcc3"))
 		var stat_name := "Schaden" if icon in ["sword", "staff", "bow"] else ("Schutz" if icon == "armor" else "Leben")
 		text_at(pos + Vector2(14, 93), "%s %d   %s%d" % [stat_name, int(item["power"]), "▲ +" if diff > 0 else ("▼ " if diff < 0 else "= "), diff], 14, color)
-	if icon in ["potion", "gem", "herb", "essence", "food"]:
+	if icon=="necklace":
+		var description:String=ArcaneNecklaces.TEXT[ArcaneNecklaces.index(item)]
+		text_at(pos+Vector2(14,94),"Alle Klassen · wirkt beim Tragen",12,Color("d8c5ff"))
+		var line:=""
+		var y:=116
+		for word in description.split(" "):
+			if (line+word).length()>31:
+				text_at(pos+Vector2(14,y),line,11,Color("bfe4d8"));y+=16;line=""
+			line+=word+" "
+		text_at(pos+Vector2(14,y),line,11,Color("bfe4d8"))
+	elif icon in ["potion", "gem", "herb", "essence", "food"]:
 		var effect_name: String = "%s +65" % ("Mana" if class_id == 1 else "Energie") if String(item["name"]) in ["Energietrank", "Manatrank"] else ("+80% maximale HP" if String(item["name"]) == "Großer Heiltrank" else ("+50% maximale HP" if icon == "potion" else "Wertvolles Material"))
 		if icon == "food":
 			var nutrition := FoodSystem.by_name(str(item["name"]))
@@ -10967,10 +11093,10 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 	elif bool(item.get("locked",false)):
 		text_at(pos+Vector2(14,168),"UNVERKÄUFLICH · Doppelklick zum Entsperren",10,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
 	var price_text := "Kaufpreis: %d Gold" % purchase_price if purchase_price >= 0 else "Verkauf: %d Gold" % item_sale_value(item)
-	text_at(pos + Vector2(14, 190), price_text, 13, Color("f0d69b"))
+	text_at(pos + Vector2(14, 198), price_text, 13, Color("f0d69b"))
 
 func draw_item_signature(p: Vector2, item: Dictionary) -> void:
-	if item.get("icon") == "food": return
+	if item.get("icon") in ["food","necklace"]: return
 	var signature := absi(String(item["name"]).hash())
 	var tint: Color = element_color(String(item.get("element", ""))) if str(item.get("element", "")) != "" else RARITY_COLORS[int(item["rarity"])]
 	var center := p + Vector2(27, 25)
@@ -11000,26 +11126,10 @@ func draw_equipment_slot(p: Vector2, label: String, uid: int, icon: String) -> v
 	text_at(p + Vector2(9, 66), label, 12, Color("fff0c3"))
 
 func item_type(icon: String) -> String:
-	match icon:
-		"sword": return "Waffe"
-		"staff": return "Stab"
-		"bow": return "Bogen"
-		"food": return "Nahrung"
-		"potion": return "Trank"
-		"gem": return "Kristall"
-		"ring": return "Schmuck"
-		"armor": return "Rüstung"
-		"head": return "Kopfausrüstung"
-		"herb": return "Kräuter"
-		_: return "Gegenstand"
+	return ItemRules.item_type(icon)
 
 func element_color(element: String) -> Color:
-	match element:
-		"feuer": return Color("ff9147")
-		"eis": return Color("a3e9fb")
-		"blitz": return Color("ffe480")
-		"gift": return Color("b3e978")
-		_: return Color("f5e9cc")
+	return ItemRules.element_color(element)
 
 func draw_skill_icon(p: Vector2, id: int, size: float) -> void:
 	var box := Rect2(p, Vector2(size,size))
@@ -11099,18 +11209,20 @@ func shop_preview_item(stock_item: Dictionary) -> Dictionary:
 	return preview
 
 func draw_travel_panel() -> void:
-	text_at(Vector2(165, 131), "WEGSTEINE · REISE VON SONNENHAIN", 24, Color("ffe5a2"))
-	text_at(Vector2(168, 159), "Berühre einen Wegstein draußen und drücke F, um ihn dauerhaft zu aktivieren.", 15, Color("dcebdc"))
-	for i in range(1, WAYSTONES.size()):
-		var col := (i - 1) % 3
-		var row := (i - 1) / 3
-		var pos := Vector2(166 + col * 271, 175 + row * 96)
-		var zone := region_at(WAYSTONES[i])
-		var available: bool = waystone_unlocked[i] and region_available(zone)
-		ui_box(Rect2(pos, Vector2(255, 79)), Color("59766b") if available else Color("405657"))
-		draw_circle(pos + Vector2(25, 35), 12, Color("9cece7") if available else Color("8d9b9a"))
-		text_at(pos + Vector2(48, 32), region_name(zone), 16, Color("fff1c4") if available else Color("b9c7c1"))
-		text_at(pos + Vector2(48, 57), "EMPF. LV %d · %s" % [region_level(zone), "REISEN" if available else "NICHT AKTIVIERT"], 13, Color("bfeee0") if available else Color("d2c0b6"))
+	text_at(Vector2(165, 131), "WEGSTEINE · REISEN", 24, Color("ffe5a2"))
+	text_at(Vector2(168, 159), "Jeder aktivierte Wegstein bringt dich zu jedem anderen. Neue Wegsteine aktivierst du, indem du sie draußen berührst.", 15, Color("dcebdc"), HORIZONTAL_ALIGNMENT_LEFT, 800)
+	var slots := travel_slots()
+	for slot in slots.size():
+		var i: int = slots[slot]
+		var rect := travel_slot_rect(slot)
+		var here: bool = i == travel_from
+		var available := travel_available(i) and not here
+		var zone := 0 if i == 0 else region_at(WAYSTONES[i])
+		ui_box(rect, Color("59766b") if available else Color("405657"))
+		draw_circle(rect.position + Vector2(25, 35), 12, Color("ffd98a") if here else (Color("9cece7") if available else Color("8d9b9a")))
+		text_at(rect.position + Vector2(48, 32), travel_label(i), 16, Color("fff1c4") if available or here else Color("b9c7c1"))
+		var state := "DU BIST HIER" if here else ("REISEN" if available else "NICHT AKTIVIERT")
+		text_at(rect.position + Vector2(48, 57), ("DORF · %s" % state) if i == 0 else ("EMPF. LV %d · %s" % [region_level(zone), state]), 13, Color("ffe2a8") if here else (Color("bfeee0") if available else Color("d2c6b6")))
 
 func draw_journal_panel() -> void:
 	text_at(Vector2(165, 125), "QUESTBUCH", 26, Color("ffeda9"))
@@ -11531,6 +11643,7 @@ func invalidate_static_cache() -> void:
 
 func village_props() -> Array:
 	var props: Array = []
+	props.append({"kind":"mountain","point":VillageElevation.Mountain.CENTER,"depth":324.0})
 	for house in house_positions():
 		var kind:="home"
 		for info in VillageLayout.SHOPS:
@@ -11544,16 +11657,22 @@ func village_props() -> Array:
 	for p in VillageLayout.FENCES: props.append({"kind":"fence","point":p,"depth":p.y+12})
 	for p in VillageFixtures.LAMPS: props.append({"kind":"lamp","point":p,"depth":p.y+8})
 	for p in VillageLayout.BUSHES: props.append({"kind":"bush","point":p,"depth":p.y+16})
-	for shop in VillageLayout.SHOPS:
-		if shop["kind"]=="smith":props.append({"kind":"cart","point":shop["cart"],"depth":shop["cart"].y+24,"goods":shop["kind"]})
+	for p in VillageLayout.FLOWER_BUSHES:
+		# Ground-level shrubs must not show through the raised northwest terraces.
+		if VillageElevation.Mountain.height_at(p)>0 or VillageElevation.Mountain.height_at(p+Vector2(0,32))>0:continue
+		props.append({"kind":"flower_bush","point":p,"depth":p.y+16})
+	for item in preload("res://components/village_forecourts.gd").ITEMS:
+		props.append({"kind":"forecourt","point":item["point"],"depth":item["point"].y+8,"item":item["item"]})
 	return props
 
 func prop_bounds(prop: Dictionary) -> Rect2:
 	var p: Vector2 = prop["point"]
 	match prop["kind"]:
+		"mountain": return VillageElevation.Mountain.BOUNDS
+		"forecourt":return preload("res://components/village_forecourts.gd").bounds(p,str(prop["item"]))
 		"house":
 			var house_kind:=str(prop.get("house_kind","home"))
-			return VillageBuildings.bounds(p,house_kind)
+			return VillageBuildings.visual_bounds(p,house_kind)
 		"tree": return StartScenery32.scenery_bounds(p,StartScenery32.tree_variant(p))
 		"magic_tree": return StartScenery32.scenery_bounds(p,"borin-runenbaum")
 		"lamp": return Rect2(p+Vector2(-20,-104),Vector2(40,120))
@@ -11562,12 +11681,15 @@ func prop_bounds(prop: Dictionary) -> Rect2:
 		"fence": return Rect2(p+Vector2(-8,-30),Vector2(116,36))
 		"board": return Rect2(p+Vector2(-48,-94),Vector2(96,128))
 		"well": return StartScenery32.scenery_bounds(p,"brunnen")
-		"bush": return StartScenery32.scenery_bounds(p,StartScenery32.bush_variant(p))
+		"bush": return StartScenery32.scenery_bounds(p,"busch-oliv")
+		"flower_bush": return StartScenery32.scenery_bounds(p,"busch-blumen")
 		_: return Rect2(p+Vector2(-64,-48),Vector2(128,96))
 
 func paint_village_prop(prop: Dictionary) -> void:
 	var p: Vector2 = prop["point"]
 	match prop["kind"]:
+		"mountain": VillageElevation.Mountain.paint(self)
+		"forecourt":preload("res://components/village_forecourts.gd").paint(self,p,str(prop["item"]))
 		"house":
 			draw_house(p)
 			for shop in VillageLayout.SHOPS:
@@ -11583,7 +11705,8 @@ func paint_village_prop(prop: Dictionary) -> void:
 		"lamp": StartScenery32.lamp(self,p)
 		"barrel": StartScenery32.barrel(self,p)
 		"fence": StartScenery32.fence(self,p,p+Vector2(100,0))
-		"bush": food_system.bush(self,p)
+		"bush": StartScenery32.scenery(self,p,"busch-oliv")
+		"flower_bush": StartScenery32.scenery(self,p,"busch-blumen")
 		"cart": Wagon32.paint(self,p,prop["goods"])
 
 func prop_cache_key(prop: Dictionary) -> String:
@@ -11697,7 +11820,7 @@ func draw_sorted_world_objects() -> void:
 			"player": draw_spawn_elevated_actor(-1)
 
 func class_weapon_icon_for(value: int) -> String:
-	return ["sword", "staff", "bow"][clampi(value, 0, 2)]
+	return ItemRules.class_weapon_icon_for(value)
 
 
 
@@ -11760,6 +11883,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
+		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,5), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
@@ -11767,6 +11891,8 @@ func rpc_player_presence(state: Dictionary) -> void:
 	}
 	clean["konflux"] = in_konflux
 	clean["room"] = room_id
+	if int(clean.get("necklace_serial",0))!=int(remote_players.get(sender,{}).get("necklace_serial",-1)) or int(clean.get("necklace",-1))!=int(remote_players.get(sender,{}).get("necklace",-1)):
+		necklaces.reset_charges(sender,int(clean.get("necklace",-1)),Time.get_ticks_msec())
 	remote_players[sender] = clean
 	server_restore_party_reconnect(sender)
 	send_server_session_status(sender)
@@ -12352,7 +12478,7 @@ func draw_party_widget() -> void:
 
 func multiplayer_debug_rect() -> Rect2:
 	# Oberhalb liegen Regionskopf + Minimap + KOOP/Save-Hinweise.
-	return Rect2(VIEW.x-265.0,218.0,253.0,39.0)
+	return Rect2(VIEW.x-265.0,HudLayout.RIGHT_STATUS_BOTTOM+6.0,253.0,39.0)
 
 func draw_multiplayer_debug_overlay() -> void:
 	if not is_web_platform() or network_mode == "offline" or not character_created:return
@@ -12453,14 +12579,14 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		var cloth:=int(state.get("cosmetic_cloak",0))
 		var accent:=int(state.get("cosmetic_accent",0))
 		draw_character_cloak_back(rp,rdir,WORLD_CHARACTER_SCALE,cloth,accent,bool(state.get("walking",false)),bool(state.get("running",false)),false,float(state.get("hp",1))<=0,world_time,float(state.get("death_progress",-1.0)),cls,race)
-		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, WORLD_CHARACTER_SCALE, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)))
+		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, WORLD_CHARACTER_SCALE, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)),clampi(int(state.get("necklace",-1)),-1,5))
 		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5*WORLD_CHARACTER_SCALE), cls, clampi(int(state.get("weapon",0)),0,11), rdir, WORLD_CHARACTER_SCALE)
 		draw_character_cloak_foreground(rp,rdir,WORLD_CHARACTER_SCALE,cloth,accent,bool(state.get("walking",false)),bool(state.get("running",false)),false,float(state.get("hp",1))<=0,world_time,float(state.get("death_progress",-1.0)),cls,race)
 		adornment_transform(rp,rdir,WORLD_CHARACTER_SCALE,float(state.get("death_progress",-1.0)),-1.0,cls,race)
 		var color:=cosmetic_accent_color(accent)
 		if race==2:CharacterAdornments.head(self,rp,rdir,WORLD_CHARACTER_SCALE,int(state.get("cosmetic_hair",0)),color)
 		CharacterAdornments.badge(self,rp,rdir,WORLD_CHARACTER_SCALE,int(state.get("cosmetic_jewelry",0)),color)
-		draw_set_transform(character_canvas_offset)
+		restore_canvas_transform()
 		combat_feedback.health(self,"peer:%d"%int(peer_id),rp+Vector2(0,-43),float(state.get("hp",1)),float(state.get("max_hp",1)),60,Color("79caa3"))
 		var party_peer_ids := local_party_peer_ids()
 		var name_color := Color("ffe0a1") if int(peer_id) in party_peer_ids else Color("bfe7ff")
@@ -12509,6 +12635,11 @@ func update_network_interpolation(delta: float) -> void:
 			var target: Vector2 = enemy["net_target_pos"]
 			var current: Vector2 = enemy["pos"]
 			enemy["pos"] = target if current.distance_to(target) > 360.0 else current.lerp(target,mob_blend)
+			var type:=int(enemy.get("type",-1))
+			if type in [0,1,2,3] and bool(enemy.get("walking",false)) and str(attack.get("ability",{}).get("shape",""))!="leap" and current.distance_to(target)<=360.0:
+				var previous_phase:=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU)))
+				var distance:=current.distance_to(enemy["pos"])
+				enemy["gait_phase"]=WolfAnimation.advance_gait(previous_phase,distance) if type==3 else WoodlandPoseAnimation.advance_gait(type,previous_phase,distance)
 
 func export_save_backup() -> void:
 	if not character_created: return
@@ -12559,12 +12690,16 @@ func run_inventory_consistency_smoke() -> bool:
 	var old_armor := equipped_armor_uid
 	var old_ring := equipped_ring_uid
 	var old_ring2 := equipped_ring2_uid
+	var old_necklace:=equipped_necklace_uid
+	var old_necklaces=necklaces
 	var old_next := next_uid
 	inventory = []
 	equipped_uid = -1
 	equipped_armor_uid = -1
 	equipped_ring_uid = -1
 	equipped_ring2_uid = -1
+	equipped_necklace_uid = -1
+	necklaces=ArcaneNecklaces.new()
 	next_uid = 1
 	var armor := make_item("Smoke Rüstung","armor",1,4,10)
 	var ring := make_item("Smoke Ring","ring",1,8,10)
@@ -12617,6 +12752,8 @@ func run_inventory_consistency_smoke() -> bool:
 	equipped_armor_uid = old_armor
 	equipped_ring_uid = old_ring
 	equipped_ring2_uid = old_ring2
+	equipped_necklace_uid=old_necklace
+	necklaces=old_necklaces
 	next_uid = old_next
 	validate_equipment_slots()
 	print("INVENTORY_SMOKE_OK unique_uids=true toggle_armor=true buy=true equipped_sell_block=true server_loot_local_uid=true loadout_state=true tx_dedupe=persistent")
@@ -12730,6 +12867,8 @@ func item_icon_for_uid(uid: int) -> String:
 	return ""
 
 func inventory_item_usable(item:Dictionary)->bool:
+	ArcaneNecklaces.normalize(item)
+	if ArcaneNecklaces.index(item)>=0:return true
 	if item_skill_unlock_id(item)>=0:return true
 	return bool(item.get("class_relic",false)) or item.get("icon","") in ["potion","food",class_weapon_icon(),"armor","ring"] or preload("res://components/headgear_rules.gd").allowed(item,class_id)
 
@@ -12743,6 +12882,8 @@ func equipped_head_allowed() -> bool:
 	return false
 
 func validate_equipment_slots() -> void:
+	for item in inventory:ArcaneNecklaces.normalize(item)
+	if equipped_necklace_uid>=0 and necklace_visual()<0:equipped_necklace_uid=-1
 	for item in inventory:preload("res://components/headgear_rules.gd").normalize(item)
 	if not equipped_head_allowed():equipped_head_uid=-1
 	var weapon_icon := item_icon_for_uid(equipped_uid)
@@ -12779,9 +12920,19 @@ func make_class_head(item_level:int) -> Dictionary:
 
 func toggle_equipment_item(index: int) -> bool:
 	if index < 0 or index >= inventory.size(): return false
+	ArcaneNecklaces.normalize(inventory[index])
 	var item: Dictionary = inventory[index]
 	var uid := int(item.get("uid",-1))
 	var icon := str(item.get("icon",""))
+	if icon=="necklace":
+		var removing:=equipped_necklace_uid==uid
+		equipped_necklace_uid=-1 if removing else uid
+		necklace_equip_serial+=1
+		necklaces.reset_charges(0,necklace_visual(),Time.get_ticks_msec())
+		play_sound("unequip" if removing else "equip")
+		message(("Abgelegt: " if removing else "Angelegt: ")+str(item["name"]))
+		save_game();announce_multiplayer_context()
+		return true
 	if icon=="head":
 		if not preload("res://components/headgear_rules.gd").allowed(item,class_id):
 			message("Diese Kopfbedeckung gehört einer anderen Klasse.")
@@ -12839,6 +12990,10 @@ func toggle_equipment_item(index: int) -> bool:
 
 func unequip_slot(slot: String) -> void:
 	match slot:
+		"necklace":
+			equipped_necklace_uid=-1
+			necklace_equip_serial+=1
+			necklaces.reset_charges(0,-1,Time.get_ticks_msec())
 		"weapon": equipped_uid = -1
 		"head": equipped_head_uid = -1
 		"armor": equipped_armor_uid = -1
@@ -12852,9 +13007,11 @@ func unequip_slot(slot: String) -> void:
 
 func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	var item: Dictionary = raw.duplicate(true)
+	ArcaneNecklaces.normalize(item)
+	if item.get("icon","")=="necklace" and ArcaneNecklaces.index(item)<0:item["icon"]="gem"
 	item.erase("uid")
 	var icon := str(item.get("icon","gem"))
-	if icon not in ["sword","staff","bow","armor","ring","head","potion","gem","herb","essence","food"]:
+	if icon not in ["sword","staff","bow","armor","ring","head","potion","gem","herb","essence","food","necklace"]:
 		item["icon"] = "gem"
 	item["rarity"] = clampi(int(item.get("rarity",0)),0,4)
 	item["power"] = clampi(int(item.get("power",0)),0,10000)
@@ -12883,7 +13040,7 @@ func apply_rescue_progress(amount: int, shared: bool = false) -> void:
 		rescue_intro_timer = 5.0
 		effect(RESCUE_POS+Vector2(0,-210),"BLÜTENWEILER GERETTET",Color("a8edb5"),5.0)
 		message(("Gemeinsam gerettet! " if shared else "")+"Blütenweiler gerettet! Nela wartet am Dorfplatz auf dich (E).")
-		play_sound("level")
+		play_sound("quest_bereit")
 	else:
 		message("%sBlütenweiler verteidigt: %d/%d Dornenwesen besiegt." % ["Gruppe · " if shared else "",rescue_kills,RESCUE_GOAL])
 	save_game()
@@ -12912,11 +13069,7 @@ func run_rescue_quest_consistency_smoke() -> bool:
 	return ok
 
 func network_reward_payload(item: Dictionary) -> Dictionary:
-	var payload: Dictionary = item.duplicate(true)
-	payload.erase("uid")
-	# Identität eines Inventargegenstands gehört ausschließlich dem Browser-Save.
-	payload.erase("stack_value")
-	return payload
+	return NetworkCodec.network_reward_payload(item)
 
 func server_rescue_active_peers() -> Array:
 	var peers: Array = []
@@ -12973,7 +13126,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "rune_ranks":essence.ranks.duplicate(true), "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "cosmetic_hair":cosmetic_hair,"cosmetic_cloak":cosmetic_cloak,"cosmetic_jewelry":cosmetic_jewelry,"cosmetic_accent":cosmetic_accent, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "rune_ranks":essence.ranks.duplicate(true), "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "cosmetic_hair":cosmetic_hair,"cosmetic_cloak":cosmetic_cloak,"cosmetic_jewelry":cosmetic_jewelry,"cosmetic_accent":cosmetic_accent, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"necklace":necklace_visual(),"necklace_serial":necklace_equip_serial,"normal_power":normal_attack_power(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:
@@ -13019,40 +13172,13 @@ func active_event_sync_rows() -> Array:
 	return rows
 
 func sanitize_active_quest_rows(raw: Variant) -> Array:
-	var out: Array = []
-	if not raw is Array: return out
-	var seen: Dictionary = {}
-	for entry in raw:
-		if not entry is Array or entry.size() < 2: continue
-		var quest_id := int(entry[0])
-		if quest_id < 0 or quest_id >= QUESTS.size() or seen.has(quest_id): continue
-		seen[quest_id] = true
-		out.append([quest_id,clampi(int(entry[1]),0,int(QUESTS[quest_id]["count"]))])
-	return out
+	return NetworkCodec.sanitize_active_quest_rows(raw)
 
 func sanitize_active_borin_quest_rows(raw:Variant)->Array:
-	var out:Array=[]
-	if not raw is Array:return out
-	var seen:Dictionary={}
-	for entry in raw:
-		if not entry is Array or entry.size()<2:continue
-		var quest_id:=int(entry[0])
-		if quest_id<0 or quest_id>=BORIN_QUESTS.size() or seen.has(quest_id):continue
-		seen[quest_id]=true
-		out.append([quest_id,clampi(int(entry[1]),0,int(BORIN_QUESTS[quest_id]["count"]))])
-	return out
+	return NetworkCodec.sanitize_active_borin_quest_rows(raw)
 
 func sanitize_active_event_rows(raw: Variant) -> Array:
-	var out: Array = []
-	if not raw is Array: return out
-	var seen: Dictionary = {}
-	for entry in raw:
-		if not entry is Array or entry.size() < 2: continue
-		var event_id := int(entry[0])
-		if event_id < 0 or event_id >= WORLD_EVENTS.size() or seen.has(event_id): continue
-		seen[event_id] = true
-		out.append([event_id,clampi(int(entry[1]),0,int(WORLD_EVENTS[event_id]["goal"]))])
-	return out
+	return NetworkCodec.sanitize_active_event_rows(raw)
 
 func server_transaction_seen(tx_id: String) -> bool:
 	return tx_id != "" and tx_id in processed_server_transactions
@@ -13102,6 +13228,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 		if int(borin_state["progress"])>=int(BORIN_QUESTS[borin_id]["count"]):
 			borin_state["state"]=2
 			message("%sBorins Prüfung geschafft: %s. Kehre zu Borin zurück!" % ["Gruppe · " if shared else "",BORIN_QUESTS[borin_id]["title"]])
+			play_sound("quest_bereit")
 	for raw_id in (payload.get("quests",[]) as Array):
 		var quest_id := int(raw_id)
 		if quest_id < 0 or quest_id >= quests.size(): continue
@@ -13112,6 +13239,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 		if int(quest["progress"]) >= int(QUESTS[quest_id]["count"]):
 			quest["state"] = 2
 			message("%sQuestziel erreicht: %s. Kehre zurück!" % ["Gruppe · " if shared else "",QUESTS[quest_id]["title"]])
+			play_sound("quest_bereit")
 		changed = true
 	for raw_id in (payload.get("events",[]) as Array):
 		var event_id := int(raw_id)
@@ -13122,7 +13250,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 		if int(event_progress[event_id]) >= int(WORLD_EVENTS[event_id]["goal"]):
 			event_states[event_id] = 2
 			message("%s%s ist in Sicherheit! Sprich erneut mit %s (E)." % ["Gruppe · " if shared else "",WORLD_EVENTS[event_id]["role"],WORLD_EVENTS[event_id]["name"]])
-			play_sound("level")
+			play_sound("quest_bereit")
 		changed = true
 	if bool(payload.get("rescue",false)):
 		apply_rescue_progress(1,shared)
@@ -13275,6 +13403,7 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 	# Beute gehört der gemeinsamen Welt: genau ein Relikt pro Klassenboss und
 	# auch normale Itemdrops können von jedem Spieler aufgehoben werden.
 	if is_boss:
+		server_spawn_world_drop(boss_necklace_item(type-12),Vector2(enemy["pos"])+Vector2(0,-25),-1,180.0)
 		server_spawn_world_drop(class_relic_item(type-12),Vector2(enemy["pos"])+Vector2(25,0),type-12,180.0)
 		server_spawn_world_drop(class_boss_hat_item(type-12),Vector2(enemy["pos"])+Vector2(-25,8),type-12,180.0)
 		if type==14:server_spawn_world_drop(ranger_falcon_rune_item(),Vector2(enemy["pos"])+Vector2(0,34),2,180.0)
@@ -13615,7 +13744,7 @@ func receive_mob_death(payload:Dictionary)->void:
 		play_sound("hit")
 		boss_death_end_queue.append({"uid":uid,"remaining":1.35})
 	else:
-		row["duration"]=.45
+		row["duration"]=.95 if death_type in [0,1,2,3] else .45
 	mob_deaths.append(row)
 	while mob_deaths.size()>24:mob_deaths.pop_front()
 	for key in dead_mob_uids.keys():
@@ -13651,9 +13780,13 @@ func draw_mob_deaths()->void:
 				var distance:float=18.0+burst*105.0
 				var point:=p+Vector2.RIGHT.rotated(angle)*distance
 				draw_rect(Rect2(point-Vector2(3,3),Vector2(6,6)),Color(color,.8*(1.0-progress)))
+		elif type in [0,1,2,3]:
+			var face:Array=row.get("facing",[0.0,1.0])
+			var look:=Vector2(float(face[0]),float(face[1]))
+			MobDesign32.paint(self,p+character_canvas_offset,type,enemy_level(type),look,ENEMY_TYPES[type]["color"],0,-1,float(row["scale"]),Vector2.ONE,"",{"death":age})
 		else:
 			MobDesign32.paint(self,p+character_canvas_offset,type,enemy_level(type),Vector2.DOWN,ENEMY_TYPES[type]["color"].darkened(age*.9),0,-1,float(row["scale"])*(1-age*.75),Vector2(1,1-age*1.6))
-		draw_set_transform(character_canvas_offset)
+		restore_canvas_transform()
 
 func normal_mob_count()->int:
 	var count:=0
@@ -13677,13 +13810,55 @@ func draw_local_player_label() -> void:
 
 func draw_spawn_elevated_actor(peer:int)->void:
 	var point:Vector2=player_pos if peer<0 else network_player_position(peer)
-	var height:float=SpawnPlatform32.height_at(point,WAYSTONES[0]) if multiplayer_context()=="world" else 0
+	var height:float=maxf(SpawnPlatform32.height_at(point,WAYSTONES[0]),VillageElevation.height_at(point)) if multiplayer_context()=="world" else 0
 	var old_offset:Vector2=character_canvas_offset
 	character_canvas_offset=old_offset-Vector2(0,height)
-	draw_set_transform(character_canvas_offset)
+	restore_canvas_transform()
 	if peer<0:
 		draw_player()
 		draw_local_player_label()
 	else:draw_remote_players(peer)
 	character_canvas_offset=old_offset
 	draw_set_transform(old_offset)
+
+func necklace_visual(peer:int=0)->int:
+	if peer>0:return clampi(int(remote_players.get(peer,{}).get("necklace",-1)),-1,5)
+	for item in inventory:
+		if int(item.get("uid",-1))==equipped_necklace_uid:return ArcaneNecklaces.index(item)
+	return -1
+
+func boss_necklace_item(boss:int)->Dictionary:
+	var i:=clampi(boss,0,2)+3
+	return make_item(ArcaneNecklaces.NAMES[i],"necklace",3,0,0,"",maxi(1,level))
+
+func necklace_cast_eligible(id:int)->bool:
+	if id<0 or id>=ABILITIES.size():return false
+	if id>=BASE_ABILITIES.size():
+		var definition:=fusion_definition_by_id(id)
+		return not definition.is_empty() and (necklace_cast_eligible(int(definition["a"])) or necklace_cast_eligible(int(definition["b"])))
+	return bool(FusionRules.metadata(id).get("damage",false)) or id in [8,15,24,33,35]
+
+func sync_necklace_progress(peer:int)->void:
+	if network_mode!="host" or peer not in multiplayer.get_peers():return
+	var now:=Time.get_ticks_msec()
+	var s:Dictionary=necklaces.state(peer,necklace_visual(peer),now)
+	var payload:Dictionary={"id":s["id"],"rage":s["rage"],"hits":s["hits"],"target":s["target"],"ready":maxi(0,int(s["ready"])-now),"rage_until":maxi(0,int(s["rage_until"])-now),"hunt_until":maxi(0,int(s["hunt_until"])-now)}
+	rpc_necklace_progress.rpc_id(peer,payload)
+
+@rpc("authority","call_remote","reliable")
+func rpc_necklace_progress(payload:Dictionary)->void:
+	if network_mode!="client" or int(payload.get("id",-1))!=necklace_visual():return
+	var now:=Time.get_ticks_msec()
+	var s:Dictionary=necklaces.state(0,necklace_visual(),now)
+	s["rage"]=clampi(int(payload.get("rage",0)),0,5)
+	s["hits"]=clampi(int(payload.get("hits",0)),0,2)
+	s["target"]=int(payload.get("target",-1))
+	for key in ["ready","rage_until","hunt_until"]:s[key]=now+clampi(int(payload.get(key,0)),0,6000)
+
+func restore_canvas_transform()->void:
+	if drawing_ui:apply_ui_transform()
+	else:draw_set_transform(character_canvas_offset)
+
+func set_local_canvas_transform(origin:Vector2,rotation:float=0.0)->void:
+	var z:=effective_camera_zoom() if drawing_ui else 1.0
+	draw_set_transform(origin/z,rotation,Vector2.ONE/z)

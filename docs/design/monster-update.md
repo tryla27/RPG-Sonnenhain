@@ -1,4 +1,5 @@
 # Entwurf: Monster, Waffen und Fähigkeiten
+Update 9. Oktober 2026: Der aktuelle Nutzerwunsch ersetzt den früheren Angriffsplan für die ersten Waldgegner. Blütenkäfer nutzen Drüsensekret als Fernangriff, Pilzlinge einen stationären AoE-Giftstaub, Mooswölfe einen Nahbiss sowie einen angekündigten Sprungbiss. Die alte Ein-Angriff-Vorgabe gilt beim Mooswolf damit nicht mehr. Details und Prüfungen stehen in woodland-mobs-v2.md.
 Stand: 1. Oktober 2026. Entwurf, noch nicht im Live-Spiel.
 Bilder werden nativ in Godot aus components/monster_design_32.gd gerendert.
 Die acht Spalten zeigen N, NO, O, SO, S, SW, W, NW. Es sind Ansichten einer Laufphase, noch keine vollständigen Animationszyklen.

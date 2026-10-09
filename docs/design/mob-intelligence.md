@@ -1,0 +1,11 @@
+# Mob pursuit and obstacle routing · 2026-10-09
+
+Wolf leap windup is 0.4 seconds (previously 0.8); airborne time remains 0.32 seconds. Anticipation is shown through the wolf pose without a targeting line or landing ring. Landing damage, swept collision and aim lock remain authoritative.
+
+Ordinary enemies retain their acquired target without a home-distance leash. Unseen targets still require the normal detection range. Automatic ranged retreat and melee backoff are removed. Recovery permits forward pursuit when the player moves out of close contact. Acquired offline enemies are not despawned merely because the player gets ahead. Dead, hidden, disconnected or protected players are still excluded; region boundaries and boss arenas remain enforced.
+
+Movement uses deterministic local A* on a 32-unit grid, capped at 384 expanded nodes and a 640-unit planning horizon. Each enemy caches waypoints and replans after 0.6–0.78 seconds, a significant destination change or a blocked movement segment. Every edge and actual displacement is sampled at most eight units apart with the mob's collision radius, zone and context restrictions. Waypoints are reached precisely to avoid cutting obstacle corners. Valid separation can spread nearby enemies; there is no random backward escape. Leap displacement invalidates obsolete paths.
+
+Attack sight is checked near attack range and cached briefly until an endpoint moves. A blocked attack prompts routing rather than repeated casting into a tree. Deterministic tree geometry is cached to keep navigation queries economical. A bounded search cannot guarantee a route through arbitrary long mazes; unreachable protected destinations remain protected.
+
+Validation covers tree detours, larger bodies, U-shaped traps requiring an initial move away from the destination, multiple obstacles, swept thin-wall collision, protected zones, all ordinary mob types' pursuit/no-retreat behavior, blocked attack approach and wolf recovery. The real shared movement driver is checked as well as multiplayer attack snapshots, exactly-once damage, stun cancellation and boss credit through WebSocket clients. Navigation checks run in CI and both production release pipelines.

@@ -96,7 +96,19 @@ func run()->void:
 	for shop in g.VillageLayout.SHOPS:
 		var door:Vector2=g.village_house_door(shop)
 		assert(not g.is_blocked(door,door),"Blocked door: "+str(shop["name"]))
-		assert(reached.has(Vector2i((door/16.0).round())),"Unreachable door: "+str(shop["name"]))
+		# Scaled artwork can put a door between grid samples. The rounded sample
+		# may lie inside the facade even when the real door is reachable from below.
+		var reachable:=false
+		var cell:Vector2i=Vector2i((door/16.0).floor())
+		for offset in [Vector2i.ZERO,Vector2i.RIGHT,Vector2i.DOWN,Vector2i(1,1)]:
+			var candidate:Vector2i=cell+offset
+			if not reached.has(candidate):continue
+			var origin:=Vector2(candidate)*16.0
+			var clear:=true
+			for step in 4:
+				if g.is_blocked(origin.lerp(door,(step+1)/4.0),origin):clear=false;break
+			if clear:reachable=true;break
+		assert(reachable,"Unreachable door: "+str(shop["name"]))
 	assert(reached.has(Vector2i(55,160)),"South exit disconnected")
 	for name in ["smith","chapel","tavern","arena","arena_interior","atelier","skillhaus","ratshalle"]:
 		var texture:Texture2D=load("res://art/village/%s.png" % name)

@@ -7,6 +7,11 @@ import subprocess
 
 root = Path(__file__).resolve().parents[1]
 source = (root / 'main.gd').read_text(encoding='utf8')
+# Spielinhalte (Gegner, Fähigkeiten, Quests, NPCs, ...) liegen seit der
+# Modularisierung in components/game_content.gd; main.gd verweist darauf.
+content_source = (root / 'components' / 'game_content.gd').read_text(encoding='utf8')
+geometry_source = (root / 'components' / 'world_geometry.gd').read_text(encoding='utf8')
+data_source = source + '\n' + content_source + '\n' + geometry_source
 
 # Catch accidental duplicate top-level function declarations before Godot does.
 func_names = re.findall(r'^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(', source, re.M)
@@ -14,12 +19,11 @@ duplicates = sorted({name for name in func_names if func_names.count(name) > 1})
 assert not duplicates, f'duplicate functions: {duplicates}'
 
 # HUD navigation is intentionally outside the ESC menu: mouse and keyboard share
-# the same actions, while hovering the tracked quest reveals its live details.
+# the same actions. Quest line and hover details are checked by
+# tests/ui/check_hud_slim.gd.
 for token in [
-    'const QUEST_HUD_RECT:=Rect2(10,118,348,46)',
     'var actions:Array=["skills","inventory","journal","map","mechanics","party","chat"]',
     'var hud_action:=hud_action_at(event.position)',
-    'quest_guide.draw_hud_hover(self)',
     'Input.CURSOR_POINTING_HAND if hud_hovered else Input.CURSOR_ARROW',
 ]:
     assert token in source, f'missing clickable HUD/quest-hover behavior: {token}'
@@ -29,12 +33,12 @@ for legacy_entry in ['"INVENTAR"', '"FÄHIGKEITEN"', '"QUESTBUCH"', '"WELTKARTE"
 assert 'INVENTORY_HUD_RECT' not in source, 'legacy standalone inventory HUD button returned'
 
 def block(name):
-    match = re.search(rf'^const {name} := \[', source, re.M)
+    match = re.search(rf'^const {name} := \[', data_source, re.M)
     assert match, f'{name} missing'
     depth, start = 0, match.end() - 1
     quote, escaped = False, False
-    for index in range(start, len(source)):
-        c = source[index]
+    for index in range(start, len(data_source)):
+        c = data_source[index]
         if quote:
             if escaped: escaped = False
             elif c == '\\': escaped = True
@@ -43,7 +47,7 @@ def block(name):
         elif c == '[': depth += 1
         elif c == ']':
             depth -= 1
-            if depth == 0: return source[start:index+1]
+            if depth == 0: return data_source[start:index+1]
     raise AssertionError(f'{name} not closed')
 
 def entries(name):
@@ -96,14 +100,14 @@ for token in [
 ]:
     assert token in source, f'missing feature connection: {token}'
 for index in (0, 16, 25):
-    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":3, "kind":{index}\}}', source)
+    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":3, "kind":{index}\}}', data_source)
 for index in (1, 17, 26):
-    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":8, "kind":{index}\}}', source)
+    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":8, "kind":{index}\}}', data_source)
 for index in (2, 18, 27):
-    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":12, "kind":{index}\}}', source)
+    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":12, "kind":{index}\}}', data_source)
 for index in (15, 33):
-    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":20, "kind":{index}\}}', source)
-assert re.search(r'\{"name":"[^"]+"[^\n]+"req":40, "kind":24\}', source), 'mage ultimate must unlock at level 40'
+    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":20, "kind":{index}\}}', data_source)
+assert re.search(r'\{"name":"[^"]+"[^\n]+"req":40, "kind":24\}', data_source), 'mage ultimate must unlock at level 40'
 assert 'slots = [-1, -1, -1]' in source
 assert '"waystone_unlocked":waystone_unlocked' in source
 assert '"shop_stock":shop_stock' in source
@@ -123,8 +127,8 @@ for connection in ['func draw_volume_slider', 'func set_volume_from_mouse', '"mu
 teleport = source.split('\t\t19, 27:', 1)[1].split('\t\t20:', 1)[0]
 assert '\t\t\t\tdraw_arc(point, 18 + echo * 4' in teleport
 assert 'var hue: Color = [Color("a9eafa")' in source
-assert 'func draw_trails() -> void:' in source and 'draw_line(a, b, edge_colors[theme], 116.0, false)' in source
-assert '"name":"Elara"' in source
+assert 'func draw_trails() -> void:' in source and 'draw_trail_band(a, b, 116.0, edge_colors[theme])' in source
+assert '"name":"Elara"' in data_source
 assert 'const MUSIC_FADE_SECONDS := 1.35' in source
 assert 'music_incoming.volume_db' in source and 'music_player.volume_db' in source
 assert 'AudioStreamOggVorbis: stream.loop = true' in source
@@ -204,8 +208,8 @@ for connection in [
 village_layout = (root / 'components' / 'village_layout.gd').read_text(encoding='utf8')
 for resident in ['Mira','Liora','Arven','Torvald','Fenna','Pip','Elara','Alma','Borin']:
     assert f'"name":"{resident}"' in village_layout, f'missing village house: {resident}'
-assert '"name":"Borin","house":Vector2(1248,64)' in village_layout, 'Borin house anchor moved'
-assert 'const BORIN_MAGIC_TREE_POS := Vector2(1120,616)' in source, 'Borin magic tree anchor moved'
+assert '"name":"Borin","house":Vector2(1248,64)' in village_layout, 'Borin house must remain at ground level'
+assert 'const BORIN_MAGIC_TREE_POS := Vector2(1120,480)' in source, 'Borin magic tree must use its approved grass placement'
 assert 'const BORIN_CRYSTAL_POS := Vector2(1512,736)' in source, 'Borin fusion crystal anchor moved'
 interiors32 = (root / 'components' / 'village_interiors_32.gd').read_text(encoding='utf8')
 for chapel_token in [
@@ -213,8 +217,8 @@ for chapel_token in [
     'ELARA_CONCEPT := "res://art/concepts/map0/elara_church_interior_32px.webp"',
     'static func healing_field_pos',
     '"asset":"kapelle"',
-    'Rect2(397,418,277,106)',
-    'Rect2(984,569,280,102)',
+    'Rect2(397,440,277,62)',
+    'Rect2(984,591,280,58)',
     'pixel_point(id,Vector2(830,433))',
 ]:
     assert chapel_token in interiors32, f'missing Elara chapel feature: {chapel_token}'
@@ -247,6 +251,8 @@ for name, xs, ys, kind in shop_rows:
     seen_houses.add(key)
     if kind == 'arena':
         rect = (x + 72, y + 472, 944, 445)
+    elif kind == 'style':
+        rect = (x, y, 384, 384)
     elif kind in ['smith','healer','innkeeper','style','elder','borin']:
         rect = (x, y, 448, 448)
     elif kind == 'borin':

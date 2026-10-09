@@ -32,7 +32,7 @@ static func direction_index(look:Vector2)->int:
 	if look.length_squared()<0.0001:return 0
 	return posmod(roundi(atan2(look.x,look.y)/(PI/4.0)),8)
 
-static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0,hurt:float=0.0,head:int=-1,rings:int=0,running:bool=false,jump_progress:float=-1.0) -> void:
+static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look: Vector2,phase: float,s: float,offset: Vector2,roll: float=-1.0,roll_dir: Vector2=Vector2.RIGHT,armor: int=-1,death: float=-1.0,hurt:float=0.0,head:int=-1,rings:int=0,running:bool=false,jump_progress:float=-1.0,necklace:int=-1) -> void:
 	hurt_flash=clampf(hurt,0,1)
 	var female := gender == 1
 	var heading:=direction_index(look)
@@ -40,6 +40,7 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 		var frame:=clampi(floori(clampf(jump_progress,0.0,0.9999)*8.0),0,7)
 		var tint:=Color("fff3de").lerp(Color.WHITE,1.0-clampf(hurt,0.0,1.0)*0.45)
 		if GoldenSprites.draw_animation_strip(c,GOLDEN_HUMAN_WARRIOR_JUMP[heading],p+offset,frame,8,Vector2(96,96),75.0,s,tint):
+			preload("res://components/arcane_necklaces.gd").paint_actor(c,p+offset+(Vector2(0,-sin(jump_progress*PI)*20)*s if jump_progress>=0 else Vector2.ZERO),look,necklace,s,phase)
 			hurt_flash=0.0
 			return
 	# Golden pilot: authored idle strip for the base human warrior. Incomplete
@@ -47,6 +48,7 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	if role==0 and race==0 and gender==0 and phase==0.0 and not running and roll<0.0 and death<0.0 and armor<0 and head<0:
 		var tint:=Color("fff3de").lerp(Color.WHITE,1.0-clampf(hurt,0.0,1.0)*0.45)
 		if GoldenSprites.draw_direction_strip(c,GOLDEN_HUMAN_WARRIOR_IDLE,p+offset,heading,Vector2(24,24),20.0,s*4.0,tint):
+			preload("res://components/arcane_necklaces.gd").paint_actor(c,p+offset+(Vector2(0,-sin(jump_progress*PI)*20)*s if jump_progress>=0 else Vector2.ZERO),look,necklace,s,phase)
 			hurt_flash=0.0
 			return
 	look=Vector2(sin(heading*PI/4.0),cos(heading*PI/4.0))
@@ -231,5 +233,6 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 			poly(c,Vector2.ZERO,[[10,16],[12,4],[25,-1],[38,4],[46,16],[38,14],[34,9],[20,9],[16,14]],Color("254a3d"))
 			poly(c,Vector2.ZERO,[[14,5],[26,2],[38,6],[35,10],[21,8]],Color("76915b"))
 			poly(c,Vector2.ZERO,[[37,5],[46,-8],[49,-5],[41,8]],Color("c5af74" if female else "91bd80"))
+	preload("res://components/arcane_necklaces.gd").paint_actor(c,Vector2(28,56),look,necklace,1.0,phase)
 	hurt_flash=0.0
 	c.draw_set_transform(offset)

@@ -22,3 +22,6 @@ Thumbs.db
 /index.apple-touch-icon.png.import
 /index.png
 /index.png.import
+
+# Python-Zwischenspeicher (z. B. von tools/build_sfx.py)
+__pycache__/

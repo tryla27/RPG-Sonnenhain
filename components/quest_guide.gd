@@ -33,31 +33,33 @@ func summary(g) -> String:
 	var q: Dictionary = g.QUESTS[id]
 	return "%s · Abgabe bei %s" % [q["title"],q["npc"]] if int(g.quests[id]["state"]) == 2 else "%s · %d/%d" % [q["title"],g.quests[id]["progress"],q["count"]]
 
-func draw_hud_hover(g) -> void:
+## Questdetails beim Darüberfahren; origin ist die linke obere Ecke des Kastens.
+func draw_hud_hover(g, origin:Vector2=Vector2(370,82)) -> void:
+	var o:=origin-Vector2(370,82)
 	var id:=current_id(g)
-	var box:=Rect2(370,82,470,178)
+	var box:=Rect2(origin,Vector2(470,178))
 	g.ui_box(box,Color("314b54"))
-	g.text_at(Vector2(390,111),"AKTUELLE QUEST",13,Color("f0cf92"))
+	g.text_at(o+Vector2(390,111),"AKTUELLE QUEST",13,Color("f0cf92"))
 	if id==AUTO:
-		g.text_at(Vector2(390,143),"Kein aktiver Auftrag",19,Color("fff0ce"))
-		g.text_at(Vector2(390,174),"Sprich mit Mira im Rathaus von Sonnenhain.",14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,425)
-		g.text_at(Vector2(390,229),"J öffnet das Questbuch.",12,Color("aebfb9"))
+		g.text_at(o+Vector2(390,143),"Kein aktiver Auftrag",19,Color("fff0ce"))
+		g.text_at(o+Vector2(390,174),"Sprich mit Mira im Rathaus von Sonnenhain.",14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,425)
+		g.text_at(o+Vector2(390,229),"J öffnet das Questbuch.",12,Color("aebfb9"))
 		return
-	g.text_at(Vector2(390,143),title(g,id),19,Color("fff0ce"),HORIZONTAL_ALIGNMENT_LEFT,425)
+	g.text_at(o+Vector2(390,143),title(g,id),19,Color("fff0ce"),HORIZONTAL_ALIGNMENT_LEFT,425)
 	if id==STORY:
 		var status:String=str(["Zum Dorf folgen","Aktiv","Abgabebereit","Abgeschlossen"][g.rescue_state])
-		g.text_at(Vector2(390,174),"Status: %s" % status,14,Color("d8e6dc"))
-		g.text_at(Vector2(390,198),"Fortschritt: %d / %d Dornenwesen" % [g.rescue_kills,g.RESCUE_GOAL],14,Color("d8e6dc"))
-		g.text_at(Vector2(390,222),"Belohnung: 160 XP · 80 Gold",14,Color("ffe4a8"))
+		g.text_at(o+Vector2(390,174),"Status: %s" % status,14,Color("d8e6dc"))
+		g.text_at(o+Vector2(390,198),"Fortschritt: %d / %d Dornenwesen" % [g.rescue_kills,g.RESCUE_GOAL],14,Color("d8e6dc"))
+		g.text_at(o+Vector2(390,222),"Belohnung: 160 XP · 80 Gold",14,Color("ffe4a8"))
 	else:
 		var data:Dictionary=g.QUESTS[id]
 		var state:=int(g.quests[id]["state"])
 		var status:String=str(["Verfügbar","Aktiv","Abgabebereit","Erledigt"][state])
-		g.text_at(Vector2(390,174),"Status: %s · bei %s" % [status,str(data["npc"])],14,Color("d8e6dc"))
-		g.text_at(Vector2(390,198),"Fortschritt: %d / %d %s" % [int(g.quests[id]["progress"]),int(data["count"]),str(g.ENEMY_TYPES[int(data["target"])]["name"])],14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,425)
-		g.text_at(Vector2(390,222),"Belohnung: %d XP · %d Gold · %s" % [int(data["xp"]),int(data["gold"]),str(data["reward"])],13,Color("ffe4a8"),HORIZONTAL_ALIGNMENT_LEFT,425)
+		g.text_at(o+Vector2(390,174),"Status: %s · bei %s" % [status,str(data["npc"])],14,Color("d8e6dc"))
+		g.text_at(o+Vector2(390,198),"Fortschritt: %d / %d %s" % [int(g.quests[id]["progress"]),int(data["count"]),str(g.ENEMY_TYPES[int(data["target"])]["name"])],14,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,425)
+		g.text_at(o+Vector2(390,222),"Belohnung: %d XP · %d Gold · %s" % [int(data["xp"]),int(data["gold"]),str(data["reward"])],13,Color("ffe4a8"),HORIZONTAL_ALIGNMENT_LEFT,425)
 	var goal:=target(g,id)
-	if not goal.is_empty():g.text_at(Vector2(390,246),"Ziel: %s" % str(goal["label"]),12,Color("ffe34b"),HORIZONTAL_ALIGNMENT_LEFT,425)
+	if not goal.is_empty():g.text_at(o+Vector2(390,246),"Ziel: %s" % str(goal["label"]),12,Color("ffe34b"),HORIZONTAL_ALIGNMENT_LEFT,425)
 
 func target(g, id: int = AUTO) -> Dictionary:
 	if id == AUTO: id = current_id(g)

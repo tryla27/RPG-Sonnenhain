@@ -1,6 +1,36 @@
 extends RefCounted
-const VERSION="PATCH 06.10.2026"
+const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Oberfläche · Schlankeres HUD", "Leben, Energie und Ausdauer sind jetzt schmale Balken ohne Kasten; die Zahlen samt XP und Gold erscheinen beim Darüberfahren. XP läuft als dünne Linie unter der Fähigkeitenleiste. Das aktuelle Ziel steht als eine halbtransparente Zeile unten über der Leiste und zeigt beim Darüberfahren die Details. Kartenname und Stufe stehen unter der Minimap. Die Speicherzeile erscheint nur noch bei Problemen."],
+["Oberfläche · Patch Notes als Liste", "Die Patch Notes zeigen nur noch die Überschriften, neueste oben. Ein Klick öffnet den ganzen Text; mit „Neuer“ und „Älter“ blätterst du weiter, Escape führt zurück zur Liste. Das Mausrad blättert durch ältere Einträge."],
+["Fehlerbehebung · Fenna-Änderungen nach dem Login", "Änderungen bei Fenna, die den Server vor dem Schließen nicht mehr erreicht haben, gehen beim nächsten Anmelden nicht mehr verloren. Ist der Server neuer, wird der lokale Stand als Kopie gesichert. Fenna zeigt an, wann der Server gespeichert hat."],
+["Wegsteine · Reisen von überall", "Jeder aktivierte Wegstein öffnet die Reiseauswahl und bringt dich zu jedem anderen aktivierten Wegstein; Sonnenhain ist immer ein Ziel. Ein neuer Wegstein wird beim Berühren aktiviert, ohne dich ins Dorf zu schicken."],
+["Kapelle · Freie Gänge und Heilpodest", "Zwischen den Kirchenbänken kann man jetzt hindurchgehen, und Elara ist bequem erreichbar. Das Heilfeld liegt auf einem erhöhten, begehbaren Steinpodest vor dem Altar."],
+["Sonnenhain · Eingänge, Laternen und Büsche", "Die Wege enden an beiden Dorfeingängen sauber an der Mauer. Die Laterne auf der Mauer unten bei der Arena steht jetzt im Gras daneben; Laternen und Büsche stehen nicht mehr auf Pflaster."],
+["Klänge · Menüs und Fortschritt", "Knöpfe, Fenster, Gespräche, Kaufen und Verkaufen klingen eigen; was gerade nicht geht, meldet ein kurzer Fehlerton. Quests, Level-Aufstieg, Skillpunkte, Freischaltungen, Wegsteine, Reisen, Truhen, Heilung und Boss-Auftritte haben eigene Klänge im 16-Bit-Märchenstil. Neuer Lautstärkeregler „Oberfläche“ in den Einstellungen."],
+["Klänge · Büsche", "Wer durch Büsche und Sträucher läuft, hört sie rascheln."],
+["Klänge · Kampf im 16-Bit-Märchenstil", "Schwert, Stab und Bogen klingen eigen. Treffer hören sich je nach Gegner weich, gepanzert, fellig, steinern, geisterhaft oder metallisch an. Waldschleim, Blütenkäfer, Pilzling und Mooswolf haben eigene Angriffslaute, die ersten drei auch eigene Niederlagenlaute; entfernte Gegner sind leiser. Neue Klänge für Schaden, Ausweichen, Tränke, Niederlage, Rückkehr und das Betreten der Welt sowie Gold und seltene Beute. Unter 25 % Leben schlägt ein Herz, bis du dich erholst."],
+["Technik · Gegenstandsregeln als Modul", "Erzeugung von Gegenständen und Beute, Stapelgrößen, Verkaufswerte und Anzeigenamen liegen jetzt in einem eigenen, getesteten Modul. Beutechancen und Werte bleiben unverändert."],
+["Technik · Weltgeometrie als Modul", "Gebietsgrenzen, Wegabstände, Wegsteine sowie Lage der Klassenboss-Arenen und -Häuser liegen jetzt in einem eigenen, getesteten Modul. Karte, Spawns und Teleports verhalten sich unverändert."],
+["Technik · Netzwerk-Hilfen als Modul", "Koop-Einladungscodes und die Prüfung eingehender Quest-, Ereignis- und Beutedaten liegen jetzt in einem eigenen, getesteten Modul. Spielverhalten und Einladungscodes bleiben unverändert."],
+["Technik · Spielinhalte als eigenes Modul", "Gegner, Fähigkeiten, Quests, NPCs, Händler, Weltereignisse, Wahrzeichen, Wege und Torbogen liegen jetzt gebündelt in einer eigenen Inhaltsdatei. Werte und Spielverhalten bleiben unverändert."],
+["Klänge · Pilzling", "Der Pilzling verwendet beim Giftstaubausstoß ein kurzes weiches Giftzischen ohne anfänglichen Klick, Quetschlaut oder Murmeln."],
+["Mobs · Verfolgung und Hindernisse", "Mooswölfe bereiten ihren Sprung in 0,4 statt 0,8 Sekunden vor; Ziellinie und Landekreis entfallen. Erkannte Spieler werden von normalen Mobs auch außerhalb des Heimradius weiterverfolgt. Automatisches Zurückweichen entfällt; nach dem Angriff schließen die Gegner wieder auf. Bäume und andere Hindernisse werden mit geplanten Umwegen und passender Körperbreite umgangen. Blockierte Angriffe lösen Annäherung aus. Sicherheitszonen, Regionsgrenzen und Bosskampfgebiete bleiben gültig."],
+["Waldmobs · Bewegliche Körper und Angriffe", "Auch Waldschleim, Blütenkäfer und Pilzling besitzen nun eigene Ruhe-, acht Bewegungs- und acht Angriffs-/Erholungsposen in allen acht Blickrichtungen. Käferbeine und Fühler arbeiten mit, die Drüsen schwellen vor dem Sekretschuss an. Der Pilzhut federt und hebt sich beim Giftstaubausstoß. Der Schleim komprimiert sich und federt beim Hüpfen nach. Dazu kommen Treffer- und Todesposen. Die Animation folgt der tatsächlichen Bewegung; Kampfwerte und Trefferzeiten bleiben unverändert."],
+["Mooswolf · Lebendige Animationen", "Der Mooswolf verwendet jetzt eigene Posen für Ruhe, acht Laufphasen, Biss, geduckte Sprungvorbereitung, Absprung und abgefederte Landung in allen acht Blickrichtungen. Schwanz und Körper bewegen sich mit; die Pfoten folgen dem tatsächlichen Bewegungstempo. Dazu kommen Trefferreaktion, Zusammenbrechen und sanftes Ausblenden. Kampfwerte und Trefferzeiten bleiben unverändert."],
+["Mobs · Drüsen, Giftstaub und Sprungbiss", "Blütenkäfer verschießen grünes Sekret aus ihren vorderen Drüsen statt Kontaktschaden. Pilzlinge kündigen einen Giftstaubkreis an; der Staub schädigt Spieler darin kurzzeitig in einzelnen Impulsen. Mooswölfe beißen aus der Nähe und springen aus mittlerer Entfernung mit sichtbarer Vorwarnung an. Sprünge beachten Hindernisse und treffen erst bei der Landung. Die Ost-/West-Blickrichtungen der neuen Mob-Bilder wurden berichtigt."],
+["Mobs · Blütenwiesen und Pilzwald", "Waldschleim, Blütenkäfer, Pilzling und Mooswolf erhalten detaillierte Pixelart mit acht Blickrichtungen. Ihre Körper bleiben beim Bewegen und Angreifen im selben Stil. Der Blütenkäfer steht passend zu seinen Beinen auf dem Boden. Schaden, Trefferbereiche, Beute und Angriffstempo bleiben unverändert."],
+["Sonnenhain · Laternen und Büsche", "Die orangefarbenen Lichtflecken an den Laternen wurden durch einen einzelnen sanft auslaufenden warmen Lichtschein ersetzt; tagsüber bleibt der Boden unverfärbt. Der orange Busch am Brunnen entfällt. Vier feste grüne Büsche stehen jetzt auf anderen freien Rasenflächen."],
+["Sonnenhain · Zäune und Türen", "Die drei freistehenden Zaunreste ohne Grundstücksfunktion wurden samt ihren Kollisionen entfernt. Türen verwenden jetzt getrennte kurze Holzgeräusche zum Öffnen und Schließen statt synthetischer Töne, mit Riegel, Scharnier und gedämpftem Anschlag."],
+["Sonnenhain · Hausgegenstände im Dorfstil", "Die zwei Gegenstände pro Haus verwenden jetzt detaillierte transparente Pixelart passend zu den neuen Gebäuden: Stoffe, Bücher, Holz, Metall und Stein mit klaren Materialschattierungen. Sie stehen dicht an den Fassaden und seitlich der freien Eingänge statt verstreut im Vorgarten."],
+["Sonnenhain · Dorfvorplätze", "Das Atelier ist kleiner und nach links versetzt; Tür und Pflasteranschluss passen dazu. Alle sieben Häuser besitzen zwei passende Gegenstände vor dem Haus, mit freien Eingängen und geprüften Objektkollisionen."],
+["Sonnenhain · Wege und Höhen", "Der rechte Dorfeingang ist direkt mit Borin und dem Spawnplatz verbunden. Pflasterübergänge sind abgerundet, das Kirchenfundament folgt der Gebäudebodenbreite. Im Nordwesten liegt ein grasbewachsener Berg mit sechs unregelmäßigen Höhenstufen, Felsen und Moos."],
+["Arkanhalsketten · Für alle Klassen", "Eis-, Blitz- und Giftkerne werden zu tragbaren Arkanhalsketten. Ein eigener Halskettenplatz aktiviert ausschließlich den besonderen Effekt; keine zusätzlichen Grundwerte und kein Verbrauch. Bereits gelernte Blitzlanze bleibt erhalten."],
+["Bossbeute · Drei besondere Halsketten", "Kriegsherr, Arkanhüter und Jagdmeister lassen zusätzlich ihre besondere Halskette fallen. Jede Klasse kann jede Halskette tragen. Die Anhänger sind sichtbar und werden im Koop übertragen."],
+["Zoom · Feste Menüs", "ESC-Menü, Figurenansichten und Ausrüstungsdarstellung behalten bei 100 %, 85 % und 70 % ihre Größe und Position. Mausradereignisse werden nur im passenden Kamera- oder Menükontext verarbeitet."],
+["Zoom · Vollständige Atmosphäre", "Nebel, Wolken und Dungeon-Dunkelheit decken auch beim Herauszoomen den gesamten sichtbaren Weltbereich ab."],
+["Sonnenhain · Neues Bodenprofil", "Map 0 wurde ausschließlich am Boden neu gestaltet: großer heller Spawnplatz, warme Dorfwege, zusammenhängende Hausvorplätze und ruhige Gras-/Moosflächen mit organischen Übergängen. Die visuelle Höhen-/Treppenschicht wurde aus dem Map-0-Boden entfernt. Gebäude, Objekte, Kollisionen, Navigation und Gameplay bleiben unverändert."],
+["Map 0 · Terrain-Polish", "Arenaflächen verwenden nun echten Boden statt einer vollflächigen Randkachel. Grundstücke und Plaza sind zusammenhängender, dunkle Einzelpflaster-Flecken entfallen und Übergänge zwischen Gras, Erde und Stein sind breiter und organischer."],
 ["Map 0 · Neues Terrain", "Sonnenhain verwendet neue 32px-Bodenfamilien für Gras, Wege, Pflaster, Hausvorplätze und Arena. Übergänge, dezente Details und visuelle Höhenstufen werden deterministisch gewählt; Gebäude, Türen, Kollisionen, Navigation, Saves und Multiplayer bleiben unverändert."],
 ["Kamera · Zielen beim Zoom", "Mauszielen bleibt bei 100 %, 85 % und 70 % Kamera-Zoom exakt am Cursor. Bildschirmkoordinaten werden wieder korrekt in Weltkoordinaten umgerechnet."],
 ["Dorf · Acht neue Innenräume", "Schmiede, Kapelle, Steinrose, Arena-Halle, Atelier, Ratshalle, Borins Haus und Pips Nebenraum verwenden die abgestimmten Pixelgrafiken. Möbel und Wände besitzen zur Grafik passende Hitboxen. Pips Werkstatt ist durch die Seitentür bei Borin erreichbar."],
@@ -71,14 +101,116 @@ const NOTES=[
 ["Menüs", "Login-Navigation per Tab/Shift+Tab; Spielmenü und Untermenüs erhalten konsistente Zurück-Navigation."],
 ["Audio", "Musik und Effekte erhalten eigene Mute-Schalter; eingestellte Lautstärken bleiben beim Stummschalten erhalten."],
 ["Patch-Ablauf", "Patch Notes sind ab jetzt Pflichtbestandteil jedes relevanten PRs; CI prüft, dass sie mit aktualisiert wurden."]]
+## Ansicht: Liste nur mit Überschriften (neueste oben), Klick öffnet den
+## vollen Text. Der Zustand liegt in main.gd als `patch_view`
+## ({"open": Index oder -1, "scroll": erste sichtbare Zeile}).
+const ROWS:=11
+const ROW_TOP:=192.0
+const ROW_H:=33.0
+const LIST_RECT:=Rect2(160,ROW_TOP-4,820,ROWS*ROW_H)
+const UP_RECT:=Rect2(160,560,44,32)
+const DOWN_RECT:=Rect2(210,560,44,32)
+const BACK_RECT:=Rect2(160,552,170,40)
+const PREV_RECT:=Rect2(640,552,160,40)
+const NEXT_RECT:=Rect2(810,552,160,40)
+
+static func new_view()->Dictionary:return {"open":-1,"scroll":0}
+
+## Bereich und Überschrift eines Eintrags. Ältere Einträge ohne eigene
+## Überschrift bekommen den ersten Satz ihres Textes, gekürzt.
+static func category(index:int)->String:
+	return String(NOTES[index][0]).get_slice(" · ",0)
+
+static func headline(index:int)->String:
+	var title:=String(NOTES[index][0])
+	if " · " in title:return title.substr(title.find(" · ")+3)
+	var sentence:=String(NOTES[index][1]).get_slice(". ",0).trim_suffix(".")
+	return sentence if sentence.length()<=72 else sentence.left(70).strip_edges()+"…"
+
+static func max_scroll()->int:return maxi(0,NOTES.size()-ROWS)
+
+static func row_rect(slot:int)->Rect2:
+	return Rect2(LIST_RECT.position.x,ROW_TOP-4+slot*ROW_H,LIST_RECT.size.x,ROW_H-3)
+
+## Eintrag unter der Maus in der Liste, sonst -1.
+static func row_at(view:Dictionary,mouse:Vector2)->int:
+	if int(view["open"])>=0:return -1
+	for slot in ROWS:
+		var index:=int(view["scroll"])+slot
+		if index<NOTES.size() and row_rect(slot).has_point(mouse):return index
+	return -1
+
+static func scroll(view:Dictionary,delta:int)->void:
+	if int(view["open"])>=0:return
+	view["scroll"]=clampi(int(view["scroll"])+delta,0,max_scroll())
+
+## Verarbeitet einen Klick; true, wenn er die Ansicht geändert hat.
+static func click(view:Dictionary,mouse:Vector2)->bool:
+	var open:=int(view["open"])
+	if open>=0:
+		if BACK_RECT.has_point(mouse):
+			view["open"]=-1
+			return true
+		if PREV_RECT.has_point(mouse) and open>0:
+			view["open"]=open-1
+			return true
+		if NEXT_RECT.has_point(mouse) and open<NOTES.size()-1:
+			view["open"]=open+1
+			return true
+		return false
+	var index:=row_at(view,mouse)
+	if index>=0:
+		view["open"]=index
+		return true
+	if UP_RECT.has_point(mouse):
+		scroll(view,-ROWS)
+		return true
+	if DOWN_RECT.has_point(mouse):
+		scroll(view,ROWS)
+		return true
+	return false
+
+## Escape im Detailtext führt zurück zur Liste; true, wenn das passiert ist.
+static func back(view:Dictionary)->bool:
+	if int(view["open"])<0:return false
+	view["open"]=-1
+	return true
+
 static func draw(g)->void:
 	var BuildInfo=preload("res://components/build_info.gd")
+	var view:Dictionary=g.patch_view
+	var mouse:Vector2=g.get_viewport().get_mouse_position()
 	g.text_at(Vector2(170,135),VERSION,25,Color("ffe2aa"))
-	g.text_at(Vector2(760,135),"BUILD "+str(BuildInfo.SHORT),13,Color("b8cbc5"),HORIZONTAL_ALIGNMENT_RIGHT,210)
-	g.text_at(Vector2(170,166),"Neueste Änderungen zuerst · Production-Build sichtbar",14,Color("b8cbc5"))
-	var visible_count:=mini(10,NOTES.size())
-	for i in visible_count:
-		var y:float=198+i*38
-		g.text_at(Vector2(170,y),NOTES[i][0],13,Color("ffe2aa"))
-		g.text_at(Vector2(330,y),NOTES[i][1],11,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,640)
-	g.text_at(Vector2(170,590),"%d weitere ältere Einträge im Patch-Verlauf." % maxi(0,NOTES.size()-visible_count),11,Color("9fb4ac"))
+	g.text_at(Vector2(760,135),"BUILD "+str(BuildInfo.SHORT),13,Color("b8cbc5"),HORIZONTAL_ALIGNMENT_RIGHT,190)
+	var open:=int(view["open"])
+	if open>=0:
+		draw_detail(g,open)
+		return
+	g.text_at(Vector2(170,166),"Neueste zuerst · Eintrag anklicken für Details",14,Color("b8cbc5"))
+	var first:=int(view["scroll"])
+	for slot in ROWS:
+		var index:=first+slot
+		if index>=NOTES.size():break
+		var rect:=row_rect(slot)
+		var hovering:=rect.has_point(mouse)
+		g.draw_rect(rect,Color("1b3b54",0.85) if hovering else Color("0d2236",0.55 if slot%2==0 else 0.25))
+		if hovering:g.draw_rect(rect,Color("ffe0a0"),false,1.0)
+		g.text_at(rect.position+Vector2(12,21),category(index),13,Color("c9a45e"),HORIZONTAL_ALIGNMENT_LEFT,180)
+		g.text_at(rect.position+Vector2(200,21),headline(index),16,Color("fff1ce") if hovering else Color("e6eadf"),HORIZONTAL_ALIGNMENT_LEFT,560)
+		g.text_at(rect.position+Vector2(rect.size.x-26,21),"›",18,Color("ffe0a0") if hovering else Color("7f8f8a"))
+	g.ui_button(UP_RECT,"^",first>0)
+	g.ui_button(DOWN_RECT,"v",first<max_scroll())
+	var last:=mini(first+ROWS,NOTES.size())
+	g.text_at(Vector2(270,582),"%d–%d von %d Einträgen · Mausrad blättert" % [first+1,last,NOTES.size()],13,Color("9fb4ac"))
+
+static func draw_detail(g,index:int)->void:
+	g.text_at(Vector2(170,170),category(index).to_upper(),14,Color("c9a45e"))
+	var title:=String(NOTES[index][0])
+	g.text_at(Vector2(170,200),title.substr(title.find(" · ")+3) if " · " in title else title,22,Color("ffe2aa"),HORIZONTAL_ALIGNMENT_LEFT,800)
+	g.draw_rect(Rect2(170,214,800,2),Color("9d845e",0.7))
+	g.draw_multiline_string(g.font,Vector2(170,250),String(NOTES[index][1]),HORIZONTAL_ALIGNMENT_LEFT,800,17,-1,Color("e6eadf"))
+	g.ui_button(BACK_RECT,"< Zur Liste")
+	g.ui_button(PREV_RECT,"< Neuer",index>0)
+	g.ui_button(NEXT_RECT,"Älter >",index<NOTES.size()-1)
+	g.text_at(Vector2(345,578),"Eintrag %d von %d" % [index+1,NOTES.size()],13,Color("9fb4ac"))
+# Production deploy trigger: Map 0 terrain rework 2026-10-06

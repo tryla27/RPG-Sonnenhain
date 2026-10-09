@@ -1,5 +1,7 @@
 # Sonnenhain RPG
 
+> **Mitarbeit:** Wo neuer Code hingehört und wie getestet wird, steht in [`AGENTS.md`](AGENTS.md).
+
 Ein lokales, farbiges Top-down-Action-RPG für Godot 4.7. Die Welt, Figuren, Gegenstände, Fähigkeiten und Menüs werden im Projekt gezeichnet; Musik und Effekte sind als WAV-Dateien enthalten. Zum Spielen ist kein Webserver nötig.
 
 ## Start

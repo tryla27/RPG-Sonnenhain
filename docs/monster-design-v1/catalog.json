@@ -1,0 +1,1055 @@
+[
+  {
+    "id": 0,
+    "name": "Waldschleim",
+    "slug": "forest_slime",
+    "region_id": 1,
+    "region": "Blütenwiesen",
+    "boss": false,
+    "design_board": 1,
+    "visible_width_world_px": 40,
+    "visible_height_world_px": 32,
+    "proposed_frame_px": 64,
+    "foot_anchor": [
+      32,
+      52
+    ],
+    "silhouette": "Kompakter asymmetrischer Schleim mit Blattspross, wenigen weißen Blüten und goldenen Augen.",
+    "palette": "Olivgrün, Creme, warmes Dunkelbraun",
+    "attack_animation_motif": "Körper wird flacher vor einem kurzen Stoß.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 1,
+    "name": "Blütenkäfer",
+    "slug": "blossom_beetle",
+    "region_id": 1,
+    "region": "Blütenwiesen",
+    "boss": false,
+    "design_board": 1,
+    "visible_width_world_px": 40,
+    "visible_height_world_px": 32,
+    "proposed_frame_px": 64,
+    "foot_anchor": [
+      32,
+      52
+    ],
+    "silhouette": "Niedriger sechsbeiniger Käfer; kupferroter Panzer mit einer rosa Blüte.",
+    "palette": "Kupfer, Burgunder, Altrosa",
+    "attack_animation_motif": "Vorderbeine stemmen sich, Mandibeln öffnen vor dem Biss.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 2,
+    "name": "Pilzling",
+    "slug": "mushroom_sprite",
+    "region_id": 2,
+    "region": "Pilzwald",
+    "boss": false,
+    "design_board": 1,
+    "visible_width_world_px": 48,
+    "visible_height_world_px": 48,
+    "proposed_frame_px": 64,
+    "foot_anchor": [
+      32,
+      52
+    ],
+    "silhouette": "Breite rote Pilzkappe, cremefarbener Stamm, kurze wurzelartige Füße.",
+    "palette": "Ziegelrot, Creme, Honigbraun",
+    "attack_animation_motif": "Kappe zieht sich zusammen und stößt einen klaren Sporenball aus.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 3,
+    "name": "Mooswolf",
+    "slug": "moss_wolf",
+    "region_id": 2,
+    "region": "Pilzwald",
+    "boss": false,
+    "design_board": 1,
+    "visible_width_world_px": 72,
+    "visible_height_world_px": 48,
+    "proposed_frame_px": 96,
+    "foot_anchor": [
+      48,
+      79
+    ],
+    "silhouette": "Schlanker vierbeiniger Wolf mit Moosmähne, rostroten Blättern und klarer Schnauze.",
+    "palette": "Graubraun, Moosgrün, Kupfer",
+    "attack_animation_motif": "Ducken, deutlicher Sprungbiss, kurze Landung.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 4,
+    "name": "Steingolem",
+    "slug": "stone_golem",
+    "region_id": 3,
+    "region": "Alte Ruinen",
+    "boss": false,
+    "design_board": 1,
+    "visible_width_world_px": 72,
+    "visible_height_world_px": 80,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Asymmetrische Schiefer- und Sandsteinblöcke, Moosfugen, schwere Hammerfaust.",
+    "palette": "Schiefergrau, Sandstein, Oliv",
+    "attack_animation_motif": "Langsames Ausholen mit gewichtiger Schulter und Hammerfaust.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 5,
+    "name": "Ruinenbeholder",
+    "slug": "ruin_beholder",
+    "region_id": 3,
+    "region": "Alte Ruinen",
+    "boss": false,
+    "design_board": 1,
+    "visible_width_world_px": 56,
+    "visible_height_world_px": 56,
+    "proposed_frame_px": 96,
+    "foot_anchor": [
+      48,
+      79
+    ],
+    "silhouette": "Schwebende Bronze-Steinkugel mit einem großen türkisen Auge und drei kurzen Augenstielen.",
+    "palette": "Bronze, warmes Grau, Türkis",
+    "attack_animation_motif": "Auge verengt sich und richtet den Strahl aus; keine Gesichter am Rücken.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 6,
+    "name": "Kristallkrabbe",
+    "slug": "crystal_crab",
+    "region_id": 4,
+    "region": "Kristallmoor",
+    "boss": false,
+    "design_board": 1,
+    "visible_width_world_px": 64,
+    "visible_height_world_px": 40,
+    "proposed_frame_px": 96,
+    "foot_anchor": [
+      48,
+      79
+    ],
+    "silhouette": "Flache Steinkrabbe mit klaren sechs Beinen, ungleichen Scheren und kleinem Kristallrücken.",
+    "palette": "Blaugrau, Cyan, Blauviolett",
+    "attack_animation_motif": "Eine Schere wird groß geöffnet, dann gezielt geschlossen.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 7,
+    "name": "Kristallgolem",
+    "slug": "crystal_golem",
+    "region_id": 4,
+    "region": "Kristallmoor",
+    "boss": false,
+    "design_board": 1,
+    "visible_width_world_px": 80,
+    "visible_height_world_px": 96,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Hoher breiter Golem mit großen Schulterkristallen und rechteckigen Fäusten.",
+    "palette": "Schieferblau, Cyan, Violettgrau",
+    "attack_animation_motif": "Schulterkristalle kippen mit dem schweren Hieb; Körper bleibt gewichtig.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 8,
+    "name": "Ascheläufer",
+    "slug": "ash_runner",
+    "region_id": 5,
+    "region": "Ascheberge",
+    "boss": false,
+    "design_board": 1,
+    "visible_width_world_px": 72,
+    "visible_height_world_px": 48,
+    "proposed_frame_px": 96,
+    "foot_anchor": [
+      48,
+      79
+    ],
+    "silhouette": "Niedriger schneller Basalt-Schakal mit Glut in den Fugen und kurzem Rückenkamm.",
+    "palette": "Kohlegrau, Kupfer, Glutorange",
+    "attack_animation_motif": "Vor dem geraden Ansturm ducken; Glutspur als separater Effekt.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 9,
+    "name": "Lavagolem",
+    "slug": "lava_golem",
+    "region_id": 5,
+    "region": "Ascheberge",
+    "boss": false,
+    "design_board": 2,
+    "visible_width_world_px": 88,
+    "visible_height_world_px": 96,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Gedrungener breiter Basaltgolem, große Hammerarme, sparsame orange Glutfugen.",
+    "palette": "Basaltgrau, Rostrot, Orange",
+    "attack_animation_motif": "Langes Ausholen; Füße bleiben vor dem Bodenschlag verankert.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 10,
+    "name": "Strandkrabbe",
+    "slug": "shore_crab",
+    "region_id": 6,
+    "region": "Mondküste",
+    "boss": false,
+    "design_board": 2,
+    "visible_width_world_px": 48,
+    "visible_height_world_px": 32,
+    "proposed_frame_px": 64,
+    "foot_anchor": [
+      32,
+      52
+    ],
+    "silhouette": "Honigfarbene Strandkrabbe mit kleinem Muschelrücken und runden robusten Scheren.",
+    "palette": "Sandcreme, Honig, Terrakotta",
+    "attack_animation_motif": "Kurzes seitliches Versetzen und klar angekündigtes Scherenschnappen.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 11,
+    "name": "Wassergeist",
+    "slug": "water_spirit",
+    "region_id": 6,
+    "region": "Mondküste",
+    "boss": false,
+    "design_board": 2,
+    "visible_width_world_px": 48,
+    "visible_height_world_px": 64,
+    "proposed_frame_px": 96,
+    "foot_anchor": [
+      48,
+      79
+    ],
+    "silhouette": "Kompakter Wassergeist mit markantem Wellenkopf, zwei Strömungsarmen und eingerolltem Wasserschweif.",
+    "palette": "Türkis, gedämpftes Blau, Creme",
+    "attack_animation_motif": "Arme sammeln Wasser zu einem einzelnen Ball; Flüssigkeitsbewegung aus Frames.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 12,
+    "name": "Kriegsherr",
+    "slug": "warlord",
+    "region_id": 6,
+    "region": "Mondküste",
+    "boss": true,
+    "design_board": 2,
+    "visible_width_world_px": 96,
+    "visible_height_world_px": 112,
+    "proposed_frame_px": 160,
+    "foot_anchor": [
+      80,
+      131
+    ],
+    "silhouette": "Orkischer Kriegsherr mit breiten Schultern, kupferrotem Wappen, Axt und schwerem Schild.",
+    "palette": "Eisengrau, Kupferrot, Gold",
+    "attack_animation_motif": "Axt und Schild folgen getrennten Armbewegungen; gut sichtbares Ausholen.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 13,
+    "name": "Arkanhüter",
+    "slug": "arcane_keeper",
+    "region_id": 7,
+    "region": "Sternenbruch",
+    "boss": true,
+    "design_board": 2,
+    "visible_width_world_px": 88,
+    "visible_height_world_px": 112,
+    "proposed_frame_px": 160,
+    "foot_anchor": [
+      80,
+      131
+    ],
+    "silhouette": "Großer verhüllter Magier mit blauvioletter Robe, goldenen Runen und kristallbesetztem Stab.",
+    "palette": "Blauviolett, Honiggold, Türkis",
+    "attack_animation_motif": "Stab führt den Zauber, zwei Begleitkristalle als getrennte Effektlayer.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 14,
+    "name": "Jagdmeister",
+    "slug": "hunt_master",
+    "region_id": 8,
+    "region": "Nebelheide",
+    "boss": true,
+    "design_board": 2,
+    "visible_width_world_px": 80,
+    "visible_height_world_px": 104,
+    "proposed_frame_px": 160,
+    "foot_anchor": [
+      80,
+      131
+    ],
+    "silhouette": "Großer Waldjäger mit Geweihkapuze, Blattmantel, geschwungenem Holzbogen und Köcher.",
+    "palette": "Oliv, Honigbraun, Kupfer",
+    "attack_animation_motif": "Deutliches Spannen, fixes Zielen vor dem Schuss und klare Erholung.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 15,
+    "name": "Sternenschatten",
+    "slug": "star_shadow",
+    "region_id": 7,
+    "region": "Sternenbruch",
+    "boss": false,
+    "design_board": 2,
+    "visible_width_world_px": 56,
+    "visible_height_world_px": 72,
+    "proposed_frame_px": 96,
+    "foot_anchor": [
+      48,
+      79
+    ],
+    "silhouette": "Kapuzenförmiger violetter Schatten mit asymmetrischen Zipfeln, wenigen Sternpunkten und Runenstab.",
+    "palette": "Dunkelviolett, Blauviolett, Creme",
+    "attack_animation_motif": "Schatten verdichtet sich vor dem Projektil; Körperkontur bleibt scharf.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 16,
+    "name": "Bruchwächter",
+    "slug": "fracture_guardian",
+    "region_id": 7,
+    "region": "Sternenbruch",
+    "boss": false,
+    "design_board": 2,
+    "visible_width_world_px": 88,
+    "visible_height_world_px": 96,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Gebrochener steinerner Torwächter: Ringkern im Brustkorb, gegliederte Steinbeine und Zweihandhammer.",
+    "palette": "Sandstein, Schiefer, Violett",
+    "attack_animation_motif": "Zweihandhammer schwingt langsam; Ringkern bleibt an derselben Körperstelle.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 17,
+    "name": "Nebelhirsch",
+    "slug": "mist_stag",
+    "region_id": 8,
+    "region": "Nebelheide",
+    "boss": false,
+    "design_board": 2,
+    "visible_width_world_px": 80,
+    "visible_height_world_px": 80,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Schlanker Hirsch mit perlgrauem Fell, klar verzweigtem Geweih und kurzen nebelblauen Fellbüscheln.",
+    "palette": "Perlgrau, Blaugrau, gedämpftes Türkis",
+    "attack_animation_motif": "Kopf senkt sich vor dem Geweihstoß; Beine bleiben echte Vierbeineranimation.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 18,
+    "name": "Irrlicht",
+    "slug": "will_o_wisp",
+    "region_id": 8,
+    "region": "Nebelheide",
+    "boss": false,
+    "design_board": 3,
+    "visible_width_world_px": 32,
+    "visible_height_world_px": 48,
+    "proposed_frame_px": 64,
+    "foot_anchor": [
+      32,
+      52
+    ],
+    "silhouette": "Kleine scharfkantige blaue Flamme mit hellem Kern und zwei goldenen Punkten als Gesicht.",
+    "palette": "Gedämpftes Cyan, Blau, Creme",
+    "attack_animation_motif": "Flammenzunge neigt sich vor einem kurzen magischen Impuls; kein großer Glow.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 19,
+    "name": "Harzbestie",
+    "slug": "resin_beast",
+    "region_id": 9,
+    "region": "Bernsteinforst",
+    "boss": false,
+    "design_board": 3,
+    "visible_width_world_px": 80,
+    "visible_height_world_px": 72,
+    "proposed_frame_px": 96,
+    "foot_anchor": [
+      48,
+      79
+    ],
+    "silhouette": "Schwere vierbeinige Holzbestie mit amberfarbenen Harzplatten und wenigen goldenen Tropfen.",
+    "palette": "Honig, dunkle Rinde, Oliv",
+    "attack_animation_motif": "Gewichtiger Prankenhieb; Harztropfen getrennt von der festen Körperkontur.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 20,
+    "name": "Wurzelhexe",
+    "slug": "root_witch",
+    "region_id": 9,
+    "region": "Bernsteinforst",
+    "boss": false,
+    "design_board": 3,
+    "visible_width_world_px": 64,
+    "visible_height_world_px": 88,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Schmale Baumhexe mit geflochtener Wurzelkapuze, Herbstblattmantel und verzweigtem Stab.",
+    "palette": "Rindenbraun, Oliv, Kupferrot",
+    "attack_animation_motif": "Stab zeichnet den Angriff; Wurzelfüße lösen sich nacheinander vom Boden.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 21,
+    "name": "Quellkriecher",
+    "slug": "spring_crawler",
+    "region_id": 10,
+    "region": "Tiefenquell",
+    "boss": false,
+    "design_board": 3,
+    "visible_width_world_px": 72,
+    "visible_height_world_px": 48,
+    "proposed_frame_px": 96,
+    "foot_anchor": [
+      48,
+      79
+    ],
+    "silhouette": "Niedriger Wasser-Steinkriecher mit rundem Schalenrücken, sechs Steinfüßen und blauen Quellpflanzen.",
+    "palette": "Schiefergrau, Quellblau, Moosgrün",
+    "attack_animation_motif": "Vorderkörper hebt sich vor einem Wasserstoß; klarer Bodenkontakt.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 22,
+    "name": "Perlengeist",
+    "slug": "pearl_spirit",
+    "region_id": 10,
+    "region": "Tiefenquell",
+    "boss": false,
+    "design_board": 3,
+    "visible_width_world_px": 56,
+    "visible_height_world_px": 80,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Aufrechter Geist mit cremefarbener Perlenmaske und drei kurzen blauweißen Wasserbändern.",
+    "palette": "Perlcreme, Blau, gedämpftes Türkis",
+    "attack_animation_motif": "Wasserbänder sammeln sich hinter einer Perle; Gesicht nur nach vorne.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 23,
+    "name": "Gratgreif",
+    "slug": "ridge_griffin",
+    "region_id": 11,
+    "region": "Dämmergrat",
+    "boss": false,
+    "design_board": 3,
+    "visible_width_world_px": 96,
+    "visible_height_world_px": 88,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Stämmiger Greif mit cremefarbenem Adlerkopf, honigbraunem Löwenkörper und breiten schieferblauen Flügeln.",
+    "palette": "Creme, Honigbraun, Schieferblau",
+    "attack_animation_motif": "Flügel heben sich sichtbar vor dem Sprung; Krallen landen gemeinsam.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 24,
+    "name": "Schattenritter",
+    "slug": "shadow_knight",
+    "region_id": 11,
+    "region": "Dämmergrat",
+    "boss": false,
+    "design_board": 3,
+    "visible_width_world_px": 72,
+    "visible_height_world_px": 96,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Geschlossener Ritterhelm, violettgraue Platten, zerrissener Umhang, langes dunkles Schwert.",
+    "palette": "Violettgrau, Eisen, dezentes Blauviolett",
+    "attack_animation_motif": "Schwertspitze und Schulter kündigen den Hieb an; kein gespiegelter Waffenwechsel.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 25,
+    "name": "Himmelsfalter",
+    "slug": "sky_moth",
+    "region_id": 12,
+    "region": "Himmelsgarten",
+    "boss": false,
+    "design_board": 3,
+    "visible_width_world_px": 88,
+    "visible_height_world_px": 64,
+    "proposed_frame_px": 128,
+    "foot_anchor": [
+      64,
+      105
+    ],
+    "silhouette": "Großer kompakter Falter mit symmetrischer Creme-Gold-Zeichnung und schieferblauen Flügelrändern.",
+    "palette": "Creme, Honiggold, Schieferblau",
+    "attack_animation_motif": "Flügelrhythmus und kurzer Stillstand kündigen den Luftangriff an.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  },
+  {
+    "id": 26,
+    "name": "Sternenwächterin",
+    "slug": "star_warden",
+    "region_id": 12,
+    "region": "Himmelsgarten",
+    "boss": false,
+    "design_board": 3,
+    "visible_width_world_px": 72,
+    "visible_height_world_px": 104,
+    "proposed_frame_px": 160,
+    "foot_anchor": [
+      80,
+      131
+    ],
+    "silhouette": "Aufrechte Wächterin in creme-goldener Sternenrobe, geschlossener Silhouette und sternbesetztem Stab.",
+    "palette": "Creme, Honiggold, Blauviolett",
+    "attack_animation_motif": "Stab und freie Hand führen eine klare Sternenfolge; Effekte bleiben getrennt.",
+    "animations": [
+      "idle",
+      "move",
+      "windup",
+      "attack",
+      "recovery",
+      "hit",
+      "death"
+    ],
+    "directions": [
+      "S",
+      "SW",
+      "W",
+      "NW",
+      "N",
+      "NE",
+      "E",
+      "SE"
+    ],
+    "status": "design_concept"
+  }
+]

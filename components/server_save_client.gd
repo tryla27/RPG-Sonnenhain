@@ -7,6 +7,9 @@ var dirty := true
 var ready := false
 var loading := false
 var status := "Noch nicht auf dem Server gespeichert"
+## true, solange die Server-Speicherung gestört ist (Verbindung weg, keine Antwort,
+## Fehler). Nur dann zeigt das HUD die Statuszeile.
+var problem := false
 var latest: Dictionary = {}
 var inflight: Dictionary = {}
 var last_request := ""
@@ -27,6 +30,7 @@ func restore(data: Dictionary) -> void:
 	inflight.clear()
 	ready = false
 	loading = false
+	problem = false
 	status = "Serverabgleich ausstehend" if dirty else "Serverstand · warte auf Verbindung"
 
 func decorate(data: Dictionary) -> Dictionary:
@@ -78,6 +82,7 @@ func disconnected() -> void:
 	loading = false
 	inflight.clear()
 	status = "Verbindung weg · lokal gesichert, Abgleich folgt"
+	problem = true
 
 func flush(g) -> void:
 	if not dirty or not ready or not inflight.is_empty() or latest.is_empty() or not connected(g): return
@@ -97,6 +102,7 @@ func update(g) -> void:
 		if loading and now-open_started_ms > 10000:
 			loading = false
 			status = "Server-Speicherung antwortet nicht · lokal gesichert"
+			problem = true
 		if now > retry_after_ms:
 			retry_after_ms = now+3000
 			g.rpc_zz_save_open.rpc_id(1,token,uuid)
@@ -118,6 +124,7 @@ func reply(g, response: Dictionary) -> void:
 		retry_after_ms = Time.get_ticks_msec()+5000
 		var labels := {"already_online":"Charakter bereits in einem anderen Fenster online", "disk_error":"Server kann gerade nicht speichern", "corrupt":"Serverstand beschädigt · vorhandene Daten bleiben geschützt", "invalid_save":"Spielstand konnte nicht geprüft werden", "revision_conflict":"Neuerer Serverstand vorhanden · gleiche ab", "identity_mismatch":"Spielstand und Charakter passen nicht zusammen", "unauthorized":"Speicherzugriff nicht bestätigt"}
 		status = str(labels.get(error,"Server-Speicherfehler"))+" · lokal gesichert"
+		problem = true
 		g.pause_status=status
 		g.message(status)
 		return
@@ -141,6 +148,7 @@ func reply(g, response: Dictionary) -> void:
 		inflight.clear()
 		ready = true
 		loading = false
+		problem = false
 		status = "Server gespeichert ✓" if not dirty else "Speichere auf Server …"
 		g.write_local_save(decorate(latest))
 		g.announce_multiplayer_context()
@@ -151,6 +159,7 @@ func reply(g, response: Dictionary) -> void:
 		revision = server_revision
 		dirty = digest(latest) != digest(inflight["data"])
 		inflight.clear()
+		problem = false
 		status = "Server gespeichert ✓" if not dirty else "Speichere auf Server …"
 		g.write_local_save(decorate(latest))
 		g.pause_status=status
