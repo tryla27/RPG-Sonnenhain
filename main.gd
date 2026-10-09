@@ -69,6 +69,7 @@ func hud_action_at(pos:Vector2)->String:
 	return ""
 const MobCombat=preload("res://components/mob_combat.gd")
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
+const WolfAnimation=preload("res://components/wolf_animation.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
 const ItemStyle32=preload("res://components/item_style_32.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
@@ -1366,6 +1367,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 		if previous_by_uid.has(uid):
 			var old: Dictionary = previous_by_uid[uid]
 			copy["pos"] = old.get("pos",target)
+			copy["gait_phase"]=old.get("gait_phase",fposmod(float(copy.get("seed",0.0))*.73,TAU))
 			copy["flash"]=maxf(float(copy.get("flash",0)),float(old.get("flash",0)))
 			if float(copy.get("hp",1))<float(old.get("hp",1)):copy["flash"]=.18
 			if int(copy.get("type",-1)) in [12,13,14]:
@@ -2078,6 +2080,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 	var profile:=mob_profile(enemy)
 	var targets:=mob_targets(enemy,server)
 	var previous_attack_state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
+	var gait_origin:Vector2=enemy["pos"]
 	var action:=MobCombat.step(enemy,profile,targets,delta)
 	if not server and int(enemy.get("type",-1)) in [12,13,14]:
 		var current_attack:Dictionary=enemy.get("attack_state",{})
@@ -2180,6 +2183,10 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			rpc_server_damage.rpc_id(int(event["target"]),int(event["damage"]))
 		elif invulnerable<=0:
 			apply_player_damage(int(event["damage"]))
+	if int(enemy["type"])==3:
+		enemy["walking"]=moved
+		if moved and str(previous_attack_state.get("ability",{}).get("shape",""))!="leap":
+			enemy["gait_phase"]=WolfAnimation.advance_gait(float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU))),Vector2(enemy["pos"]).distance_to(gait_origin))
 	return moved
 
 func update_dedicated_enemies(delta:float)->void:
@@ -8939,6 +8946,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 	var enemy_color:Color=ENEMY_TYPES[type]["color"]
 	var model_pos:Vector2=p
 	var stride:float=world_time*(3.5 if bool(profile["heavy"]) else 7.0) if bool(enemy.get("walking",false)) else 0.0
+	if type==3:stride=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU))) if bool(enemy.get("walking",false)) else 0.0
 	if boss and float(enemy.get("boss_spawn_timer",0.0))>0.0:
 		var spawn_left:float=clampf(float(enemy["boss_spawn_timer"])/1.6,0.0,1.0)
 		var appear:float=1.0-spawn_left
@@ -8960,13 +8968,17 @@ func draw_enemy(enemy: Dictionary) -> void:
 	if boss:
 		draw_class_boss_actor(enemy,model_pos,aim,scale_factor,animation)
 	else:
-		MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion,str(state.get("ability",{}).get("id","")))
+		MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion,str(state.get("ability",{}).get("id","")),{"walking":bool(enemy.get("walking",false)),"clock":world_time,"seed":enemy.get("seed",0.0),"hurt":float(enemy.get("flash",0.0))})
 	restore_canvas_transform()
 	if type==1:WoodlandAttackVFX.glands(self,model_pos,aim.normalized(),scale_factor,animation)
 	if float(enemy.get("flash", 0.0)) > 0.0:
 		draw_arc(model_pos, 37.0 * scale_factor, 0.0, TAU, 18, Color("fff7df", 0.72), 3.0)
-	draw_enemy_level(p, type, boss, elite_kind)
-	combat_feedback.health(self,"mob:%d"%int(enemy["uid"]),p+Vector2(0,-135 if type==12 else (-104 if boss else -54)),float(enemy["hp"]),float(enemy["max_hp"]),106 if boss else 54)
+	var label_pos:=p
+	if type==3:
+		var leap_lift:=WoodlandAttackVFX.leap_height(animation)*scale_factor if str(state.get("ability",{}).get("id",""))=="sprungbiss" else 0.0
+		label_pos.y-=maxf(0.0,88.0*scale_factor+leap_lift+12.0-54.0)
+	draw_enemy_level(label_pos, type, boss, elite_kind)
+	combat_feedback.health(self,"mob:%d"%int(enemy["uid"]),label_pos+Vector2(0,-135 if type==12 else (-104 if boss else -54)),float(enemy["hp"]),float(enemy["max_hp"]),106 if boss else 54)
 
 func draw_enemy_level(p: Vector2, type: int, boss: bool, elite_kind: int = 0) -> void:
 	var y := (-170.0 if type==12 else -139.0) if boss else (-103.0 if elite_kind > 0 else -82.0)
@@ -12660,6 +12672,8 @@ func update_network_interpolation(delta: float) -> void:
 			var target: Vector2 = enemy["net_target_pos"]
 			var current: Vector2 = enemy["pos"]
 			enemy["pos"] = target if current.distance_to(target) > 360.0 else current.lerp(target,mob_blend)
+			if int(enemy.get("type",-1))==3 and bool(enemy.get("walking",false)) and str(attack.get("ability",{}).get("shape",""))!="leap" and current.distance_to(target)<=360.0:
+				enemy["gait_phase"]=WolfAnimation.advance_gait(float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU))),current.distance_to(enemy["pos"]))
 
 func export_save_backup() -> void:
 	if not character_created: return
@@ -13793,7 +13807,7 @@ func receive_mob_death(payload:Dictionary)->void:
 		play_sound("hit")
 		boss_death_end_queue.append({"uid":uid,"remaining":1.35})
 	else:
-		row["duration"]=.45
+		row["duration"]=.95 if death_type==3 else .45
 	mob_deaths.append(row)
 	while mob_deaths.size()>24:mob_deaths.pop_front()
 	for key in dead_mob_uids.keys():
@@ -13829,6 +13843,10 @@ func draw_mob_deaths()->void:
 				var distance:float=18.0+burst*105.0
 				var point:=p+Vector2.RIGHT.rotated(angle)*distance
 				draw_rect(Rect2(point-Vector2(3,3),Vector2(6,6)),Color(color,.8*(1.0-progress)))
+		elif type==3:
+			var face:Array=row.get("facing",[0.0,1.0])
+			var look:=Vector2(float(face[0]),float(face[1]))
+			MobDesign32.paint(self,p+character_canvas_offset,type,enemy_level(type),look,ENEMY_TYPES[type]["color"],0,-1,float(row["scale"]),Vector2.ONE,"",{"death":age})
 		else:
 			MobDesign32.paint(self,p+character_canvas_offset,type,enemy_level(type),Vector2.DOWN,ENEMY_TYPES[type]["color"].darkened(age*.9),0,-1,float(row["scale"])*(1-age*.75),Vector2(1,1-age*1.6))
 		restore_canvas_transform()

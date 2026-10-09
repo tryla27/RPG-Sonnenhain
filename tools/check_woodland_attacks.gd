@@ -94,6 +94,10 @@ func run()->void:
 	wolf=mob(3);wolf["attack_sequence"]=1;game.enemies=[wolf];game.player_pos=Vector2(65,0)
 	game.advance_mob(wolf,.1,false)
 	check(wolf.get("attack_state",{}).is_empty() and Vector2(wolf["pos"]).x>0,"gap between bite and leap ranges causes approach")
+	var gait_phase:=float(wolf.get("gait_phase",0.0))
+	check(gait_phase>0 and bool(wolf.get("walking",false)),"actual movement advances drawn gait")
+	wolf["stun"]=1;game.advance_mob(wolf,.1,false)
+	check(is_equal_approx(float(wolf.get("gait_phase",0.0)),gait_phase) and not bool(wolf.get("walking",false)),"stunned wolf stops stepping")
 	var timed:Dictionary={"duration":2.6,"pulse_interval":.65}
 	check(Combat.cloud_pulses(timed,2.5)==4 and Combat.cloud_pulses(timed,.1)==0,"pulse schedule survives coarse delta without duplicates")
 	check(VFX.leap_height(.475)>21 and absf(VFX.leap_height(.55))<.01,"wolf rises and lands in active phase")

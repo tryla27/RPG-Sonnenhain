@@ -138,8 +138,8 @@ static func paint_waldschleim(c:CanvasItem,p:Vector2,look:Vector2,base:Color,pha
 		box(c,q,side*2-3,-1,6,3,base.darkened(.28))
 	c.draw_set_transform(Vector2.ZERO)
 
-static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color,phase:float=0.0,attack:float=-1.0,scale_factor:float=1.0,stretch:Vector2=Vector2.ONE,ability_id:String="")->void:
-	if WoodlandArt.paint(c,p,t,look,base,phase,attack,scale_factor,stretch,ability_id):return
+static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color,phase:float=0.0,attack:float=-1.0,scale_factor:float=1.0,stretch:Vector2=Vector2.ONE,ability_id:String="",visual:Dictionary={})->void:
+	if WoodlandArt.paint(c,p,t,look,base,phase,attack,scale_factor,stretch,ability_id,visual):return
 	if t==0:
 		paint_waldschleim(c,p,look,base,phase,attack,scale_factor,stretch)
 		return

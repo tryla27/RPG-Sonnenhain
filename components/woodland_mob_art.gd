@@ -3,6 +3,7 @@ extends RefCounted
 const Sprites=preload("res://components/golden_sprite_runtime.gd")
 const Hero=preload("res://components/rpg_hero.gd")
 const AttackVFX=preload("res://components/woodland_attack_vfx.gd")
+const WolfAnimation=preload("res://components/wolf_animation.gd")
 const PATHS=[
 	"res://art/sprites/mobs/woodland_v2/forest_slime_8dir.png",
 	"res://art/sprites/mobs/woodland_v2/flower_beetle_8dir.png",
@@ -40,15 +41,20 @@ static func pose(type:int,phase:float,attack:float,ability_id:String="")->Dictio
 		elif type==2:stretch=Vector2(1.0+sin(phase)*.025,1.0)
 	return {"offset":offset,"stretch":stretch,"lunge":lunge}
 
-static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,phase:float,attack:float,scale_factor:float,stretch:Vector2,ability_id:String="")->bool:
+static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,phase:float,attack:float,scale_factor:float,stretch:Vector2,ability_id:String="",visual:Dictionary={})->bool:
 	if type<0 or type>=PATHS.size() or Sprites.texture(PATHS[type])==null:return false
 	var heading:=direction_index(look)
 	var motion:=pose(type,phase,attack,ability_id)
+	var animated_wolf:=type==3 and WolfAnimation.available(heading)
+	if animated_wolf:
+		# Joint poses already move the body. Keep only the real leap height.
+		motion={"offset":Vector2(0,-AttackVFX.leap_height(attack)) if ability_id=="sprungbiss" else Vector2.ZERO,"stretch":Vector2.ONE,"lunge":0.0}
 	var canvas_scale:=stretch*scale_factor
 	c.draw_set_transform(foot,0,canvas_scale)
 	# The ground contact stays fixed when the creature hops or lunges.
-	c.draw_rect(Rect2(-22,0,44,6),Color("172a23",.18))
-	c.draw_rect(Rect2(-17,-2,34,8),Color("172a23",.20))
+	var shadow_alpha:=1.0-smoothstep(.35,.9,float(visual["death"])) if animated_wolf and float(visual.get("death",-1.0))>=0.0 else 1.0
+	c.draw_rect(Rect2(-22,0,44,6),Color("172a23",.18*shadow_alpha))
+	c.draw_rect(Rect2(-17,-2,34,8),Color("172a23",.20*shadow_alpha))
 	var offset:Vector2=motion["offset"]+look.normalized()*float(motion["lunge"])
 	c.draw_set_transform(foot+offset*canvas_scale,0,canvas_scale*Vector2(motion["stretch"]))
 	var tint:=Color.WHITE
@@ -56,7 +62,8 @@ static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,pha
 	var palette:Color=PALETTES[type]
 	if base.v<palette.v*.85:tint=Color(base.v/palette.v,base.v/palette.v,base.v/palette.v)
 	elif base.s<palette.s*.7:tint=Color(1.15,1.12,1.08)
-	Sprites.draw_direction_strip(c,PATHS[type],Vector2.ZERO,heading,SIZES[type],ANCHORS[type],SCALES[type],tint)
+	if animated_wolf:WolfAnimation.draw(c,heading,phase,attack,ability_id,visual,SCALES[type],tint)
+	else:Sprites.draw_direction_strip(c,PATHS[type],Vector2.ZERO,heading,SIZES[type],ANCHORS[type],SCALES[type],tint)
 	c.draw_set_transform(Vector2.ZERO)
 	return true
 
