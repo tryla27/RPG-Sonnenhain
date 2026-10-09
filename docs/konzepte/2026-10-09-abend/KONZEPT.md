@@ -284,11 +284,67 @@ sehen durch einen Pixel-Filter aus wie Pixelart.
 | 12 | C2, D3, D4 auf dem neuen Figuren-System | XL | baut auf D2 |
 | 13 | D5 Licht, Partikel, Treffergefühl | L | unabhängig, jederzeit |
 
-## Deine Entscheidungen
+## Entscheidungen (Angelo, 9.10.2026, 22:19)
 
-1. **C1:** Ist auch das Dorf am Anfang dunkel?
-2. **C2:** Gehen Angriffe in Kopfrichtung (bis über die Schulter) oder immer in
-   Körperrichtung?
-3. **D2:** Weg 1 (3D-Figuren in Pixel-Optik) als Prototyp starten?
-4. **E1:** Was soll am Fusionsstein neu werden?
-5. **F1:** Instrumente nur zum Spaß oder später mit Wirkung?
+- Konzept freigegeben bis auf A2 Punkte 2, 4, 5, 6 und 7 (Bot-Spieltest,
+  Fehlerberichte, Testserver, Leistung messen, `main.gd` zerlegen). Dafür steht
+  unten ein anderer Vorschlag (A2-neu).
+- **C1:** Auch das Dorf ist am Anfang dunkel.
+- **C2:** Angriffe gehen in Kopfrichtung, höchstens über die Schulter.
+- **D2:** Prototyp 3D-Figuren in Pixel-Optik starten.
+- **E1:** Alle drei Vorschläge: neues Aussehen, besseres Menü, Verschmelzungs-Animation.
+- **F1:** Instrumente erst zum Spaß, Wirkung später.
+
+## A2-neu. Stabilität ohne Zusatzbetrieb (Vorschlag)
+
+Statt Bot, Testserver, Fehlerberichten im Hintergrund und Messungen:
+1. **Vorschau-Link pro Änderung:** Jeder PR baut das Spiel zusätzlich als
+   Einzelspieler-Version unter einer eigenen Adresse auf der Website
+   (z. B. `/vorschau/pr-80/`). Du klickst vor dem Live-Gang einmal rein, ohne
+   eigenen Testserver.
+2. **„Fehler melden“ im Spiel (F8):** Erst auf deinen Knopfdruck werden ein
+   Bildschirmfoto, die letzten Meldungen und der Spielstand an den Server
+   geschickt. Nichts läuft heimlich im Hintergrund.
+3. **Leistungsanzeige (F3) und automatische Qualität:** Bilder pro Sekunde
+   sichtbar, bei schwachen Geräten werden Effekte von selbst reduziert.
+4. **Aufräumen nur durch den Neubau der Darstellung (H):** Kein eigenes
+   Zerlegen von `main.gd`, sondern jedes Teil, das in die neue Darstellung
+   wandert, verlässt dabei `main.gd`.
+
+## H. Darstellung: wie das Spiel heute gezeichnet wird und wie es besser geht
+
+**Heute.**
+- Ein einziges Objekt zeichnet jedes Bild alles von Hand: Boden, Häuser,
+  Figuren, Effekte, HUD und Menüs. Das sind rund 1.000 Zeichenbefehle im Code
+  (`draw_rect`, `draw_circle`, `draw_texture` …).
+- Nur der Boden wird in Stücken zwischengespeichert. Alles andere wird jedes
+  Bild neu in GDScript berechnet.
+- Figuren und viele Objekte bestehen aus Rechtecken und Kreisen statt aus Bildern.
+- Das Bild ist fest 1152 × 648 groß und wird gestreckt, daher die schwarzen
+  Ränder und uneinheitliche Pixelgrößen.
+- Menüs sind gemalte Kästen mit festen Klickflächen. Jede Änderung braucht
+  neue Koordinaten.
+
+**Besser: Szenen statt Malen.**
+1. **Welt aus Knoten:** Boden als Kachel-Ebenen, Häuser und Objekte als
+   Sprites, automatische Tiefensortierung, eine echte Kamera mit weichem
+   Folgen. Godot zeichnet das gebündelt auf der Grafikkarte. Nur was sich
+   bewegt, kostet Rechenzeit.
+2. **Pixelgenaue Darstellung:** Die Welt wird in kleiner, fester Auflösung
+   gerendert (z. B. 640 × 360) und in ganzen Schritten hochskaliert. Jeder
+   Pixel ist überall gleich groß und scharf. HUD und Schrift liegen getrennt
+   darüber in voller Auflösung. Breitbild füllt den Schirm ohne Ränder.
+3. **Licht und Schatten:** 2D-Lichter für Laternen, Kristalle und Zauber,
+   Nacht durch echte Dunkelheit statt Farbschleier. Damit wird auch das
+   Dunkel aus C1 schön: Sicht ist Licht.
+4. **Shader statt Handarbeit:** Nebel, Wasser, Wind in Gras und Bäumen,
+   Trefferblitz, Umrisse als kleine Grafikprogramme.
+5. **Partikel** für Funken, Staub, Magie und Blätter.
+6. **Menüs aus echten Bedienelementen** mit gemeinsamem Stil: Hover, Fokus,
+   Controller und verschiedene Bildschirmgrößen funktionieren von selbst.
+7. **Figuren** kommen als 3D-Modelle mit Pixel-Filter in diese Welt (D2).
+
+**Ablauf ohne Stillstand.** Das alte und das neue Zeichnen laufen eine Zeit
+nebeneinander. Reihenfolge: Kamera und HUD-Ebene trennen → Boden →
+Objekte und Häuser → Figuren und Gegner → Effekte und Licht → Menüs nach und
+nach. Jeder Schritt geht einzeln live.
