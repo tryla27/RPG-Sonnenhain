@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Nebel schneller: Weltkarten-Overlay als `ImageTexture` (1 px je Zelle,
+  einzelne Pixel bei `set_seen`), Dunkelheitsnetz gecacht nach Ausschnitt und
+  `version`. Gemessen lokal: Karte 44 → 17 ms, Spielbild 17 → 12 ms pro Bild.
 - Weltpaket pro Spieler nur mit Gegnern, Geschossen und Beute im Umkreis von
   2600 px (`components/world_snapshot.gd`), WebSocket-Puffer auf 1 MiB.
   Ursache für eingefrorene Gegner und fehlende Bosse: Pakete über 64 KiB
