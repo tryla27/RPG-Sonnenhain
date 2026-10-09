@@ -212,3 +212,10 @@ deterministisch (feste Saat), damit ein erneuter Lauf dieselben Dateien ergibt.
 
 - 9.10.2026: Klangrichtung **16-Bit, märchenhaft** (Angelo).
 - Offen: Referenzspiele, deren Klang gefällt (hilft beim Feinschliff).
+
+## Technik: Busse im Browser (9.10.2026)
+
+Im Web-Export ohne Threads spielt Godot Klänge als Web-Audio-Samples. Busse,
+die erst zur Laufzeit mit `AudioServer.add_bus()` entstehen, kommen dort nicht
+an und bleiben stumm. Deshalb stehen alle Busse (Musik, Effekte, Oberfläche,
+Umgebung) fest in `default_bus_layout.tres`. Neue Busse immer dort eintragen.

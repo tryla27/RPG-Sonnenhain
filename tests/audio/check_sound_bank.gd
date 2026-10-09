@@ -14,6 +14,7 @@ func check(ok:bool,label:String)->void:
 func _initialize()->void:call_deferred("run")
 
 func run()->void:
+	check_layout()
 	check_files()
 	check_rules()
 	check_voices()
@@ -25,6 +26,16 @@ func run()->void:
 		return
 	print("SOUND_BANK_OK %d sounds, files, levels, voices and mob voices" % Bank.CATALOG.size())
 	quit()
+
+## Im Browser klingen nur Busse aus dem Projekt-Layout; zur Laufzeit angelegte
+## bleiben stumm. Deshalb müssen alle Busse schon beim Start da sein.
+func check_layout()->void:
+	var layout:=load("res://default_bus_layout.tres") as AudioBusLayout
+	check(layout!=null,"default_bus_layout.tres fehlt")
+	for bus in [Bank.BUS_MUSIC,Bank.BUS_SFX,Bank.BUS_UI,Bank.BUS_AMBIENCE]:
+		var index:=AudioServer.get_bus_index(bus)
+		check(index>0,"Bus %s nicht im Projekt-Layout" % bus)
+		if index>0:check(AudioServer.get_bus_send(index)==&"Master","Bus %s sendet an Master" % bus)
 
 ## WAV-Kopf und Pegel direkt aus der Datei lesen.
 func check_files()->void:
