@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Gegenstandsregeln (Gegenstands- und Beuteerzeugung, Stapelgrößen,
+  Verkaufswert, Anzeigenamen, Elementfarben, Formvarianten) nach
+  `components/item_rules.gd` ausgelagert, mit Verhaltenstest
+  `tests/gameplay/check_item_rules.gd`. Die Sperr-Prüfung in
+  `tools/check_inventory_sell_lock.gd` testet neue Gegenstände jetzt am Verhalten.
 - Weltgeometrie (Gebietsgrenzen, Wegabstand, Wegsteine, Klassenboss-Arenen und
   -Häuser) nach `components/world_geometry.gd` ausgelagert, mit Verhaltenstest
   `tests/gameplay/check_world_geometry.gd`.
