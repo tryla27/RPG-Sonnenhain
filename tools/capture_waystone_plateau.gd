@@ -34,7 +34,7 @@ func capture()->void:
 	g.hero_name="Angelo"
 	g.level=30
 	for i in g.event_states.size():g.event_states[i]=3
-	g.world_fog.bytes.fill(255)
+	g.world_fog.bytes.fill(255);g.world_fog.mark_changed()
 	var a:Vector2=g.WAYSTONES[8]
 	g.waystone_unlocked[8]=true
 	await shot(g,viewport,a+Vector2(0,120),out.path_join("1-aktiv-vor-treppe.png"))

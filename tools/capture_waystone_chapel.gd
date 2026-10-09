@@ -3,7 +3,7 @@ class Board extends "res://main.gd":
 	var chapel:=false
 	func _ready()->void:
 		font=ThemeDB.fallback_font
-		world_fog.configure(WORLD);world_fog.bytes.fill(255)
+		world_fog.configure(WORLD);world_fog.bytes.fill(255);world_fog.mark_changed()
 		for event in WORLD_EVENTS:event_states.append(0)
 		for quest in QUESTS:quests.append({"state":0,"progress":0})
 		for quest in BORIN_QUESTS:borin_quests.append({"state":0,"progress":0})
