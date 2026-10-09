@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Fusionen · Wirkung am Trefferpunkt", "Alle Fusionen zünden jetzt dort, wo ihr Angriff trifft: am ersten getroffenen Gegner, sonst am Hindernis oder am Ende der Reichweite. Bisher lösten viele Fusionen ihren zweiten Teil einfach am Spieler aus. Fusionen aus zwei Schutz- oder Hilfsfähigkeiten schicken einen kurzen Impuls in Blickrichtung. Schilde, Heilung und Stärkungen wirken weiter auf dich. Fächer und Durchschläge zünden höchstens dreimal pro Einsatz. Der Reaktorwall schützt dich sofort, seine Wand entsteht am Einschlag."],
 ["Reisen · Weltkarte an Wegsteinen", "Spawn und Wegsteine öffnen die Weltkarte. Ein Klick auf eine Region oder einen aktivierten Wegstein reist direkt dorthin; Aktivierungen und Boss-Siegel bleiben gültig. Wegsteine schicken dich beim Öffnen nicht mehr sofort ins Dorf zurück."],
 ["Bossgaben · Zuordnung und Anhänger", "Die drei Meistergaben erkennen ihre Boss- und Klassenzuordnung auch bei älteren Gegenständen zuverlässig. Ungültige Kennungen werden nicht mehr als Kriegergabe behandelt. Anhänger und Amulette tragen Kettenoptik, werden im Halskettenplatz angelegt und behalten ihre Werte."],
 ["Kristallmoor · Dunkler Arkanhüter", "Der Arkanhüter heißt jetzt Dunkler Arkanhüter und besitzt sein Kampfgebiet samt Haus im Kristallmoor. Quest- und Kartenangaben folgen dem neuen Standort. In Elaras Kapelle sind die Wege links und rechts am Heilungsfeld breiter."],

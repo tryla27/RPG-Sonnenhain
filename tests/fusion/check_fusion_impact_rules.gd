@@ -26,7 +26,7 @@ func run()->void:
 	assert(g.fusion_spawn_rule(40)=="DAMAGE_IMPACT_POSITION")
 	assert(g.fusion_spawn_rule(42)=="DAMAGE_IMPACT_POSITION")
 	assert(g.fusion_spawn_rule(43)=="DAMAGE_IMPACT_POSITION")
-	assert(g.fusion_spawn_rule(41)=="PLAYER_POSITION")
+	assert(g.fusion_spawn_rule(41)=="IMPULSE_IMPACT_POSITION")
 
 	# Flammenwirbel wirkt am Trefferpunkt, nicht am Spieler.
 	g.player_pos=Vector2.ZERO

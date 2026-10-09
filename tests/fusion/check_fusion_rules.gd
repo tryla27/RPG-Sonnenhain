@@ -22,18 +22,23 @@ func _initialize()->void:
 	assert(str(fire_whirl["spawn_position"])=="DAMAGE_IMPACT_POSITION")
 	assert(str(fire_whirl["fusion_reaction"])!="")
 
+	# Regel D1: Ohne angreifenden Träger fliegt ein Impuls; sonst zündet der Treffer.
 	var reactor:=FusionRules.template_for_pair(1,36)
-	assert(str(reactor["trigger"])=="ON_CAST")
-	assert(str(reactor["spawn_position"])=="PLAYER_POSITION")
+	assert(str(reactor["trigger"])=="ON_IMPULSE_HIT")
+	assert(str(reactor["spawn_position"])=="IMPULSE_IMPACT_POSITION")
 
 	var jump_frost:=FusionRules.template_for_pair(2,21)
-	assert(str(jump_frost["spawn_position"])=="LANDING_POSITION")
+	assert(int(jump_frost["carrier"]["spell_id"])==2)
+	assert(str(jump_frost["spawn_position"])=="DAMAGE_IMPACT_POSITION")
 
 	var mark_guard:=FusionRules.template_for_pair(32,36)
-	assert(str(mark_guard["spawn_position"])=="TARGET_POSITION")
+	assert(str(mark_guard["spawn_position"])=="IMPULSE_IMPACT_POSITION")
 
-	var reactive_guard:=FusionRules.template_for_pair(21,36)
-	assert(str(reactive_guard["spawn_position"]) in ["ATTACKER_POSITION","PLAYER_POSITION"])
+	for a in range(40):
+		for b in range(a+1,40):
+			var template:=FusionRules.template_for_pair(a,b)
+			if template.is_empty():continue
+			assert(str(template["spawn_position"]) not in ["PLAYER_POSITION","LANDING_POSITION"])
 
 	var ice_lightning:=FusionRules.template_for_pair(17,18)
 	assert(str(ice_lightning["fusion_reaction"])=="CONDUCTIVE_FREEZE")
@@ -43,5 +48,5 @@ func _initialize()->void:
 	assert(invalid.is_empty())
 	assert(str(BuildInfo.SHORT)!="")
 
-	print("FUSION_RULES_OK 33 fusible sources; deterministic carrier/trigger/spawn; four ranks; exclusions")
+	print("FUSION_RULES_OK 33 fusible sources; deterministic carrier/trigger/spawn at the hit point; four ranks; exclusions")
 	quit()

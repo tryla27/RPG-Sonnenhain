@@ -13,10 +13,10 @@ func _initialize()->void:
 	assert(FusionReadModel.definition_by_key(indexes,"16:0").is_empty())
 	var profiles:Dictionary={
 		40:{"spawn":"DAMAGE_IMPACT_POSITION"},
-		41:{"spawn":"PLAYER_POSITION"}
+		41:{"spawn":"IMPULSE_IMPACT_POSITION"}
 	}
 	assert(FusionReadModel.spawn_rule(profiles,40)=="DAMAGE_IMPACT_POSITION")
-	assert(FusionReadModel.spawn_rule(profiles,41)=="PLAYER_POSITION")
+	assert(FusionReadModel.spawn_rule(profiles,41)=="IMPULSE_IMPACT_POSITION")
 	var abilities:Array=[{"name":"Wirbelhieb"},{"name":"Schildwall"}]
 	var learned:Array=[true,false]
 	var missing:=FusionReadModel.missing_sources({"a":0,"b":1},learned,abilities)

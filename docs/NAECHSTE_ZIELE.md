@@ -33,7 +33,7 @@ Konzept mit Befunden und Reihenfolge: `docs/konzepte/2026-10-09/KONZEPT.md`
 Wegsteine, orangene Ecken, Eingangswege, Hausaccessoires, Laternen, Patch
 Notes, HUD, Fusionsregel). Von Angelo freigegeben. Paket 1 ist live,
 Paket 2 (Patch Notes, HUD) ist seit 9.10.2026 live (Commit `391db84`).
-Als Nächstes: Paket 3 (Fusionsregel D1).
+Paket 3 (Fusionsregel D1) ist umgesetzt. Den Arkanhüter hat PR #70 schon ins Kristallmoor versetzt. Als Nächstes aus Paket 4: das sichtbare Ascheberge-Tor.
 
 ## 1. Startbereich abrunden
 

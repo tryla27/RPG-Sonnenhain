@@ -280,6 +280,11 @@ anderen Effekte zünden immer am Trefferort.
   Werkzeug `tools/capture_hud.gd`, Test `tests/ui/check_hud_slim.gd`.
   Am Touchgerät bleibt die Questzeile oben links unter den Balken, weil unten
   die Touch-Steuerung liegt.
+- **Paket 3 umgesetzt (9.10.2026):** D1 Fusionsregel. Alle 528 Fusionen (524
+  erzeugte, 4 handgebaute) zünden am Trefferpunkt, offline und auf dem Server
+  (`components/fusion_cast.gd`, Test `tests/fusion/check_fusion_impact_origin.gd`).
+  Vorschau: `fusion-feuerball-schildwall.gif`, `fusion-pfeil-frostnova.gif`,
+  `fusion-sprung-rissnova.gif`, `fusion-reaktorwall.gif`.
 
 ## E. Vorgeschlagene Reihenfolge
 

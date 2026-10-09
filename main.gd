@@ -145,6 +145,10 @@ var fusion_page:=0
 
 const COSMETIC_ACCENT_HEX := ["be5368","557fc0","5f9b68","b7894f","8d62aa","55a5a5","cf6f59","c94f7e","6a6fd1","4e9ad6","4ca6a0","5caf7a","86b84d","c2b14a","d48c4f","a86b4e","8c6a58","9a7acb","c36db5","d7d7d7"]
 const FUSION_IMPACT_PROFILES := FusionCatalog.IMPACT_PROFILES
+const FusionCast = preload("res://components/fusion_cast.gd")
+## Während ein Fusionsträger sofort wirkt, merkt sich damage_enemy den ersten Treffer.
+var fusion_capturing := false
+var fusion_capture: Array = []
 const BORIN_HOUSE_POS := Vector2(1248,64)
 const BORIN_MAGIC_TREE_POS := Vector2(1120,480)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
@@ -3576,6 +3580,7 @@ func move_enemy_with_collision(enemy: Dictionary, displacement: Vector2) -> void
 func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0, apply_runes:bool=true,direct_hit:bool=true) -> void:
 	if index < 0 or index >= enemies.size(): return
 	var enemy: Dictionary = enemies[index]
+	if fusion_capturing and fusion_capture.is_empty(): fusion_capture.append(Vector2(enemy["pos"]))
 	play_world_sound(SoundBank.hit_sound_for(int(enemy.get("type",-1))), enemy["pos"])
 	if source_peer > 0:
 		enemy["last_hit_peer"] = source_peer
@@ -3699,8 +3704,7 @@ func server_ability_effects(id:int,origin:Vector2,dir:Vector2,remote_class:int,p
 	var fusion_definition:=fusion_definition_by_id(id)
 	if id>=BASE_ABILITIES.size():
 		if fusion_definition.is_empty():return
-		for source in [int(fusion_definition["a"]),int(fusion_definition["b"])]:
-			server_ability_effects(source,origin,dir,remote_class,maxi(1,roundi(power*0.725)),rank,sender)
+		cast_fusion_at_impact(id,fusion_definition,rank,maxi(1,roundi(power*0.725)),origin,dir,sender,remote_class)
 		return
 	# Support components are applied by the owning client, never converted into attacks.
 	if FusionRules.is_fusible(id) and not bool(FusionRules.metadata(id).get("damage",false)):return
@@ -3712,7 +3716,9 @@ func server_ability_effects(id:int,origin:Vector2,dir:Vector2,remote_class:int,p
 			projectiles.append(shot)
 		return
 	if id==41:
-		apply_fusion_impact(41,origin,power+12,-1,rank,sender)
+		var wall:=FusionCast.impulse_projectile(origin,dir,FusionCast.tag(41,[],rank,power+12,sender,remote_class,41))
+		wall["owner_peer"]=sender
+		projectiles.append(wall)
 		return
 	# Host löst den Schaden aus; der Client behält nur seine lokale Animation.
 	var radial_ids := [0,5,17,19,22,23,24,31,33,37,39]
@@ -3788,9 +3794,7 @@ func execute_ability_effects(id:int,rank:int,power:int,cast_pos:Vector2,cast_dir
 	if id>=BASE_ABILITIES.size():
 		var fusion:=fusion_definition_by_id(id)
 		if fusion.is_empty():return
-		var shared_power:=maxi(1,roundi(power*0.725))
-		execute_ability_effects(int(fusion["a"]),rank,shared_power,cast_pos,cast_dir)
-		execute_ability_effects(int(fusion["b"]),rank,shared_power,player_pos,cast_dir)
+		cast_fusion_at_impact(id,fusion,rank,maxi(1,roundi(power*0.725)),cast_pos,cast_dir)
 		effect(player_pos,ABILITIES[id]["name"],Color("d9c8ff"),0.9)
 		return
 	match id:
@@ -3879,7 +3883,9 @@ func execute_ability_effects(id:int,rank:int,power:int,cast_pos:Vector2,cast_dir
 				shot["fusion_rank"]=rank
 				projectiles.append(shot)
 		41:
-			apply_fusion_impact(41,player_pos,power+12,-1,rank)
+			# Schild schützt sofort den Spieler, die Reaktorwand zündet am Impuls-Einschlag.
+			shield_timer=maxf(shield_timer,6.0+rank*0.5)
+			projectiles.append(FusionCast.impulse_projectile(player_pos,facing,FusionCast.tag(41,[],rank,power+12,0,class_id,41)))
 		15:
 			shield_timer = 5.0 + rank
 			for i in range(enemies.size() - 1, -1, -1):
@@ -3932,7 +3938,8 @@ func execute_ability_effects(id:int,rank:int,power:int,cast_pos:Vector2,cast_dir
 			rage_timer = 7.0 + rank
 			for enemy in enemies:
 				if enemy["pos"].distance_to(player_pos) < 400: enemy["marked"] = rage_timer
-	spell_visuals.append({"kind":id, "pos":cast_pos, "end":player_pos, "dir":cast_dir, "rank":rank, "life":0.65 if id not in [2, 5] else 0.85, "max":0.65 if id not in [2, 5] else 0.85})
+	# Der Reaktorwall zeigt seine Wand erst am Einschlag des Impulses.
+	if id != 41: spell_visuals.append({"kind":id, "pos":cast_pos, "end":player_pos, "dir":cast_dir, "rank":rank, "life":0.65 if id not in [2, 5] else 0.85, "max":0.65 if id not in [2, 5] else 0.85})
 	play_sound("skill_%d" % id)
 
 func update_projectiles(delta: float) -> void:
@@ -3959,6 +3966,10 @@ func update_projectiles(delta: float) -> void:
 			if collision["hit"]:
 				p["pos"]=collision["pos"]
 				if not uses_server_world():projectile_break(p["pos"],p["dir"],int(p.get("kind",2)),str(p.get("element","")))
+			# Kein Gegner getroffen: Die Fusion zündet am Hindernis oder am Reichweitenende.
+			if p.has("fusion") and not bool(p.get("fusion_fired",false)) and not bool(p.get("network_visual",false)):
+				p["fusion_fired"]=true
+				trigger_fusion(p["fusion"],p["pos"],p["dir"])
 			if spell_id == 16 and not bool(p.get("network_visual",false)): explode_fireball(p)
 			if spell_id == 28 and not bool(p.get("network_visual",false)): create_poison_cloud(p["pos"], int(p["damage"]))
 			projectiles.remove_at(i)
@@ -3974,9 +3985,12 @@ func update_projectiles(delta: float) -> void:
 				var network_visual:=bool(p.get("network_visual",false))
 				var source_peer:=int(p.get("owner_peer",0))
 				if not network_visual:
-					damage_enemy(e,int(p["damage"]),p["dir"],false,str(p.get("element","")),source_peer)
+					if int(p["damage"])>0:damage_enemy(e,int(p["damage"]),p["dir"],false,str(p.get("element","")),source_peer)
 					if not fusion_impact_profile(spell_id).is_empty():
 						apply_fusion_impact(spell_id,impact,int(p["damage"]),uid,clampi(int(p.get("fusion_rank",1)),1,4),source_peer)
+					if p.has("fusion") and not bool(p.get("fusion_fired",false)):
+						p["fusion_fired"]=true
+						trigger_fusion(p["fusion"],impact,p["dir"])
 				match (-1 if network_visual else spell_id):
 					25:
 						for survivor in enemies:
@@ -4097,10 +4111,16 @@ func update_impact_zones(delta: float) -> void:
 		var zone: Dictionary = impact_zones[i]
 		zone["delay"] = float(zone["delay"]) - delta
 		if zone["delay"] > 0.0: continue
+		var first_hit: Vector2 = zone.get("fusion_fallback", zone["pos"])
+		var any_hit := false
 		for e in range(enemies.size() - 1, -1, -1):
 			var offset: Vector2 = enemies[e]["pos"] - zone["pos"]
 			if offset.length() < float(zone["radius"]):
-				damage_enemy(e, int(zone["damage"]), offset.normalized(), false, str(zone["element"]),0,true,false)
+				if not any_hit:
+					first_hit = enemies[e]["pos"]
+					any_hit = true
+				damage_enemy(e, int(zone["damage"]), offset.normalized(), false, str(zone["element"]),int(zone.get("owner_peer",0)),true,false)
+		if zone.has("fusion"): trigger_fusion(zone["fusion"], first_hit, Vector2.RIGHT)
 		spell_visuals.append({"kind":int(zone["kind"]), "pos":zone["pos"], "end":zone["pos"], "dir":Vector2.RIGHT, "rank":1, "life":0.62, "max":0.62})
 		if int(zone["kind"]) == 22: create_burning_ground(zone["pos"], int(zone["damage"] * 0.18), 5.0)
 		impact_zones.remove_at(i)
@@ -6453,6 +6473,76 @@ func fusion_spawn_rule(fusion_id:int)->String:
 
 func fusion_pair_template(source_a:int,source_b:int)->Dictionary:
 	return FusionRules.template_for_pair(source_a,source_b)
+
+## Fusion mit Träger (Regel D1): Der Träger wird normal gewirkt; seine Geschosse
+## und Zonen tragen die Zündmarke, sofort wirkende Träger zünden am ersten Treffer.
+## server_peer > 0: der Server wirkt für diesen Spieler.
+func cast_fusion_at_impact(fusion_id:int,fusion:Dictionary,rank:int,power:int,cast_pos:Vector2,cast_dir:Vector2,server_peer:int=0,remote_class:int=0)->void:
+	var fusion_plan:=FusionCast.plan(int(fusion["a"]),int(fusion["b"]))
+	if fusion_plan.is_empty():return
+	var fusion_tag:=FusionCast.tag(fusion_id,fusion_plan["secondaries"],rank,power,server_peer,remote_class)
+	if bool(fusion_plan["impulse"]):
+		# Ohne angreifenden Träger: Impuls in Zielrichtung. Auf dem Server gibt es
+		# dafür nichts zu tun, Schutz und Heilung wendet der Client selbst an.
+		if server_peer<=0:projectiles.append(FusionCast.impulse_projectile(cast_pos,cast_dir,fusion_tag))
+		return
+	var carrier:=int(fusion_plan["carrier"])
+	var shots_before:=projectiles.size()
+	var zones_before:=impact_zones.size()
+	fusion_capture.clear()
+	fusion_capturing=true
+	if server_peer>0:server_ability_effects(carrier,cast_pos,cast_dir,remote_class,power,rank,server_peer)
+	else:execute_ability_effects(carrier,rank,power,cast_pos,cast_dir)
+	fusion_capturing=false
+	var carried:=false
+	for i in range(shots_before,projectiles.size()):
+		projectiles[i]["fusion"]=fusion_tag
+		carried=true
+	if impact_zones.size()>zones_before:
+		# Zonen zünden einmal: an der ersten Detonation.
+		fusion_tag["left"]=1
+		var zone_origin:=cast_pos if server_peer>0 else player_pos
+		for i in range(zones_before,impact_zones.size()):
+			impact_zones[i]["fusion"]=fusion_tag
+			# Zonen rund um den Wirker zünden ohne Treffer am Reichweitenende, nicht in ihrer Mitte.
+			var zone_pos:Vector2=impact_zones[i]["pos"]
+			impact_zones[i]["fusion_fallback"]=zone_pos if zone_pos.distance_to(zone_origin)>60.0 else FusionCast.fallback_point(carrier,zone_origin,cast_dir)
+			if server_peer>0:impact_zones[i]["owner_peer"]=server_peer
+		carried=true
+	if carried:return
+	var origin:=cast_pos if server_peer>0 else player_pos
+	var point:Vector2=fusion_capture[0] if not fusion_capture.is_empty() else FusionCast.fallback_point(carrier,origin,cast_dir)
+	fusion_capture.clear()
+	trigger_fusion(fusion_tag,point,cast_dir)
+
+## Zündet die Zweitfähigkeiten einer Fusion am Trefferpunkt.
+func trigger_fusion(fusion_tag:Dictionary,point:Vector2,dir:Vector2)->void:
+	if not FusionCast.take(fusion_tag):return
+	var rank:=int(fusion_tag["rank"])
+	var power:=int(fusion_tag["power"])
+	var peer:=int(fusion_tag["peer"])
+	var aim:=dir.normalized() if dir.length_squared()>0.0001 else Vector2.RIGHT
+	if int(fusion_tag["builtin"])==41:
+		apply_fusion_impact(41,point,power,-1,rank,peer)
+		return
+	for source in fusion_tag["secondaries"]:
+		if peer>0:server_ability_effects(int(source),point,aim,int(fusion_tag["class"]),power,rank,peer)
+		else:execute_secondary_at(int(source),rank,power,point,aim)
+
+## Wirkt eine Fähigkeit als Fusionsteil am Trefferpunkt. Zustände wie Schild,
+## Heilung und Buffs gelten weiter für den Spieler; alles Sichtbare und
+## Schadende entsteht am Punkt.
+func execute_secondary_at(id:int,rank:int,power:int,point:Vector2,dir:Vector2)->void:
+	if id==2:
+		# Der Sprung bewegt den Spieler nicht; sein Landeschlag zündet am Treffer.
+		hit_arc(point,dir,100,-0.3,power+12,true)
+		spell_visuals.append({"kind":2,"pos":point,"end":point,"dir":dir,"rank":rank,"life":0.85,"max":0.85})
+		play_sound("skill_2")
+		return
+	var home:=player_pos
+	player_pos=point
+	execute_ability_effects(id,rank,power,point,dir)
+	player_pos=home
 
 func apply_fusion_impact(fusion_id:int,center:Vector2,damage:int,main_uid:int,rank:int,source_peer:int=0)->void:
 	var profile:=fusion_impact_profile(fusion_id)

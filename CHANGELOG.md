@@ -6,6 +6,15 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Fusionsregel D1: `components/fusion_cast.gd` plant Träger, Zündmarke,
+  Träger-Impuls und Zündlimit. `cast_fusion_at_impact` (offline und Server)
+  wirkt den Träger, markiert seine Geschosse und Zonen und zündet die
+  Zweitfähigkeit am ersten Treffer (`trigger_fusion`, `execute_secondary_at`).
+  `fusion_rules.gd` kennt nur noch `DAMAGE_IMPACT_POSITION` und
+  `IMPULSE_IMPACT_POSITION`; alle Rezepte laufen als `CARRIER_IMPACT`.
+  Reaktorwall (41) schickt einen Impuls. Test
+  `tests/fusion/check_fusion_impact_origin.gd` spielt alle 528 Fusionen offline
+  und auf dem Server durch. Vorschau `tools/capture_fusion_impact.gd`.
 - Meistergaben anhand stabiler IDs repariert; alte Anhänger werden mit erhaltenen Werten im Halskettenplatz getragen.
 - Dunkler Arkanhüter nach Kristallmoor versetzt (Gebietsstufe: 29 statt 43); Arenen, Beute, Quest und Kartenmarkierungen angepasst.
 - Spawn und Wegsteine öffnen die Weltkarte; aktivierte Ziele starten per Kartenklick die bestehende, servergeprüfte Reise.
