@@ -39,7 +39,7 @@ func _initialize() -> void:
 	g.bosses_defeated=[false,false,false]
 	check(g.is_blocked(Vector2(5000,6200),Vector2(4900,6200)),"Kriegsherr boss gate not sealed")
 	check(g.boss_gate_name(0)=="Kriegsherr","Boss gate 0 label names wrong boss")
-	check(g.boss_gate_name(1)=="Arkanhüter","Boss gate 1 label names wrong boss")
+	check(g.boss_gate_name(1)=="Dunkler Arkanhüter","Boss gate 1 label names wrong boss")
 	check(not g.region_available(4),"Boss-locked region opened before Kriegsherr")
 	g.bosses_defeated[0]=true
 	check(not g.is_blocked(Vector2(5000,6200),Vector2(4900,6200)),"Kriegsherr victory did not open gate")

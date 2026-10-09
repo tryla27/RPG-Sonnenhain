@@ -41,6 +41,10 @@ func run()->void:
 		if drop.has("item") and Neck.index(drop["item"])==4:
 			found+=1;assert(int(drop["reserved_class"])==-1)
 	assert(found==1,"server boss necklace is unrestricted")
+	actor.inventory.clear();actor.add_item(actor.make_item("Blütenanhänger","gem",1,0,10))
+	actor.equipped_necklace_uid=int(actor.inventory[0]["uid"])
+	actor.rpc_player_presence.rpc_id(1,actor.local_player_state());await settle()
+	assert(server.necklace_visual(aid)==6 and other.remote_players[aid]["necklace"]==6,"ordinary pendants preserve their chain appearance across peers")
 	print("ARCANE_NECKLACES_NETWORK_OK authoritative effects, wearer progress, observer appearance, independent attackers, unrestricted server drops")
 	pa.close();pb.close();host.close()
 	for branch in root.get_children():

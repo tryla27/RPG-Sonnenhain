@@ -124,9 +124,11 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 		if not item.get("icon") is String or String(item["icon"]) not in ["sword","staff","bow","armor","ring","potion","herb","essence","gem","food","head","necklace"]: return false
 		if item["icon"]=="head" and (not item.get("head_class") is int and not item.get("head_class") is float or int(item.get("head_class",-1)) not in [0,1,2]):return false
 		if item["icon"]=="necklace":
-			if preload("res://components/arcane_necklaces.gd").index(item)<0:return false
-			for stat in ["power","str","agi","int"]:
-				if float(item.get(stat,0))!=0:return false
+			var necklace_id:=preload("res://components/arcane_necklaces.gd").index(item)
+			if necklace_id<0:return false
+			if necklace_id<6:
+				for stat in ["power","str","agi","int"]:
+					if float(item.get(stat,0))!=0:return false
 		if item["icon"]=="food" and preload("res://components/food_system.gd").by_name(item["name"]).is_empty():return false
 		for field in ["power","rarity","value","count","level","str","agi","int","design"]:
 			var value: Variant = item.get(field,1 if field == "count" else 0)

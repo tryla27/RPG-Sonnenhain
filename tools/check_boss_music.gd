@@ -8,7 +8,7 @@ func _initialize()->void:
 	g.skill_levels.resize(16);g.skill_levels.fill(0)
 	var failures=0
 	for index in 3:
-		if g.enemy_level(index+12)!=[12,43,19][index]:failures+=1
+		if g.enemy_level(index+12)!=[12,29,19][index]:failures+=1
 		if not g.register_boss_defeat(index,true):failures+=1
 		if g.register_boss_defeat(index,true):failures+=1
 	# Individuelle Klassenboss-Musik wird pro Boss geroutet; solange die

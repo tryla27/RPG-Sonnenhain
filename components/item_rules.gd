@@ -9,6 +9,7 @@ extends RefCounted
 ## Siehe docs/architecture/main-modularization.md, Schritt 2.
 
 const GameContent = preload("res://components/game_content.gd")
+const BossRelics=preload("res://components/boss_relics.gd")
 const ArcaneNecklaces = preload("res://components/arcane_necklaces.gd")
 const FoodSystem = preload("res://components/food_system.gd")
 
@@ -20,14 +21,15 @@ const LOOT_WORDS := {"sword":"Klinge", "staff":"Stab", "bow":"Bogen", "gem":"Ess
 static func build_item(uid: int, name: String, icon: String, rarity: int, power: int, value: int, element: String, item_level: int) -> Dictionary:
 	var ilvl := maxi(1, item_level)
 	var bonus: int = maxi(0, rarity + int(ilvl / 9.0))
-	var strength: int = bonus if icon == "sword" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	var agility: int = bonus if icon == "bow" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	var intellect: int = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
+	var strength: int = bonus if icon == "sword" else (int(bonus / 2.0) if icon in ["armor", "ring", "necklace"] else 0)
+	var agility: int = bonus if icon == "bow" else (int(bonus / 2.0) if icon in ["armor", "ring", "necklace"] else 0)
+	var intellect: int = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring", "necklace"] else 0)
 	var fair_value := value if icon == "potion" else 10 + ilvl * 4 + maxi(0, power) * (3 if icon in ["sword", "staff", "bow"] else 2) + rarity * rarity * 32 + (25 if element != "" else 0) + (strength + agility + intellect) * 5
 	var item := {"uid":uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4, "locked":false}
 	if icon == "food":
 		item["value"] = value
 		item["design"] = maxi(0,FoodSystem.index_for(name))
+	BossRelics.normalize(item)
 	ArcaneNecklaces.normalize(item)
 	return item
 
@@ -63,6 +65,7 @@ static func stack_limit(item: Dictionary) -> int:
 	var icon: String = str(item.get("icon", ""))
 	if icon == "food": return 30
 	if icon == "potion": return 16
+	if icon=="necklace" and ArcaneNecklaces.index(item)==6 and int(item.get("count",1))==1:return 1
 	if icon in ["gem", "herb", "essence", "necklace"]: return 1000000000
 	return 1
 
@@ -70,6 +73,7 @@ static func item_sale_value(item: Dictionary) -> int:
 	return int(item.get("stack_value", int(item.get("value", 0)) * int(item.get("count", 1))))
 
 static func item_skill_unlock_id(item: Dictionary) -> int:
+	BossRelics.normalize(item)
 	ArcaneNecklaces.normalize(item)
 	if ArcaneNecklaces.index(item)>=0:return -1
 	var explicit:=int(item.get("skill_unlock",-1))

@@ -6,6 +6,12 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Meistergaben anhand stabiler IDs repariert; alte Anhänger werden mit erhaltenen Werten im Halskettenplatz getragen.
+- Dunkler Arkanhüter nach Kristallmoor versetzt (Gebietsstufe: 29 statt 43); Arenen, Beute, Quest und Kartenmarkierungen angepasst.
+- Spawn und Wegsteine öffnen die Weltkarte; aktivierte Ziele starten per Kartenklick die bestehende, servergeprüfte Reise.
+- Elara: breitere Kirche und zusätzliche Querpassage, Podest und aktuelle Kollisionsgrenzen bleiben erhalten.
+- Pilzlinge verwenden weiterhin ausschließlich das saubere Giftzischen bei Freisetzung.
+
 - Web-Ton repariert: Audio-Busse stehen jetzt in `default_bus_layout.tres`.
   Im Web-Export ohne Threads (Sample-Wiedergabe) bleiben zur Laufzeit per
   `AudioServer.add_bus()` angelegte Busse stumm; im Browser gemessen (Spitze 0

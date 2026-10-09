@@ -280,6 +280,10 @@ func panel_points(g) -> Array:
 			points.append(Vector2(986,109))
 		"quest_details":
 			points = [Vector2(260,569),Vector2(520,569),Vector2(830,569),Vector2(986,109)]
+		"map":
+			if g.travel_map:
+				for i in g.WAYSTONES.size():points.append(g.WaystoneMap.point(g,i))
+			points.append(Vector2(986,109))
 		"travel":
 			for i in range(1,g.WAYSTONES.size()):
 				var col := (i-1)%3

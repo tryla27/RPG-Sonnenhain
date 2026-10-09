@@ -53,7 +53,7 @@ func run()->void:
 	assert(legacy["uid"]==543 and legacy["locked"] and legacy["count"]==3)
 	assert(legacy["name"]==Neck.NAMES[1] and not legacy.has("skill_unlock"))
 	var weapon={"name":"Arkankern","icon":"staff","power":42,"element":"blitz"}
-	Neck.normalize(weapon);assert(weapon["name"]=="Arkanhüter-Waffe" and weapon["power"]==42)
+	Neck.normalize(weapon);assert(weapon["name"]=="Dunkler-Arkanhüter-Waffe" and weapon["power"]==42)
 	var n:=Neck.new();var enemy={"uid":101,"type":0,"hp":1000.0}
 	assert(n.direct_hit(0,0,enemy,100,10,1000)==10 and enemy["necklace_frost_mult"]==0.8)
 	var boss={"uid":102,"type":13,"hp":1000.0}
