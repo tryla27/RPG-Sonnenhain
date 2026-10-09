@@ -123,6 +123,7 @@ const WorldGeometry=preload("res://components/world_geometry.gd")
 const ItemRules=preload("res://components/item_rules.gd")
 const SoundBank=preload("res://components/sound_bank.gd")
 const TypingSound=preload("res://components/typing_sound.gd")
+const AccountSlots=preload("res://components/account_slots.gd")
 const PORTALS := GameContent.PORTALS
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
@@ -5563,6 +5564,10 @@ func slot_save_path(index: int, testing: bool = false) -> String:
 
 func refresh_save_slot_labels() -> void:
 	save_slot_labels.clear()
+	if account_logged_in:
+		if character_created: AccountSlots.refresh_current(account_characters, player_uuid, hero_name, level, class_id)
+		for index in range(1, 4): save_slot_labels.append(AccountSlots.label_for(account_characters, index, CLASS_NAMES))
+		return
 	for index in range(1, 4):
 		var path := slot_save_path(index)
 		if not FileAccess.file_exists(path):
@@ -5972,6 +5977,16 @@ func panel_click(mouse: Vector2) -> void:
 			active_save_slot = selected_save_slot
 			begin_character_creation()
 		elif Rect2(300, 448, 550, 54).has_point(mouse):
+			if account_logged_in:
+				# Mit Konto lädt der Platz den Charakter vom Server, wie in der Charakterauswahl.
+				var account_index := AccountSlots.index_for_slot(account_characters, selected_save_slot)
+				if account_index < 0:
+					message_error("Auf diesem Platz liegt kein Charakter deines Kontos.")
+					return
+				if account_pending_load: return
+				play_sound("ui_klick")
+				open_account_character(account_index)
+				return
 			if not FileAccess.file_exists(slot_save_path(selected_save_slot)):
 				message_error("Noch kein Spielstand vorhanden. Wähle eine Klasse und starte ein neues Spiel.")
 				return
@@ -10677,6 +10692,10 @@ func draw_account_characters()->void:
 	ui_button(Rect2(590,520,340,44),"ZUM STARTMENÜ")
 	if account_status!="":text_at(Vector2(220,585),account_status,13,Color("e7c5ad"),HORIZONTAL_ALIGNMENT_LEFT,710)
 
+func start_slot_loadable() -> bool:
+	if account_logged_in: return AccountSlots.index_for_slot(account_characters, selected_save_slot) >= 0 and not account_pending_load
+	return FileAccess.file_exists(slot_save_path(selected_save_slot))
+
 func draw_start_panel() -> void:
 	preload("res://components/start_emblem.gd").background(self)
 	text_at(Vector2(300, 210), "SONNENHAIN", 42, Color("ffe2aa"))
@@ -10684,7 +10703,7 @@ func draw_start_panel() -> void:
 	text_at(Vector2(300, 320), "Lade deinen Spielstand oder erschaffe einen neuen Charakter.", 16, Color("dce7d8"), HORIZONTAL_ALIGNMENT_LEFT, 550)
 	if account_logged_in:text_at(Vector2(300,286),"Angemeldet als %s" % account_name,13,Color("9fd9c4"))
 	ui_button(Rect2(300, 378, 550, 54), "NEUEN CHARAKTER ERSTELLEN")
-	ui_button(Rect2(300, 448, 550, 54), "SPIELSTAND LADEN", FileAccess.file_exists(slot_save_path(selected_save_slot)))
+	ui_button(Rect2(300, 448, 550, 54), "SPIELSTAND LADEN", start_slot_loadable())
 	text_at(Vector2(168, 521), "SPEICHERPLATZ WÄHLEN", 14, Color("f6dfa9"))
 	for index in 3:
 		var card := Rect2(168 + index * 273, 530, 260, 57)
@@ -13707,6 +13726,7 @@ func rpc_account_reply(response:Dictionary)->void:
 	account_logged_in=true
 	account_name=str(response.get("name",account_name))
 	account_characters=response.get("characters",[])
+	refresh_save_slot_labels()
 	account_password=""
 	account_password_confirm=""
 	if str(response.get("kind",""))=="claimed":

@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Fehlerbehebung · Spielstände im Startmenü", "Angemeldet zeigte das Startmenü die Spielstände, die zufällig im Browser lagen, manchmal von einem anderen Konto oder einem alten Charakter. Jetzt zeigen die drei Speicherplätze genau die Charaktere deines Kontos, wie bei der Anmeldung, mit aktueller Stufe. „Spielstand laden“ lädt sie vom Server."],
 ["Welt · Start im Dunkeln", "Die Welt liegt jetzt im Dunkeln, auch Sonnenhain. Du siehst 20 Meter weit, und alles, was du einmal gesehen hast, bleibt dauerhaft aufgedeckt: im Spielbild, auf der Minikarte und auf der Weltkarte. Bisher erkundete Gebiete bleiben erhalten. Gruppenmitglieder decken nur mit auf, wenn sie in deiner Nähe sind."],
 ["Klänge · Tippgeräusch", "Beim Schreiben klickt jetzt jede Taste leise: im Anmelde- und Registrierformular, beim Koop-Code, beim Charakternamen und im Chat. Löschen klingt etwas tiefer. Die Lautstärke folgt dem Regler „Oberfläche“."],
 ["Reisen · Über die Karte", "Stehst du an einem Wegstein oder am Spawn, wird die Karte mit M zur Reisekarte: Ein Klick auf ein aktiviertes Ziel reist sofort. Weiter weg sagt dir ein Hinweis: „Gehe zu einem Wegstein, um zu teleportieren.“"],
