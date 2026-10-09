@@ -84,8 +84,13 @@ func snapshot()->Array:
 	for i in bytes.size():out[i]=int(bytes[i])
 	return out
 
+## Alles wieder verdeckt (neuer Charakter, Charakterwechsel).
+func clear()->void:
+	bytes.fill(0)
+
 func restore(raw:Variant,size:Vector2)->void:
 	configure(size)
+	clear()
 	if not raw is Array:return
 	for i in mini(raw.size(),bytes.size()):
 		var value:Variant=raw[i]
