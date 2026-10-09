@@ -191,6 +191,7 @@ deterministisch (feste Saat), damit ein erneuter Lauf dieselben Dateien ergibt.
   Wolf-Todeslaut auf Wunsch entfernt; der Mooswolf nutzt „tod_fell“. Der
   Rückkehr-Klang spielt auch beim Betreten der Welt (Fortsetzen, Koop-Start,
   nach dem Prolog). Bogenschuss: alle 10 Varianten im Spiel.
+- Runde 3 (9.10.2026): alle 39 Sounds von Angelo freigegeben. Paket 1 abgeschlossen.
 - Alle Sounds sind selbst erzeugt; es gibt keine Fremdlizenzen.
 - Freigabe läuft über die Hörvorschau „Sonnenhain Klangprobe“.
 
