@@ -45,6 +45,7 @@ abgrenzbar ist, löse sie bei der Gelegenheit heraus (siehe Abschnitt 4).
 | Dorf (Gebäude, Wege, Innenräume, Objekte) | `components/village_*.gd` |
 | Gelände und Boden | `components/terrain/` |
 | Speichern | `components/local_save_store.gd`, `components/server_save_*.gd` |
+| Soundeffekte: Katalog, Lautstärke, Wiedergabe, Monsterlaute | `components/sound_bank.gd` (Dateien erzeugt `tools/build_sfx.py`, Konzept `docs/sound/KONZEPT.md`) |
 | Patch Notes für Spieler | `components/patch_notes.gd` |
 | Neues Thema ohne passende Datei | neue Datei `components/<thema>.gd` |
 | Grafik, Klänge, Musik | `art/`, `audio/`, `music/` |

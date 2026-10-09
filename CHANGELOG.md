@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Sound-Paket 1: `components/sound_bank.gd` (Katalog, Audio-Busse, Stimmenlimits
+  mit Vorrang, Varianten, Entfernungsdämpfung, Ducking, Monsterlaute aus dem
+  Angriffszustand), Generator `tools/build_sfx.py`, 71 neue Dateien unter
+  `audio/sfx/`, Test `tests/audio/check_sound_bank.gd`.
 - Gegenstandsregeln (Gegenstands- und Beuteerzeugung, Stapelgrößen,
   Verkaufswert, Anzeigenamen, Elementfarben, Formvarianten) nach
   `components/item_rules.gd` ausgelagert, mit Verhaltenstest

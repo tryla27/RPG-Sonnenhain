@@ -28,6 +28,7 @@ ersten Spielminuten entscheiden, ob jemand weiterspielt.
 Neues Soundkonzept: `docs/sound/KONZEPT.md`. Erst Paket 1 (Kampfgefühl im
 Startbereich), danach Oberfläche, Fähigkeiten, Atmosphäre und übrige Gegner.
 Klangrichtung: 16-Bit, märchenhaft. Sounds entstehen überwiegend per Skript.
+Paket 1 (Kampfgefühl im Startbereich) ist freigegeben. Nächstes Paket: 2 (Oberfläche und Fortschritt).
 
 ## 3. Schrittweise Modularisierung von `main.gd`
 

@@ -169,7 +169,33 @@ deterministisch (feste Saat), damit ein erneuter Lauf dieselben Dateien ergibt.
   übersteuern; nach 10 Minuten Spielen darf kein Sound nerven.
 - Live geht ein Paket nur nach Angelos Bestätigung (siehe `AGENTS.md`).
 
-## 7. Entscheidungen
+## 7. Stand
+
+- **Paket 1 umgesetzt** (9.10.2026): 41 Sounds in 71 Dateien unter
+  `audio/sfx/{kampf,treffer,spieler,mobs,beute}/`, erzeugt mit
+  `python3 tools/build_sfx.py`. Katalog, Busse (`Musik`, `Effekte` mit
+  Begrenzer, `Oberfläche`, `Umgebung`), Stimmenlimits, Varianten,
+  Entfernungsdämpfung und Ducking in `components/sound_bank.gd`;
+  Test `tests/audio/check_sound_bank.gd`.
+- Noch nicht in Paket 1: Stereo-Richtung (zurzeit nur Entfernung), eigene
+  Regler für Oberfläche und Umgebung (Paket 2), Laute der übrigen Monster
+  (Paket 5). `bogen_spannen` ist vorbereitet, wird aber noch nicht abgespielt.
+- Runde 1 der Freigabe: 30 passt, 11 überarbeitet (Schwert schlitzt statt
+  pfeift, Stab nach Alchemie, Bogen trocken mit 10 Varianten, Spannen ohne
+  Ton, Krit als brechende Rüstung, Geisttreffer wie Pappe, Schaden als
+  stimmhaftes „Uff“, Trank nur Schlucke, Wolf landet auf Gras und winselt).
+  Wenig Leben ist jetzt ein Herzschlag als Schleife, solange das Leben unter
+  25 % liegt.
+- Runde 2: 36 passt. Geisttreffer geisterhafter (Pappe-Kern plus Seufzen und
+  Nachklang), Trank als schnelles Gluckern. Wolf-Landung und eigener
+  Wolf-Todeslaut auf Wunsch entfernt; der Mooswolf nutzt „tod_fell“. Der
+  Rückkehr-Klang spielt auch beim Betreten der Welt (Fortsetzen, Koop-Start,
+  nach dem Prolog). Bogenschuss: alle 10 Varianten im Spiel.
+- Runde 3 (9.10.2026): alle 39 Sounds von Angelo freigegeben. Paket 1 abgeschlossen.
+- Alle Sounds sind selbst erzeugt; es gibt keine Fremdlizenzen.
+- Freigabe läuft über die Hörvorschau „Sonnenhain Klangprobe“.
+
+## 8. Entscheidungen
 
 - 9.10.2026: Klangrichtung **16-Bit, märchenhaft** (Angelo).
 - Offen: Referenzspiele, deren Klang gefällt (hilft beim Feinschliff).
