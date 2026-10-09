@@ -81,6 +81,10 @@ lokalen Projektwurzel. Umhang- und Farbteile sind teilweise bereits vorhanden.
 
 ## Bereits erledigt und live
 
+- 9.10.2026 live (Commit `2935228`, von Angelo vorab bestätigt): Sound-Paket 2
+  (Oberfläche, Fortschritt, Welt, Regler „Oberfläche“), Busch-Rascheln und
+  Konzept-Paket 1 (Fenna-Speicherverlust, Wegsteine, Laternen/Büsche,
+  Eingangswege, Kapelle).
 - 9.10.2026 live (Commit `678bc55`, von Angelo bestätigt): Sound-Paket 1
   (39 Klänge, Herzschlag-Warnung, Monsterlaute, Entfernungsdämpfung, Ducking)
   sowie die Module `game_content.gd`, `network_codec.gd`, `world_geometry.gd`
