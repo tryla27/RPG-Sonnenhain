@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Mobs · Drüsen, Giftstaub und Sprungbiss", "Blütenkäfer verschießen grünes Sekret aus ihren vorderen Drüsen statt Kontaktschaden. Pilzlinge kündigen einen Giftstaubkreis an; der Staub schädigt Spieler darin kurzzeitig in einzelnen Impulsen. Mooswölfe beißen aus der Nähe und springen aus mittlerer Entfernung mit sichtbarer Vorwarnung an. Sprünge beachten Hindernisse und treffen erst bei der Landung. Die Ost-/West-Blickrichtungen der neuen Mob-Bilder wurden berichtigt."],
 ["Mobs · Blütenwiesen und Pilzwald", "Waldschleim, Blütenkäfer, Pilzling und Mooswolf erhalten detaillierte Pixelart mit acht Blickrichtungen. Ihre Körper bleiben beim Bewegen und Angreifen im selben Stil. Der Blütenkäfer steht passend zu seinen Beinen auf dem Boden. Schaden, Trefferbereiche, Beute und Angriffstempo bleiben unverändert."],
 ["Sonnenhain · Laternen und Büsche", "Die orangefarbenen Lichtflecken an den Laternen wurden durch einen einzelnen sanft auslaufenden warmen Lichtschein ersetzt; tagsüber bleibt der Boden unverfärbt. Der orange Busch am Brunnen entfällt. Vier feste grüne Büsche stehen jetzt auf anderen freien Rasenflächen."],
 ["Sonnenhain · Zäune und Türen", "Die drei freistehenden Zaunreste ohne Grundstücksfunktion wurden samt ihren Kollisionen entfernt. Türen verwenden jetzt getrennte kurze Holzgeräusche zum Öffnen und Schließen statt synthetischer Töne, mit Riegel, Scharnier und gedämpftem Anschlag."],

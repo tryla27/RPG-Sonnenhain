@@ -22,7 +22,7 @@ func run()->void:
 		var info:Dictionary=game.ENEMY_TYPES[type]
 		var config=Combat.profile(type,info,game.enemy_level(type),game.enemy_damage(type))
 		check(float(config["attack_cycle"])>=float(config["windup"])+float(config["active_time"])+float(config["recovery"]),"valid timings "+str(type))
-		if int(info["region"]) in [1,2,6,8] and type not in [12,13,14]:check(config["abilities"].size()==1,"early single move "+str(type))
+		if int(info["region"]) in [1,2,6,8] and type not in [3,12,13,14]:check(config["abilities"].size()==1,"early single move "+str(type))
 		var offline=mob(type)
 		var dedicated=offline.duplicate(true)
 		var target=[{"id":2,"pos":Vector2(0,35)}]

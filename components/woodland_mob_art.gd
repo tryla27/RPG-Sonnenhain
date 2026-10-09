@@ -2,6 +2,7 @@ extends RefCounted
 ## Authored woodland sprites retain the same body throughout a combat cycle.
 const Sprites=preload("res://components/golden_sprite_runtime.gd")
 const Hero=preload("res://components/rpg_hero.gd")
+const AttackVFX=preload("res://components/woodland_attack_vfx.gd")
 const PATHS=[
 	"res://art/sprites/mobs/woodland_v2/forest_slime_8dir.png",
 	"res://art/sprites/mobs/woodland_v2/flower_beetle_8dir.png",
@@ -13,7 +14,7 @@ const SCALES=[.9,1.05,1.12,1.22]
 const ANCHORS=[80.0,80.0,80.0,80.0]
 const PALETTES=[Color("73cb88"),Color("e998b6"),Color("e3ad77"),Color("789983")]
 
-static func pose(type:int,phase:float,attack:float)->Dictionary:
+static func pose(type:int,phase:float,attack:float,ability_id:String="")->Dictionary:
 	var offset:=Vector2.ZERO
 	var stretch:=Vector2.ONE
 	var lunge:=0.0
@@ -22,13 +23,16 @@ static func pose(type:int,phase:float,attack:float)->Dictionary:
 		# the active hit phase to 0.4..0.55; keep the visual strike in it.
 		var windup:=smoothstep(0.0,.4,attack)*(1.0-smoothstep(.4,.55,attack))
 		var impact:=smoothstep(.4,.55,attack)*(1.0-smoothstep(.55,1.0,attack))
-		lunge=(-3.0*windup+8.0*impact) if type!=2 else 0.0
+		lunge=(-3.0*windup+8.0*impact) if type in [0,3] else 0.0
 		if type==0:
 			stretch=Vector2(1.0+.16*windup-.10*impact,1.0-.13*windup+.10*impact)
 		elif type==2:
 			offset.y=-3.0*windup
 		else:
 			offset.y=-4.0*impact
+		if type==3 and ability_id=="sprungbiss":
+			lunge=0.0
+			offset.y=-AttackVFX.leap_height(attack)
 	elif absf(phase)>.0001:
 		var bounce:=absf(sin(phase))
 		offset.y=-bounce*([3.0,1.5,2.0,3.0][type])
@@ -36,10 +40,10 @@ static func pose(type:int,phase:float,attack:float)->Dictionary:
 		elif type==2:stretch=Vector2(1.0+sin(phase)*.025,1.0)
 	return {"offset":offset,"stretch":stretch,"lunge":lunge}
 
-static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,phase:float,attack:float,scale_factor:float,stretch:Vector2)->bool:
+static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,phase:float,attack:float,scale_factor:float,stretch:Vector2,ability_id:String="")->bool:
 	if type<0 or type>=PATHS.size() or Sprites.texture(PATHS[type])==null:return false
-	var heading:=Hero.direction_index(look)
-	var motion:=pose(type,phase,attack)
+	var heading:=direction_index(look)
+	var motion:=pose(type,phase,attack,ability_id)
 	var canvas_scale:=stretch*scale_factor
 	c.draw_set_transform(foot,0,canvas_scale)
 	# The ground contact stays fixed when the creature hops or lunges.
@@ -55,3 +59,8 @@ static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,pha
 	Sprites.draw_direction_strip(c,PATHS[type],Vector2.ZERO,heading,SIZES[type],ANCHORS[type],SCALES[type],tint)
 	c.draw_set_transform(Vector2.ZERO)
 	return true
+
+static func direction_index(look:Vector2)->int:
+	# Hero headings run S,SE,E,NE,N,NW,W,SW; authored mob strips run
+	# S,SW,W,NW,N,NE,E,SE. Convert rather than mirroring the artwork.
+	return posmod(-Hero.direction_index(look),8)

@@ -68,6 +68,7 @@ func hud_action_at(pos:Vector2)->String:
 		if hud_action_rect(i).has_point(pos):return str(actions[i])
 	return ""
 const MobCombat=preload("res://components/mob_combat.gd")
+const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
 const ItemStyle32=preload("res://components/item_style_32.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
@@ -1326,7 +1327,7 @@ func push_world_snapshot() -> void:
 		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0),"boss_spawn_timer":enemy.get("boss_spawn_timer",0.0)})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
-		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0)})
+		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0),"kind":shot.get("kind","projectile"),"ability_id":shot.get("ability_id","basic"),"radius":shot.get("radius",0.0),"age":shot.get("age",0.0),"duration":shot.get("duration",0.0)})
 	var drop_rows:Array=[]
 	for drop in drops:
 		if not drop.has("drop_uid") or not drop.has("item"):continue
@@ -2146,7 +2147,29 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			MobCombat.cancel(enemy,.35)
 	for event in action["events"]:
 		if event["kind"]=="projectile":
-			enemy_projectiles.append({"pos":enemy["pos"],"dir":event["dir"],"speed":profile["projectile_speed"],"life":2.3,"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"hit_radius":profile["hit_radius"],"source_region":region_at(enemy["pos"])})
+			var spawn:Vector2=enemy["pos"]+Vector2(event["dir"])*float(event.get("origin_offset",0.0))+(Vector2(0,-8) if str(event.get("ability_id",""))=="druesensekret" else Vector2.ZERO)
+			if is_zero_approx(float(event.get("origin_offset",0.0))) or not projectile_collision(enemy["pos"],spawn,server)["hit"]:
+				enemy_projectiles.append({"pos":spawn,"dir":event["dir"],"speed":profile["projectile_speed"],"life":event.get("life",2.3),"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"hit_radius":profile["hit_radius"],"source_region":region_at(enemy["pos"]),"ability_id":event.get("ability_id","basic")})
+		elif event["kind"]=="cloud":
+			enemy_projectiles.append({"kind":"cloud","ability_id":"giftstaub","pos":enemy["pos"],"dir":Vector2.ZERO,"speed":0.0,"life":event["duration"],"duration":event["duration"],"age":0.0,"next_pulse":0.0,"pulse_interval":event["pulse_interval"],"radius":event["radius"],"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"source_region":region_at(enemy["pos"])})
+		elif event["kind"]=="leap_move":
+			var distance:float=event["distance"]
+			var steps:=maxi(1,ceili(distance/8.0))
+			for part in steps:
+				var next:Vector2=enemy["pos"]+Vector2(event["dir"])*distance/steps
+				if terrain_blocked(next,mob_hit_radius(enemy)) or blocked_by_region_wall(next) or region_at(next)!=region_at(enemy["pos"]) or waystone_safe_at(next) or (not server and dungeon_id>=0 and dungeon_blocked(next)) or (not server and arena_mode!="" and next.distance_to(ARENA_CENTER)>=ARENA_RADIUS-16):
+					if not enemy.get("attack_state",{}).is_empty():enemy["attack_state"]["leap_blocked"]=true
+					break
+				enemy["pos"]=next
+				enemy["walking"]=true
+				moved=true
+		elif event["kind"]=="leap_land":
+			var bite:Dictionary=event["ability"].duplicate()
+			bite["range"]=bite["landing_range"]
+			for victim in targets:
+				if MobCombat.hits(enemy["pos"],event["dir"],victim["pos"],bite,float(profile["hit_radius"])) and not projectile_collision(enemy["pos"],victim["pos"],server)["hit"]:
+					if server:rpc_server_damage.rpc_id(int(victim["id"]),int(event["damage"]))
+					elif invulnerable<=0:apply_player_damage(int(event["damage"]))
 		elif event["kind"]=="boss_move":
 			var move_dir:Vector2=Vector2(event.get("dir",Vector2.ZERO)).normalized()
 			var desired:Vector2=Vector2(enemy["pos"])+move_dir*float(event.get("distance",0.0))
@@ -2209,6 +2232,15 @@ func advance_mob_shots(delta:float,server:bool)->void:
 				if str(state.get("context","world"))=="world" and not bool(state.get("konflux",false)) and not konflux.fighter_stats.has(peer) and float(state.get("hp",1))>0 and region_at(pos)==int(shot.get("source_region",region_at(previous))) and region_at(pos)!=0 and not waystone_safe_at(pos):
 					candidates.append({"id":int(peer),"pos":pos})
 		elif hp>0 and death_timer<=0 and not waystone_safe_at(player_pos):candidates.append({"id":0,"pos":player_pos})
+		if str(shot.get("kind",""))=="cloud":
+			var pulses:=MobCombat.cloud_pulses(shot,delta)
+			if pulses==0:continue
+			for candidate in candidates:
+				if Vector2(candidate["pos"]).distance_to(shot["pos"])>float(shot["radius"])+10.0 or projectile_collision(shot["pos"],candidate["pos"],server)["hit"]:continue
+				for pulse in pulses:
+					if server:rpc_server_damage.rpc_id(int(candidate["id"]),int(shot["damage"]))
+					elif invulnerable<=0:apply_player_damage(int(shot["damage"]))
+			continue
 		var nearest:Dictionary={}
 		var distance:float=INF
 		for candidate in candidates:
@@ -7220,8 +7252,14 @@ func _draw() -> void:
 				var point := center + Vector2.RIGHT.rotated(angle) * (19 + bubble % 4 * 16)
 				draw_circle(point + Vector2(0, sin(world_time * 3.0 + bubble) * 6), 5 + bubble % 3, Color(0.62, 0.88, 0.35, 0.55 * fade))
 	for shot in enemy_projectiles:
-		if visible_world(shot["pos"], 45):
+		if visible_world(shot["pos"], maxf(45.0,float(shot.get("radius",0.0)))):
 			var p: Vector2 = shot["pos"]
+			if str(shot.get("kind",""))=="cloud":
+				WoodlandAttackVFX.cloud(self,p,float(shot["radius"]),float(shot.get("age",0)),float(shot["life"]))
+				continue
+			if str(shot.get("ability_id",""))=="druesensekret":
+				WoodlandAttackVFX.secretion(self,p,shot["dir"])
+				continue
 			var c := Color("b6e5fa") if shot["type"] == 11 else Color("d5acf3")
 			draw_line(p - shot["dir"] * 16, p, c.darkened(0.3), 8)
 			draw_vfx_sprite(1 if int(shot["type"]) in [11,13,22] else (0 if int(shot["type"]) in [14] else 4), p, 28.0)
@@ -8860,6 +8898,12 @@ func draw_class_boss_actor(enemy:Dictionary,p:Vector2,look:Vector2,scale_factor:
 	if ratio<=.38:
 		PixelStyle32.arc(self,p+Vector2(0,4),42*scale_factor,0,TAU,24,[Color("ff5c4d",.48),Color("cf73ff",.5),Color("b7f16d",.48)][boss_index],3.5*scale_factor)
 
+func mob_attack_target_position(enemy:Dictionary)->Vector2:
+	var peer:=int(enemy.get("target_peer",0))
+	if peer<=0 or peer==multiplayer.get_unique_id():return player_pos
+	if remote_players.has(peer):return network_player_position(peer)
+	return Vector2(enemy["pos"])+Vector2(enemy.get("facing",Vector2.DOWN))*165.0
+
 func draw_enemy(enemy: Dictionary) -> void:
 	var p: Vector2 = enemy["pos"]
 	var type: int = int(enemy["type"])
@@ -8878,10 +8922,16 @@ func draw_enemy(enemy: Dictionary) -> void:
 	if not state.is_empty():
 		aim=state.get("dir",aim)
 		animation=MobCombat.visual_progress(state,profile)
-		if float(state.get("age",0))<float(profile["windup"]):
+		if float(state.get("age",0))<float(MobCombat.attack_timing(profile,state.get("ability",{}))["windup"]):
 			var ability:Dictionary=state["ability"]
 			var warn:Color=[Color("f36f5d",.72),Color("ba7cff",.72),Color("9cdd72",.72)][type-12] if boss else Color("efd49a",.6)
-			if ability["shape"]=="line":
+			if ability["shape"]=="cloud":
+				draw_arc(p,float(ability["range"]),0,TAU,48,Color("b9d965",.75),2)
+			elif ability["shape"]=="leap":
+				var landing:=p+aim*minf(float(ability["dash"]),p.distance_to(mob_attack_target_position(enemy)))
+				PixelStyle32.line(self,p,landing,Color(warn,.45),3)
+				draw_arc(landing,float(ability["landing_range"]),0,TAU,32,warn,2)
+			elif ability["shape"]=="line":
 				PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.25),20)
 			elif ability["shape"]=="arc":
 				PixelStyle32.arc(self,p,float(ability["range"]),aim.angle()-float(ability["half_angle"]),aim.angle()+float(ability["half_angle"]),18,warn,2)
@@ -8910,8 +8960,9 @@ func draw_enemy(enemy: Dictionary) -> void:
 	if boss:
 		draw_class_boss_actor(enemy,model_pos,aim,scale_factor,animation)
 	else:
-		MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion)
+		MobDesign32.paint(self,model_pos+character_canvas_offset,type,enemy_level(type),aim,enemy_color.lerp(Color("fff3de"),clampf(float(enemy.get("flash",0))/.18,0,1)*.7),stride,animation,scale_factor,motion,str(state.get("ability",{}).get("id","")))
 	restore_canvas_transform()
+	if type==1:WoodlandAttackVFX.glands(self,model_pos,aim.normalized(),scale_factor,animation)
 	if float(enemy.get("flash", 0.0)) > 0.0:
 		draw_arc(model_pos, 37.0 * scale_factor, 0.0, TAU, 18, Color("fff7df", 0.72), 3.0)
 	draw_enemy_level(p, type, boss, elite_kind)

@@ -16,7 +16,7 @@ class Board extends Node2D:
 			for direction in 8:
 				var foot:=Vector2(260+direction*128,y)
 				draw_rect(Rect2(foot-Vector2(56,86),Vector2(112,108)),Color("536b3e"))
-				var angle:=direction*PI/4.0
+				var angle:=-direction*PI/4.0
 				var look:=Vector2(sin(angle),cos(angle))
 				var phase:=tick*.38 if tick<16 else 0.0
 				var attack:float=(tick-16)/15.0 if tick>=16 else -1.0

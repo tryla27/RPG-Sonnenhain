@@ -134,6 +134,7 @@ jobs:
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_steinrose_kitchen.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_mob_combat.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_woodland_mobs.gd
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_woodland_attacks.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_boss_music.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_start32_assets.gd
           for script in check_spawn_platform check_spawn_network check_escape_save check_local_save_recovery check_controller_flows check_combat_feedback_network check_mob_combat_network check_party_xp_network; do

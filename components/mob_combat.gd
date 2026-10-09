@@ -1,7 +1,7 @@
 extends RefCounted
 ## Shared deterministic PvE attack model for offline and dedicated server.
 const HEAVY=[4,7,9,12,13,14,16,24,26]
-const RANGED=[2,5,11,13,14,15,18,20,22,25]
+const RANGED=[1,5,11,13,14,15,18,20,22,25]
 static func weapon_tier(level:int)->int:
 	return 0 if level<8 else (1 if level<15 else (2 if level<22 else (3 if level<29 else (4 if level<36 else 5))))
 static func profile(type:int,info:Dictionary,level:int,raw_damage:int)->Dictionary:
@@ -55,6 +55,18 @@ static func profile(type:int,info:Dictionary,level:int,raw_damage:int)->Dictiona
 	if not early and not ranged:reach+=rank*2.0
 	var first={"id":"basic","shape":"projectile" if ranged else "arc","range":reach,"damage":damage,"half_angle":1.05 if heavy else .7,"phase":1.0}
 	var abilities:Array=[first]
+	if type==1:
+		first["id"]="druesensekret"
+		first["origin_offset"]=16.0
+		first["projectile_life"]=reach/230.0
+	elif type==2:
+		cycle=3.6;windup=.85;recovery=.65;reach=84.0
+		abilities=[{"id":"giftstaub","shape":"cloud","range":reach,"damage":maxi(1,roundi(damage*.25)),"phase":1.0,"duration":2.6,"pulse_interval":.65}]
+	elif type==3:
+		abilities=[
+			{"id":"biss","shape":"arc","range":38.0,"damage":damage,"half_angle":.7,"phase":1.0},
+			{"id":"sprungbiss","shape":"leap","range":180.0,"min_range":80.0,"landing_range":38.0,"damage":damage,"half_angle":.8,"phase":1.0,"dash":165.0,"windup":.8,"active_time":.32,"recovery":.75,"attack_cycle":3.1}
+		]
 	if not early:
 		if type in [4,7,9,16,24,26]:
 			abilities.append({"id":"ground_line","shape":"line","range":190.0,"damage":roundi(damage*.85),"half_angle":0.0,"phase":1.0})
@@ -116,13 +128,14 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 	var state:Dictionary=enemy.get("attack_state",{})
 	if not state.is_empty():
 		var previous=float(state["age"])
+		var ability:Dictionary=state["ability"]
+		var timing:=attack_timing(config,ability)
+		var strike:float=timing["windup"]
 		# Aim locks at the end of windup, then cannot chase a dodging player.
-		if previous<float(config["windup"]):
+		if previous<strike:
 			state["dir"]=toward
 			enemy["facing"]=toward
 		state["age"]=previous+dt
-		var strike=float(config["windup"])
-		var ability:Dictionary=state["ability"]
 		if not bool(state["fired"]) and float(state["age"])>=strike:
 			state["fired"]=true
 			var direction:Vector2=state["dir"]
@@ -131,19 +144,31 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 				var spread:=float(ability.get("spread",0.0))
 				for shot_index in projectile_count:
 					var centered:=float(shot_index)-float(projectile_count-1)*.5
-					result["events"].append({"kind":"projectile","dir":direction.rotated(centered*spread),"damage":ability["damage"],"attack_id":state["id"],"ability_id":str(ability.get("id","basic"))})
+					result["events"].append({"kind":"projectile","dir":direction.rotated(centered*spread),"damage":ability["damage"],"attack_id":state["id"],"ability_id":str(ability.get("id","basic")),"origin_offset":ability.get("origin_offset",0.0),"life":ability.get("projectile_life",2.3)})
+			elif ability["shape"]=="cloud":
+				result["events"].append({"kind":"cloud","radius":ability["range"],"damage":ability["damage"],"duration":ability["duration"],"pulse_interval":ability["pulse_interval"],"attack_id":state["id"],"ability_id":ability["id"]})
+			elif ability["shape"]=="leap":
+				state["leap_distance"]=minf(float(ability["dash"]),position.distance_to(target["pos"]))
 			else:
 				for victim in targets:
 					if hits(position,direction,victim["pos"],ability,float(config["hit_radius"])):
 						for hit_index in maxi(1,int(ability.get("multi",1))):
 							result["events"].append({"kind":"damage","target":victim["id"],"damage":ability["damage"],"attack_id":state["id"],"ability_id":str(ability.get("id","basic"))})
-			if float(ability.get("dash",0.0))>0.0:
+			if float(ability.get("dash",0.0))>0.0 and ability["shape"]!="leap":
 				result["events"].append({"kind":"boss_move","dir":direction,"distance":float(ability["dash"]),"ability_id":str(ability.get("id","basic"))})
 			if float(ability.get("blink",0.0))>0.0:
 				result["events"].append({"kind":"boss_move","dir":-direction,"distance":float(ability["blink"]),"ability_id":str(ability.get("id","basic"))})
-		var finish=strike+float(config["active_time"])+float(config["recovery"])
+		if ability["shape"]=="leap" and bool(state["fired"]):
+			var before:=clampf((previous-strike)/float(timing["active_time"]),0.0,1.0)
+			var after:=clampf((float(state["age"])-strike)/float(timing["active_time"]),0.0,1.0)
+			if after>before and not bool(state.get("leap_blocked",false)):
+				result["events"].append({"kind":"leap_move","dir":state["dir"],"distance":float(state["leap_distance"])*(after-before)})
+			if after>=1.0 and not bool(state.get("landed",false)):
+				state["landed"]=true
+				result["events"].append({"kind":"leap_land","dir":state["dir"],"damage":ability["damage"],"ability":ability,"attack_id":state["id"]})
+		var finish=strike+float(timing["active_time"])+float(timing["recovery"])
 		if float(state["age"])>=finish:
-			enemy["attack_wait"]=maxf(0,float(config["attack_cycle"])-float(state["age"]))
+			enemy["attack_wait"]=maxf(0,float(timing["attack_cycle"])-float(state["age"]))
 			enemy["attack_state"]={}
 		else:enemy["attack_state"]=state
 		return result
@@ -154,7 +179,14 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 	if abilities.is_empty():abilities=[config["abilities"][0]]
 	var sequence=int(enemy.get("attack_sequence",0))
 	var ability:Dictionary=abilities[sequence%abilities.size()]
-	if best<=float(ability["range"])+float(config["hit_radius"]) and float(enemy["attack_wait"])<=0:
+	# Choose only a move that fits the current distance. A wolf closes the
+	# gap with a leap and switches to biting at its target's feet.
+	if int(enemy["type"])==3:
+		for offset in abilities.size():
+			var candidate:Dictionary=abilities[(sequence+offset)%abilities.size()]
+			if best>=float(candidate.get("min_range",0.0)) and best<=float(candidate["range"])+float(config["hit_radius"]):
+				ability=candidate;break
+	if best>=float(ability.get("min_range",0.0)) and best<=float(ability["range"])+float(config["hit_radius"]) and float(enemy["attack_wait"])<=0:
 		enemy["attack_sequence"]=sequence+1
 		enemy["attack_state"]={"id":sequence+1,"age":0.0,"dir":toward,"ability":ability.duplicate(),"fired":false}
 		enemy["facing"]=toward
@@ -180,11 +212,25 @@ static func shot_hits(a:Vector2,b:Vector2,p:Vector2,radius:float)->bool:
 static func visual_progress(state:Dictionary,config:Dictionary)->float:
 	if state.is_empty():return -1.0
 	var age=float(state.get("age",0))
-	var windup=float(config["windup"])
-	var active=float(config["active_time"])
-	var recovery=float(config["recovery"])
+	var timing:=attack_timing(config,state.get("ability",{}))
+	var windup=float(timing["windup"])
+	var active=float(timing["active_time"])
+	var recovery=float(timing["recovery"])
 	var impact=.35 if bool(config["heavy"]) else .4
 	var finish=.43 if bool(config["heavy"]) else .55
 	if age<windup:return clampf(age/windup,0,1)*impact
 	if age<windup+active:return lerpf(impact,finish,clampf((age-windup)/active,0,1))
 	return lerpf(finish,1.0,clampf((age-windup-active)/recovery,0,1))
+
+static func attack_timing(config:Dictionary,ability:Dictionary)->Dictionary:
+	return {"windup":ability.get("windup",config["windup"]),"active_time":ability.get("active_time",config["active_time"]),"recovery":ability.get("recovery",config["recovery"]),"attack_cycle":ability.get("attack_cycle",config["attack_cycle"])}
+
+static func cloud_pulses(field:Dictionary,delta:float)->int:
+	field["age"]=float(field.get("age",0.0))+maxf(0.0,delta)
+	var next:float=field.get("next_pulse",0.0)
+	var pulses:=0
+	while next<float(field["duration"])-.0001 and next<=float(field["age"]):
+		pulses+=1
+		next+=float(field["pulse_interval"])
+	field["next_pulse"]=next
+	return pulses

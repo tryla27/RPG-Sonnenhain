@@ -6,6 +6,8 @@ func check(value:bool,label:String)->void:
 		failures+=1
 		print("FAIL ",label)
 func _initialize()->void:
+	check(Art.direction_index(Vector2.RIGHT)==6 and Art.direction_index(Vector2.LEFT)==2,"east/west face the actual target")
+	check(Art.direction_index(Vector2.UP)==4 and Art.direction_index(Vector2.DOWN)==0,"north/south heading")
 	for type in 4:
 		var texture:Texture2D=Art.Sprites.texture(Art.PATHS[type])
 		check(texture!=null,"asset "+str(type))
