@@ -22,6 +22,23 @@ var cols:=0
 var rows:=0
 var bytes:=PackedByteArray()
 var last_reveal:Array=[]
+## Zählt jede Änderung; Zeichen-Caches bauen sich nur bei neuer Version neu.
+var version:=0
+## Weltkarte: ein Pixel pro Zelle, nur geänderte Pixel werden gesetzt.
+var map_image:Image
+var map_texture:ImageTexture
+var map_dirty:=false
+## Spielbild: Dreiecksnetz der Dunkelheit für den zuletzt gezeichneten Ausschnitt.
+var darkness_key:=[]
+var darkness_points:=PackedVector2Array()
+var darkness_colors:=PackedColorArray()
+var darkness_indices:=PackedInt32Array()
+const MAP_TINT:=Color("071018",0.86)
+
+## Nach einer Änderung von außen an `bytes` (z. B. Werkzeuge) aufrufen.
+func mark_changed()->void:
+	version+=1
+	map_image=null
 
 func configure(size:Vector2)->void:
 	world_size=size
@@ -33,6 +50,7 @@ func configure(size:Vector2)->void:
 		bytes=PackedByteArray()
 		bytes.resize(needed)
 		for i in mini(old.size(),bytes.size()):bytes[i]=old[i]
+		mark_changed()
 
 func cell_index(cell:Vector2i)->int:
 	if cell.x<0 or cell.y<0 or cell.x>=cols or cell.y>=rows:return -1
@@ -44,7 +62,14 @@ func world_cell(pos:Vector2)->Vector2i:
 func set_seen(cell:Vector2i)->void:
 	var index:=cell_index(cell)
 	if index<0:return
-	bytes[index>>3]=int(bytes[index>>3]) | (1<<(index&7))
+	var bit:=1<<(index&7)
+	var current:=int(bytes[index>>3])
+	if current & bit:return
+	bytes[index>>3]=current | bit
+	version+=1
+	if map_image!=null:
+		map_image.set_pixel(cell.x,cell.y,Color(0,0,0,0))
+		map_dirty=true
 
 func seen(cell:Vector2i)->bool:
 	var index:=cell_index(cell)
@@ -124,6 +149,7 @@ func legacy_snapshot()->Array:
 func clear()->void:
 	bytes.fill(0)
 	last_reveal=[]
+	mark_changed()
 
 ## `fine` ist der Base64-Text aus `snapshot()`; fehlt er, wird das alte grobe
 ## Raster `raw` (256 px) auf das feine Raster übertragen.
@@ -134,6 +160,7 @@ func restore(raw:Variant,size:Vector2,fine:Variant="")->void:
 		var decoded:=Marshalls.base64_to_raw(fine)
 		if decoded.size()==bytes.size():
 			bytes=decoded
+			mark_changed()
 			return
 	if not raw is Array:return
 	var legacy_cols:=maxi(1,ceili(size.x/LEGACY_CELL))
@@ -179,40 +206,75 @@ func draw_world_darkness(g,view:Rect2)->void:
 	var y0:=maxi(0,floori(view.position.y/CELL)-1)
 	var x1:=mini(cols,ceili(view.end.x/CELL)+1)
 	var y1:=mini(rows,ceili(view.end.y/CELL)+1)
-	var points:=PackedVector2Array()
-	var colors:=PackedColorArray()
-	var indices:=PackedInt32Array()
+	var key:=[x0,y0,x1,y1,version]
+	if key!=darkness_key:
+		darkness_key=key
+		rebuild_darkness(x0,y0,x1,y1)
+	if darkness_indices.is_empty():return
+	RenderingServer.canvas_item_add_triangle_array(g.get_canvas_item(),darkness_indices,darkness_points,darkness_colors)
+
+## Baut das Netz für die Zellen x0..x1-1, y0..y1-1. Jede Zelle wird nur einmal
+## nachgeschlagen; die Ecken ergeben sich aus den vier Nachbarzellen.
+func rebuild_darkness(x0:int,y0:int,x1:int,y1:int)->void:
+	darkness_points=PackedVector2Array()
+	darkness_colors=PackedColorArray()
+	darkness_indices=PackedInt32Array()
+	var w:=x1-x0+2
+	var h:=y1-y0+2
+	var lit:=PackedByteArray()
+	lit.resize(w*h)
+	var any_dark:=false
+	for yy in h:
+		for xx in w:
+			var on:=seen(Vector2i(x0-1+xx,y0-1+yy))
+			lit[yy*w+xx]=1 if on else 0
+			if not on:any_dark=true
+	if not any_dark:return
+	var cw:=x1-x0+1
+	var corner:=PackedFloat32Array()
+	corner.resize(cw*(y1-y0+1))
+	for cy in y1-y0+1:
+		for cx in cw:
+			var i:=cy*w+cx
+			corner[cy*cw+cx]=1.0-float(lit[i]+lit[i+1]+lit[i+w]+lit[i+w+1])/4.0
 	var clear_dark:=Color(DARK,0.0)
 	for y in range(y0,y1):
 		for x in range(x0,x1):
-			var a:=corner_dark(x,y)
-			var b:=corner_dark(x+1,y)
-			var c:=corner_dark(x+1,y+1)
-			var d:=corner_dark(x,y+1)
+			var cx:=x-x0
+			var cy:=y-y0
+			var a:=corner[cy*cw+cx]
+			var b:=corner[cy*cw+cx+1]
+			var c:=corner[(cy+1)*cw+cx+1]
+			var d:=corner[(cy+1)*cw+cx]
 			if a+b+c+d<=0.0:continue
-			var base:=points.size()
+			var base:=darkness_points.size()
 			var p:=Vector2(x,y)*CELL
-			points.append_array([p,p+Vector2(CELL,0),p+Vector2(CELL,CELL),p+Vector2(0,CELL)])
-			colors.append_array([clear_dark.lerp(DARK,a),clear_dark.lerp(DARK,b),clear_dark.lerp(DARK,c),clear_dark.lerp(DARK,d)])
-			indices.append_array([base,base+1,base+2,base,base+2,base+3])
-	if indices.is_empty():return
-	RenderingServer.canvas_item_add_triangle_array(g.get_canvas_item(),indices,points,colors)
+			darkness_points.append_array([p,p+Vector2(CELL,0),p+Vector2(CELL,CELL),p+Vector2(0,CELL)])
+			darkness_colors.append_array([clear_dark.lerp(DARK,a),clear_dark.lerp(DARK,b),clear_dark.lerp(DARK,c),clear_dark.lerp(DARK,d)])
+			darkness_indices.append_array([base,base+1,base+2,base,base+2,base+3])
 
-## Große Karte: unaufgedeckte Zellen zeilenweise zu Streifen zusammengefasst.
+## Weltkarte: eine Textur mit einem Pixel pro Zelle, skaliert gezeichnet.
+## Aufgebaut einmal pro Laden; danach setzt set_seen nur einzelne Pixel.
+func overlay_texture()->ImageTexture:
+	if map_image==null or map_image.get_width()!=cols or map_image.get_height()!=rows:
+		var data:=PackedByteArray()
+		data.resize(cols*rows*4)
+		var r:=int(MAP_TINT.r8);var gc:=int(MAP_TINT.g8);var bc:=int(MAP_TINT.b8);var al:=int(MAP_TINT.a8)
+		for index in cols*rows:
+			if (int(bytes[index>>3]) & (1<<(index&7)))!=0:continue
+			var o:=index*4
+			data[o]=r;data[o+1]=gc;data[o+2]=bc;data[o+3]=al
+		map_image=Image.create_from_data(cols,rows,false,Image.FORMAT_RGBA8,data)
+		map_texture=ImageTexture.create_from_image(map_image)
+		map_dirty=false
+	elif map_dirty:
+		map_texture.update(map_image)
+		map_dirty=false
+	return map_texture
+
 func draw_overlay(g,inset:Rect2,map_scale:Vector2)->void:
 	if cols<=0:return
-	var tint:=Color("071018",0.86)
-	for y in rows:
-		var run_start:=-1
-		for x in cols+1:
-			var dark:=x<cols and not seen(Vector2i(x,y))
-			if dark and run_start<0:run_start=x
-			elif not dark and run_start>=0:
-				# Auf ganze Pixel runden, damit zwischen den Zeilen keine Streifen bleiben.
-				var top_left:=(inset.position+Vector2(run_start,y)*CELL*map_scale).floor()
-				var bottom_right:=(inset.position+Vector2(x,y+1)*CELL*map_scale).floor()
-				g.draw_rect(Rect2(top_left,bottom_right-top_left),tint)
-				run_start=-1
+	g.draw_texture_rect(overlay_texture(),Rect2(inset.position,Vector2(cols,rows)*CELL*map_scale),false)
 
 func draw_live_party_vision(g,inset:Rect2,map_scale:Vector2)->void:
 	for raw in party_positions(g):
