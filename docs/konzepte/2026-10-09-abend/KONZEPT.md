@@ -295,6 +295,10 @@ sehen durch einen Pixel-Filter aus wie Pixelart.
 - **E1:** Alle drei Vorschläge: neues Aussehen, besseres Menü, Verschmelzungs-Animation.
 - **F1:** Instrumente erst zum Spaß, Wirkung später.
 
+**Nachtrag 22:25:** A2-neu und F1 (Instrumente, zum Spaß) nach hinten
+verschoben. Dorf am Anfang dunkel, Fusionsstein mit allen drei Funktionen
+bestätigt. Start mit A1.
+
 ## A2-neu. Stabilität ohne Zusatzbetrieb (Vorschlag)
 
 Statt Bot, Testserver, Fehlerberichten im Hintergrund und Messungen:
