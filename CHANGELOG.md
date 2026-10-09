@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- B2 Tippgeräusch: `ui_tippen` (3 Varianten) und `ui_tippen_loeschen` in
+  `tools/build_sfx.py`/`sound_bank.gd`, Regel in `components/typing_sound.gd`
+  (max. 25 Anschläge/s), verdrahtet in Konto, Koop-Code, Name und Chat über
+  `typing_feedback()`. Test `tests/audio/check_typing_sound.gd`.
 - A1 Charakterwechsel: `reset_character_state()` (auch von `start_new_game`
   genutzt) vor jedem Laden eines anderen Charakters, `WorldFog.clear()`,
   Gruppe beim Trennen geleert, kein Autosave während des Ladens. Test

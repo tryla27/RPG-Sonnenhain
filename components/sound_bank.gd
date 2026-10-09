@@ -73,6 +73,8 @@ const CATALOG := {
 	"beute_legendaer": {"path":"beute/beute_legendaer", "variants":1, "db":-8.0, "max":1, "prio":7, "pitch":0.0, "duck":1.4},
 	# Paket 2: Oberfläche (eigener Regler) und Fortschritt.
 	"ui_klick": {"path":"ui/ui_klick", "variants":3, "db":-12.0, "max":2, "prio":2, "pitch":0.03, "bus":"ui"},
+	"ui_tippen": {"path":"ui/ui_tippen", "variants":3, "db":-17.0, "max":3, "prio":1, "pitch":0.04, "bus":"ui"},
+	"ui_tippen_loeschen": {"path":"ui/ui_tippen_loeschen", "variants":1, "db":-17.0, "max":2, "prio":1, "pitch":0.03, "bus":"ui"},
 	"ui_fenster_auf": {"path":"ui/ui_fenster_auf", "variants":1, "db":-13.0, "max":1, "prio":2, "pitch":0.02, "bus":"ui"},
 	"ui_fenster_zu": {"path":"ui/ui_fenster_zu", "variants":1, "db":-13.0, "max":1, "prio":2, "pitch":0.02, "bus":"ui"},
 	"ui_fehler": {"path":"ui/ui_fehler", "variants":1, "db":-11.0, "max":1, "prio":4, "pitch":0.0, "bus":"ui"},

@@ -9,6 +9,7 @@ const MenuFeedback = preload("res://components/menu_feedback.gd")
 var menu_feedback = MenuFeedback.new()
 ## Zählt abgespielte Oberflächenklänge, damit Menüklicks nicht doppelt klingen.
 var ui_sound_count := 0
+var last_typing_ms := -1
 var patch_notice = PatchNotice.new()
 const ExperienceRules = preload("res://components/experience_rules.gd")
 const ControllerControls = preload("res://components/controller_controls.gd")
@@ -121,6 +122,7 @@ const NetworkCodec=preload("res://components/network_codec.gd")
 const WorldGeometry=preload("res://components/world_geometry.gd")
 const ItemRules=preload("res://components/item_rules.gd")
 const SoundBank=preload("res://components/sound_bank.gd")
+const TypingSound=preload("res://components/typing_sound.gd")
 const PORTALS := GameContent.PORTALS
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
@@ -1413,6 +1415,15 @@ func _exit_tree() -> void:
 	for player in sound_players:
 		player.stop()
 		player.stream = null
+
+## Tippgeräusch nach einer Texteingabe; gedrosselt auf 25 Anschläge pro Sekunde.
+func typing_feedback(before: int, after: int) -> void:
+	var sound := TypingSound.sound_for(before, after)
+	if sound == "": return
+	var now := Time.get_ticks_msec()
+	if not TypingSound.allowed(last_typing_ms, now): return
+	last_typing_ms = now
+	play_sound(sound)
 
 func play_sound(name: String) -> void:
 	if SoundBank.is_ui(name): ui_sound_count += 1
@@ -3056,6 +3067,7 @@ func handle_account_key(event:InputEventKey)->void:
 	if not event.pressed or event.echo:return
 	account_shift_tap_pending=false
 	var registering:=panel=="account_register"
+	var typed_before:=account_name.length()+account_password.length()+account_password_confirm.length()
 	var focus_count:=3 if registering else 2
 	if key==KEY_TAB:
 		account_focus=posmod(account_focus+(-1 if event.shift_pressed else 1),focus_count)
@@ -3076,6 +3088,7 @@ func handle_account_key(event:InputEventKey)->void:
 		account_status="Die Passwörter stimmen nicht überein."
 	elif account_status=="Die Passwörter stimmen nicht überein.":
 		account_status=""
+	if panel!="account_gate":typing_feedback(typed_before,account_name.length()+account_password.length()+account_password_confirm.length())
 	queue_redraw()
 	return
 
@@ -3142,6 +3155,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if panel=="steinrose" and steinrose.keyboard_input(self,event):
 		return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
+		var code_before := join_code.length()
 		if event.keycode == KEY_ESCAPE:
 			panel = "start"
 		elif event.keycode == KEY_BACKSPACE:
@@ -3151,10 +3165,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.unicode >= 32 and join_code.length() < 28:
 			var code_char := String.chr(event.unicode).to_upper()
 			if "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-".find(code_char) >= 0: join_code += code_char
+		typing_feedback(code_before, join_code.length())
 		queue_redraw()
 		return
 	# Texteingabe für einmalige Charaktererstellung.
 	if panel == "creation" and event is InputEventKey and event.pressed and not event.echo:
+		var name_before := creation_name.length()
 		if event.keycode == KEY_BACKSPACE:
 			if creation_name.length() > 0: creation_name = creation_name.left(creation_name.length() - 1)
 		elif event.keycode == KEY_ENTER:
@@ -3162,10 +3178,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.unicode >= 32 and creation_name.length() < 16:
 			var typed := String.chr(event.unicode)
 			if "abcdefghijklmnopqrstuvwxyzäöüß0123456789 -_".find(typed.to_lower()) >= 0: creation_name += typed
+		typing_feedback(name_before, creation_name.length())
 		queue_redraw()
 		return
 	# Chat blockiert die Kampfsteuerung, solange geschrieben wird.
 	if chat_open and event is InputEventKey and event.pressed and not event.echo:
+		var chat_before := chat_input.length()
 		if event.keycode == KEY_ESCAPE:
 			chat_open = false
 			chat_input = ""
@@ -3177,6 +3195,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if chat_input.length() > 0: chat_input = chat_input.left(chat_input.length() - 1)
 		elif event.unicode >= 32 and chat_input.length() < 120:
 			chat_input += String.chr(event.unicode)
+		if chat_open: typing_feedback(chat_before, chat_input.length())
 		queue_redraw()
 		return
 	if panel == "" and event.is_pressed() and not (event is InputEventKey and event.echo) and event_matches_binding(event, "chat"):

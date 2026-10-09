@@ -568,6 +568,22 @@ def r_ui_klick(rng, v):
     return finish(mix((tick, 1.0), (blip, 1.0)), peak_db=-6, top=9000)
 
 
+def r_ui_tippen(rng, v):
+    # Weicher Tastenanschlag: kurzer Holzklick, leiser als der Menüklick.
+    d = 0.045
+    tick = bp(noise(d, rng), 1800 + 350 * v, 5200 + 300 * v) * env(d, 0.0005, 0.004)
+    body = osc(420 + 40 * v, d, "sine") * env(d, 0.0008, 0.012) * 0.45
+    return finish(mix((tick, 1.0), (body, 1.0)), peak_db=-9, top=8000)
+
+
+def r_ui_tippen_loeschen(rng, v):
+    # Löschen: tieferer, etwas dumpferer Anschlag.
+    d = 0.06
+    tick = bp(noise(d, rng), 700, 2600) * env(d, 0.0006, 0.007)
+    body = osc(glide(300, 230, d), d, "sine") * env(d, 0.001, 0.02) * 0.6
+    return finish(mix((tick, 1.0), (body, 1.0)), peak_db=-9, top=6000)
+
+
 def r_ui_fenster_auf(rng, v):
     d = 0.3
     swish = sweep_bp(noise(d, rng), glide(700, 2600, d, 0.6), q=2) * env(d, 0.03, 0.08, 3)
@@ -805,6 +821,8 @@ SOUNDS = {
     "beute_episch": ("beute", r_beute_episch, 1),
     "beute_legendaer": ("beute", r_beute_legendaer, 1),
     "ui_klick": ("ui", r_ui_klick, 3),
+    "ui_tippen": ("ui", r_ui_tippen, 3),
+    "ui_tippen_loeschen": ("ui", r_ui_tippen_loeschen, 1),
     "ui_fenster_auf": ("ui", r_ui_fenster_auf, 1),
     "ui_fenster_zu": ("ui", r_ui_fenster_zu, 1),
     "ui_fehler": ("ui", r_ui_fehler, 1),
