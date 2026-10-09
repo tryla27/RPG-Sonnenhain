@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Technik · Weltgeometrie als Modul", "Gebietsgrenzen, Wegabstände, Wegsteine sowie Lage der Klassenboss-Arenen und -Häuser liegen jetzt in einem eigenen, getesteten Modul. Karte, Spawns und Teleports verhalten sich unverändert."],
 ["Technik · Netzwerk-Hilfen als Modul", "Koop-Einladungscodes und die Prüfung eingehender Quest-, Ereignis- und Beutedaten liegen jetzt in einem eigenen, getesteten Modul. Spielverhalten und Einladungscodes bleiben unverändert."],
 ["Technik · Spielinhalte als eigenes Modul", "Gegner, Fähigkeiten, Quests, NPCs, Händler, Weltereignisse, Wahrzeichen, Wege und Torbogen liegen jetzt gebündelt in einer eigenen Inhaltsdatei. Werte und Spielverhalten bleiben unverändert."],
 ["Klänge · Pilzling", "Der Pilzling verwendet beim Giftstaubausstoß ein kurzes weiches Giftzischen ohne anfänglichen Klick, Quetschlaut oder Murmeln."],
