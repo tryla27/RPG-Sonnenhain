@@ -88,6 +88,7 @@ const MobDesign32=preload("res://components/monster_design_32.gd")
 const ItemStyle32=preload("res://components/item_style_32.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
 const SpawnPlatform32=preload("res://components/spawn_platform_32.gd")
+const WaystoneShrine=preload("res://components/waystone_shrine_32.gd")
 const SpawnStoneBody=preload("res://components/spawn_stone_body.gd")
 const Wagon32 = preload("res://components/wagon_32.gd")
 const StartTileMap32 = preload("res://components/start_tilemap_32.gd")
@@ -1511,6 +1512,7 @@ func ground_surface_at(pos: Vector2) -> String:
 	if dungeon_id >= 0: return "stein"
 	if arena_mode != "": return "sand"
 	if SpawnPlatform32.bounds(WAYSTONES[0]).grow(-60).has_point(pos): return "spawnstein"
+	if on_waystone_shrine(pos): return "spawnstein"
 	if StartTileMap32.BOUNDS.has_point(pos):
 		var family := StartTileMap32.visual_family_at(pos)
 		if family != "": return str(SoundBank.VILLAGE_SURFACES.get(family, "gras"))
@@ -2465,7 +2467,7 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 		if stone==WAYSTONES[0]:
 			if SpawnStoneBody.blocks(pos-stone,0,hero_collision_radius()):return true
 			continue
-		if Rect2(stone+Vector2(-58,-82),Vector2(116,142)).grow(12).has_point(pos): return true
+		if WaystoneShrine.blocks(pos-stone,from_pos-stone): return true
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
 	if preload("res://components/village_forecourts.gd").blocked(pos,hero_collision_radius()):return true
@@ -2612,6 +2614,7 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 		if p.distance_to(landmark["pos"]) < radius + 180.0: return {}
 	for stone in WAYSTONES:
 		if p.distance_to(stone) < radius + 110.0: return {}
+	if near_waystone_shrine(p, radius + 24.0): return {}
 	for portal in PORTALS:
 		if p.distance_to(portal[0]) < radius + 150.0 or p.distance_to(portal[1]) < radius + 150.0: return {}
 	return {"pos":p, "radius":radius, "zone":zone, "key":key}
@@ -2635,6 +2638,7 @@ func make_decorative_tree(tx:int,ty:int) -> Dictionary:
 	if class_boss_arena_index_at(point+Vector2(24,42),70.0)>=0 or point_near_class_boss_house(point+Vector2(24,42),85.0):return {}
 	if not region_rect(zone).grow(-45).encloses(Rect2(point-Vector2(100,160),Vector2(200,210))): return {}
 	if distance_to_trail(point)<120.0:return {}
+	if near_waystone_shrine(point+Vector2(24,42), 56.0):return {}
 	var tree := false
 	match zone:
 		1: tree = key%8==0
@@ -5339,7 +5343,7 @@ func waystone_arrival(index: int) -> Vector2:
 	for offset in offsets:
 		var candidate: Vector2 = (base + offset).clamp(Vector2(30,30), WORLD - Vector2(30,30))
 		if region_at(candidate) != region: continue
-		if is_blocked(candidate, candidate): continue
+		if is_blocked(candidate, candidate) or WaystoneShrine.occupied(candidate-stone,12.0): continue
 		return candidate
 	return safe_world_teleport_destination(base, region)
 
@@ -8358,6 +8362,9 @@ func draw_static_overworld(bounds: Rect2) -> void:
 			if not obstacle.is_empty() and class_boss_arena_index_at(obstacle['pos'],65.0)<0 and visible_world(obstacle['pos'], 110): draw_obstacle(obstacle)
 
 	if bounds.intersects(Rect2(WAYSTONES[0]-Vector2(280,280),Vector2(560,560))):SpawnPlatform32.platform(self,WAYSTONES[0])
+	for stone_index in range(1, WAYSTONES.size()):
+		var shrine_stone: Vector2 = WAYSTONES[stone_index]
+		if bounds.intersects(Rect2(shrine_stone+WaystoneShrine.PLATEAU_RECT.position,WaystoneShrine.PLATEAU_RECT.size)):WaystoneShrine.draw_ground(self,shrine_stone)
 	draw_rect(Rect2(Vector2.ZERO, WORLD), Color('45726d'), false, 7)
 
 func draw_village_interior() -> void:
@@ -8490,7 +8497,7 @@ func draw_overworld_atmosphere() -> void:
 	var torches: Array = []
 	for trail in TRAILS:
 		for i in trail.size():
-			if i % 2 == 0 and darkness.has(region_at(trail[i])) and visible_world(trail[i], 260): torches.append(trail[i] + Vector2(0, -28))
+			if i % 2 == 0 and darkness.has(region_at(trail[i])) and visible_world(trail[i], 260) and not near_waystone_shrine(trail[i] + Vector2(0, -28), 20.0): torches.append(trail[i] + Vector2(0, -28))
 	for landmark in LANDMARKS:
 		if landmark["kind"] in ["tower", "gate", "shrine"] and darkness.has(region_at(landmark["pos"])) and visible_world(landmark["pos"], 310):
 			torches.append(landmark["pos"] + Vector2(-95, 42))
@@ -11618,41 +11625,11 @@ func draw_waystone(p: Vector2) -> void:
 	var active := false
 	for i in WAYSTONES.size():
 		if p == WAYSTONES[i]: active = bool(waystone_unlocked[i])
-	# Regionale Wegsteine sind bewusst fast so praesent wie der Spawn-Schrein.
-	draw_set_transform(p-camera_pos,0,Vector2.ONE*2.05)
-	draw_waystone_model(Vector2.ZERO,p)
-	draw_set_transform(-camera_pos)
+	# Regionale Wegsteine: erhöhtes Plateau (Boden) mit Obelisk und Kristall.
+	WaystoneShrine.draw_upper(self,p,active,world_time)
 	# Sichtbarer Schutzring: dieselbe Flaeche wird serverseitig fuer Mob-Schutz genutzt.
 	draw_arc(p-camera_pos+Vector2(0,10),WAYSTONE_SAFE_RADIUS,0,TAU,64,Color("8fe6df",0.18),3.0)
-	text_at(p+Vector2(-160,-205),"WEGSTEIN · SCHUTZZONE",16,Color("fff1c9"),HORIZONTAL_ALIGNMENT_CENTER,320)
-
-func draw_waystone_model(p: Vector2, stone_position: Vector2) -> void:
-	var active := false
-	for i in WAYSTONES.size():
-		if stone_position == WAYSTONES[i]:
-			active = bool(waystone_unlocked[i])
-			break
-	var shimmer := 0.58 + sin(world_time * 2.6 + p.x) * 0.18
-	draw_circle(p + Vector2(0, 17), 72, Color("315e64", 0.28))
-	draw_circle(p + Vector2(0, 13), 61, Color("a2a48b"))
-	draw_circle(p + Vector2(0, 11), 52, Color("ced5b8"))
-	for rune in 8:
-		var ray := Vector2.RIGHT.rotated(float(rune) * TAU / 8.0)
-		var rune_pos := p + Vector2(0, 12) + ray * 45
-		draw_rect(Rect2(rune_pos - Vector2(4, 4), Vector2(8, 8)), Color("75c8cb") if active else Color("657e81"))
-		draw_line(rune_pos, rune_pos + ray * 11, Color("edf5d1", 0.7), 2)
-	draw_rect(Rect2(p + Vector2(-35, 21), Vector2(70, 15)), Color("596f6d"))
-	draw_rect(Rect2(p + Vector2(-26, -40), Vector2(52, 63)), Color("667e7c"))
-	draw_rect(Rect2(p + Vector2(-21, -47), Vector2(42, 12)), Color("a4b5a8"))
-	draw_rect(Rect2(p + Vector2(-19, -34), Vector2(38, 51)), Color("b5c6b5"))
-	draw_colored_polygon(PackedVector2Array([p + Vector2(0,-31),p + Vector2(15,-9),p + Vector2(0,13),p + Vector2(-15,-9)]), Color("67bbc6"))
-	draw_colored_polygon(PackedVector2Array([p + Vector2(0,-25),p + Vector2(8,-9),p + Vector2(0,5),p + Vector2(-8,-9)]), Color("d8f8e7"))
-	draw_rect(Rect2(p + Vector2(-3, -19), Vector2(6, 19)), Color("fff4cd"))
-	for side in [-1.0, 1.0]:
-		var column := p + Vector2(side * 55, -27)
-		draw_rect(Rect2(column, Vector2(7, 60)), Color("735e52"))
-		draw_colored_polygon(PackedVector2Array([column + Vector2(7,-48),column + Vector2(-9,-31),column + Vector2(7,-15)]), Color("e4b478"))
-		draw_circle(column + Vector2(3, -31), 5, Color("fbe1a2", shimmer))
+	text_at(p+Vector2(-160,-235),"WEGSTEIN · SCHUTZZONE",16,Color("fff1c9"),HORIZONTAL_ALIGNMENT_CENTER,320)
 
 func draw_landmark(landmark: Dictionary) -> void:
 	var p: Vector2 = landmark["pos"]
@@ -11995,7 +11972,7 @@ func draw_sorted_world_objects() -> void:
 			if village_resident_is_indoors(str(npc["name"])): continue
 			if visible_world(npc["pos"],130): entries.append({"kind":"npc","depth":npc["pos"].y+24,"data":npc})
 		for stone in WAYSTONES:
-			if visible_world(stone,220): entries.append({"kind":"stone","depth":stone.y+70,"point":stone})
+			if visible_world(stone,260): entries.append({"kind":"stone","depth":stone.y+(70.0 if stone==WAYSTONES[0] else WaystoneShrine.OBELISK_FOOT.y),"point":stone})
 		if rescue_state >= 2:
 			var p := RESCUE_POS+Vector2(0,120)
 			if visible_world(p,130): entries.append({"kind":"npc","depth":p.y+24,"data":{"name":"Nela","role":"Bewohnerin","pos":p,"color":Color("bd8774"),"kind":"rescued"}})
@@ -13672,7 +13649,7 @@ func safe_world_teleport_destination(base: Vector2, expected_region: int = -1) -
 		if blocked_by_region_wall(candidate): continue
 		var occupied := false
 		for stone in WAYSTONES:
-			if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).grow(18).has_point(candidate):
+			if WaystoneShrine.occupied(candidate-stone,18.0):
 				occupied = true
 				break
 		if occupied: continue
@@ -13850,7 +13827,7 @@ func projectile_world_blocked(point:Vector2)->bool:
 			if stone==WAYSTONES[0]:
 				if SpawnStoneBody.blocks(point-stone,0):return true
 				continue
-			if Rect2(stone+Vector2(-41,-59),Vector2(82,101)).has_point(point):return true
+			if WaystoneShrine.OBELISK_SOLID.has_point(point-stone):return true
 	return false
 
 func mark_network_teleport()->void:
@@ -14038,6 +14015,19 @@ func draw_local_player_label() -> void:
 	if not character_created: return
 	var label := hero_name.strip_edges() if hero_name.strip_edges() != "" else "Held"
 	text_at(player_pos+Vector2(-80,-58),"%s · LV %d" % [label,level],13,Color("fff0b8"),HORIZONTAL_ALIGNMENT_CENTER,160)
+
+## Liegt der Punkt auf oder dicht an einem Wegstein-Plateau (für Deko-Ausschluss)?
+func near_waystone_shrine(point:Vector2, margin:float=0.0)->bool:
+	for i in range(1, WAYSTONES.size()):
+		if WaystoneShrine.occupied(point-WAYSTONES[i], margin):return true
+	return false
+
+## Steht der Punkt oben auf einem Wegstein-Plateau oder auf dessen Treppe?
+func on_waystone_shrine(point:Vector2)->bool:
+	for i in range(1, WAYSTONES.size()):
+		var local:Vector2=point-WAYSTONES[i]
+		if WaystoneShrine.on_top(local) or WaystoneShrine.on_stairs(local):return true
+	return false
 
 func draw_spawn_elevated_actor(peer:int)->void:
 	var point:Vector2=player_pos if peer<0 else network_player_position(peer)

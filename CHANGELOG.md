@@ -6,6 +6,12 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Neue Wegsteine: Plateau-Grafik aus `tools/build_waystone_art.py`
+  (`art/village/objects/wegstein-plateau.png`, `wegstein-obelisk.png`), Maße,
+  Begehbarkeit (nur über die Treppe) und Zeichnen in
+  `components/waystone_shrine_32.gd`. Deko, Fackeln und Ankunftspunkte meiden
+  das Plateau; Geschosse stoppen nur am Obelisk. Test
+  `tests/gameplay/check_waystone_plateau.gd`, Bilder `tools/capture_waystone_plateau.gd`.
 - Startmenü mit Konto: Speicherplätze aus `account_characters` statt lokaler
   Dateien, Laden über `open_account_character` (`components/account_slots.gd`).
   Test `tests/ui/check_account_start_slots.gd`.
