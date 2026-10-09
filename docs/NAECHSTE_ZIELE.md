@@ -2,8 +2,18 @@
 
 Stand: 9. Oktober 2026. Arkanhalsketten und die ersten vier erneuerten
 Waldmonster sind veröffentlicht. Aktueller Schwerpunkt: Startbereich abrunden
-und `main.gd` schrittweise modularisieren.
+und weitere Spielinhalte.
 Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzepten.
+
+## Entscheidungen
+
+- 9.10.2026: Live-Schaltungen (`[deploy]`) nur nach einmaliger Rückfrage und
+  ausdrücklicher Bestätigung durch Angelo, jedes Mal. Sonst freie Hand.
+- 9.10.2026: Neuer Code kommt in Module unter `components/`, nicht in
+  `main.gd` (Regeln in `AGENTS.md`).
+- 9.10.2026: Modularisierung nach vier Modulen (Inhalte, Netzwerk, Weltgeometrie,
+  Gegenstände) pausiert. Weitere Teile nur herauslösen, wenn ohnehin dort
+  gearbeitet wird. Schwerpunkt jetzt: Spielinhalte und Startbereich.
 
 ## 1. Startbereich abrunden
 
@@ -13,10 +23,9 @@ ersten Spielminuten entscheiden, ob jemand weiterspielt.
 
 ## 2. Schrittweise Modularisierung von `main.gd`
 
-Beginn mit reinen Daten und Konstanten, danach zustandsarme Hilfsfunktionen.
-Jeder Schritt erhält die öffentliche API von `main.gd` über Wrapper, damit
-bestehende Tests stabil bleiben. Code-Umbauten laufen über eigene Branches und
-Pull Requests, weil `.gd`-Änderungen auf `main` automatisch deployt werden.
+Pausiert (siehe Entscheidungen). Bereits ausgelagert: `game_content.gd`,
+`network_codec.gd`, `world_geometry.gd`, `item_rules.gd`.
+Vorgehen beim Herauslösen: `AGENTS.md`, Abschnitt 4.
 
 Referenz: `docs/architecture/main-modularization.md`.
 

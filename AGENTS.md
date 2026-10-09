@@ -4,6 +4,23 @@ Diese Regeln gelten für alle, die am Projekt arbeiten, ob Mensch oder KI-Assist
 (Claude, Codex, …). Sie sorgen dafür, dass neuer Code an der richtigen Stelle
 landet und `main.gd` nicht weiter wächst.
 
+## 0. Zusammenarbeit mit KI-Assistenten (von Angelo festgelegt)
+
+- **Live gehen nur mit Bestätigung.** Vor *jeder* Live-Schaltung einmal fragen
+  und auf Angelos ausdrückliche Bestätigung warten. Live-Schaltung heißt: ein
+  Commit mit `[deploy]` auf `main` oder ein manueller Start der Deploy-Workflows.
+  Eine Bestätigung gilt nur für diese eine Live-Schaltung.
+- **Sonst freie Hand.** Branches, Commits, Pull Requests, Mergen nach grüner CI,
+  Aufräumen, Bugfixes, Umbauten und Spielinhalte sind ohne Rückfrage erlaubt.
+  Änderungen an Balancewerten, Aussehen oder Speicherständen im PR deutlich
+  benennen, damit Angelo sie beim nächsten Live-Gang erkennt.
+- **Vor großen Aufgaben warnen.** Wenn absehbar ist, dass etwas lange dauert oder
+  viel umbaut, das vorher kurz ankündigen (was, ungefähr wie lange) und erst
+  dann loslegen.
+- **Sichtbare Änderungen mit Bild.** Optische Änderungen mit einem Vorschaubild
+  belegen (Werkzeuge `tools/capture_*.gd`), damit Angelo sie ohne Spielen
+  beurteilen kann.
+
 ## 1. Neuer Code gehört nicht in `main.gd`
 
 `main.gd` ist mit über 13.000 Zeilen zu groß. Neue Systeme, Regeln und Daten
@@ -69,7 +86,9 @@ Der Gesamtplan steht in `docs/architecture/main-modularization.md`.
 - Alte Textsuchen, die bei einer Änderung brechen, durch Verhaltensprüfungen
   ersetzen statt den gesuchten Text wiederherzustellen.
 - Testdateien heißen `check_*.gd`. Die CI findet alles unter `tests/` automatisch.
-- Vor dem Commit: alle Tests und `python3 tools/check_content.py` laufen lassen.
+- Vor dem Commit alle Tests laufen lassen: `tools/run_all_tests.sh` (prüft
+  dieselben Tests wie die CI, inklusive `tools/check_content.py`; Godot-Pfad
+  über `GODOT_BIN`, parallel mit `JOBS=4`).
 
 ## 6. Git und Veröffentlichung
 
@@ -83,4 +102,13 @@ Der Gesamtplan steht in `docs/architecture/main-modularization.md`.
   einer neu hinzugefügten Datei gehören, die das Projekt so verwendet. Nicht
   nebenbei mitcommitten, was ein lokaler Import verändert hat.
 - Nächste Ziele und Entscheidungen stehen in `docs/NAECHSTE_ZIELE.md`. Nach
-  Abschluss eines Ziels dort aktualisieren.
+  Abschluss eines Ziels dort aktualisieren; neue Grundsatzentscheidungen mit
+  Datum unter „Entscheidungen“ eintragen.
+
+## 7. Dokumentation und Sprache
+
+- Alles, was für die Arbeit gebraucht wird (Konzepte, Übergaben, Entwürfe),
+  liegt im Repo unter `docs/`. Verweise auf lokale Dateien außerhalb des Repos
+  vermeiden, weil sie für andere nicht erreichbar sind.
+- Commit-Nachrichten auf Englisch; Doku, Kommentare, Patch Notes und
+  Spieltexte auf Deutsch.
