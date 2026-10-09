@@ -56,4 +56,4 @@ jobs:
           while IFS= read -r line; do
             safe=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
             echo "::notice title=Server-Diagnose::$safe"
-          done < <(head -24 diag.txt)
+          done < <(grep -E "^(HB|BOSS) " diag.txt | tail -6; grep -vE "^(HB|BOSS|ERR|PROC|UPTIME) " diag.txt | head -4)
