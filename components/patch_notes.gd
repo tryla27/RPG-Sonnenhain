@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Optik · Bosshüte am Charakter", "Helm des Kriegsherrn, Hut des Dunklen Arkanhüters und Hut des Jagdmeisters waren am Charakter nicht zu sehen. Jetzt hat jeder eine eigene Form: gehörnter Eisenhelm mit rotem Kamm, hoher Nachthut mit leuchtendem Runenband und Stern, breiter Jägerhut mit Feder. Sie sind an jeder Klasse und auch bei anderen Spielern sichtbar."],
 ["Fehlerbehebung · Gegner frieren ein", "Waren viele Gegner und Beutestücke in der Welt unterwegs, wurde das Weltpaket des Servers zu groß und ging verloren: Gegner blieben stehen und Bosse wie der Dunkle Arkanhüter erschienen nicht. Jetzt bekommt jeder Spieler nur die Gegner und Beute in seiner Nähe, und die Verbindung nimmt größere Pakete an."],
 ["Fehlerbehebung · Dunkler Arkanhüter", "Nach dem Umzug ins Kristallmoor konnte der Dunkle Arkanhüter fehlen, obwohl sein Feld da war. Ein Klassenboss außerhalb seines Felds blockiert sein Erscheinen jetzt nicht mehr: Er erscheint wieder zuverlässig in seinem Feld. Der Server schreibt dazu jetzt Prüfmeldungen mit, damit sich weitere Fälle schnell finden lassen."],
 ["Welt · Neue Wegsteine", "Alle Wegsteine außerhalb des Dorfs stehen jetzt auf einem erhöhten Steinplateau mit Treppe, Runenkreis und einem Obelisk, über dem ein Kristall schwebt. Aktivierte Wegsteine leuchten. Hinauf und hinunter geht es über die Treppe."],

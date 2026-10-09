@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Bosshüte sichtbar: `head_visual()` liefert 3–5 für Bosshüte,
+  `RpgHero.paint_boss_hat`, Netzwerk-Grenze für `head` auf 5. Vorschau
+  `tools/capture_boss_hats.gd`, Test `tests/gameplay/check_boss_hat_visual.gd`.
 - Weltpaket pro Spieler nur mit Gegnern, Geschossen und Beute im Umkreis von
   2600 px (`components/world_snapshot.gd`), WebSocket-Puffer auf 1 MiB.
   Ursache für eingefrorene Gegner und fehlende Bosse: Pakete über 64 KiB

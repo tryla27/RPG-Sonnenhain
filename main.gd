@@ -1151,7 +1151,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
 		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
-		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
+		"head":clampi(int(state.get("head",-1)),-1,5),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
 		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2,
@@ -12134,7 +12134,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
 		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
-		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
+		"head":clampi(int(state.get("head",-1)),-1,5),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
 		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2
@@ -13155,9 +13155,12 @@ func is_equipped_uid(uid: int) -> bool:
 func eternal_arrows_active() -> bool:
 	return HeadgearRules.eternal_arrows(inventory, equipped_head_uid, class_id)
 
+## 0–2 Klassenhut (nur an der eigenen Klasse sichtbar), 3–5 Bosshut (immer).
 func head_visual() -> int:
 	for item in inventory:
 		if int(item.get("uid",-1))==equipped_head_uid and str(item.get("icon",""))=="head":
+			var boss:=HeadgearRules.boss_index(item)
+			if boss>=0:return 3+boss
 			return int(item.get("head_class",-1))
 	return -1
 
