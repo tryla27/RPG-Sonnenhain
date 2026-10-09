@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Reisen · Über die Karte", "Stehst du an einem Wegstein oder am Spawn, wird die Karte mit M zur Reisekarte: Ein Klick auf ein aktiviertes Ziel reist sofort. Weiter weg sagt dir ein Hinweis: „Gehe zu einem Wegstein, um zu teleportieren.“"],
+["Oberfläche · Vollbild", "F11 oder der neue Knopf „Vollbild“ in den Einstellungen schaltet das Spiel in echtes Vollbild, ohne Browserleisten. Auf 16:9-Bildschirmen füllt es dann den ganzen Schirm. Escape oder F11 beendet das Vollbild."],
 ["Fehlerbehebung · Charakterwechsel", "Wer ohne Neustart zu einem anderen Charakter wechselte, bekam Quests, Bosse, Ereignisse und Kartenfortschritt des vorigen Charakters untergemischt. Jetzt startet jeder geladene Charakter sauber mit genau seinem eigenen Stand. Auch der Kartennebel, die Gruppe und Truhen-Timer werden nicht mehr übernommen, und während des Ladens wird nicht mehr automatisch gespeichert."],
 ["Klänge · Schritte je Untergrund", "Deine Schritte klingen jetzt nach dem Boden unter dir: Gras, Waldboden, Erde und Wege, Kopfsteinpflaster, der Spawnstein, Holzdielen in Häusern, Stein in Kapelle, Gewölben und Ruinen, Sand an der Küste und in der Arena, Moor und Pfützen sowie Asche und Kies in den Aschebergen."],
 ["Sonnenhain · Keine orangenen Rahmen mehr", "Um Rathaus, Kirche, Borin, Fenna, Alma, Schmiede und Arena lag ein halbtransparenter orangener Rahmen mit gestrichelter Kante auf dem Boden. Er stammte aus einer alten Dorfversion und ist entfernt."],

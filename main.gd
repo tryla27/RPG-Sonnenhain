@@ -76,6 +76,7 @@ func hud_action_at(pos:Vector2)->String:
 		if hud_action_rect(i).has_point(pos):return str(actions[i])
 	return ""
 const WaystoneMap=preload("res://components/waystone_map.gd")
+const DisplayMode=preload("res://components/display_mode.gd")
 const BossRelics=preload("res://components/boss_relics.gd")
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobNavigation=preload("res://components/mob_navigation.gd")
@@ -3030,6 +3031,10 @@ func open_mobile_chat() -> void:
 	queue_redraw()
 
 func _input(event:InputEvent)->void:
+	if DisplayMode.is_toggle_key(event):
+		DisplayMode.toggle()
+		get_viewport().set_input_as_handled()
+		return
 	if panel not in ["account_login","account_register"]:
 		account_shift_tap_pending=false
 		return
@@ -6065,6 +6070,9 @@ func panel_click(mouse: Vector2) -> void:
 				return
 		if Rect2(190,540,300,44).has_point(mouse):
 			menu_feedback.ask_exit("pause")
+		return
+	if panel == "settings" and DisplayMode.BUTTON_RECT.has_point(mouse):
+		DisplayMode.toggle()
 		return
 	if panel == "settings":
 		if set_volume_from_mouse(mouse):
@@ -10762,6 +10770,7 @@ func draw_game_menu() -> void:
 
 func draw_pause_panel() -> void:
 	ui_button(Rect2(860,319,130,42), "CONTROLLER")
+	ui_button(DisplayMode.BUTTON_RECT, "FENSTER" if DisplayMode.is_fullscreen() else "VOLLBILD")
 	ui_button(Rect2(300, 135, 550, 42), "PAUSE", true, true)
 	text_at(Vector2(302, 205), "Level %d · %s · %d Gold" % [level, "Konflux" if konflux.active else region_name(region_at(player_pos)), gold], 17, Color("e6f0dc"))
 	ui_button(Rect2(300, 221, 550, 42), "FORTSETZEN")
@@ -11434,9 +11443,9 @@ func draw_map_panel() -> void:
 		text_at(Vector2(610,500),binding_short("interact")+" / "+binding_short("waystone")+": am Stein zurückreisen",12,Color("efe1bc"))
 		text_at(Vector2(170,584),"Weiß: deine Position · Innenräume gehören zur Konflux-Karte",13,Color("efe1bc"))
 		return
-	text_at(Vector2(165, 125), "%s · EINGANG MARKIERT" % DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else ("WEGSTEINKARTE · REISEN" if travel_map else "WELTKARTE · SONNENHAIN"), 24, Color("ffe0a4"))
+	text_at(Vector2(165, 125), "%s · EINGANG MARKIERT" % DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else ("WEGSTEINKARTE · REISEN" if WaystoneMap.travel_ready(self) else "WELTKARTE · SONNENHAIN"), 24, Color("ffe0a4"))
 	draw_world_atlas(WaystoneMap.RECT)
-	text_at(Vector2(168, 579),("Klicke eine Region oder einen cyanfarbenen Wegstein, um dorthin zu reisen." if travel_map else "Gelb blinkend: Questziel · Weiß: Du · Cyan: Wegstein · Stern: Boss"),13,Color("efe1bc"))
+	text_at(Vector2(168, 579),("Klicke eine Region oder einen cyanfarbenen Wegstein, um dorthin zu reisen." if WaystoneMap.travel_ready(self) else "Gelb blinkend: Questziel · Weiß: Du · Cyan: Wegstein · Stern: Boss"),13,Color("efe1bc"))
 	var quest_target: Dictionary = quest_guide.target(self)
 	if not quest_target.is_empty(): text_at(Vector2(168,602),String(quest_target["label"]),14,Color("ffe34b"))
 
@@ -11486,7 +11495,7 @@ func draw_world_atlas(rect: Rect2) -> void:
 		var available := region_available(region)
 		text_at(plaque.position + Vector2(3, 18), region_name(region), 12 if region in [0, 6] else 13, Color("fff0cf"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
 		var status:="OFFEN" if available else "BOSS-GESPERRT"
-		if travel_map:
+		if WaystoneMap.travel_ready(self):
 			var stone:=WaystoneMap.region_stone(self,region)
 			status="REISEN" if available and WaystoneMap.unlocked(self,stone) else ("NICHT AKTIVIERT" if available and stone>=0 else ("KEIN WEGSTEIN" if available else "BOSS-GESPERRT"))
 		text_at(plaque.position + Vector2(3, 36), "EMPF. LV %d · %s" % [region_level(region), status], 10, Color("f6d48f") if available else Color("ffaca7"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
@@ -11497,7 +11506,7 @@ func draw_world_atlas(rect: Rect2) -> void:
 		var point: Vector2 = inset.position + WAYSTONES[i] * map_scale
 		draw_rect(Rect2(point - Vector2(4, 4), Vector2(8, 8)), Color("1d3540"))
 		draw_rect(Rect2(point - Vector2(2, 2), Vector2(4, 4)), Color("9dece1") if WaystoneMap.unlocked(self,i) else Color("72878b"))
-		if travel_map and WaystoneMap.unlocked(self,i) and region_available(region_at(WAYSTONES[i])):draw_arc(point,7,0,TAU,16,Color("9dece1"),2)
+		if WaystoneMap.travel_ready(self) and WaystoneMap.unlocked(self,i) and region_available(region_at(WAYSTONES[i])):draw_arc(point,7,0,TAU,16,Color("9dece1"),2)
 	for portal in PORTALS:
 		if not region_available(int(portal[2])): continue
 		for end in [portal[0], portal[1]]:

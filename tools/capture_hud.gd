@@ -62,6 +62,7 @@ func capture()->void:
 		await shot(viewport,out.path_join("patchnotes-detail.png"))
 	if "menu_feedback" in g:
 		g.panel="settings"
+		await shot(viewport,out.path_join("einstellungen.png"))
 		g.menu_feedback.ask_exit("settings")
 		await shot(viewport,out.path_join("verlassen-rueckfrage.png"))
 	quit()
