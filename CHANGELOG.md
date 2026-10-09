@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Weltpaket pro Spieler nur mit Gegnern, Geschossen und Beute im Umkreis von
+  2600 px (`components/world_snapshot.gd`), WebSocket-Puffer auf 1 MiB.
+  Ursache für eingefrorene Gegner und fehlende Bosse: Pakete über 64 KiB
+  scheiterten mit `ERR_OUT_OF_MEMORY`. Test
+  `tests/network/check_world_snapshot_size.gd` (schlägt mit altem Code fehl).
 - Server: `SERVER_HEARTBEAT` jede Minute (Spieler, je Klassenboss nächster
   Spieler, Boss-Abstand zum Feld, Abklingzeit) über stderr, damit es ungepuffert
   im Log landet; `BOSS_*` ebenso. `diagnose-server.yml` zeigt die letzten Zeilen.
