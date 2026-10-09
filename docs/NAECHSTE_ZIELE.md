@@ -47,6 +47,17 @@ Stand 9.10. spät: A1 ist live. Gemergt, aber noch nicht live: B3 Reisen über
 die Karte, B1 F11-Vollbild, B2 Tippgeräusch. C1 Start im Dunkeln liegt als PR
 bereit. Danach: A2 Schritte 1 und 3, Paket 4 Ascheberge-Tor, E2, E1, D2.
 
+## 0c. Wünsche vom 9.10.2026 (spät)
+
+- Hut des Jagdmeisters: „Ewige Pfeile“ (PR #86).
+- Neue Wegsteine als Plateau mit Treppe (PR #87, Bilder in
+  `docs/konzepte/2026-10-09-abend/wegsteine/`).
+- Fehler: Startmenü zeigte fremde lokale Spielstände statt der Kontocharaktere
+  (PR #85, gemergt).
+- Golem-Endgegner im Himmelsgarten: Konzept mit offenen Fragen in
+  `docs/konzepte/2026-10-09-golem/KONZEPT.md`. Umsetzung erst nach Angelos
+  Antworten.
+
 ## 1. Startbereich abrunden
 
 Dorf → Blütenwiesen → erstes Waldstück einmal komplett durchspielen und alles
