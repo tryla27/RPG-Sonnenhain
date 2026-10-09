@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Technik · Spielinhalte als eigenes Modul", "Gegner, Fähigkeiten, Quests, NPCs, Händler, Weltereignisse, Wahrzeichen, Wege und Torbogen liegen jetzt gebündelt in einer eigenen Inhaltsdatei. Werte und Spielverhalten bleiben unverändert."],
 ["Klänge · Pilzling", "Der Pilzling verwendet beim Giftstaubausstoß ein kurzes weiches Giftzischen ohne anfänglichen Klick, Quetschlaut oder Murmeln."],
 ["Mobs · Verfolgung und Hindernisse", "Mooswölfe bereiten ihren Sprung in 0,4 statt 0,8 Sekunden vor; Ziellinie und Landekreis entfallen. Erkannte Spieler werden von normalen Mobs auch außerhalb des Heimradius weiterverfolgt. Automatisches Zurückweichen entfällt; nach dem Angriff schließen die Gegner wieder auf. Bäume und andere Hindernisse werden mit geplanten Umwegen und passender Körperbreite umgangen. Blockierte Angriffe lösen Annäherung aus. Sicherheitszonen, Regionsgrenzen und Bosskampfgebiete bleiben gültig."],
 ["Waldmobs · Bewegliche Körper und Angriffe", "Auch Waldschleim, Blütenkäfer und Pilzling besitzen nun eigene Ruhe-, acht Bewegungs- und acht Angriffs-/Erholungsposen in allen acht Blickrichtungen. Käferbeine und Fühler arbeiten mit, die Drüsen schwellen vor dem Sekretschuss an. Der Pilzhut federt und hebt sich beim Giftstaubausstoß. Der Schleim komprimiert sich und federt beim Hüpfen nach. Dazu kommen Treffer- und Todesposen. Die Animation folgt der tatsächlichen Bewegung; Kampfwerte und Trefferzeiten bleiben unverändert."],
