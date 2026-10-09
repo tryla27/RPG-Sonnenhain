@@ -71,15 +71,15 @@ func check_layout()->void:
 	var g:=Board.new()
 	check(g.multiplayer_debug_rect().position.y>=Hud.RIGHT_STATUS_BOTTOM,"Netzwerkanzeige unter allem rechts oben")
 	check(g.quest_hud_rect()==Hud.quest_rect(false),"Spiel nutzt die Questzeile")
-	# Aktionshinweis: unten bündig mit der Questzeile, kurz, rechts daneben.
+	# Aktionshinweis: rechts unter der Minimap, kurz, rechtsbündig.
 	g.font=ThemeDB.fallback_font
 	var short_prompt:Rect2=Hud.prompt_rect(g,"F  ·  Wegstein: Reiseziele wählen")
-	var line:=Hud.quest_rect(false)
-	check(is_equal_approx(short_prompt.end.y,line.end.y),"Hinweis unten bündig mit der Questzeile")
+	check(short_prompt.position.y>=Hud.MAP_LABEL_RECT.end.y,"Hinweis unter Minimap und Kartenname")
+	check(is_equal_approx(short_prompt.end.x,minimap.end.x),"Hinweis rechtsbündig mit der Minimap")
 	check(short_prompt.size.x<360.0,"Hinweis so kurz wie sein Text")
-	check(short_prompt.position.x>line.end.x,"Hinweis rechts neben der Questzeile")
+	check(Hud.KOOP_Y-12.0>=short_prompt.end.y,"Koop-Anzeige unter dem Hinweis")
 	var long_prompt:Rect2=Hud.prompt_rect(g,"E  ·  Heilungsfeld am Altar · HP & Energie auffüllen und noch viel mehr Text")
-	check(long_prompt.end.x<=1150.0,"Langer Hinweis bleibt im Bild")
+	check(long_prompt.position.x>=600.0,"Langer Hinweis bleibt rechts")
 	g.free()
 
 func check_save_status()->void:

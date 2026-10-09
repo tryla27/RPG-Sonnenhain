@@ -21,12 +21,13 @@ const XP_LINE:=Rect2(9,641,1134,3)
 const MINIMAP_RECT:=Rect2(976,12,164,164)
 ## Kartenname und Stufe direkt unter der Minimap.
 const MAP_LABEL_RECT:=Rect2(946,180,224,22)
-const KOOP_Y:=218.0
-const SAVE_NOTICE_Y:=234.0
-const RIGHT_STATUS_BOTTOM:=242.0
-## Aktionshinweis rechts, unten bündig mit der Questzeile.
-const PROMPT_X:=614.0
-const PROMPT_MAX_W:=520.0
+## Aktionshinweis rechts unter der Minimap, rechtsbündig mit ihr.
+const PROMPT_TOP:=206.0
+const PROMPT_H:=26.0
+const PROMPT_MAX_W:=420.0
+const KOOP_Y:=250.0
+const SAVE_NOTICE_Y:=266.0
+const RIGHT_STATUS_BOTTOM:=274.0
 
 static func quest_rect(touch:bool)->Rect2:
 	return QUEST_RECT_TOUCH if touch else QUEST_RECT_DESKTOP
@@ -103,14 +104,13 @@ static func draw_map_frame(g,rect:Rect2)->void:
 	g.draw_rect(rect.grow(2),Color("1a120a"),false,2.0)
 	g.draw_rect(rect,Color("e3c077"),false,2.0)
 
-## Rahmen des Aktionshinweises: so breit wie der Text, auf Höhe der Questzeile.
+## Rahmen des Aktionshinweises: so breit wie der Text, rechts unter der Minimap.
 static func prompt_rect(g,text:String)->Rect2:
-	var width:float=g.font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,14).x+28.0
-	var line:=QUEST_RECT_DESKTOP
-	return Rect2(PROMPT_X,line.position.y,minf(width,PROMPT_MAX_W),line.size.y)
+	var width:=minf(g.font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,14).x+28.0,PROMPT_MAX_W)
+	return Rect2(MINIMAP_RECT.end.x-width,PROMPT_TOP,width,PROMPT_H)
 
 static func draw_prompt(g,text:String)->void:
 	var rect:=prompt_rect(g,text)
 	g.draw_rect(rect,Color(0.03,0.07,0.1,0.78))
 	g.draw_rect(rect.grow(1),Color("fff3c4"),false,2.0)
-	g.text_at(rect.position+Vector2(14,17),text,14,Color("fff8dc"),HORIZONTAL_ALIGNMENT_LEFT,int(rect.size.x)-20)
+	g.text_at(rect.position+Vector2(14,18),text,14,Color("fff8dc"),HORIZONTAL_ALIGNMENT_LEFT,int(rect.size.x)-20)
