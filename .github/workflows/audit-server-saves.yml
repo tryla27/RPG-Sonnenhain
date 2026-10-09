@@ -58,7 +58,8 @@ jobs:
             < tools/audit_server_saves.py > save-audit.md
           # Öffentliche Zusammenfassung nur mit Zahlen; Namen stehen nur im Bericht-Artefakt.
           head -3 save-audit.md >> "$GITHUB_STEP_SUMMARY"
-          head -5 save-audit.md
+          # Zahlen als Hinweis am Lauf (ohne Namen), damit sie per API lesbar sind.
+          echo "::notice title=Spielstand-Prüfung::$(sed -n 3p save-audit.md)"
 
       - name: Upload report
         uses: actions/upload-artifact@v7
