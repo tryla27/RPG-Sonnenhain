@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- A1 Charakterwechsel: `reset_character_state()` (auch von `start_new_game`
+  genutzt) vor jedem Laden eines anderen Charakters, `WorldFog.clear()`,
+  Gruppe beim Trennen geleert, kein Autosave während des Ladens. Test
+  `tests/gameplay/check_character_switch.gd` (schlägt mit altem Code fehl).
 - Schritte je Untergrund: 10 Klänge × 4 Varianten unter `audio/sfx/schritte/`,
   `ground_surface_at` (Dorf über sichtbare Bodenfamilie, Spawnstein, Wege,
   Gebiete, innen/Gewölbe/Arena), Test `tests/audio/check_footsteps.gd`.

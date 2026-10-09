@@ -862,6 +862,7 @@ func _on_server_disconnected() -> void:
 	server_save.disconnected()
 	network_status = "Live-Server-Verbindung unterbrochen · verbinde neu …"
 	remote_players.clear()
+	party_state = {}
 	network_mode = "offline"
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	if character_created and not creative_mode and not multiplayer_smoke_client_mode:
@@ -969,6 +970,7 @@ func disconnect_multiplayer(show_message: bool = true) -> void:
 	if network_mode != "offline" and multiplayer.multiplayer_peer != null: multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	remote_players.clear()
+	party_state = {}
 	network_mode = "offline"
 	invite_code = ""
 	if show_message: network_status = "Offline"
@@ -1745,7 +1747,7 @@ func _process(delta: float) -> void:
 	if server_save.loading:
 		queue_redraw()
 		return
-	if character_created and panel not in ["start","creation"]:
+	if character_created and not account_pending_load and panel not in ["start","creation","account_gate","account_login","account_register","account_migrate","account_characters"]:
 		server_save_timer -= delta
 		if server_save_timer <= 0:
 			server_save_timer = AUTOSAVE_INTERVAL
@@ -6181,7 +6183,10 @@ func begin_character_creation() -> void:
 	panel = "creation"
 	play_sound("ui_klick")
 
-func start_new_game() -> void:
+## Setzt jeden Wert zurück, der zu einem Charakter gehört. Läuft vor jedem
+## neuen Spiel und vor dem Laden eines anderen Charakters, damit nichts vom
+## vorigen Charakter übrig bleibt (Quests, Kartennebel, Gruppe, Timer, Händler).
+func reset_character_state() -> void:
 	arena_reward_item.clear()
 	equipped_head_uid=-1
 	quest_guide.tracked_id = QuestGuide.AUTO
@@ -6190,18 +6195,6 @@ func start_new_game() -> void:
 	opened_village_gates.clear()
 	dash_timer = 0.0
 	invulnerable = 0.0
-	hero_name = creation_name.strip_edges().substr(0, 16) if creation_name.strip_edges() != "" else "Held"
-	player_uuid = ""
-	ensure_player_uuid()
-	recent_players.clear()
-	hero_gender = pending_gender
-	hero_race = pending_race
-	character_created = true
-	var current_path := slot_save_path(active_save_slot)
-	if FileAccess.file_exists(current_path):
-		var old_save: String = FileAccess.get_file_as_string(current_path)
-		var backup: FileAccess = FileAccess.open(current_path.trim_suffix(".json")+"_backup_%d.json" % Time.get_ticks_usec(), FileAccess.WRITE)
-		if backup != null: backup.store_string(old_save)
 	final_completed = false
 	final_countdown = -1.0
 	arena_mode = ""
@@ -6212,9 +6205,6 @@ func start_new_game() -> void:
 	arena_best = 0
 	arena_pending_loaded = false
 	arena_leaderboard.clear()
-	player_pos = Vector2(825, 1020)
-	mark_network_teleport()
-	class_id = pending_class
 	stamina = max_stamina()
 	sprint_blend = 0.0
 	sprint_heading = Vector2.ZERO
@@ -6285,6 +6275,36 @@ func start_new_game() -> void:
 	rage_timer = 0
 	drain_timer = 0
 	poison_blade_timer = 0
+	for i in chest_respawn_until.size(): chest_respawn_until[i] = 0.0
+	for i in dungeon_chest_respawn_until.size(): dungeon_chest_respawn_until[i] = 0.0
+	world_fog.clear()
+	party_state = {}
+	food_system.restore({})
+	steinrose.restore({})
+	pip_loan_level = 0
+	pip_return_dialogue_index = 0
+	processed_server_transactions.clear()
+
+func start_new_game() -> void:
+	reset_character_state()
+	hero_name = creation_name.strip_edges().substr(0, 16) if creation_name.strip_edges() != "" else "Held"
+	player_uuid = ""
+	ensure_player_uuid()
+	recent_players.clear()
+	hero_gender = pending_gender
+	hero_race = pending_race
+	character_created = true
+	var current_path := slot_save_path(active_save_slot)
+	if FileAccess.file_exists(current_path):
+		var old_save: String = FileAccess.get_file_as_string(current_path)
+		var backup: FileAccess = FileAccess.open(current_path.trim_suffix(".json")+"_backup_%d.json" % Time.get_ticks_usec(), FileAccess.WRITE)
+		if backup != null: backup.store_string(old_save)
+	player_pos = Vector2(825, 1020)
+	mark_network_teleport()
+	class_id = pending_class
+	reset_class_skills()
+	stamina = max_stamina()
+	intro_timer = 8.0
 	panel = "intro"
 	ensure_live_multiplayer()
 	message("Willkommen in Sonnenhain! Rede mit Mira, Borin oder Liora.")
@@ -10565,6 +10585,11 @@ func open_account_character(index:int)->void:
 	# Antwort entscheidet dann wie gewohnt (gleiche Revision: lokal hochladen,
 	# Server neuer: Server laden und lokalen Stand als Konfliktkopie sichern).
 	var pending:=unsynced_local_save(player_uuid,account_token)
+	# Nichts vom vorher gespielten Charakter darf in diesen hineingemischt werden.
+	var opening_uuid:=player_uuid
+	reset_character_state()
+	character_created=false
+	player_uuid=opening_uuid
 	if not pending.is_empty():
 		apply_save_data(pending)
 		server_save.restore(pending)
