@@ -209,6 +209,99 @@ def asche_b(rng, v):
     return fin(b.mix((crunch, 0.9), (dust, 0.6), (press, 0.9)), top=7500)
 
 
+# ------------------------------------------------------------------ Runde 2 (9.10.): neue Ansätze
+# für Gras, Pflaster, Holz, Sand und Moor. Beide in der natürlichen Richtung (B gefiel),
+# C eher dumpf und nah, D heller mit mehr Material-Detail.
+def gras_c(rng, v):
+    d = 0.22
+    t = b.t_axis(d)
+    env_ = np.exp(-t / 0.06) * (1 - np.exp(-t / 0.004))
+    crush = b.bp(b.noise(d, rng), 600, 2400) * env_
+    blades = grains(0.12, rng, 180, 3000, 7000, 0.003, 0.5)
+    thud = b.lp(b.noise(d, rng), 180) * b.env(d, 0.003, 0.03)
+    return fin(b.mix((crush, 1.0), (b.pad(blades, d), 0.5), (thud, 1.0)), top=6500)
+
+
+def gras_d(rng, v):
+    d = 0.26
+    t = b.t_axis(d)
+    heel = b.bp(b.noise(0.1, rng), 1800, 6000) * b.env(0.1, 0.008, 0.03)
+    roll = b.bp(b.noise(0.12, rng), 2500 + 200 * v, 8000) * b.env(0.12, 0.02, 0.04) * 0.7
+    snap = grains(0.06, rng, 90, 4000, 9000, 0.002, 0.6)
+    return fin(b.mix((b.pad(heel, d), 1.0), (b.at(roll, 0.06, d), 0.8), (b.at(snap, 0.02, d), 0.6), (b.lp(b.noise(d, rng), 220) * b.env(d, 0.003, 0.025), 0.8)), top=8500)
+
+
+def pflaster_c(rng, v):
+    d = 0.2
+    heel = b.lp(b.noise(0.06, rng), 900) * b.env(0.06, 0.001, 0.014)
+    clack = b.bp(b.noise(0.03, rng), 1400 + 100 * v, 3200) * b.env(0.03, 0.0005, 0.006)
+    toe = b.bp(b.noise(0.04, rng), 1000, 2600) * b.env(0.04, 0.001, 0.008) * 0.6
+    sand = grains(0.06, rng, 120, 3000, 7000, 0.002, 0.25)
+    return fin(b.mix((b.pad(heel, d), 1.0), (b.pad(clack, d), 0.8), (b.at(toe, 0.07, d), 0.8), (b.at(sand, 0.075, d), 0.6)), top=8500)
+
+
+def pflaster_d(rng, v):
+    d = 0.22
+    heel = b.bp(b.noise(0.05, rng), 300, 1200) * b.env(0.05, 0.001, 0.012)
+    stone = b.bp(b.noise(0.025, rng), 2200, 5000) * b.env(0.025, 0.0003, 0.004)
+    scrape = b.bp(b.noise(0.06, rng), 2500, 6500) * b.env(0.06, 0.01, 0.02) * 0.35
+    return fin(b.mix((b.pad(heel, d), 1.0), (b.pad(stone, d), 0.6), (b.at(heel * 0.6, 0.075, d), 0.9), (b.at(scrape, 0.08, d), 0.7)), top=9000)
+
+
+def holz_c(rng, v):
+    d = 0.26
+    body = b.bp(b.noise(0.14, rng), 110, 380) * b.env(0.14, 0.002, 0.05)
+    board = b.bp(b.noise(0.05, rng), 600 + 50 * v, 1500) * b.env(0.05, 0.001, 0.012) * 0.6
+    return fin(b.mix((b.pad(body, d), 1.0), (b.pad(board, d), 0.7), (b.at(body * 0.5, 0.08, d), 0.7)), top=7000)
+
+
+def holz_d(rng, v):
+    d = 0.3
+    knock = b.bp(b.noise(0.1, rng), 200, 900) * b.env(0.1, 0.001, 0.03)
+    tap = b.bp(b.noise(0.01, rng), 1500, 4000) * b.env(0.01, 0.0003, 0.003)
+    creak = b.at(b.sweep_bp(b.noise(0.12, rng), b.glide(700, 520, 0.12), q=8.0) * b.env(0.12, 0.03, 0.05) * 0.5, 0.1, d) if v in (1, 3) else 0
+    return fin(b.mix((b.pad(knock, d), 1.0), (b.pad(tap, d), 0.6), (b.at(knock * 0.55, 0.075, d), 0.7)) + creak, top=8000)
+
+
+def sand_c(rng, v):
+    d = 0.3
+    t = b.t_axis(d)
+    shape = np.minimum(t / 0.05, 1) * np.exp(-np.maximum(t - 0.05, 0) / 0.08)
+    give = b.lp(b.noise(d, rng), 900) * shape
+    crunch = grains(d, rng, 500, 1500, 5000, 0.003, 0.7, shape)
+    return fin(b.mix((give, 1.0), (crunch, 0.7)), top=7000)
+
+
+def sand_d(rng, v):
+    d = 0.32
+    t = b.t_axis(d)
+    shape = np.sin(np.pi * np.minimum(t / 0.24, 1)) ** 1.5
+    shh = b.bp(b.noise(d, rng), 3000, 9000) * shape * 0.5
+    squeak = b.at(b.osc(b.glide(900 + 60 * v, 1300, 0.05), 0.05, "tri") * b.env(0.05, 0.01, 0.02) * 0.08, 0.03, d)
+    press = b.lp(b.noise(d, rng), 400) * shape
+    return fin(b.mix((shh, 0.8), (press, 1.0)) + squeak, top=9000)
+
+
+def moor_c(rng, v):
+    d = 0.34
+    t = b.t_axis(d)
+    squelch = b.sweep_bp(b.noise(d, rng), b.glide(300, 900, d, 0.6), q=3.0) * b.env(d, 0.01, 0.08)
+    suck = b.at(b.lp(b.noise(0.12, rng), 350) * b.env(0.12, 0.04, 0.03), 0.16, d)
+    drip = sum(b.at(b.osc(b.glide(f, f * 1.5, 0.015), 0.015) * b.env(0.015, 0.001, 0.006) * 0.25, rng.uniform(0.18, 0.3), d) for f in rng.uniform(800, 1500, 2))
+    return fin(b.mix((squelch, 1.0), (suck, 0.8), (drip, 0.6)), top=7000)
+
+
+def moor_d(rng, v):
+    d = 0.32
+    splash = b.bp(b.noise(0.14, rng), 1500, 6000) * b.env(0.14, 0.002, 0.04)
+    body = b.lp(b.noise(0.14, rng), 600) * b.env(0.14, 0.003, 0.05)
+    spray = grains(0.15, rng, 200, 3000, 9000, 0.002, 0.6, None)
+    return fin(b.mix((b.pad(splash, d), 0.9), (b.pad(body, d), 1.0), (b.at(spray, 0.03, d), 0.7)), top=9000)
+
+
+ROUND2 = {"gras": (gras_c, gras_d), "pflaster": (pflaster_c, pflaster_d), "holz": (holz_c, holz_d),
+          "sand": (sand_c, sand_d), "moor": (moor_c, moor_d)}
+
 SURFACES = {
     "gras": (gras_a, gras_b), "laub": (laub_a, laub_b), "erde": (erde_a, erde_b),
     "pflaster": (pflaster_a, pflaster_b), "holz": (holz_a, holz_b), "stein": (stein_a, stein_b),
@@ -229,10 +322,10 @@ def walk(steps: list) -> np.ndarray:
     return out
 
 
-def build(target: Path) -> list:
+def build(target: Path, round2: bool = False) -> list:
     written = []
-    for surface, recipes in SURFACES.items():
-        for tag, recipe in zip("ab", recipes):
+    for surface, recipes in (ROUND2 if round2 else SURFACES).items():
+        for tag, recipe in zip("cd" if round2 else "ab", recipes):
             steps = []
             for v in range(4):
                 rng = np.random.default_rng(zlib.crc32(f"{surface}:{tag}:{v}".encode()))
@@ -250,5 +343,5 @@ def build(target: Path) -> list:
 
 if __name__ == "__main__":
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "build/footsteps_draft")
-    files = build(out)
+    files = build(out, "--runde2" in sys.argv)
     print(f"{len(files)} Dateien in {out}")
