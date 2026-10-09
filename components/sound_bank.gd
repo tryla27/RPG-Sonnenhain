@@ -58,6 +58,26 @@ const CATALOG := {
 	"beute_selten": {"path":"beute/beute_selten", "variants":1, "db":-10.0, "max":1, "prio":5, "pitch":0.0},
 	"beute_episch": {"path":"beute/beute_episch", "variants":1, "db":-9.0, "max":1, "prio":6, "pitch":0.0, "duck":0.8},
 	"beute_legendaer": {"path":"beute/beute_legendaer", "variants":1, "db":-8.0, "max":1, "prio":7, "pitch":0.0, "duck":1.4},
+	# Paket 2: Oberfläche (eigener Regler) und Fortschritt.
+	"ui_klick": {"path":"ui/ui_klick", "variants":3, "db":-12.0, "max":2, "prio":2, "pitch":0.03, "bus":"ui"},
+	"ui_fenster_auf": {"path":"ui/ui_fenster_auf", "variants":1, "db":-13.0, "max":1, "prio":2, "pitch":0.02, "bus":"ui"},
+	"ui_fenster_zu": {"path":"ui/ui_fenster_zu", "variants":1, "db":-13.0, "max":1, "prio":2, "pitch":0.02, "bus":"ui"},
+	"ui_fehler": {"path":"ui/ui_fehler", "variants":1, "db":-11.0, "max":1, "prio":4, "pitch":0.0, "bus":"ui"},
+	"ui_dialog": {"path":"ui/ui_dialog", "variants":2, "db":-11.0, "max":1, "prio":3, "pitch":0.0, "bus":"ui"},
+	"ui_hinweis": {"path":"ui/ui_hinweis", "variants":1, "db":-11.0, "max":1, "prio":4, "pitch":0.0, "bus":"ui"},
+	"kaufen": {"path":"ui/kaufen", "variants":1, "db":-10.0, "max":1, "prio":4, "pitch":0.02, "bus":"ui"},
+	"verkaufen": {"path":"ui/verkaufen", "variants":1, "db":-10.0, "max":1, "prio":4, "pitch":0.02, "bus":"ui"},
+	"quest_angenommen": {"path":"fortschritt/quest_angenommen", "variants":1, "db":-9.0, "max":1, "prio":5, "pitch":0.0, "bus":"ui"},
+	"quest_bereit": {"path":"fortschritt/quest_bereit", "variants":1, "db":-9.0, "max":1, "prio":5, "pitch":0.0, "bus":"ui"},
+	"quest_abgeschlossen": {"path":"fortschritt/quest_abgeschlossen", "variants":1, "db":-8.0, "max":1, "prio":7, "pitch":0.0, "bus":"ui", "duck":1.6},
+	"level_auf": {"path":"fortschritt/level_auf", "variants":1, "db":-7.0, "max":1, "prio":8, "pitch":0.0, "bus":"ui", "duck":2.0},
+	"skillpunkt": {"path":"fortschritt/skillpunkt", "variants":1, "db":-9.0, "max":1, "prio":5, "pitch":0.0, "bus":"ui"},
+	"freischaltung": {"path":"fortschritt/freischaltung", "variants":1, "db":-8.0, "max":1, "prio":7, "pitch":0.0, "bus":"ui", "duck":1.4},
+	"wegstein_aktiviert": {"path":"welt/wegstein_aktiviert", "variants":1, "db":-8.0, "max":1, "prio":6, "pitch":0.0, "duck":1.2},
+	"reise": {"path":"welt/reise", "variants":1, "db":-8.0, "max":1, "prio":6, "pitch":0.0},
+	"truhe_auf": {"path":"welt/truhe_auf", "variants":1, "db":-9.0, "max":1, "prio":5, "pitch":0.02},
+	"heilen": {"path":"welt/heilen", "variants":1, "db":-9.0, "max":1, "prio":6, "pitch":0.0, "duck":1.0},
+	"boss_erscheint": {"path":"welt/boss_erscheint", "variants":1, "db":-7.0, "max":1, "prio":8, "pitch":0.0, "duck":1.8},
 }
 
 ## Klangmaterial je Gegnertyp (Index wie GameContent.ENEMY_TYPES).
@@ -118,6 +138,10 @@ static func distance_gain(distance: float) -> float:
 func has(name: String) -> bool:
 	return CATALOG.has(name)
 
+## Oberflächenklänge folgen dem Regler „Oberfläche“ statt „Effekte“.
+static func is_ui(name: String) -> bool:
+	return str(CATALOG.get(name, {}).get("bus", "")) == "ui"
+
 func setup(host: Node, voices: int = 16) -> void:
 	ensure_buses()
 	music_bus = AudioServer.get_bus_index(BUS_MUSIC)
@@ -176,6 +200,7 @@ func play(name: String, volume: float = 1.0, distance: float = 0.0) -> bool:
 	var player: AudioStreamPlayer = players[slot]
 	player.stop()
 	player.stream = list[variant]
+	player.bus = BUS_UI if is_ui(name) else BUS_SFX
 	player.volume_db = float(entry["db"]) + linear_to_db(volume * gain)
 	var spread := float(entry["pitch"])
 	player.pitch_scale = 1.0 + rng.randf_range(-spread, spread)

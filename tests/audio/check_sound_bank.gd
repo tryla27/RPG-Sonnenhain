@@ -62,6 +62,9 @@ func check_rules()->void:
 		var g:=Bank.distance_gain(d)
 		check(g<=previous,"Entfernung faellt monoton")
 		previous=g
+	check(Bank.is_ui("ui_klick") and Bank.is_ui("level_auf") and not Bank.is_ui("reise") and not Bank.is_ui("schwert_schwung"),"Oberflaechen-Zuordnung")
+	for name in ["ui_klick","ui_fenster_auf","ui_fenster_zu","ui_fehler","kaufen","verkaufen","quest_angenommen","quest_bereit","quest_abgeschlossen","level_auf","skillpunkt","freischaltung","wegstein_aktiviert","reise","truhe_auf","heilen","boss_erscheint"]:
+		check(Bank.CATALOG.has(name),"Paket 2: %s" % name)
 	var bank=Bank.new()
 	var last:=-1
 	for i in 200:
@@ -93,6 +96,11 @@ func check_voices()->void:
 	check(not bank.loop_players["spieler_warnung"].playing,"Herzschlag stoppt")
 	bank.set_loop("spieler_warnung",true,0.0)
 	check(not bank.loop_players["spieler_warnung"].playing,"stumm bei Lautstaerke 0")
+	check(bank.play("ui_klick"),"Klick spielt")
+	var ui_voice:=-1
+	for i in bank.players.size():
+		if bank.voice_info[i]["name"]=="ui_klick":ui_voice=i
+	check(ui_voice>=0 and bank.players[ui_voice].bus==Bank.BUS_UI,"Klick laeuft ueber den Oberflaechen-Bus")
 	check(bank.play("spieler_tod"),"Spielertod spielt")
 	check(bank.duck_timer>0.0,"Ducking bei Spielertod")
 	for player in bank.loop_players.values():
