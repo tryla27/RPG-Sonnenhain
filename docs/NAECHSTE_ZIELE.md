@@ -43,6 +43,10 @@ vermischt Fortschritt (A1), dann Reisen über die Karte, Vollbild, Tippgeräusch
 Start im Dunkeln. Großes Thema: neues Figuren-System mit 3D-Körpern, Ragdoll,
 Treffer-Zonen und Rüstung pro Körperteil (Prototyp zuerst).
 
+Stand 9.10. spät: A1 ist live. Gemergt, aber noch nicht live: B3 Reisen über
+die Karte, B1 F11-Vollbild, B2 Tippgeräusch. C1 Start im Dunkeln liegt als PR
+bereit. Danach: A2 Schritte 1 und 3, Paket 4 Ascheberge-Tor, E2, E1, D2.
+
 ## 1. Startbereich abrunden
 
 Dorf → Blütenwiesen → erstes Waldstück einmal komplett durchspielen und alles

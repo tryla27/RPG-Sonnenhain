@@ -5589,7 +5589,8 @@ func capture_save_data() -> Dictionary:
 	data["steinrose_state"] = steinrose.snapshot()
 	data["essence_state"] = essence.snapshot()
 	data["book_state"] = book_system.snapshot()
-	data["world_fog"] = world_fog.snapshot()
+	data["world_fog"] = world_fog.legacy_snapshot()
+	data["world_fog_fine"] = world_fog.snapshot()
 	return data.duplicate(true)
 
 func save_game() -> void:
@@ -5690,7 +5691,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if not from_server and not creative_mode: server_save.restore(data)
 	food_system.restore(data.get("food_state",{}))
 	steinrose.restore(data.get("steinrose_state",{}))
-	world_fog.restore(data.get("world_fog",[]),WORLD)
+	world_fog.restore(data.get("world_fog",[]),WORLD,data.get("world_fog_fine",""))
 	var stored_recent: Variant = data.get("recent_players",[])
 	recent_players = stored_recent if stored_recent is Array else []
 	while recent_players.size() > 12: recent_players.pop_back()
@@ -7556,7 +7557,9 @@ func _draw() -> void:
 		if not visible_world(e["pos"],180): continue
 		var p: Vector2 = e["pos"] + Vector2(0, (float(e["max"]) - float(e["life"])) * -40)
 		text_at(p, String(e["text"]), 18, e["color"], HORIZONTAL_ALIGNMENT_CENTER, 180)
-	if arena_mode == "" and dungeon_id < 0 and interior_id < 0: draw_day_night_overlay()
+	if arena_mode == "" and dungeon_id < 0 and interior_id < 0:
+		draw_day_night_overlay()
+		if character_created and not creative_mode: world_fog.draw_world_darkness(self, camera_world_rect())
 	apply_ui_transform()
 	draw_hud()
 	character_canvas_offset = Vector2.ZERO
@@ -10061,32 +10064,33 @@ func draw_local_minimap(rect: Rect2) -> void:
 				if ground_kind == 2: tint = Color("a4aa91")
 				elif ground_kind == 1: tint = Color("a0b47d")
 			elif distance_to_trail(point) < 110: tint = Color("d2ba86")
+			if not world_fog.explored_world(point): tint = Color("0b1218")
 			draw_rect(Rect2(inset.position + Vector2(gx, gy) * inset.size / 21.0, inset.size / 21.0 + Vector2.ONE), tint)
 	for stone in WAYSTONES:
 		var p: Vector2 = inset.position + (stone - start) * scale_map
-		if inner.has_point(p): draw_circle(p, 3, Color("8af0e9"))
+		if inner.has_point(p) and world_fog.explored_world(stone): draw_circle(p, 3, Color("8af0e9"))
 	for portal in PORTALS:
 		for end in [portal[0], portal[1]]:
 			var p: Vector2 = inset.position + (end - start) * scale_map
-			if inner.has_point(p) and region_available(int(portal[2])): draw_circle(p, 3, Color("efccfa"))
+			if inner.has_point(p) and region_available(int(portal[2])) and world_fog.explored_world(end): draw_circle(p, 3, Color("efccfa"))
 	for index in DUNGEON_ENTRANCES.size():
 		var entrance: Vector2 = LANDMARKS[int(DUNGEON_ENTRANCES[index])]["pos"]
 		if not region_available(region_at(entrance)): continue
 		var mark: Vector2 = inset.position + (entrance - start) * scale_map
-		if inner.has_point(mark):
+		if inner.has_point(mark) and world_fog.explored_world(entrance):
 			draw_rect(Rect2(mark - Vector2(3, 3), Vector2(6, 6)), Color("f5d6aa"), false, 2)
 	if rescue_state < 3:
 		var rescue: Vector2 = inset.position + (RESCUE_POS - start) * scale_map
-		if inner.has_point(rescue): draw_arc(rescue, 6, 0, TAU, 18, Color("ffae78"), 2)
+		if inner.has_point(rescue) and world_fog.explored_world(RESCUE_POS): draw_arc(rescue, 6, 0, TAU, 18, Color("ffae78"), 2)
 	for i in WORLD_EVENTS.size():
 		if int(event_states[i]) == 3: continue
 		var encounter: Vector2 = inset.position + (WORLD_EVENTS[i]["pos"] - start) * scale_map
-		if inner.has_point(encounter) and region_available(int(WORLD_EVENTS[i]["region"])):
+		if inner.has_point(encounter) and region_available(int(WORLD_EVENTS[i]["region"])) and world_fog.explored_world(WORLD_EVENTS[i]["pos"]):
 			draw_circle(encounter, 4, Color("293e46"))
 			draw_circle(encounter, 2, Color("ffe399") if int(event_states[i]) in [0, 2] else Color("a7d2c3"))
 	for enemy in enemies:
 		var p: Vector2 = inset.position + (enemy["pos"] - start) * scale_map
-		if inner.has_point(p): draw_circle(p, 2, Color("ef8584"))
+		if inner.has_point(p) and world_fog.explored_world(enemy["pos"]): draw_circle(p, 2, Color("ef8584"))
 	for member in (party_state.get("members",[]) as Array):
 		if not member is Dictionary or str(member.get("uuid","")) == player_uuid: continue
 		if str(member.get("context","world")) != "world": continue

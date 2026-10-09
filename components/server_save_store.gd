@@ -102,7 +102,7 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 	if not (rotation is int or rotation is float) or not is_finite(float(rotation)) or float(rotation)!=floorf(float(rotation)) or int(rotation)<-1 or int(rotation)>9:return false
 	if not valid_food_state(data.get("food_state",{})):return false
 	if not valid_steinrose_state(data.get("steinrose_state",{})):return false
-	if data.size() > 80: return false
+	if data.size() > 96: return false
 	if str(data.get("player_uuid","")) != uuid or not bool(data.get("character_created",false)): return false
 	if not data.get("inventory") is Array or data["inventory"].size() > 42: return false
 	if not data.get("position") is Array or data["position"].size() != 2: return false
@@ -151,6 +151,7 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 	if not fog is Array or fog.size()>512:return false
 	for fog_byte in fog:
 		if not (fog_byte is int or fog_byte is float) or int(fog_byte)<0 or int(fog_byte)>255:return false
+	if data.has("world_fog_fine") and not preload("res://components/world_fog.gd").valid_snapshot(data["world_fog_fine"],Vector2(16000,9600)):return false
 	# Skilldaten sind dauerhaft und dürfen nicht durch manipulierte Clients beliebig
 	# zusammengesetzt werden. Drei Slots, keine Doppelbelegung, nur gelernte Skills.
 	var learned:Array=data.get("learned",[])
