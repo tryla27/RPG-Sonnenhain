@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Klänge · Tippgeräusch", "Beim Schreiben klickt jetzt jede Taste leise: im Anmelde- und Registrierformular, beim Koop-Code, beim Charakternamen und im Chat. Löschen klingt etwas tiefer. Die Lautstärke folgt dem Regler „Oberfläche“."],
 ["Reisen · Über die Karte", "Stehst du an einem Wegstein oder am Spawn, wird die Karte mit M zur Reisekarte: Ein Klick auf ein aktiviertes Ziel reist sofort. Weiter weg sagt dir ein Hinweis: „Gehe zu einem Wegstein, um zu teleportieren.“"],
 ["Oberfläche · Vollbild", "F11 oder der neue Knopf „Vollbild“ in den Einstellungen schaltet das Spiel in echtes Vollbild, ohne Browserleisten. Auf 16:9-Bildschirmen füllt es dann den ganzen Schirm. Escape oder F11 beendet das Vollbild."],
 ["Fehlerbehebung · Charakterwechsel", "Wer ohne Neustart zu einem anderen Charakter wechselte, bekam Quests, Bosse, Ereignisse und Kartenfortschritt des vorigen Charakters untergemischt. Jetzt startet jeder geladene Charakter sauber mit genau seinem eigenen Stand. Auch der Kartennebel, die Gruppe und Truhen-Timer werden nicht mehr übernommen, und während des Ladens wird nicht mehr automatisch gespeichert."],
