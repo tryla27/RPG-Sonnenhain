@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Hut des Jagdmeisters: „Ewige Pfeile“ (`HeadgearRules.eternal_arrows`), normale
+  Schützenpfeile leben 8 s statt 1,2 s und enden beim ersten Treffer. Server
+  liest `eternal_arrows` aus dem Spielerzustand. Test
+  `tests/gameplay/check_eternal_arrows.gd`.
 - C1 Start im Dunkeln: `WorldFog` auf 64-px-Zellen, Sicht 640 px, Gruppe nur
   bis 1600 px. Neues Spielstandfeld `world_fog_fine` (Base64), `world_fog`
   bleibt als grobes 256-px-Feld; alte Stände werden beim Laden hochgerechnet.
