@@ -74,6 +74,10 @@ lokalen Projektwurzel. Umhang- und Farbteile sind teilweise bereits vorhanden.
 
 ## Bereits erledigt und live
 
+- 9.10.2026 live (Commit `678bc55`, von Angelo bestätigt): Sound-Paket 1
+  (39 Klänge, Herzschlag-Warnung, Monsterlaute, Entfernungsdämpfung, Ducking)
+  sowie die Module `game_content.gd`, `network_codec.gd`, `world_geometry.gd`
+  und `item_rules.gd`.
 - Arkanhalsketten (Commit `c721f7a`): sechs klassenübergreifende Halsketten,
   eigener Ausrüstungsplatz, Bossdrops, Umwandlung alter Kerne, Koop-Sync.
   Regeln und Prüfungen: `docs/arcane-necklaces/README.md`.
