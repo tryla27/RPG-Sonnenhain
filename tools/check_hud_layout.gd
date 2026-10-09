@@ -28,7 +28,7 @@ func run()->void:
 	check(debug.position.y>=218.0,"network debug below right HUD")
 	var source:=FileAccess.get_file_as_string("res://main.gd")
 	check("draw_ref_panel(Rect2(362,540,405,32))" not in source,"duplicate fruit prompt removed")
-	check(source.count("ui_box(Rect2(610, 549, 520, 36)") == 1,"single desktop interaction prompt channel")
+	check(source.count("HudLayout.draw_prompt(self") == 1,"single desktop interaction prompt channel")
 	check("food_system.regrow_remaining(nearby_food[\"point\"])" in source,"fruit timer routed through interaction prompt")
 	print("HUD_LAYOUT_CHECK failures=",failures," · boss/party/right-status/bottom prompts separated")
 	g.free()

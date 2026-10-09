@@ -17,12 +17,16 @@ const QUEST_RECT_TOUCH:=Rect2(10,66,320,24)
 const NOTICE_RECT:=Rect2(12,522,510,34)
 ## XP als dünne Linie unter der Fähigkeitenleiste.
 const XP_LINE:=Rect2(9,641,1134,3)
-const MAP_CENTER:=Vector2(1035,116)
-## Kartenname und Stufe unter der Minimap (unter dem „+“-Knopf).
-const MAP_LABEL_RECT:=Rect2(925,210,220,22)
-const KOOP_Y:=250.0
-const SAVE_NOTICE_Y:=266.0
-const RIGHT_STATUS_BOTTOM:=274.0
+## Quadratische Minimap oben rechts mit goldenem Rahmen.
+const MINIMAP_RECT:=Rect2(976,12,164,164)
+## Kartenname und Stufe direkt unter der Minimap.
+const MAP_LABEL_RECT:=Rect2(946,180,224,22)
+const KOOP_Y:=218.0
+const SAVE_NOTICE_Y:=234.0
+const RIGHT_STATUS_BOTTOM:=242.0
+## Aktionshinweis rechts, unten bündig mit der Questzeile.
+const PROMPT_X:=614.0
+const PROMPT_MAX_W:=520.0
 
 static func quest_rect(touch:bool)->Rect2:
 	return QUEST_RECT_TOUCH if touch else QUEST_RECT_DESKTOP
@@ -94,3 +98,19 @@ static func draw_skill_slot(g,rect:Rect2,key:String,filled:bool)->void:
 		g.draw_rect(rect,Color(0.04,0.09,0.13,0.62))
 		g.draw_rect(rect,Color("c9a45e",0.85),false,1.0)
 	shadow_text(g,rect.position+Vector2(8,36),key,11,Color("ffe2a3") if filled else Color("a9aa9c",0.75))
+
+static func draw_map_frame(g,rect:Rect2)->void:
+	g.draw_rect(rect.grow(2),Color("1a120a"),false,2.0)
+	g.draw_rect(rect,Color("e3c077"),false,2.0)
+
+## Rahmen des Aktionshinweises: so breit wie der Text, auf Höhe der Questzeile.
+static func prompt_rect(g,text:String)->Rect2:
+	var width:float=g.font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,14).x+28.0
+	var line:=QUEST_RECT_DESKTOP
+	return Rect2(PROMPT_X,line.position.y,minf(width,PROMPT_MAX_W),line.size.y)
+
+static func draw_prompt(g,text:String)->void:
+	var rect:=prompt_rect(g,text)
+	g.draw_rect(rect,Color(0.03,0.07,0.1,0.78))
+	g.draw_rect(rect.grow(1),Color("fff3c4"),false,2.0)
+	g.text_at(rect.position+Vector2(14,17),text,14,Color("fff8dc"),HORIZONTAL_ALIGNMENT_LEFT,int(rect.size.x)-20)

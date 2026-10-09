@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Oberfläche · Größere, eckige Minimap", "Die Minimap oben rechts ist größer, quadratisch und schlicht mit goldenem Rahmen; Kompass und Ringe entfallen. Ein Klick darauf öffnet weiter die große Karte. Kartenname und Stufe stehen direkt darunter."],
+["Oberfläche · Aktionshinweis unten", "Hinweise wie „F · Wegstein“ stehen jetzt unten auf einer Linie mit dem Ziel, sind nur so breit wie ihr Text und haben einen hellen Rahmen."],
 ["Fehlerbehebung · Kein Ton im Browser", "Im Browser waren seit dem Klang-Update Musik, Effekte und Menüklänge stumm. Die Lautstärkekanäle sind jetzt fest im Spiel angelegt, damit der Browser sie abspielt."],
 ["Oberfläche · Durchsichtige untere Leiste", "Die Leiste unten hat keinen Hintergrund mehr. Nur Knöpfe und belegte Fähigkeitsplätze haben einen Rahmen; die Knopfbeschriftungen passen wieder vollständig hinein."],
 ["Menüs · Rückfrage beim Verlassen", "„Speichern & zur Startseite“ und „Speichern & Hauptmenü“ fragen jetzt nach, ob du das Spiel wirklich verlassen willst. Abbrechen oder Escape bringt dich zurück ins Menü."],

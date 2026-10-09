@@ -95,14 +95,19 @@ func draw_on_map(g, inset: Rect2, map_scale: Vector2) -> void:
 	if goal.is_empty(): return
 	draw_marker(g,inset.position + Vector2(goal["pos"]) * map_scale)
 
-func draw_on_minimap(g, center: Vector2, radius: float, scale_map: Vector2, _start: Vector2) -> void:
+## Zielmarke auf der quadratischen Minimap; liegt das Ziel außerhalb, sitzt die
+## Marke mit Pfeil am Rand.
+func draw_on_minimap(g, rect: Rect2, scale_map: Vector2) -> void:
 	var goal := target(g)
 	if goal.is_empty(): return
 	var offset: Vector2 = (Vector2(goal["pos"]) - g.player_pos) * scale_map
-	var far := offset.length() > radius - 13
-	var point := center + offset.limit_length(radius-13)
+	var half: Vector2 = rect.size * 0.5 - Vector2(13, 13)
+	var fit := 1.0
+	if absf(offset.x) > half.x: fit = minf(fit, half.x / absf(offset.x))
+	if absf(offset.y) > half.y: fit = minf(fit, half.y / absf(offset.y))
+	var point: Vector2 = rect.get_center() + offset * fit
 	draw_marker(g,point,true)
-	if far:
+	if fit < 1.0:
 		var dir := offset.normalized()
 		g.draw_colored_polygon(PackedVector2Array([point+dir*8,point-dir*2+dir.orthogonal()*4,point-dir*2-dir.orthogonal()*4]),marker_color(Time.get_ticks_msec()/1000.0))
 

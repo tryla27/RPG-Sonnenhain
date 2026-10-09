@@ -61,13 +61,25 @@ func check_layout()->void:
 	for bar in [Hud.HP_BAR,Hud.ENERGY_BAR,Hud.STAMINA_BAR]:
 		check(Hud.STATUS_RECT.encloses(bar),"Balken im Statusbereich")
 		check(bar.size.y<=10,"Balken schmal")
-	# Minimap-Ring: Mittelpunkt, Radius 70, „+“-Knopf bis y 205.
-	check(Hud.MAP_LABEL_RECT.position.y>=Hud.MAP_CENTER.y+76+13,"Kartenname unter der Minimap")
-	check(absf(Hud.MAP_LABEL_RECT.get_center().x-Hud.MAP_CENTER.x)<2.0,"Kartenname mittig unter der Minimap")
+	var minimap:Rect2=Hud.MINIMAP_RECT
+	check(is_equal_approx(minimap.size.x,minimap.size.y) and minimap.size.x>=150.0,"Minimap quadratisch und größer als vorher (140)")
+	check(minimap.end.x<=1152 and minimap.position.y>=0,"Minimap im Bild")
+	check(Hud.MAP_LABEL_RECT.position.y>=minimap.end.y+2,"Kartenname unter der Minimap")
+	check(absf(Hud.MAP_LABEL_RECT.get_center().x-minimap.get_center().x)<2.0,"Kartenname mittig unter der Minimap")
+	check(not Hud.MAP_LABEL_RECT.intersects(minimap),"Kartenname nicht hinter der Minimap")
 	check(Hud.KOOP_Y>Hud.MAP_LABEL_RECT.end.y and Hud.SAVE_NOTICE_Y>Hud.KOOP_Y,"Koop und Speicherhinweis darunter")
 	var g:=Board.new()
 	check(g.multiplayer_debug_rect().position.y>=Hud.RIGHT_STATUS_BOTTOM,"Netzwerkanzeige unter allem rechts oben")
 	check(g.quest_hud_rect()==Hud.quest_rect(false),"Spiel nutzt die Questzeile")
+	# Aktionshinweis: unten bündig mit der Questzeile, kurz, rechts daneben.
+	g.font=ThemeDB.fallback_font
+	var short_prompt:Rect2=Hud.prompt_rect(g,"F  ·  Wegstein: Reiseziele wählen")
+	var line:=Hud.quest_rect(false)
+	check(is_equal_approx(short_prompt.end.y,line.end.y),"Hinweis unten bündig mit der Questzeile")
+	check(short_prompt.size.x<360.0,"Hinweis so kurz wie sein Text")
+	check(short_prompt.position.x>line.end.x,"Hinweis rechts neben der Questzeile")
+	var long_prompt:Rect2=Hud.prompt_rect(g,"E  ·  Heilungsfeld am Altar · HP & Energie auffüllen und noch viel mehr Text")
+	check(long_prompt.end.x<=1150.0,"Langer Hinweis bleibt im Bild")
 	g.free()
 
 func check_save_status()->void:
