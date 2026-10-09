@@ -9,8 +9,10 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 
 - 9.10.2026: PR-Aufräumen. Geschlossen: #11, #12, #13, #16 (schon in `main`),
   #30, #32 (anders umgesetzt), #58 (überholt durch GBA-Boden), #21 (doppelt
-  zu #22). Gemergt: #55 (GitHub Actions auf Node 24). Offen mit Inhalten, die
-  nie in `main` kamen: #2, #3, #9, #14, #15, #22 – Angelo entscheidet.
+  zu #22). Gemergt: #55 (GitHub Actions auf Node 24). Ebenfalls geschlossen
+  auf Angelos Wunsch, Funktionen werden nicht übernommen: #2 (FullFix V2),
+  #3 (Beeren im Koop), #9 (Spielstand per Drag & Drop), #14 (Händler-Historie),
+  #15 (Alma-Pfeilnavigation), #22 (Alma-Tisch, Fusions-Kodex).
 
 - 9.10.2026: Live-Schaltungen (`[deploy]`) nur nach einmaliger Rückfrage und
   ausdrücklicher Bestätigung durch Angelo, jedes Mal. Sonst freie Hand.
