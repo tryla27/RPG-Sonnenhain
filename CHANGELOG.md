@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Server: `SERVER_HEARTBEAT` jede Minute (Spieler, je Klassenboss nächster
+  Spieler, Boss-Abstand zum Feld, Abklingzeit) über stderr, damit es ungepuffert
+  im Log landet; `BOSS_*` ebenso. `diagnose-server.yml` zeigt die letzten Zeilen.
 - Klassenbosse: Spawn zählt nur einen Boss im eigenen Feld
   (`class_boss_home_ok`), Streuner werden entfernt und geloggt
   (`BOSS_STRAY_REMOVED`, `BOSS_SPAWN`). Test

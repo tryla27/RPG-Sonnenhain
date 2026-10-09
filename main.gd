@@ -2331,6 +2331,10 @@ func process_dedicated_server(delta: float) -> void:
 		server_rescue_spawn_timer = 0.0
 		update_dedicated_rescue_spawns()
 		spawn_dedicated_bosses()
+	server_heartbeat_timer += delta
+	if server_heartbeat_timer >= 60.0:
+		server_heartbeat_timer = 0.0
+		printerr(server_boss_heartbeat())
 	if server_spawn_timer >= 0.8:
 		server_spawn_timer = 0.0
 		spawn_dedicated_enemy()
@@ -4666,6 +4670,27 @@ func spawn_enemy() -> void:
 func boss_max_hp(type:int)->float:
 	return float(ENEMY_TYPES[type]["hp"])*(1.2+0.08*(region_level(int(ENEMY_TYPES[type]["region"]))+5))
 
+var server_heartbeat_timer := 0.0
+
+## Logzeile (stderr, ungepuffert) ohne Namen: Spieler online, je Klassenboss nächster Spieler,
+## Boss vorhanden (Abstand zum Feld) und Abklingzeit. Für diagnose-server.yml.
+func server_boss_heartbeat()->String:
+	var parts:Array=["SERVER_HEARTBEAT peers=%d mobs=%d" % [remote_players.size(),enemies.size()]]
+	for i in 3:
+		var site:Vector2=CLASS_BOSS_SITES[i]
+		var nearest:=-1.0
+		var contexts:={}
+		for peer in remote_players:
+			var state:Dictionary=remote_players[peer]
+			var d:=network_player_position(int(peer)).distance_to(site)
+			if nearest<0 or d<nearest:nearest=d
+			if d<=900:contexts[str(state.get("context","?"))]=true
+		var boss:="none"
+		for mob in enemies:
+			if int(mob.get("type",-1))==12+i:boss="%d" % roundi(Vector2(mob.get("pos",Vector2.ZERO)).distance_to(site))
+		parts.append("b%d near=%d ctx=%s boss=%s cd=%d" % [i,roundi(nearest),",".join(contexts.keys()),boss,ceili(float(boss_cooldowns[i]))])
+	return " ".join(parts)
+
 func spawn_dedicated_bosses()->void:
 	for i in 3:
 		var site:Vector2=CLASS_BOSS_SITES[i]
@@ -4690,7 +4715,7 @@ func spawn_dedicated_bosses()->void:
 			if class_boss_home_ok(mob,i):
 				exists=true
 			else:
-				print("BOSS_STRAY_REMOVED type=",type," pos=",mob.get("pos",Vector2.ZERO)," site=",site)
+				printerr("BOSS_STRAY_REMOVED type=",type," pos=",mob.get("pos",Vector2.ZERO)," site=",site)
 				MobCombat.cancel(mob)
 				enemies.remove_at(m)
 		if exists:continue
@@ -4700,7 +4725,7 @@ func spawn_dedicated_bosses()->void:
 		boss["context"]="world";boss["instance_id"]="world";boss["boss_spawn_timer"]=1.6
 		enemies.append(boss)
 		spawn_tower_guardians(boss)
-		print("BOSS_SPAWN type=",type," pos=",boss["pos"])
+		printerr("BOSS_SPAWN type=",type," pos=",boss["pos"])
 
 ## Lebt der Klassenboss in seinem Feld (mit etwas Spielraum)?
 func class_boss_home_ok(mob:Dictionary,index:int)->bool:

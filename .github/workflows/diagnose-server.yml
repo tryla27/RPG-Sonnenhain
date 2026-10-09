@@ -43,6 +43,9 @@ jobs:
           echo "boss_stray=$(printf '%s\n' "$all" | grep -c 'BOSS_STRAY')"
           echo "restarts=$(printf '%s\n' "$all" | grep -c 'restarted\|forcing dedicated')"
           printf '%s\n' "$all" | grep -A1 'SCRIPT ERROR' | grep -v '^--$' | cut -c1-180 | sort | uniq -c | sort -rn | head -12 | sed 's/^/ERR /'
+          echo "patch_notice=$(printf '%s\n' "$all" | grep -c 'SERVER_PATCH_NOTICE_SENT')"
+          echo "heartbeats=$(printf '%s\n' "$all" | grep -c 'SERVER_HEARTBEAT')"
+          printf '%s\n' "$all" | grep 'SERVER_HEARTBEAT' | tail -4 | cut -c1-230 | sed 's/^/HB /'
           printf '%s\n' "$all" | grep 'BOSS_' | tail -5 | cut -c1-160 | sed 's/^/BOSS /'
           uptime -p 2>/dev/null | sed 's/^/UPTIME /'
           pgrep -af "[s]onnenhain-server.x86_64" | sed 's/^/PROC /' | cut -c1-120
