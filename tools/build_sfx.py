@@ -722,52 +722,7 @@ def r_boss_erscheint(rng, v):
     return finish(mix((hits, 0.9), (swell, 0.6), (rumble, 1.0)), echo_wet=0.2, echo_delay=0.15, tail=0.3)
 
 
-# ------------------------------------------------- Schritte und Büsche
-
-def r_schritt_gras(rng, v):
-    d = 0.1
-    swish = bp(noise(d, rng), 900 + 120 * v, 5200) * env(d, 0.004, 0.028, 3)
-    press = lp(noise(d, rng), 380) * env(d, 0.003, 0.02) * 0.8
-    return finish(mix((swish, 0.8), (press, 1.0)), top=8000)
-
-
-def r_schritt_erde(rng, v):
-    d = 0.09
-    thud = thump(125 + 10 * v, 70, d, 0.02)
-    dirt = lp(noise(d, rng), 1300 + 100 * v) * env(d, 0.002, 0.022)
-    return finish(mix((thud, 0.9), (dirt, 0.8)), top=7000)
-
-
-def r_schritt_pflaster(rng, v):
-    d = 0.08
-    heel = hp(noise(0.006, rng), 2000) * env(0.006, 0.0003, 0.002)
-    knock = thump(270 + 20 * v, 150, d, 0.015)
-    grit = bp(noise(d, rng), 1500, 5000) * env(d, 0.001, 0.014)
-    return finish(mix((pad(heel, d), 0.7), (knock, 0.8), (grit, 0.6)), top=9000)
-
-
-def r_schritt_holz(rng, v):
-    d = 0.13
-    knock = thump(230 + 15 * v, 185, d, 0.04)
-    hollow = bp(noise(d, rng), 190, 520) * env(d, 0.001, 0.035)
-    tap = hp(noise(0.006, rng), 1200) * env(0.006, 0.0003, 0.002)
-    return finish(mix((knock, 0.9), (hollow, 0.9), (pad(tap, d), 0.5)), top=8000)
-
-
-def r_schritt_stein(rng, v):
-    d = 0.09
-    heel = hp(noise(0.006, rng), 1800) * env(0.006, 0.0003, 0.0025)
-    knock = thump(300 + 25 * v, 170, d, 0.014)
-    grit = bp(noise(d, rng), 1800, 6000) * env(d, 0.001, 0.01)
-    return finish(mix((pad(heel, d), 0.8), (knock, 0.8), (grit, 0.5)), echo_wet=0.18, echo_delay=0.07, echo_fb=0.2, top=9000)
-
-
-def r_schritt_sand(rng, v):
-    d = 0.14
-    hiss = bp(noise(d, rng), 1400 + 100 * v, 7000) * env(d, 0.012, 0.05, 2.5)
-    give = lp(noise(d, rng), 500) * env(d, 0.006, 0.03) * 0.6
-    return finish(mix((hiss, 0.8), (give, 1.0)), top=8500)
-
+# ------------------------------------------------- Büsche
 
 def r_busch_rascheln(rng, v):
     d = 0.42
@@ -839,13 +794,7 @@ SOUNDS = {
     "truhe_auf": ("welt", r_truhe_auf, 1),
     "heilen": ("welt", r_heilen, 1),
     "boss_erscheint": ("welt", r_boss_erscheint, 1),
-    "schritt_gras": ("schritte", r_schritt_gras, 4),
-    "schritt_erde": ("schritte", r_schritt_erde, 4),
-    "schritt_pflaster": ("schritte", r_schritt_pflaster, 4),
-    "schritt_holz": ("schritte", r_schritt_holz, 4),
-    "schritt_stein": ("schritte", r_schritt_stein, 4),
-    "schritt_sand": ("schritte", r_schritt_sand, 4),
-    "busch_rascheln": ("schritte", r_busch_rascheln, 3),
+    "busch_rascheln": ("welt", r_busch_rascheln, 3),
 }
 
 

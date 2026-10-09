@@ -199,13 +199,12 @@ deterministisch (feste Saat), damit ein erneuter Lauf dieselben Dateien ergibt.
   `menu`, `level`, `pickup` und `dodge` sind an allen Stellen durch passende
   ersetzt (ausgenommen ein Klassen-Buff, der zu Paket 3 gehört). Freigabe
   läuft über die Klangprobe.
-- **Schritte und Büsche vorgezogen** (aus Paket 4, auf Angelos Wunsch):
-  6 Untergründe mit je 4 Varianten unter `audio/sfx/schritte/`,
-  Erkennung in `ground_surface_at()` (Dorf aus dem Bodenplan, Oberwelt aus
-  Gebiet und Wegabstand, Innenräume Holz, Kapelle und Dungeons Stein, Arena
-  Sand) und Rascheln in `foliage_at()` (Dorfbüsche, Fruchtbüsche,
-  Sträucher an Hindernissen in Blütenwiesen, Pilzwald, Nebelheide,
-  Bernsteinforst).
+- **Busch-Rascheln vorgezogen** (9.10.2026, freigegeben): `welt/busch_rascheln`,
+  Erkennung in `foliage_at()` (Dorfbüsche, Fruchtbüsche, Sträucher an
+  Hindernissen in Blütenwiesen, Pilzwald, Nebelheide, Bernsteinforst).
+  Schritte je Untergrund wurden ausprobiert und auf Angelos Wunsch wieder
+  entfernt; sie kommen später überarbeitet in Paket 4.
+- Paket 2 von Angelo freigegeben (9.10.2026).
 - Alle Sounds sind selbst erzeugt; es gibt keine Fremdlizenzen.
 - Freigabe läuft über die Hörvorschau „Sonnenhain Klangprobe“.
 

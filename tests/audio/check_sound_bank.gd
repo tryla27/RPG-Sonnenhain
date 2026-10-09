@@ -138,23 +138,8 @@ func check_mob_voices()->void:
 	check(bank.observe_mobs([],listener,true).is_empty(),"gesunder Gegner verschwindet ohne Todeslaut")
 
 func check_surfaces()->void:
-	for surface in ["gras","erde","pflaster","holz","stein","sand"]:
-		check(Bank.CATALOG.has(Bank.step_sound_for(surface)),"Schrittklang fuer %s" % surface)
-	check(Bank.step_sound_for("unbekannt")=="schritt_gras","unbekannter Untergrund klingt wie Gras")
-	check(Bank.village_surface("village_stone")=="pflaster" and Bank.village_surface("earth_path")=="erde" and Bank.village_surface("grass_meadow")=="gras","Dorfmaterialien")
+	check(Bank.CATALOG.has("busch_rascheln"),"Busch-Rascheln im Katalog")
 	var game=load("res://main.gd").new()
-	var kinds:={}
-	for x in range(40,1760,64):
-		for y in range(40,2580,64):
-			kinds[game.ground_surface_at(Vector2(x,y))]=true
-	check(kinds.has("pflaster") and kinds.has("gras") and kinds.has("erde"),"Dorf hat Pflaster, Gras und Erdwege")
-	var coast:=Vector2(250,4000)
-	check(game.distance_to_trail(coast)>=60.0 and game.ground_surface_at(coast)=="sand","Mondkueste abseits der Wege ist Sand")
-	game.interior_id=3
-	check(game.ground_surface_at(Vector2(100,100))=="holz","Haeuser innen Holz")
-	game.interior_id=7
-	check(game.ground_surface_at(Vector2(100,100))=="stein","Kapelle Stein")
-	game.interior_id=-1
 	var bush:Vector2=game.VillageLayout.BUSHES[0]
 	check(game.foliage_at(bush),"Dorfbusch raschelt")
 	check(not game.foliage_at(game.WAYSTONES[0]),"Wegstein ist kein Busch")
