@@ -9,6 +9,11 @@ const MenuFeedback = preload("res://components/menu_feedback.gd")
 var menu_feedback = MenuFeedback.new()
 ## Zählt abgespielte Oberflächenklänge, damit Menüklicks nicht doppelt klingen.
 var ui_sound_count := 0
+## Borin: Spells abgeben (components/spell_return.gd).
+var spell_return_selected := -1
+var spell_return_confirm := false
+var spell_return_quip := ""
+var spell_return_count := 0
 var last_typing_ms := -1
 var patch_notice = PatchNotice.new()
 const ExperienceRules = preload("res://components/experience_rules.gd")
@@ -124,6 +129,7 @@ const WorldGeometry=preload("res://components/world_geometry.gd")
 const ItemRules=preload("res://components/item_rules.gd")
 const SoundBank=preload("res://components/sound_bank.gd")
 const TypingSound=preload("res://components/typing_sound.gd")
+const SpellReturn=preload("res://components/spell_return.gd")
 const WorldSnapshot=preload("res://components/world_snapshot.gd")
 const HeadgearRules=preload("res://components/headgear_rules.gd")
 const AccountSlots=preload("res://components/account_slots.gd")
@@ -3274,6 +3280,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		if not event.pressed:return
 		if event.button_index == MOUSE_BUTTON_LEFT: handle_panel_click(event.position)
+		elif panel=="spell_return" and event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN]:
+			menu_scroll=clampi(menu_scroll+(-1 if event.button_index==MOUSE_BUTTON_WHEEL_UP else 1),0,maxi(0,learned_loadout_skills().size()-SpellReturn.ROWS))
 		elif panel=="patches" and event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN]:
 			PatchNotes.scroll(patch_view,-1 if event.button_index==MOUSE_BUTTON_WHEEL_UP else 1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "skill_loadout", "journal"]:
@@ -6244,6 +6252,7 @@ func panel_click(mouse: Vector2) -> void:
 		return
 	match panel:
 		"essence": click_essence(mouse)
+		"spell_return": SpellReturn.click(self,mouse)
 		"skills": click_skills(mouse)
 		"skill_loadout": click_skill_loadout(mouse)
 		"fusion": click_fusion(mouse)
@@ -6593,6 +6602,7 @@ func buy_skill(index:int) -> bool:
 	if index < 0 or index >= ABILITIES.size() or index not in all_slot_skills(): return false
 	if not fusion_definition_by_id(index).is_empty():return false
 	if learned[index]: return false
+	if not SpellReturn.can_learn_more(learned_loadout_skills()): message_error(SpellReturn.FULL_MESSAGE % SpellReturn.MAX_KNOWN);return false
 	if level < int(ABILITIES[index]["req"]): message("%s benötigt Level %d." % [ABILITIES[index]["name"],ABILITIES[index]["req"]]);return false
 	var price:=skill_point_cost(index)
 	if skill_points < price: message("Du brauchst %d Skillpunkte." % price);return false
@@ -6976,6 +6986,36 @@ func click_skills(mouse: Vector2) -> void:
 				buy_skill(id)
 			return
 
+## Borin nimmt einen Spell zurück: Spell, Stufen, Taste und Fusionsstand weg.
+func give_back_spell(id:int)->bool:
+	if id<0 or id>=learned.size() or not learned[id] or id not in learned_loadout_skills():return false
+	var spell_name:=str(ABILITIES[id]["name"])
+	learned[id]=false
+	skill_levels[id]=0
+	cooldowns[id]=0.0
+	for i in slots.size():
+		if int(slots[i])==id:slots[i]=-1
+	var fusion:=fusion_definition_by_id(id)
+	if not fusion.is_empty():
+		var key:=fusion_key(int(fusion["a"]),int(fusion["b"]))
+		learned_fusions.erase(key)
+		# Der Verlauf würde die Fusion beim Laden sonst wiederherstellen.
+		var kept:Array=[]
+		for entry in fusion_history:
+			if entry is Dictionary and (str(entry.get("key",""))==key or fusion_key(int(entry.get("a",-1)),int(entry.get("b",-1)))==key):continue
+			kept.append(entry)
+		fusion_history=kept
+	spell_return_quip=SpellReturn.quip(spell_return_count)
+	spell_return_count+=1
+	spell_return_selected=-1
+	spell_return_confirm=false
+	menu_scroll=clampi(menu_scroll,0,maxi(0,learned_loadout_skills().size()-SpellReturn.ROWS))
+	message("%s abgegeben. %s" % [spell_name,spell_return_quip])
+	play_sound("ui_klick")
+	save_game()
+	queue_redraw()
+	return true
+
 func learned_loadout_skills()->Array:
 	var out:Array=[]
 	for id in range(ABILITIES.size()):
@@ -7280,6 +7320,9 @@ func use_item(index: int) -> void:
 			return
 		if learned[unlock_id]:
 			message("%s ist bereits gelernt." % ABILITIES[unlock_id]["name"])
+			return
+		if is_slot_skill(unlock_id) and not SpellReturn.can_learn_more(learned_loadout_skills()):
+			message_error(SpellReturn.FULL_MESSAGE % SpellReturn.MAX_KNOWN)
 			return
 		var required_level:=int(ABILITIES[unlock_id]["req"])
 		if level<required_level:
@@ -10260,6 +10303,7 @@ func draw_panel() -> void:
 		"controller": controller.draw(self)
 		"skills": draw_skills_panel()
 		"essence": draw_essence_panel()
+		"spell_return": SpellReturn.draw(self)
 		"skill_loadout": draw_skill_loadout_panel()
 		"fusion": draw_fusion_panel()
 		"appearance": draw_appearance_panel()
@@ -11021,8 +11065,12 @@ func draw_essence_panel() -> void:
 		if rank<4:label+=" · +1 RUNE"
 		ui_button(Rect2(875,y+8,105,38),label,essence.can_invest(level,selected,talent),false)
 	text_at(Vector2(165,570),"Runen nutzen Essenzpunkte bei Borin. Spells nutzen eigene Skillpunkte: K, überall.",12,Color("b9d9cf"))
+	ui_button(SpellReturn.OPEN_BUTTON,"SPELLS ABGEBEN")
 
 func click_essence(mouse:Vector2)->void:
+	if SpellReturn.OPEN_BUTTON.has_point(mouse):
+		panel="spell_return";menu_scroll=0;spell_return_selected=-1;spell_return_confirm=false;spell_return_quip=""
+		play_sound("ui_klick");queue_redraw();return
 	for tree in EssenceSystem.TREE_COUNT:
 		if Rect2(165+tree*162,148,152,36).has_point(mouse):
 			essence.selected_tree=tree
@@ -11107,7 +11155,7 @@ func rpc_mage_auto_detonate(pos_data:Array)->void:
 
 func draw_skills_panel() -> void:
 	text_at(Vector2(165,125),"SPELLS · FÄHIGKEITEN",25,Color("ffeda9"))
-	text_at(Vector2(650,124),"LV %d · %d SP · %d GOLD" % [level,skill_points,gold],16,Color("f6dc9a"))
+	text_at(Vector2(650,124),"LV %d · %d SP · SPELLS %d/%d" % [level,skill_points,learned_loadout_skills().size(),SpellReturn.MAX_KNOWN],16,Color("f6dc9a"))
 	for tab in 3: ui_button(Rect2(165+tab*180,145,168,38),SKILL_TREE_NAMES[tab],true,skill_tree_tab==tab)
 	ui_button(Rect2(718,145,118,38),"PRÜFUNGEN",near_borin());ui_button(Rect2(848,145,118,38),"BELEGUNG")
 	for slot in 3:
@@ -11131,7 +11179,9 @@ func draw_skills_panel() -> void:
 				ui_button(Rect2(x+134,y+77,119,30),label,can_upgrade_skill(id))
 		else:
 			var price:=skill_point_cost(id)
-			text_at(Vector2(x+12,y+88),"LERNEN · %d SP" % price if level>=req else "GESPERRT · LV %d" % req,12,Color("f4d49b") if level>=req else Color("c98d84"))
+			var full:=not SpellReturn.can_learn_more(learned_loadout_skills()) and is_slot_skill(id)
+			var learn_label:=("VOLL · %d/%d SPELLS" % [learned_loadout_skills().size(),SpellReturn.MAX_KNOWN]) if full else ("LERNEN · %d SP" % price)
+			text_at(Vector2(x+12,y+88),learn_label if level>=req else "GESPERRT · LV %d" % req,12,(Color("c98d84") if full else Color("f4d49b")) if level>=req else Color("c98d84"))
 	text_at(Vector2(165,530),"Überall skillen: +1 Skillpunkt pro Level · Spells bis STUFE 4 · Runen separat bei Borin.",13,Color("d9e6d5"))
 	text_at(Vector2(165,554),"Skillkarte anklicken = Slot belegen · +STUFE verbessert · Fusionen am Kristall.",13,Color("b9d9cf"))
 	var mastery:String=str(["Wut: %.0f/100" % warrior_rage,"Risssprung (LEER): %s" % ("bereit" if mage_rift_blink_unlocked() else "gesperrt"),"Jagd: %.0f/100%s" % [ranger_hunt_meter," · %.0fs Buff" % ranger_hunt_buff if ranger_hunt_buff>0 else ""]][class_id])

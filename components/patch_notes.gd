@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Spells · Höchstens 4, Abgabe bei Borin", "Ein Charakter kennt jetzt höchstens 4 Spells. Wer schon 4 kennt, kann bei Borin unter „Spells abgeben“ einen loswerden, auch eine Fusion. Dort siehst du zu jedem Spell Stufe, Kosten, Abklingzeit, Taste und Herkunft. Borin nimmt ihn mit einem lockeren Spruch, Skillpunkte gibt es dafür nicht zurück. Wer schon mehr als 4 kennt, behält sie, kann aber erst wieder lernen, wenn er unter 4 ist."],
 ["Leistung · Karte ohne Ruckeln", "Seit dem Start im Dunkeln ruckelte die Weltkarte stark. Der Nebel wird jetzt einmal als Bild vorbereitet statt jedes Bild neu aus tausenden Feldern gezeichnet, und die Dunkelheit im Spielbild wird nur neu berechnet, wenn sich etwas ändert."],
 ["Fehlerbehebung · Gegner frieren ein", "Waren viele Gegner und Beutestücke in der Welt unterwegs, wurde das Weltpaket des Servers zu groß und ging verloren: Gegner blieben stehen und Bosse wie der Dunkle Arkanhüter erschienen nicht. Jetzt bekommt jeder Spieler nur die Gegner und Beute in seiner Nähe, und die Verbindung nimmt größere Pakete an."],
 ["Fehlerbehebung · Dunkler Arkanhüter", "Nach dem Umzug ins Kristallmoor konnte der Dunkle Arkanhüter fehlen, obwohl sein Feld da war. Ein Klassenboss außerhalb seines Felds blockiert sein Erscheinen jetzt nicht mehr: Er erscheint wieder zuverlässig in seinem Feld. Der Server schreibt dazu jetzt Prüfmeldungen mit, damit sich weitere Fälle schnell finden lassen."],
