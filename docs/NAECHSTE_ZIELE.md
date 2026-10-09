@@ -33,7 +33,7 @@ Konzept mit Befunden und Reihenfolge: `docs/konzepte/2026-10-09/KONZEPT.md`
 Wegsteine, orangene Ecken, Eingangswege, Hausaccessoires, Laternen, Patch
 Notes, HUD, Fusionsregel). Von Angelo freigegeben. Paket 1 ist live,
 Paket 2 (Patch Notes, HUD) ist seit 9.10.2026 live (Commit `391db84`).
-Paket 3 (Fusionsregel D1) ist umgesetzt. Den Arkanhüter hat PR #70 schon ins Kristallmoor versetzt. Als Nächstes aus Paket 4: das sichtbare Ascheberge-Tor.
+Paket 3 (Fusionsregel D1, Limit 5, Sprünge bleiben) ist live. Ebenfalls live seit 9.10. abends (Commit `8664714`): Web-Ton, schlankes HUD mit eckiger Minimap, Rückfrage beim Verlassen, Menüklicks, Schritte je Untergrund (Schrittprobe), Busch-Rascheln überall, Teleport-Brummen, B4 orangene Grundstücksrahmen entfernt, Kapellenboden repariert. Den Arkanhüter hat PR #70 schon ins Kristallmoor versetzt. Als Nächstes aus Paket 4: das sichtbare Ascheberge-Tor.
 
 ## 1. Startbereich abrunden
 
