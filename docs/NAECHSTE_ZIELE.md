@@ -7,6 +7,11 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 
 ## Entscheidungen
 
+- 9.10.2026: PR-Aufräumen. Geschlossen: #11, #12, #13, #16 (schon in `main`),
+  #30, #32 (anders umgesetzt), #58 (überholt durch GBA-Boden), #21 (doppelt
+  zu #22). Gemergt: #55 (GitHub Actions auf Node 24). Offen mit Inhalten, die
+  nie in `main` kamen: #2, #3, #9, #14, #15, #22 – Angelo entscheidet.
+
 - 9.10.2026: Live-Schaltungen (`[deploy]`) nur nach einmaliger Rückfrage und
   ausdrücklicher Bestätigung durch Angelo, jedes Mal. Sonst freie Hand.
 - 9.10.2026: Neuer Code kommt in Module unter `components/`, nicht in
@@ -23,7 +28,7 @@ Konzept mit Befunden und Reihenfolge: `docs/konzepte/2026-10-09/KONZEPT.md`
 (Fenna-Speicherfehler, Umhänge, Accessoires, Ascheberge-Tor, Kirche,
 Wegsteine, orangene Ecken, Eingangswege, Hausaccessoires, Laternen, Patch
 Notes, HUD, Fusionsregel). Von Angelo freigegeben. Paket 1 ist live,
-Paket 2 (Patch Notes, HUD) ist umgesetzt und wartet auf den nächsten Live-Gang.
+Paket 2 (Patch Notes, HUD) ist seit 9.10.2026 live (Commit `391db84`).
 Als Nächstes: Paket 3 (Fusionsregel D1).
 
 ## 1. Startbereich abrunden
