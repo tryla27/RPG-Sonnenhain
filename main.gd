@@ -124,6 +124,7 @@ const WorldGeometry=preload("res://components/world_geometry.gd")
 const ItemRules=preload("res://components/item_rules.gd")
 const SoundBank=preload("res://components/sound_bank.gd")
 const TypingSound=preload("res://components/typing_sound.gd")
+const HeadgearRules=preload("res://components/headgear_rules.gd")
 const AccountSlots=preload("res://components/account_slots.gd")
 const PORTALS := GameContent.PORTALS
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
@@ -1135,6 +1136,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"essence_magic_aoe":int(clean_runes[2][2]) if clean_runes.size()==5 else clampi(int(state.get("essence_magic_aoe",0)),0,4),
 		"mage_rift_blink":bool(state.get("mage_rift_blink",false)) and clampi(int(state.get("class",0)),0,2)==1,
 		"ranger_falcon_rune":bool(state.get("ranger_falcon_rune",false)),
+		"eternal_arrows":bool(state.get("eternal_arrows",false)),
 		"race":clampi(int(state.get("race",0)),0,2),
 		"gender":clampi(int(state.get("gender",0)),0,1),
 		"name":str(state.get("name","Held")).strip_edges().substr(0,16),
@@ -3593,12 +3595,12 @@ func normal_attack() -> void:
 	if uses_server_world():
 		rpc_client_normal_attack.rpc_id(1, [player_pos.x,player_pos.y], [facing.x,facing.y], class_id, design, power, weapon_element())
 		if class_id != 0:
-			projectiles.append({"pos":player_pos,"dir":facing,"speed":790.0 if variant=="crossbow" else (650.0 if class_id==2 else 520.0),"life":1.2,"damage":0,"kind":3 if class_id==2 else 2,"element":weapon_element(),"hits":[],"network_visual":true,"mage_auto":class_id==1 and essence.unstable_projectile_rank()>0})
+			projectiles.append({"pos":player_pos,"dir":facing,"speed":790.0 if variant=="crossbow" else (650.0 if class_id==2 else 520.0),"life":HeadgearRules.arrow_life(eternal_arrows_active()),"damage":0,"kind":3 if class_id==2 else 2,"element":weapon_element(),"hits":[],"network_visual":true,"mage_auto":class_id==1 and essence.unstable_projectile_rank()>0})
 		return
 	if class_id == 0:
 		hit_arc(player_pos, facing, 116.0 if variant == "axe" else 100.0, 0.08 if variant == "axe" else 0.13, power, false, "gift" if poison_blade_timer > 0 else weapon_element())
 	else:
-		projectiles.append({"pos":player_pos, "dir":facing, "speed":790.0 if variant == "crossbow" else (650.0 if class_id == 2 else 520.0), "life":1.2, "damage":power, "kind":3 if class_id == 2 else 2, "element":weapon_element(), "hits":[],"mage_auto":class_id==1 and essence.unstable_projectile_rank()>0})
+		projectiles.append({"pos":player_pos, "dir":facing, "speed":790.0 if variant == "crossbow" else (650.0 if class_id == 2 else 520.0), "life":HeadgearRules.arrow_life(eternal_arrows_active()), "damage":power, "kind":3 if class_id == 2 else 2, "element":weapon_element(), "hits":[],"mage_auto":class_id==1 and essence.unstable_projectile_rank()>0})
 
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class: int, design: int, power: int, element: String) -> void:
@@ -3619,7 +3621,7 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 	remote_class = clampi(int(state.get("class",0)),0,2)
 	design = clampi(int(state.get("weapon",0)),0,32)
 	element = str(state.get("element",""))
-	server_relay_combat_visual(sender,{"kind":"normal","pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":design,"element":element})
+	server_relay_combat_visual(sender,{"kind":"normal","pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":design,"element":element,"eternal":remote_class==2 and bool(state.get("eternal_arrows",false))})
 	var level_cap := clampi(int(state.get("level",1)),1,99)
 	power = clampi(power,1,80 + level_cap * 20)
 	if remote_class == 0:
@@ -3627,7 +3629,8 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 		hit_arc(origin,dir,116.0 if axe else 100.0,0.08 if axe else 0.13,power,false,element,sender)
 	else:
 		var crossbow := remote_class == 2 and design % 4 == 3
-		projectiles.append({"pos":origin,"dir":dir,"speed":790.0 if crossbow else (650.0 if remote_class==2 else 520.0),"life":1.2,"damage":power,"kind":3 if remote_class==2 else 2,"element":element,"hits":[],"owner_peer":sender,"mage_auto":remote_class==1 and int(state.get("essence_magic_unstable",0))>0})
+		var eternal := remote_class == 2 and bool(state.get("eternal_arrows",false))
+		projectiles.append({"pos":origin,"dir":dir,"speed":790.0 if crossbow else (650.0 if remote_class==2 else 520.0),"life":HeadgearRules.arrow_life(eternal),"damage":power,"kind":3 if remote_class==2 else 2,"element":element,"hits":[],"owner_peer":sender,"mage_auto":remote_class==1 and int(state.get("essence_magic_unstable",0))>0})
 
 func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float, damage: int, stun: bool, element: String = "", source_peer: int = 0) -> void:
 	for i in range(enemies.size() - 1, -1, -1):
@@ -11313,7 +11316,9 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var attribute_diff := int(item.get(primary_key, 0)) - int(worn.get(primary_key, 0))
 		var arrow := "▲ +" if attribute_diff > 0 else ("▼ " if attribute_diff < 0 else "= ")
 		text_at(pos + Vector2(14, 145), "%s für %s: %s%d" % [primary_key.to_upper(), CLASS_NAMES[class_id], arrow, attribute_diff], 13, Color("83e4a0") if attribute_diff > 0 else (Color("ee8a86") if attribute_diff < 0 else Color("dfdcc3")))
-	if bool(item.get("boss_relic",false)) or str(item.get("rune_id",""))!="":
+	if HeadgearRules.grants_eternal_arrows(item):
+		text_at(pos+Vector2(14,168),HeadgearRules.ETERNAL_ARROWS_TEXT,11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	elif bool(item.get("boss_relic",false)) or str(item.get("rune_id",""))!="":
 		text_at(pos+Vector2(14,168),str(item.get("tooltip","Spezialgegenstand")),11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
 	elif bool(item.get("locked",false)):
 		text_at(pos+Vector2(14,168),"UNVERKÄUFLICH · Doppelklick zum Entsperren",10,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
@@ -12563,7 +12568,7 @@ func rpc_remote_combat_visual(peer_id: int, payload: Dictionary) -> void:
 			projectiles.append(shot)
 		return
 	if str(payload.get("kind","normal"))=="normal" and remote_class!=0:
-		projectiles.append({"pos":pos,"dir":dir,"speed":650.0 if remote_class==2 else 520.0,"life":1.2,"damage":0,"kind":3 if remote_class==2 else 2,"element":str(payload.get("element","")),"hits":[],"network_visual":true,"remote_owner":peer_id})
+		projectiles.append({"pos":pos,"dir":dir,"speed":650.0 if remote_class==2 else 520.0,"life":HeadgearRules.arrow_life(remote_class==2 and bool(payload.get("eternal",false))),"damage":0,"kind":3 if remote_class==2 else 2,"element":str(payload.get("element","")),"hits":[],"network_visual":true,"remote_owner":peer_id})
 		return
 	remote_combat_visuals.append({
 		"peer_id":peer_id,
@@ -13101,6 +13106,9 @@ func validate_equipment_slots() -> void:
 func is_equipped_uid(uid: int) -> bool:
 	return uid >= 0 and uid in equipped_item_uids()
 
+func eternal_arrows_active() -> bool:
+	return HeadgearRules.eternal_arrows(inventory, equipped_head_uid, class_id)
+
 func head_visual() -> int:
 	for item in inventory:
 		if int(item.get("uid",-1))==equipped_head_uid and str(item.get("icon",""))=="head":
@@ -13333,7 +13341,7 @@ func server_send_rescue_progress(killer_peer: int, enemy: Dictionary) -> void:
 
 func local_player_state() -> Dictionary:
 	ensure_player_uuid()
-	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "rune_ranks":essence.ranks.duplicate(true), "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "race":hero_race, "cosmetic_hair":cosmetic_hair,"cosmetic_cloak":cosmetic_cloak,"cosmetic_jewelry":cosmetic_jewelry,"cosmetic_accent":cosmetic_accent, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"necklace":necklace_visual(),"necklace_serial":necklace_equip_serial,"normal_power":normal_attack_power(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
+	return {"protocol":NETWORK_PROTOCOL_VERSION, "uuid":player_uuid, "context":multiplayer_context(), "instance_id":multiplayer_instance_id(), "rescue_state":rescue_state, "rescue_kills":rescue_kills, "active_quests":active_quest_sync_rows(), "active_borin_quests":active_borin_quest_sync_rows(), "active_events":active_event_sync_rows(), "fusions":fusion_progress_rows(), "skill_ranks":skill_rank_rows(), "pos":[player_pos.x,player_pos.y], "facing":[facing.x,facing.y], "class":class_id, "rune_ranks":essence.ranks.duplicate(true), "essence_magic_unstable":essence.unstable_projectile_rank(), "essence_magic_element":essence.rank(2,1), "essence_magic_aoe":essence.rank(2,2), "ranger_falcon_rune":ranger_falcon_rune, "eternal_arrows":eternal_arrows_active(), "race":hero_race, "cosmetic_hair":cosmetic_hair,"cosmetic_cloak":cosmetic_cloak,"cosmetic_jewelry":cosmetic_jewelry,"cosmetic_accent":cosmetic_accent, "gender":hero_gender, "name":hero_name, "level":level, "hp":hp, "max_hp":max_hp(), "teleport_serial":teleport_serial,"death_progress":1.0-death_timer/DEATH_DURATION if hp<=0 else -1.0, "walking":is_walking, "running":is_sprinting, "weapon":equipped_weapon_design(), "armor":armor_visual(), "head":head_visual(),"necklace":necklace_visual(),"necklace_serial":necklace_equip_serial,"normal_power":normal_attack_power(),"rings":ring_visual(), "element":weapon_element(), "region":region_at(player_pos), "stealth":class_id==2 and class_mastery_unlocked and ranger_stealth_timer>0.0, "konflux":konflux.active, "room":konflux.room, "test_mode":creative_mode}
 
 @rpc("authority","call_remote","reliable")
 func rpc_server_quest_progress(payload: Dictionary) -> void:

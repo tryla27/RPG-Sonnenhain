@@ -12,6 +12,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
   `components/waystone_shrine_32.gd`. Deko, Fackeln und Ankunftspunkte meiden
   das Plateau; Geschosse stoppen nur am Obelisk. Test
   `tests/gameplay/check_waystone_plateau.gd`, Bilder `tools/capture_waystone_plateau.gd`.
+- Hut des Jagdmeisters: „Ewige Pfeile“ (`HeadgearRules.eternal_arrows`), normale
+  Schützenpfeile leben 8 s statt 1,2 s und enden beim ersten Treffer. Server
+  liest `eternal_arrows` aus dem Spielerzustand. Test
+  `tests/gameplay/check_eternal_arrows.gd`.
 - Startmenü mit Konto: Speicherplätze aus `account_characters` statt lokaler
   Dateien, Laden über `open_account_character` (`components/account_slots.gd`).
   Test `tests/ui/check_account_start_slots.gd`.
