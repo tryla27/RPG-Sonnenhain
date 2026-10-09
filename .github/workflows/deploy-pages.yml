@@ -41,7 +41,7 @@ jobs:
       GODOT_VERSION: "4.7.2"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Stamp production build
         shell: bash

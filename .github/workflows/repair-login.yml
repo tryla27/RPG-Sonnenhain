@@ -19,7 +19,7 @@ jobs:
       SONNENHAIN_ACCESS_HTPASSWD: ${{ secrets.SONNENHAIN_ACCESS_HTPASSWD }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify required secrets
         shell: bash

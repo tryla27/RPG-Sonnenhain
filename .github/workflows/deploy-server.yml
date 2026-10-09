@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Stamp production build
         shell: bash
@@ -184,7 +184,7 @@ jobs:
           test -x build/server-host/start-server.sh
 
       - name: Upload server host version
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sonnenhain-server-host
           path: build/server-host/
