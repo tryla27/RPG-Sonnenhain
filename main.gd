@@ -108,6 +108,7 @@ const NEW_REGION_NAMES := ["Nebelheide", "Bernsteinforst", "Tiefenquell", "Dämm
 const GameContent=preload("res://components/game_content.gd")
 const NetworkCodec=preload("res://components/network_codec.gd")
 const WorldGeometry=preload("res://components/world_geometry.gd")
+const ItemRules=preload("res://components/item_rules.gd")
 const PORTALS := GameContent.PORTALS
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
@@ -4820,32 +4821,18 @@ func can_upgrade_skill(index:int)->bool:
 	return level>=skill_rank_level(index,next_rank) and skill_points>=skill_upgrade_cost(index,next_rank)
 
 func make_item(name: String, icon: String, rarity: int, power: int, value: int, element: String = "", item_level: int = -1) -> Dictionary:
-	var ilvl := maxi(1, level if item_level < 0 else item_level)
-	var bonus: int = maxi(0, rarity + int(ilvl / 9.0))
-	var strength: int = bonus if icon == "sword" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	var agility: int = bonus if icon == "bow" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	var intellect: int = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	var fair_value := value if icon == "potion" else 10 + ilvl * 4 + maxi(0, power) * (3 if icon in ["sword", "staff", "bow"] else 2) + rarity * rarity * 32 + (25 if element != "" else 0) + (strength + agility + intellect) * 5
-	var item := {"uid":next_uid, "name":name, "icon":icon, "rarity":rarity, "power":power, "value":fair_value, "element":element, "level":ilvl, "str":strength, "agi":agility, "int":intellect, "count":1, "design":absi(hash(name)) % 4, "locked":false}
-	if icon == "food":
-		item["value"] = value
-		item["design"] = maxi(0,FoodSystem.index_for(name))
+	var item := ItemRules.build_item(next_uid, name, icon, rarity, power, value, element, level if item_level < 0 else item_level)
 	next_uid += 1
-	ArcaneNecklaces.normalize(item)
 	return item
 
 func stack_limit(item: Dictionary) -> int:
-	var icon: String = str(item.get("icon", ""))
-	if icon == "food": return 30
-	if icon == "potion": return 16
-	if icon in ["gem", "herb", "essence", "necklace"]: return 1000000000
-	return 1
+	return ItemRules.stack_limit(item)
 
 func stack_matches(a: Dictionary, b: Dictionary) -> bool:
 	return a.get("icon") == b.get("icon") and a.get("name") == b.get("name") and a.get("rarity") == b.get("rarity") and a.get("element", "") == b.get("element", "") and bool(a.get("locked",false)) == bool(b.get("locked",false))
 
 func item_sale_value(item: Dictionary) -> int:
-	return int(item.get("stack_value", int(item.get("value", 0)) * int(item.get("count", 1))))
+	return ItemRules.item_sale_value(item)
 
 func can_add_item(item: Dictionary) -> bool:
 	var limit := stack_limit(item)
@@ -4888,29 +4875,10 @@ func add_item(item: Dictionary) -> bool:
 	return remaining == 0
 
 func random_loot(type: int, loot_class: int = -1) -> Dictionary:
-	var chance := randf()
-	var rarity := 0
 	var area_level := region_level(int(ENEMY_TYPES[type]["region"]))
-	if area_level >= 30 and chance < 0.0008: rarity = 4
-	elif area_level >= 16 and chance < 0.025: rarity = 3
-	elif chance < 0.13: rarity = 2
-	elif chance < 0.47: rarity = 1
-	var name: String = ENEMY_TYPES[type]["name"]
-	var rank: String = ["Alte", "Feine", "Seltene", "Epische", "Legendäre"][rarity]
 	var loot_weapon := class_weapon_icon_for(loot_class) if loot_class >= 0 else class_weapon_icon()
-	var icon: String = [loot_weapon, "gem", "ring", "armor", "herb"][randi_range(0, 4)]
-	var item_name: String = "%s %s" % [rank, {"sword":"Klinge", "staff":"Stab", "bow":"Bogen", "gem":"Essenz", "ring":"Ring", "armor":"Rüstung", "herb":"Kräuter"}[icon]]
-	if icon=="herb":
-		var herb_info:Dictionary=FoodSystem.herb_for_region(int(ENEMY_TYPES[type]["region"]))
-		if not herb_info.is_empty():item_name=str(herb_info["name"])
-	elif rarity >= 3:
-		item_name = "%s des %s" % [item_name, name]
-	var strength: int = (3 + area_level * 2 + rarity * 5 if icon in ["sword", "staff", "bow"] else (1 + int(area_level / 5) + rarity * 2 if icon == "armor" else (8 + area_level + rarity * 4 if icon == "ring" else 0)))
-	var element := ""
-	if icon in ["sword", "staff", "bow"] and rarity >= 1 and randf() < 0.32:
-		element = "gift" if type in [2, 3, 10] else ("eis" if type in [6, 7, 11] else ("blitz" if type in [5, 8, 9] else ["eis", "blitz", "gift"].pick_random()))
-		item_name = "%s · %s" % [item_name, element.capitalize()]
-	return make_item(item_name, icon, rarity, strength, 0, element, area_level)
+	var spec := ItemRules.roll_loot(type, area_level, loot_weapon)
+	return make_item(spec["name"], spec["icon"], spec["rarity"], spec["power"], 0, spec["element"], spec["level"])
 
 func collect_drops() -> void:
 	for i in range(drops.size() - 1, -1, -1):
@@ -6836,16 +6804,7 @@ func sell_all_unequipped() -> void:
 	save_game()
 
 func item_skill_unlock_id(item:Dictionary)->int:
-	ArcaneNecklaces.normalize(item)
-	if ArcaneNecklaces.index(item)>=0:return -1
-	var explicit:=int(item.get("skill_unlock",-1))
-	if explicit>=0:return explicit
-	var item_name:=str(item.get("name",""))
-	var element:=str(item.get("element","")).to_lower()
-	# Backward compatibility for already-owned Arkankern items from older saves.
-	if item_name.begins_with("Arkankern") and element=="blitz":
-		return 18 # Blitzlanze
-	return -1
+	return ItemRules.item_skill_unlock_id(item)
 
 func use_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
@@ -9240,8 +9199,7 @@ func draw_hero_sword(hand: Vector2, blade_dir: Vector2, preview: bool = false) -
 			draw_circle(shoulder + blade_dir * 12, 3, element_color(weapon_element()))
 
 func weapon_visual_stage(item: Dictionary) -> int:
-	# Jede neue Ausrüstungsstufe verfeinert Form und Verzierung, nicht nur den Farbton.
-	return clampi(int((int(item.get("level", 1)) + int(item.get("rarity", 0)) * 2) / 10.0), 0, 4)
+	return ItemRules.weapon_visual_stage(item)
 
 func equipped_weapon_stage() -> int:
 	for item in inventory:
@@ -9250,9 +9208,7 @@ func equipped_weapon_stage() -> int:
 	return 0
 
 func item_design(item: Dictionary) -> int:
-	if item.get("icon")=="necklace":return maxi(0,ArcaneNecklaces.index(item))
-	if item.get("icon")=="food": return maxi(0,FoodSystem.index_for(str(item.get("name",""))))
-	return clampi(int(item.get("design", absi(hash(String(item.get("name", "Ausrüstung")))) % 12)), 0, 11)
+	return ItemRules.item_design(item)
 
 func equipped_item_design(uid: int) -> int:
 	for item in inventory:
@@ -10978,27 +10934,10 @@ func draw_equipment_slot(p: Vector2, label: String, uid: int, icon: String) -> v
 	text_at(p + Vector2(9, 66), label, 12, Color("fff0c3"))
 
 func item_type(icon: String) -> String:
-	match icon:
-		"necklace": return "Arkanhalskette"
-		"sword": return "Waffe"
-		"staff": return "Stab"
-		"bow": return "Bogen"
-		"food": return "Nahrung"
-		"potion": return "Trank"
-		"gem": return "Kristall"
-		"ring": return "Schmuck"
-		"armor": return "Rüstung"
-		"head": return "Kopfausrüstung"
-		"herb": return "Kräuter"
-		_: return "Gegenstand"
+	return ItemRules.item_type(icon)
 
 func element_color(element: String) -> Color:
-	match element:
-		"feuer": return Color("ff9147")
-		"eis": return Color("a3e9fb")
-		"blitz": return Color("ffe480")
-		"gift": return Color("b3e978")
-		_: return Color("f5e9cc")
+	return ItemRules.element_color(element)
 
 func draw_skill_icon(p: Vector2, id: int, size: float) -> void:
 	var box := Rect2(p, Vector2(size,size))
@@ -11687,7 +11626,7 @@ func draw_sorted_world_objects() -> void:
 			"player": draw_spawn_elevated_actor(-1)
 
 func class_weapon_icon_for(value: int) -> String:
-	return ["sword", "staff", "bow"][clampi(value, 0, 2)]
+	return ItemRules.class_weapon_icon_for(value)
 
 
 
