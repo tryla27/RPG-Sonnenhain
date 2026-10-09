@@ -107,6 +107,7 @@ const REGION_LEVELS := [1, 1, 8, 15, 22, 29, 5, 36, 12, 19, 26, 33, 40]
 const NEW_REGION_NAMES := ["Nebelheide", "Bernsteinforst", "Tiefenquell", "Dämmergrat", "Himmelsgarten"]
 const GameContent=preload("res://components/game_content.gd")
 const NetworkCodec=preload("res://components/network_codec.gd")
+const WorldGeometry=preload("res://components/world_geometry.gd")
 const PORTALS := GameContent.PORTALS
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
@@ -136,11 +137,11 @@ const BORIN_HOUSE_POS := Vector2(1248,64)
 const BORIN_MAGIC_TREE_POS := Vector2(1120,480)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
 const WORLD_CHARACTER_SCALE := 0.84
-const CLASS_BOSS_SITES := [Vector2(430,6500),Vector2(9700,6500),Vector2(14300,1200)] # Map 06 / 07 / 08
-const CLASS_BOSS_ARENA_RADIUS := 410.0
+const CLASS_BOSS_SITES := WorldGeometry.CLASS_BOSS_SITES
+const CLASS_BOSS_ARENA_RADIUS := WorldGeometry.CLASS_BOSS_ARENA_RADIUS
 const CLASS_BOSS_ARENA_CLEAR_RADIUS := 475.0
-const CLASS_BOSS_HOUSE_POS := [Vector2(430,5940),Vector2(9700,5940),Vector2(14300,640)]
-const CLASS_BOSS_HOUSE_SIZE := Vector2(192,160)
+const CLASS_BOSS_HOUSE_POS := WorldGeometry.CLASS_BOSS_HOUSE_POS
+const CLASS_BOSS_HOUSE_SIZE := WorldGeometry.CLASS_BOSS_HOUSE_SIZE
 const CLASS_BOSS_MUSIC_THEMES := ["boss_kriegsherr","boss_arkanhueter","boss_jagdmeister"]
 const CLASS_RELIC_NAMES := ["Herz des Kriegsherrn","Arkansplitter","Herz der Jagd"]
 const CLASS_RELIC_SKILLS := ["WUT + BLUTRAUSCH","RISSSPRUNG · LEERTASTE","JAGDRAUSCH + SCHATTENROLLE"]
@@ -149,7 +150,7 @@ const QUESTS := GameContent.QUESTS
 const BORIN_QUESTS := GameContent.BORIN_QUESTS
 const NPCS := GameContent.NPCS
 const SHOPS := GameContent.SHOPS
-const WAYSTONES := [Vector2(825, 915), Vector2(3300, 1900), Vector2(3200, 6200), Vector2(6700, 1950), Vector2(6700, 6250), Vector2(9750, 3900), Vector2(1000, 6100), Vector2(13500, 950), Vector2(13500, 2850), Vector2(13500, 4750), Vector2(13500, 6650), Vector2(13500, 8550)]
+const WAYSTONES := WorldGeometry.WAYSTONES
 const RESCUE_POS := GameContent.RESCUE_POS
 const RESCUE_GOAL := 20
 const ARENA_CENTER := Vector2(8000, 4800)
@@ -1537,14 +1538,7 @@ func xp_required() -> int:
 	return 120 + (level - 1) * 85 + (level - 1) * (level - 1) * 10
 
 func region_at(p: Vector2) -> int:
-	if p.x >= 11000: return clampi(int(p.y / 1920.0) + 8, 8, 12)
-	if p.x < 1780:
-		return 0 if p.y < 2600 else 6
-	if p.x < 5000:
-		return 1 if p.y < 4200 else 2
-	if p.x < 8500:
-		return 3 if p.y < 4200 else 4
-	return 5 if p.y < 4200 else 7
+	return WorldGeometry.region_at(p)
 
 func region_name(region: int) -> String:
 	if region >= 8: return NEW_REGION_NAMES[region - 8]
@@ -2365,20 +2359,10 @@ func blocked_by_region_wall(pos: Vector2) -> bool:
 	return false
 
 func distance_to_trail(p: Vector2) -> float:
-	var best := INF
-	for trail in TRAILS:
-		for i in range(trail.size() - 1):
-			var a: Vector2 = trail[i]
-			var b: Vector2 = trail[i + 1]
-			var segment := b - a
-			var t := clampf((p - a).dot(segment) / segment.length_squared(), 0.0, 1.0)
-			best = minf(best, p.distance_to(a + segment * t))
-	return best
+	return WorldGeometry.distance_to_trail(p)
 
 func class_boss_arena_index_at(p:Vector2,extra:float=0.0) -> int:
-	for i in CLASS_BOSS_SITES.size():
-		if p.distance_to(CLASS_BOSS_SITES[i]) <= CLASS_BOSS_ARENA_RADIUS+extra:return i
-	return -1
+	return WorldGeometry.class_boss_arena_index_at(p,extra)
 
 func class_boss_arena_walkable(p:Vector2,radius:float=0.0) -> bool:
 	var index:=class_boss_arena_index_at(p,0.0)
@@ -2401,13 +2385,10 @@ func class_boss_recovery_point(enemy:Dictionary) -> Vector2:
 	return center
 
 func class_boss_house_rect(index:int)->Rect2:
-	var center:Vector2=CLASS_BOSS_HOUSE_POS[clampi(index,0,2)]
-	return Rect2(center-Vector2(CLASS_BOSS_HOUSE_SIZE.x*.5,CLASS_BOSS_HOUSE_SIZE.y),CLASS_BOSS_HOUSE_SIZE)
+	return WorldGeometry.class_boss_house_rect(index)
 
 func point_near_class_boss_house(p:Vector2,margin:float=0.0)->bool:
-	for i in CLASS_BOSS_HOUSE_POS.size():
-		if class_boss_house_rect(i).grow(margin).has_point(p):return true
-	return false
+	return WorldGeometry.point_near_class_boss_house(p,margin)
 
 func boss_spell_sound(ability_id:String)->String:
 	match ability_id:
@@ -4449,14 +4430,7 @@ func waystone_safe_at(p: Vector2) -> bool:
 	return false
 
 func nearest_waystone(p: Vector2) -> Vector2:
-	var best := WAYSTONES[0]
-	var best_distance := INF
-	for stone in WAYSTONES:
-		var distance := p.distance_to(stone)
-		if distance < best_distance:
-			best_distance = distance
-			best = stone
-	return best
+	return WorldGeometry.nearest_waystone(p)
 
 func flee_from_safe_zone(enemy: Dictionary, delta: float) -> bool:
 	if arena_mode != "" or dungeon_id >= 0: return false
@@ -7556,8 +7530,7 @@ func visible_world(pos: Vector2, margin: float = 100.0) -> bool:
 	return camera_world_rect().grow(margin).has_point(pos)
 
 func hash_cell(x: int, y: int) -> int:
-	var n := x * 92821 + y * 68917 + x * y * 31
-	return absi(n ^ (n >> 11)) % 997
+	return WorldGeometry.hash_cell(x, y)
 
 func visual_region_at(p: Vector2) -> int:
 	return region_at(p)
@@ -8330,16 +8303,7 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 			draw_circle(p, r, Color("53666c"))
 
 func region_rect(id: int) -> Rect2:
-	if id >= 8: return Rect2(11000, (id - 8) * 1920, 5000, 1920)
-	match id:
-		0: return Rect2(0, 0, 1780, 2600)
-		1: return Rect2(1780, 0, 3220, 4200)
-		2: return Rect2(1780, 4200, 3220, 4300)
-		3: return Rect2(5000, 0, 3500, 4200)
-		4: return Rect2(5000, 4200, 3500, 4300)
-		5: return Rect2(8500, 0, 2500, 4200)
-		6: return Rect2(0, 2600, 1780, 5900)
-		_: return Rect2(8500, 4200, 2500, 4300)
+	return WorldGeometry.region_rect(id)
 
 func draw_region_gates() -> void:
 	draw_line(Vector2(11070, 0), Vector2(11070, 9600), Color("536c70"), 145)

@@ -10,7 +10,8 @@ source = (root / 'main.gd').read_text(encoding='utf8')
 # Spielinhalte (Gegner, Fähigkeiten, Quests, NPCs, ...) liegen seit der
 # Modularisierung in components/game_content.gd; main.gd verweist darauf.
 content_source = (root / 'components' / 'game_content.gd').read_text(encoding='utf8')
-data_source = source + '\n' + content_source
+geometry_source = (root / 'components' / 'world_geometry.gd').read_text(encoding='utf8')
+data_source = source + '\n' + content_source + '\n' + geometry_source
 
 # Catch accidental duplicate top-level function declarations before Godot does.
 func_names = re.findall(r'^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(', source, re.M)

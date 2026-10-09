@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Weltgeometrie (Gebietsgrenzen, Wegabstand, Wegsteine, Klassenboss-Arenen und
+  -Häuser) nach `components/world_geometry.gd` ausgelagert, mit Verhaltenstest
+  `tests/gameplay/check_world_geometry.gd`.
 - Koop-Einladungscodes, Bereinigung fremder Quest-/Ereigniszeilen und
   Belohnungs-Payloads nach `components/network_codec.gd` ausgelagert, mit
   Verhaltenstest `tests/network/check_network_codec.gd`.
