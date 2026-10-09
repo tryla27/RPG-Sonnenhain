@@ -343,6 +343,32 @@ def sand_f(rng, v):
     return fin(b.mix((give, 0.9), (crunch, 1.0)), top=10000)
 
 
+# ------------------------------------------------------------------ Runde 4 (9.10.): Gras
+# Vorbild ist das freigegebene Busch-Rascheln: dichtes, leichtes Halmrascheln,
+# kein Wusch und kein Aufstampfen. G: kurz und fein, H: etwas länger und voller.
+def _halme(rng, d, rise, density, low, high):
+    t = b.t_axis(d)
+    shape = np.minimum(t / rise, 1) ** 0.8 * np.exp(-np.maximum(t - rise, 0) / (d * 0.32))
+    crackle = b.bp(b.noise(d, rng), low, high) * (rng.random(int(SR * d)) > density) * shape
+    soft = b.bp(b.noise(d, rng), 1800, 5500) * shape * 0.22
+    return crackle, soft
+
+
+def gras_g(rng, v):
+    d = 0.26
+    crackle, soft = _halme(rng, d, 0.05, 0.86, 2600, 8500)
+    return fin(b.mix((crackle, 1.0), (soft, 0.8)), top=9500)
+
+
+def gras_h(rng, v):
+    d = 0.34
+    crackle, soft = _halme(rng, d, 0.08, 0.82, 2000, 7500)
+    tail, _ = _halme(rng, d, 0.04, 0.9, 3000, 9000)
+    return fin(b.mix((crackle, 1.0), (soft, 1.0), (b.at(tail[: int(SR * 0.2)], 0.12, d), 0.5)), top=9000)
+
+
+ROUND4 = {"gras": (gras_g, gras_h)}
+
 ROUND3 = {"gras": (gras_e, gras_f), "sand": (sand_e, sand_f)}
 
 ROUND2 = {"gras": (gras_c, gras_d), "pflaster": (pflaster_c, pflaster_d), "holz": (holz_c, holz_d),
@@ -370,7 +396,7 @@ def walk(steps: list) -> np.ndarray:
 
 def build(target: Path, round_no: int = 1) -> list:
     written = []
-    table, tags = {1: (SURFACES, "ab"), 2: (ROUND2, "cd"), 3: (ROUND3, "ef")}[round_no]
+    table, tags = {1: (SURFACES, "ab"), 2: (ROUND2, "cd"), 3: (ROUND3, "ef"), 4: (ROUND4, "gh")}[round_no]
     for surface, recipes in table.items():
         for tag, recipe in zip(tags, recipes):
             steps = []
@@ -390,5 +416,6 @@ def build(target: Path, round_no: int = 1) -> list:
 
 if __name__ == "__main__":
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "build/footsteps_draft")
-    files = build(out, 3 if "--runde3" in sys.argv else (2 if "--runde2" in sys.argv else 1))
+    rounds = [n for n in (4, 3, 2) if f"--runde{n}" in sys.argv]
+    files = build(out, rounds[0] if rounds else 1)
     print(f"{len(files)} Dateien in {out}")
