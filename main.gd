@@ -505,6 +505,7 @@ var sprint_block_timer := 0.0
 var sprint_exhausted := false
 var step_timer := 0.0
 var music_player: AudioStreamPlayer
+var mushroom_sound_seen:Dictionary={}
 var music_incoming: AudioStreamPlayer
 var music_theme := ""
 var music_fading := false
@@ -851,6 +852,7 @@ func _ready() -> void:
 	sound_streams["magic_break"]=CombatFeedback.break_sound(false)
 	sound_streams["equip"]=EquipmentSfx.make(true)
 	sound_streams["unequip"]=EquipmentSfx.make(false)
+	sound_streams["mushroom_poison"]=load("res://audio/sfx/mushroom_spores_clean.wav")
 	for i in 8:
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -15.0
@@ -1388,6 +1390,13 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 				boss_spawn_sound_seen[uid]=true
 				play_sound("menu")
 		rebuilt.append(copy)
+		if int(copy.get("type",-1))==2:
+			var dust_state:Dictionary=copy.get("attack_state",{})
+			var dust_ability:Dictionary=dust_state.get("ability",{})
+			var dust_id:=int(dust_state.get("id",-1))
+			if str(dust_ability.get("id",""))=="giftstaub" and bool(dust_state.get("fired",false)) and int(mushroom_sound_seen.get(uid,-1))!=dust_id:
+				mushroom_sound_seen[uid]=dust_id
+				if float(dust_state.get("age",10.0))<float(mob_profile(copy)["windup"])+.4:play_mushroom_poison(target)
 	enemies = rebuilt
 	var rebuilt_shots: Array = []
 	for raw in snapshot.get("shots", []):
@@ -1557,6 +1566,10 @@ func play_sound(name: String) -> void:
 	player.volume_db = -80.0 if effects_volume <= 0.0 else ((-29.0 if name == "step" else -11.0) + linear_to_db(effects_volume))
 	player.pitch_scale = 0.92 if name == "step" and next_sound_player % 2 == 0 else 1.0
 	player.play()
+
+func play_mushroom_poison(position:Vector2)->void:
+	if dedicated_server_mode or position.distance_to(player_pos)>620.0:return
+	play_sound("mushroom_poison")
 
 func desired_music_theme() -> String:
 	if konflux.active:return "dorf"
@@ -2172,6 +2185,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			if is_zero_approx(float(event.get("origin_offset",0.0))) or not projectile_collision(enemy["pos"],spawn,server)["hit"]:
 				enemy_projectiles.append({"pos":spawn,"dir":event["dir"],"speed":profile["projectile_speed"],"life":event.get("life",2.3),"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"hit_radius":profile["hit_radius"],"source_region":region_at(enemy["pos"]),"ability_id":event.get("ability_id","basic")})
 		elif event["kind"]=="cloud":
+			play_mushroom_poison(enemy["pos"])
 			enemy_projectiles.append({"kind":"cloud","ability_id":"giftstaub","pos":enemy["pos"],"dir":Vector2.ZERO,"speed":0.0,"life":event["duration"],"duration":event["duration"],"age":0.0,"next_pulse":0.0,"pulse_interval":event["pulse_interval"],"radius":event["radius"],"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"source_region":region_at(enemy["pos"])})
 		elif event["kind"]=="leap_move":
 			enemy["nav_wait"]=0.0;enemy["nav_path"]=[]

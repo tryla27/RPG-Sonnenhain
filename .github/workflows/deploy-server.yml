@@ -137,6 +137,7 @@ jobs:
           "$godot" --headless --path . --script tools/check_mob_combat.gd
           "$godot" --headless --path . --script tools/check_mob_navigation.gd
           "$godot" --headless --path . --script tools/check_woodland_attacks.gd
+          "$godot" --headless --path . --script tools/check_mushroom_sound.gd
           "$godot" --headless --path . --script tools/check_boss_music.gd
           "$godot" --headless --path . --script tools/check_mob_combat_network.gd
           "$godot" --headless --path . --script tools/check_headgear_arena_choices.gd
