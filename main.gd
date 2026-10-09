@@ -106,6 +106,7 @@ const RARITY_COLORS := [Color("d9dfd6"), Color("75d891"), Color("72bafa"), Color
 const REGION_LEVELS := [1, 1, 8, 15, 22, 29, 5, 36, 12, 19, 26, 33, 40]
 const NEW_REGION_NAMES := ["Nebelheide", "Bernsteinforst", "Tiefenquell", "Dämmergrat", "Himmelsgarten"]
 const GameContent=preload("res://components/game_content.gd")
+const NetworkCodec=preload("res://components/network_codec.gd")
 const PORTALS := GameContent.PORTALS
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
@@ -838,51 +839,22 @@ func _on_server_disconnected() -> void:
 		live_reconnect_timer = 2.0
 
 func to_base36(value: int) -> String:
-	var chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	var n := maxi(0, value)
-	if n == 0: return "0"
-	var out := ""
-	while n > 0:
-		out = chars.substr(n % 36, 1) + out
-		n = int(n / 36)
-	return out
+	return NetworkCodec.to_base36(value)
 
 func from_base36(value: String) -> int:
-	var chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	var out := 0
-	for i in value.length():
-		var ch := value.to_upper().substr(i, 1)
-		var idx := chars.find(ch)
-		if idx < 0: return -1
-		out = out * 36 + idx
-	return out
+	return NetworkCodec.from_base36(value)
 
 func ipv4_to_int(address: String) -> int:
-	var parts := address.split(".")
-	if parts.size() != 4: return -1
-	var result := 0
-	for part in parts:
-		var octet := int(part)
-		if octet < 0 or octet > 255: return -1
-		result = (result << 8) | octet
-	return result
+	return NetworkCodec.ipv4_to_int(address)
 
 func int_to_ipv4(value: int) -> String:
-	return "%d.%d.%d.%d" % [(value >> 24) & 255, (value >> 16) & 255, (value >> 8) & 255, value & 255]
+	return NetworkCodec.int_to_ipv4(value)
 
 func make_invite_code(address: String, port: int) -> String:
-	var packed := ipv4_to_int(address)
-	if packed < 0: return ""
-	return "SH-%s-%s" % [to_base36(packed), to_base36(port)]
+	return NetworkCodec.make_invite_code(address, port)
 
 func decode_invite_code(code: String) -> Dictionary:
-	var cleaned := code.strip_edges().to_upper()
-	var parts := cleaned.split("-")
-	if parts.size() != 3 or parts[0] != "SH": return {}
-	var packed := from_base36(parts[1])
-	var port := from_base36(parts[2])
-	if packed < 0 or port <= 0 or port > 65535: return {}
-	return {"address":int_to_ipv4(packed), "port":port}
+	return NetworkCodec.decode_invite_code(code)
 
 func preferred_host_address() -> String:
 	# UPnP liefert bei unterstützten Routern direkt die öffentliche IPv4-Adresse und richtet UDP-Portweiterleitung ein.
@@ -13000,11 +12972,7 @@ func run_rescue_quest_consistency_smoke() -> bool:
 	return ok
 
 func network_reward_payload(item: Dictionary) -> Dictionary:
-	var payload: Dictionary = item.duplicate(true)
-	payload.erase("uid")
-	# Identität eines Inventargegenstands gehört ausschließlich dem Browser-Save.
-	payload.erase("stack_value")
-	return payload
+	return NetworkCodec.network_reward_payload(item)
 
 func server_rescue_active_peers() -> Array:
 	var peers: Array = []
@@ -13107,40 +13075,13 @@ func active_event_sync_rows() -> Array:
 	return rows
 
 func sanitize_active_quest_rows(raw: Variant) -> Array:
-	var out: Array = []
-	if not raw is Array: return out
-	var seen: Dictionary = {}
-	for entry in raw:
-		if not entry is Array or entry.size() < 2: continue
-		var quest_id := int(entry[0])
-		if quest_id < 0 or quest_id >= QUESTS.size() or seen.has(quest_id): continue
-		seen[quest_id] = true
-		out.append([quest_id,clampi(int(entry[1]),0,int(QUESTS[quest_id]["count"]))])
-	return out
+	return NetworkCodec.sanitize_active_quest_rows(raw)
 
 func sanitize_active_borin_quest_rows(raw:Variant)->Array:
-	var out:Array=[]
-	if not raw is Array:return out
-	var seen:Dictionary={}
-	for entry in raw:
-		if not entry is Array or entry.size()<2:continue
-		var quest_id:=int(entry[0])
-		if quest_id<0 or quest_id>=BORIN_QUESTS.size() or seen.has(quest_id):continue
-		seen[quest_id]=true
-		out.append([quest_id,clampi(int(entry[1]),0,int(BORIN_QUESTS[quest_id]["count"]))])
-	return out
+	return NetworkCodec.sanitize_active_borin_quest_rows(raw)
 
 func sanitize_active_event_rows(raw: Variant) -> Array:
-	var out: Array = []
-	if not raw is Array: return out
-	var seen: Dictionary = {}
-	for entry in raw:
-		if not entry is Array or entry.size() < 2: continue
-		var event_id := int(entry[0])
-		if event_id < 0 or event_id >= WORLD_EVENTS.size() or seen.has(event_id): continue
-		seen[event_id] = true
-		out.append([event_id,clampi(int(entry[1]),0,int(WORLD_EVENTS[event_id]["goal"]))])
-	return out
+	return NetworkCodec.sanitize_active_event_rows(raw)
 
 func server_transaction_seen(tx_id: String) -> bool:
 	return tx_id != "" and tx_id in processed_server_transactions

@@ -5,6 +5,7 @@ Dieses Verzeichnis enthält ausführbare Godot-Regressionstests. Die Migration a
 ## Struktur
 
 - `fusion/` – Fusionsregeln, Identität, Trefferregeln und reine Fusionsmodule.
+- `network/` – zustandslose Netzwerk-Hilfen: Einladungscodes, Bereinigung fremder Quest-/Ereigniszeilen, Belohnungs-Payloads.
 
 Weitere Bereiche werden erst verschoben, wenn ihre Aufrufer in CI/Deploy bekannt und angepasst sind.
 
