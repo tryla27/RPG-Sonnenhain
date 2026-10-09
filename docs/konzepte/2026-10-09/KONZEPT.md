@@ -113,8 +113,8 @@ den Arkanhüter. Ob es einen anderen Weg zu ihm gibt, muss ich noch prüfen.
    Kein Boss darf hinter seiner eigenen Sperre stehen, und kein Wegstein darf
    die Sperre umgehen.
 
-**Offene Frage:** Wo soll der Arkanhüter stehen, damit man ihn vor den
-Aschebergen erreicht? Mein Vorschlag: am Ende des Kristallmoors.
+**Entschieden (Angelo, 9.10.):** Der Arkanhüter zieht ans Ende des
+Kristallmoors, damit er vor den Aschebergen erreichbar ist.
 
 ### B2. Kirche innen
 
@@ -153,8 +153,15 @@ Schmiede und Arena nicht betroffen sind, kläre ich bei der Umsetzung.
 Eckkacheln bzw. abgerundete Ecken), Randlinie entfernen. Dazu ein
 Prüfwerkzeug, das alle Eckzellen auf fehlende Übergänge prüft.
 
-**Bitte:** ein Screenshot einer orangenen Ecke aus dem Spiel. Mein Testbild
-zeigt die Fläche, aber nicht den genauen Farbfehler.
+**Screenshot von Angelo** (`orangene-ecke-screenshot.png`): Um das Rathaus
+läuft auf dem Pflaster eine dünne bräunlich-orange Rechtecklinie, genau am
+Rand der Grundstücksfläche. Es ist also keine Eckkachel, sondern eine
+Übergangskante im Boden zwischen Grundstückspflaster und Dorfpflaster. Die
+Hauszeichnungen selbst zeichnen keine solche Linie (geprüft).
+
+**Lösung präzisiert.** Wo Grundstück und Dorfplatz dasselbe Material haben,
+entfällt der Übergang ganz; sonst wird ein weicher Übergang ohne Linie
+gesetzt.
 
 ### B5. Wege an den beiden Dorfeingängen sauber abschneiden
 
@@ -235,8 +242,9 @@ oben links, und die Minimap überdeckt rechts oben „Sonnenhain · LV 1“.
    Zielrichtung. Der Effekt zündet an dessen Einschlag.
 3. Sprungfusionen zünden dort, wo der Sprung trifft, nicht dort, wo der
    Spieler landet.
-4. Schutz und Heilung werden am Einschlag zu einem Feld. Wer darin steht,
-   erhält die Wirkung; der Spieler nur, wenn er selbst im Feld steht.
+4. Ein Schutzschild wirkt weiterhin direkt auf den Spieler. Alle sichtbaren
+   und schadenden Teile der Fusion (Explosion, Welle, Feld, Geschosse)
+   zünden am Trefferort.
 5. Mehrfachtreffer (Fächer, Durchschlag, Kette): Der Effekt zündet am ersten
    Treffer jedes Geschosses, höchstens dreimal pro Wirken.
 6. Erlaubte Zündorte: Trefferpunkt, Zielpunkt, Angreiferposition. Spieler-
@@ -250,9 +258,9 @@ auf dem Server ebenso.
 Zündort ist Spieler- oder Landeposition, jede Fusion hat einen treffenden
 Träger. Im Spiel: Vorschau-GIF von 3 Beispielen.
 
-**Offene Frage zu Regel 4:** Soll ein eigener Schild aus einer Fusion den
-Spieler weiterhin immer schützen? Oder wirklich nur, wenn er im Feld am
-Einschlag steht? Ich empfehle das Feld, weil es die Regel konsequent hält.
+**Entschieden (Angelo, 9.10.) zu Regel 4:** Schutzschilde aus Fusionen
+schützen den Spieler weiterhin direkt. Geschosse, Explosionen, Felder und alle
+anderen Effekte zünden immer am Trefferort.
 
 ---
 
