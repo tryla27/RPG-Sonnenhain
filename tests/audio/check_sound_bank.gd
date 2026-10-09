@@ -145,7 +145,7 @@ func check_mob_voices()->void:
 	var beetle:={"uid":8,"type":1,"pos":Vector2(9000,0),"hp":30.0,"max_hp":32.0,"attack_state":{"id":1,"fired":false,"ability":{"id":"druesensekret","shape":"projectile"}}}
 	check(bank.observe_mobs([beetle],listener).is_empty(),"zu weit weg: still")
 	var mushroom:={"uid":9,"type":2,"pos":listener,"hp":60.0,"max_hp":65.0,"attack_state":{"id":4,"fired":false,"ability":{"id":"giftstaub","shape":"cloud"}}}
-	check(names.call(bank.observe_mobs([mushroom],listener))==["pilz_ankuendigung"],"Pilz kuendigt an")
+	check(names.call(bank.observe_mobs([mushroom],listener))==[],"Pilz spielt vor dem Giftzischen keinen Zusatzton")
 	check(bank.observe_mobs([],listener,true).is_empty(),"gesunder Gegner verschwindet ohne Todeslaut")
 
 func check_surfaces()->void:

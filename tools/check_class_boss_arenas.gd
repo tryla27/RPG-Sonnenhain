@@ -19,13 +19,13 @@ func run()->void:
 	# zur Wegstein-Safezone halten.
 	for i in 3:
 		var center:Vector2=g.CLASS_BOSS_SITES[i]
-		check(g.region_at(center)==6+i,"arena region "+str(i))
+		check(g.region_at(center)==g.CLASS_BOSS_REGIONS[i],"arena region "+str(i))
 		var nearest:=INF
 		for stone in g.WAYSTONES:
 			nearest=minf(nearest,center.distance_to(stone))
 		check(nearest>g.CLASS_BOSS_ARENA_RADIUS+g.WAYSTONE_SAFE_RADIUS+30.0,"arena waystone separation "+str(i))
 		var house:Vector2=g.CLASS_BOSS_HOUSE_POS[i]
-		check(g.region_at(house)==6+i,"house region "+str(i))
+		check(g.region_at(house)==g.CLASS_BOSS_REGIONS[i],"house region "+str(i))
 		check(house.distance_to(center)>g.CLASS_BOSS_ARENA_RADIUS+90.0,"house outside combat ring "+str(i))
 		check(not g.waystone_safe_at(house),"house outside waystone safezone "+str(i))
 		check(g.terrain_blocked(house-Vector2(0,50),16.0),"house body collision "+str(i))

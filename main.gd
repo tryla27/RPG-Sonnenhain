@@ -75,6 +75,8 @@ func hud_action_at(pos:Vector2)->String:
 	for i in actions.size():
 		if hud_action_rect(i).has_point(pos):return str(actions[i])
 	return ""
+const WaystoneMap=preload("res://components/waystone_map.gd")
+const BossRelics=preload("res://components/boss_relics.gd")
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobNavigation=preload("res://components/mob_navigation.gd")
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
@@ -151,14 +153,15 @@ const BORIN_HOUSE_POS := Vector2(1248,64)
 const BORIN_MAGIC_TREE_POS := Vector2(1120,480)
 const BORIN_CRYSTAL_POS := Vector2(1512,736)
 const WORLD_CHARACTER_SCALE := 0.84
+const CLASS_BOSS_REGIONS := WorldGeometry.CLASS_BOSS_REGIONS
 const CLASS_BOSS_SITES := WorldGeometry.CLASS_BOSS_SITES
 const CLASS_BOSS_ARENA_RADIUS := WorldGeometry.CLASS_BOSS_ARENA_RADIUS
 const CLASS_BOSS_ARENA_CLEAR_RADIUS := 475.0
 const CLASS_BOSS_HOUSE_POS := WorldGeometry.CLASS_BOSS_HOUSE_POS
 const CLASS_BOSS_HOUSE_SIZE := WorldGeometry.CLASS_BOSS_HOUSE_SIZE
 const CLASS_BOSS_MUSIC_THEMES := ["boss_kriegsherr","boss_arkanhueter","boss_jagdmeister"]
-const CLASS_RELIC_NAMES := ["Herz des Kriegsherrn","Arkansplitter","Herz der Jagd"]
-const CLASS_RELIC_SKILLS := ["WUT + BLUTRAUSCH","RISSSPRUNG · LEERTASTE","JAGDRAUSCH + SCHATTENROLLE"]
+const CLASS_RELIC_NAMES := BossRelics.NAMES
+const CLASS_RELIC_SKILLS := BossRelics.SKILLS
 const CLASS_RELIC_RESERVE_MS := 15000
 const QUESTS := GameContent.QUESTS
 const BORIN_QUESTS := GameContent.BORIN_QUESTS
@@ -371,6 +374,7 @@ var sprint_regen_delay := 0.0
 var sprint_block_timer := 0.0
 var sprint_exhausted := false
 var step_timer := 0.0
+var travel_map:=false
 var music_player: AudioStreamPlayer
 var sound_bank=SoundBank.new()
 var ui_volume := 0.8
@@ -1134,7 +1138,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"running":bool(state.get("running",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
-		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,5), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
+		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
@@ -1538,7 +1542,7 @@ func update_music(delta: float = 0.0) -> void:
 		music_player.volume_db = move_toward(music_player.volume_db, base_volume, delta * 22.0)
 
 func max_hp() -> float:
-	return 100.0 + float(level - 1) * 8.0 + float(skill_levels[10]) * 25.0 + equipment_power(equipped_ring_uid) + (equipment_power(equipped_ring2_uid) if class_id == 1 and equipped_ring2_uid != equipped_ring_uid else 0) + item_attribute("str") * (2 if class_id == 0 else 1)
+	return 100.0 + float(level - 1) * 8.0 + float(skill_levels[10]) * 25.0 + equipment_power(equipped_ring_uid) + equipment_power(equipped_necklace_uid) + (equipment_power(equipped_ring2_uid) if class_id == 1 and equipped_ring2_uid != equipped_ring_uid else 0) + item_attribute("str") * (2 if class_id == 0 else 1)
 
 func max_energy() -> float:
 	return (100.0 + float(skill_levels[11]) * 25.0)*essence.energy_mult()
@@ -2466,7 +2470,7 @@ func class_boss_arena_walkable(p:Vector2,radius:float=0.0) -> bool:
 	if index<0:return false
 	var center:Vector2=CLASS_BOSS_SITES[index]
 	if p.distance_to(center)>CLASS_BOSS_ARENA_RADIUS-radius:return false
-	if region_at(p)!=6+index:return false
+	if region_at(p)!=CLASS_BOSS_REGIONS[index]:return false
 	if waystone_safe_at(p):return false
 	return true
 
@@ -3228,6 +3232,7 @@ func near_borin() -> bool:
 	return (interior_id==VillageInteriors32.id_for_name("Borin")) or (interior_id < 0 and dungeon_id < 0 and arena_mode == "" and player_pos.distance_to(village_house_door(village_house("Borin"))-Vector2(0,70)) < 150.0)
 
 func toggle_panel(which: String) -> void:
+	travel_map=false
 	panel = "" if panel == which else which
 	if which=="skills":skill_tree_tab=class_id
 	menu_scroll = 0
@@ -4303,6 +4308,7 @@ func dungeon_torches() -> Array:
 	return torches
 
 func tavern_blocked(pos: Vector2) -> bool:
+	if interior_id>=0:return VillageInteriors32.blocked(pos,INTERIOR_CENTER,interior_id,hero_collision_radius())
 	var local := pos - INTERIOR_CENTER
 	if absf(local.x) > 445.0 or absf(local.y) > 245.0: return true
 	if Rect2(INTERIOR_CENTER + Vector2(-265, -230), Vector2(530, 85)).has_point(pos): return true
@@ -4782,8 +4788,8 @@ func class_relic_item(boss_index:int) -> Dictionary:
 
 func class_boss_hat_item(boss_index:int) -> Dictionary:
 	boss_index=clampi(boss_index,0,2)
-	var names:=["Helm des Kriegsherrn","Hut des Arkanhüters","Hut des Jagdmeisters"]
-	var item:=make_item(names[boss_index],"head",4,18+boss_index*4,1800+boss_index*500,"",maxi(1,region_level(6+boss_index)))
+	var names:=["Helm des Kriegsherrn","Hut des Dunklen Arkanhüters","Hut des Jagdmeisters"]
+	var item:=make_item(names[boss_index],"head",4,18+boss_index*4,1800+boss_index*500,"",maxi(1,region_level(CLASS_BOSS_REGIONS[boss_index])))
 	item["head_class"]=boss_index
 	item["design"]=boss_index
 	item[["str","int","agi"][boss_index]]=18+boss_index*2
@@ -4963,6 +4969,7 @@ func can_add_item(item: Dictionary) -> bool:
 	return capacity >= maxi(1, int(item.get("count", 1)))
 
 func add_item(item: Dictionary) -> bool:
+	BossRelics.normalize(item)
 	ArcaneNecklaces.normalize(item)
 	if not can_add_item(item): return false
 	var remaining := maxi(1, int(item.get("count", 1)))
@@ -5284,27 +5291,14 @@ func update_waystone_activation() -> void:
 			break
 
 func use_waystone() -> void:
-	if konflux.active:
-		if konflux.room<0 and player_pos.distance_to(KonfluxMap.CENTER)<185: konflux.leave(self, true)
-		else: message("Der Spawnwegstein im Zentrum bringt dich nach Sonnenhain zurück.")
-		return
-	for i in WAYSTONES.size():
-		if player_pos.distance_to(WAYSTONES[i]) < 185:
-			if i > 0 and not waystone_unlocked[i]:
-				waystone_unlocked[i] = true
-				last_waystone = i
-				play_sound("wegstein_aktiviert")
-				message("Wegstein %s aktiviert. Von jedem Wegstein aus kannst du jetzt hierher reisen." % region_name(region_at(WAYSTONES[i])))
-				save_game()
-				return
-			# Jeder aktivierte Wegstein öffnet die Reiseauswahl, nicht nur der im Dorf.
-			travel_from = i
-			if i > 0: last_waystone = i
-			panel = "travel"
-			message("Wähle ein Reiseziel.")
-			return
+	WaystoneMap.use_waystone(self)
 
-## Reiseziele im Raster: die elf Außen-Wegsteine, dann Sonnenhain.
+func travel_to_waystone(index:int)->bool:
+	return WaystoneMap.travel_to_waystone(self, index)
+
+func click_map(mouse:Vector2)->void:
+	WaystoneMap.click_map(self, mouse)
+
 func travel_slots() -> Array:
 	var slots: Array = []
 	for i in range(1, WAYSTONES.size()): slots.append(i)
@@ -5457,8 +5451,9 @@ func quest_dialogue(npc_name: String) -> void:
 		if QUESTS[i]["npc"] != npc_name: continue
 		if quests[i]["state"] == 2:
 			var reward_name: String = QUESTS[i]["reward"]
-			var reward_icon := class_weapon_icon() if i in [0, 5, 8, 9, 12, 14] else ("armor" if i == 4 or "panzer" in reward_name.to_lower() or "rüstung" in reward_name.to_lower() else ("ring" if i == 10 or "ring" in reward_name.to_lower() or "amulett" in reward_name.to_lower() else "gem"))
-			var reward_power := (6 + i * 3) if reward_icon in ["sword", "staff", "bow"] else (4 + int(i / 2.0) if reward_icon == "armor" else (12 + i * 2 if reward_icon == "ring" else 0))
+			var reward_icon := class_weapon_icon() if i in [0, 5, 8, 9, 12, 14] else ("armor" if i == 4 or "panzer" in reward_name.to_lower() or "rüstung" in reward_name.to_lower() else ("ring" if i == 10 or "ring" in reward_name.to_lower() else "gem"))
+			if ArcaneNecklaces.pendant_name(reward_name):reward_icon="necklace"
+			var reward_power := (6 + i * 3) if reward_icon in ["sword", "staff", "bow"] else (4 + int(i / 2.0) if reward_icon == "armor" else (12 + i * 2 if reward_icon in ["ring","necklace"] else 0))
 			var reward_item := make_item(reward_name, reward_icon, mini(4, 1 + i / 3), reward_power, 75 + i * 30, "blitz" if i == 12 else ("gift" if i == 14 else ""))
 			if not can_add_item(reward_item):
 				message_error("Dein Inventar ist voll. Verkaufe erst etwas und hole dann die Questbelohnung ab.")
@@ -5716,7 +5711,8 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	equipped_necklace_uid = int(data.get("equipped_necklace_uid", -1))
 	necklaces=ArcaneNecklaces.new()
 	necklaces.state(0,-1,Time.get_ticks_msec())["ready"]=Time.get_ticks_msec()+clampi(int(data.get("necklace_cooldown_ms",0)),0,6000)
-	for item in inventory:ArcaneNecklaces.normalize(item)
+	for item in inventory:
+		BossRelics.normalize(item);ArcaneNecklaces.normalize(item)
 	for offers in shop_stock.values():
 		for item in offers:ArcaneNecklaces.normalize(item)
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
@@ -6063,7 +6059,7 @@ func panel_click(mouse: Vector2) -> void:
 			if Rect2(300,510,280,38).has_point(mouse):
 				panel="repair";queue_redraw();return
 			if Rect2(590,510,170,38).has_point(mouse):
-				travel_from=-1;panel="travel";return
+				travel_map=true;panel="map";return
 			if Rect2(770,510,180,38).has_point(mouse):
 				world_builder.active=true
 				panel="world_builder"
@@ -6119,6 +6115,7 @@ func panel_click(mouse: Vector2) -> void:
 		"inventory": click_inventory(mouse)
 		"shop": click_shop(mouse)
 		"travel": click_travel(mouse)
+		"map": click_map(mouse)
 		"journal": quest_guide.click_journal(self,mouse)
 		"quest_details": quest_guide.click_details(self,mouse)
 
@@ -7070,6 +7067,7 @@ func item_skill_unlock_id(item:Dictionary)->int:
 
 func use_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
+	BossRelics.normalize(inventory[index])
 	ArcaneNecklaces.normalize(inventory[index])
 	if ArcaneNecklaces.index(inventory[index])>=0:
 		toggle_equipment_item(index)
@@ -7089,16 +7087,25 @@ func use_item(index: int) -> void:
 		message("Rune des Falken gebunden: Pfeile markieren Ziele.")
 		play_sound("freischaltung");save_game();return
 	if bool(item.get("class_relic",false)):
-		var required:=clampi(int(item.get("mastery_class",-1)),0,2)
+		var required:=BossRelics.index(item)
+		if required<0:
+			message("Diese Meistergabe hat keine gültige Bosszuordnung.");return
 		if class_id!=required:
 			message("%s kann nur von %s verwendet werden." % [name,CLASS_NAMES[required]])
 			return
 		if class_mastery_unlocked:
+			if class_id==1 and not arcane_step_learned:
+				arcane_step_learned=true
+				save_game()
 			message("%s bereits freigeschaltet." % CLASS_RELIC_SKILLS[class_id])
 			return
 		class_mastery_unlocked=true
 		arcane_step_learned=class_id==1
-		inventory.remove_at(index);selected_item=-1
+		if int(item.get("count",1))>1:
+			item["count"]=int(item["count"])-1
+			if item.has("stack_value"):item["stack_value"]=maxi(0,int(item["stack_value"])-int(item.get("value",0)))
+		else:inventory.remove_at(index)
+		selected_item=-1
 		message("%s freigeschaltet: %s" % [CLASS_NAMES[class_id],CLASS_RELIC_SKILLS[class_id]])
 		play_sound("freischaltung");save_game();return
 	var unlock_id:=item_skill_unlock_id(item)
@@ -9506,7 +9513,7 @@ func draw_item_icon(origin: Vector2, kind: String, accent: Color, scale_factor: 
 	var p := origin
 	var s := scale_factor
 	if kind=="necklace":
-		var tint:=Color(ArcaneNecklaces.COLORS[clampi(design,0,5)])
+		var tint:=Color(ArcaneNecklaces.COLORS[clampi(design,0,ArcaneNecklaces.COLORS.size()-1)])
 		PixelStyle32.line(self,p+Vector2(5,3)*s,p+Vector2(8,17)*s,Color("bca372"),2*s)
 		PixelStyle32.line(self,p+Vector2(27,3)*s,p+Vector2(24,17)*s,Color("bca372"),2*s)
 		PixelStyle32.line(self,p+Vector2(8,17)*s,p+Vector2(16,24)*s,Color("bca372"),2*s)
@@ -9738,7 +9745,7 @@ func draw_hud() -> void:
 		nearest="E  ·  %s" % (nearby_food_info["name"]+" pflücken" if nearby_ripe else "Nachwachsen %02d:%02d" % [food_system.regrow_remaining(nearby_food["point"])/60,food_system.regrow_remaining(nearby_food["point"])%60])
 	for i in WAYSTONES.size():
 		if player_pos.distance_to(WAYSTONES[i]) < 185:
-			nearest = "F  ·  Wegstein: %s" % ("Reiseziele wählen" if i == 0 else ("zurück ins Dorf · aktiviert" if waystone_unlocked[i] else "wird beim Betreten automatisch aktiviert"))
+			nearest = "F  ·  Wegstein: %s" % ("Weltkarte · Reise wählen" if i==0 or waystone_unlocked[i] else "aktivieren und Weltkarte öffnen")
 			break
 	for portal in PORTALS:
 		if player_pos.distance_to(portal[0]) < 112 or player_pos.distance_to(portal[1]) < 112:
@@ -11176,6 +11183,7 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		text_at(pos + Vector2(14, 93), "%s %d   %s%d" % [stat_name, int(item["power"]), "▲ +" if diff > 0 else ("▼ " if diff < 0 else "= "), diff], 14, color)
 	if icon=="necklace":
 		var description:String=ArcaneNecklaces.TEXT[ArcaneNecklaces.index(item)]
+		if ArcaneNecklaces.index(item)==6:description="Leben +%d · STÄ %d · BEW %d · INT %d. Wirkt beim Anlegen." % [int(item.get("power",0)),int(item.get("str",0)),int(item.get("agi",0)),int(item.get("int",0))]
 		text_at(pos+Vector2(14,94),"Alle Klassen · wirkt beim Tragen",12,Color("d8c5ff"))
 		var line:=""
 		var y:=116
@@ -11312,9 +11320,9 @@ func shop_preview_item(stock_item: Dictionary) -> Dictionary:
 	var bonus := maxi(0, rarity + int(item_level / 9.0))
 	preview["level"] = item_level
 	preview["rarity"] = rarity
-	preview["str"] = bonus if icon == "sword" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	preview["agi"] = bonus if icon == "bow" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
-	preview["int"] = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring"] else 0)
+	preview["str"] = bonus if icon == "sword" else (int(bonus / 2.0) if icon in ["armor", "ring", "necklace"] else 0)
+	preview["agi"] = bonus if icon == "bow" else (int(bonus / 2.0) if icon in ["armor", "ring", "necklace"] else 0)
+	preview["int"] = bonus if icon == "staff" else (int(bonus / 2.0) if icon in ["armor", "ring", "necklace"] else 0)
 	preview["value"] = int(int(stock_item["price"]) / 2.0)
 	preview["count"] = 1
 	return preview
@@ -11378,9 +11386,9 @@ func draw_map_panel() -> void:
 		text_at(Vector2(610,500),binding_short("interact")+" / "+binding_short("waystone")+": am Stein zurückreisen",12,Color("efe1bc"))
 		text_at(Vector2(170,584),"Weiß: deine Position · Innenräume gehören zur Konflux-Karte",13,Color("efe1bc"))
 		return
-	text_at(Vector2(165, 125), "%s · EINGANG MARKIERT" % DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "WELTKARTE · SONNENHAIN", 24, Color("ffe0a4"))
-	draw_world_atlas(Rect2(167, 148, 800, 405))
-	text_at(Vector2(168, 579),"Gelb blinkend: Questziel · Weiß: Du · Cyan: Wegstein · Stern: Boss",13,Color("efe1bc"))
+	text_at(Vector2(165, 125), "%s · EINGANG MARKIERT" % DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else ("WEGSTEINKARTE · REISEN" if travel_map else "WELTKARTE · SONNENHAIN"), 24, Color("ffe0a4"))
+	draw_world_atlas(WaystoneMap.RECT)
+	text_at(Vector2(168, 579),("Klicke eine Region oder einen cyanfarbenen Wegstein, um dorthin zu reisen." if travel_map else "Gelb blinkend: Questziel · Weiß: Du · Cyan: Wegstein · Stern: Boss"),13,Color("efe1bc"))
 	var quest_target: Dictionary = quest_guide.target(self)
 	if not quest_target.is_empty(): text_at(Vector2(168,602),String(quest_target["label"]),14,Color("ffe34b"))
 
@@ -11423,21 +11431,25 @@ func draw_world_atlas(rect: Rect2) -> void:
 			draw_line(a, b, Color("ccb689"), 3)
 	# Plaques haben immer denselben dunklen Grund, unabhängig von der Gebietsfarbe.
 	for region in 13:
-		var center: Vector2 = inset.position + region_rect(region).get_center() * map_scale
-		var width := 105.0 if region in [0, 6] else 130.0
-		var plaque := Rect2(Vector2(clampf(center.x - width * 0.5, inset.position.x + 3, inset.end.x - width - 3), clampf(center.y - 22, inset.position.y + 3, inset.end.y - 47)), Vector2(width, 44))
+		var plaque:=WaystoneMap.plaque(self,region,rect)
+		var width:=plaque.size.x
 		draw_rect(plaque, Color("222d35", 0.94))
 		draw_rect(plaque, Color("c8a96d") if region_available(region) else Color("ad7676"), false, 2)
 		var available := region_available(region)
 		text_at(plaque.position + Vector2(3, 18), region_name(region), 12 if region in [0, 6] else 13, Color("fff0cf"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
-		text_at(plaque.position + Vector2(3, 36), "EMPF. LV %d · %s" % [region_level(region), "OFFEN" if available else "BOSS-GESPERRT"], 10, Color("f6d48f") if available else Color("ffaca7"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
+		var status:="OFFEN" if available else "BOSS-GESPERRT"
+		if travel_map:
+			var stone:=WaystoneMap.region_stone(self,region)
+			status="REISEN" if available and WaystoneMap.unlocked(self,stone) else ("NICHT AKTIVIERT" if available and stone>=0 else ("KEIN WEGSTEIN" if available else "BOSS-GESPERRT"))
+		text_at(plaque.position + Vector2(3, 36), "EMPF. LV %d · %s" % [region_level(region), status], 10, Color("f6d48f") if available else Color("ffaca7"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 6))
 	# Persistent Fog-of-War spans the complete WORLD grid, independent of region borders.
 	world_fog.draw_overlay(self,inset,map_scale)
 	world_fog.draw_live_party_vision(self,inset,map_scale)
 	for i in WAYSTONES.size():
 		var point: Vector2 = inset.position + WAYSTONES[i] * map_scale
 		draw_rect(Rect2(point - Vector2(4, 4), Vector2(8, 8)), Color("1d3540"))
-		draw_rect(Rect2(point - Vector2(2, 2), Vector2(4, 4)), Color("9dece1") if waystone_unlocked[i] else Color("72878b"))
+		draw_rect(Rect2(point - Vector2(2, 2), Vector2(4, 4)), Color("9dece1") if WaystoneMap.unlocked(self,i) else Color("72878b"))
+		if travel_map and WaystoneMap.unlocked(self,i) and region_available(region_at(WAYSTONES[i])):draw_arc(point,7,0,TAU,16,Color("9dece1"),2)
 	for portal in PORTALS:
 		if not region_available(int(portal[2])): continue
 		for end in [portal[0], portal[1]]:
@@ -11994,7 +12006,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
-		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,5), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
+		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
 		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
@@ -12690,7 +12702,7 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		var cloth:=int(state.get("cosmetic_cloak",0))
 		var accent:=int(state.get("cosmetic_accent",0))
 		draw_character_cloak_back(rp,rdir,WORLD_CHARACTER_SCALE,cloth,accent,bool(state.get("walking",false)),bool(state.get("running",false)),false,float(state.get("hp",1))<=0,world_time,float(state.get("death_progress",-1.0)),cls,race)
-		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, WORLD_CHARACTER_SCALE, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)),clampi(int(state.get("necklace",-1)),-1,5))
+		draw_character_sprite(rp, cls, bool(state.get("walking",false)), rdir, WORLD_CHARACTER_SCALE, false, race, gender, int(state.get("armor",-1)),float(state.get("death_progress",-1.0)),clampf((float(state.get("hurt_until",0))-combat_feedback.clock)/.18,0,1),int(state.get("head",-1)),int(state.get("rings",0)),bool(state.get("running",false)),clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1))
 		if float(state.get("hp",1))>0:draw_weapon_world(rp + Vector2(0,-5*WORLD_CHARACTER_SCALE), cls, clampi(int(state.get("weapon",0)),0,11), rdir, WORLD_CHARACTER_SCALE)
 		draw_character_cloak_foreground(rp,rdir,WORLD_CHARACTER_SCALE,cloth,accent,bool(state.get("walking",false)),bool(state.get("running",false)),false,float(state.get("hp",1))<=0,world_time,float(state.get("death_progress",-1.0)),cls,race)
 		adornment_transform(rp,rdir,WORLD_CHARACTER_SCALE,float(state.get("death_progress",-1.0)),-1.0,cls,race)
@@ -12978,6 +12990,7 @@ func item_icon_for_uid(uid: int) -> String:
 	return ""
 
 func inventory_item_usable(item:Dictionary)->bool:
+	BossRelics.normalize(item)
 	ArcaneNecklaces.normalize(item)
 	if ArcaneNecklaces.index(item)>=0:return true
 	if item_skill_unlock_id(item)>=0:return true
@@ -12993,7 +13006,9 @@ func equipped_head_allowed() -> bool:
 	return false
 
 func validate_equipment_slots() -> void:
-	for item in inventory:ArcaneNecklaces.normalize(item)
+	for item in inventory:
+		BossRelics.normalize(item);ArcaneNecklaces.normalize(item)
+		if equipped_necklace_uid<0 and item.get("icon","")=="necklace" and int(item.get("uid",-1)) in [equipped_ring_uid,equipped_ring2_uid]:equipped_necklace_uid=int(item["uid"])
 	if equipped_necklace_uid>=0 and necklace_visual()<0:equipped_necklace_uid=-1
 	for item in inventory:preload("res://components/headgear_rules.gd").normalize(item)
 	if not equipped_head_allowed():equipped_head_uid=-1
@@ -13031,13 +13046,17 @@ func make_class_head(item_level:int) -> Dictionary:
 
 func toggle_equipment_item(index: int) -> bool:
 	if index < 0 or index >= inventory.size(): return false
+	BossRelics.normalize(inventory[index])
 	ArcaneNecklaces.normalize(inventory[index])
 	var item: Dictionary = inventory[index]
 	var uid := int(item.get("uid",-1))
 	var icon := str(item.get("icon",""))
 	if icon=="necklace":
+		var old_max:=max_hp()
 		var removing:=equipped_necklace_uid==uid
 		equipped_necklace_uid=-1 if removing else uid
+		validate_equipment_slots()
+		hp=minf(max_hp(),hp+maxf(0.0,max_hp()-old_max))
 		necklace_equip_serial+=1
 		necklaces.reset_charges(0,necklace_visual(),Time.get_ticks_msec())
 		play_sound("unequip" if removing else "equip")
@@ -13118,6 +13137,7 @@ func unequip_slot(slot: String) -> void:
 
 func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	var item: Dictionary = raw.duplicate(true)
+	BossRelics.normalize(item)
 	ArcaneNecklaces.normalize(item)
 	if item.get("icon","")=="necklace" and ArcaneNecklaces.index(item)<0:item["icon"]="gem"
 	item.erase("uid")
@@ -13131,7 +13151,7 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 	item["element"] = str(item.get("element","")) if str(item.get("element","")) in ["","feuer","eis","blitz","gift"] else ""
 	if bool(item.get("class_relic",false)):
 		item["class_relic"]=true
-		item["mastery_class"]=clampi(int(item.get("mastery_class",-1)),0,2)
+		item["mastery_class"]=BossRelics.index(item)
 		item["mastery_skill"]=CLASS_RELIC_SKILLS[int(item["mastery_class"])]
 	else:
 		item.erase("mastery_class");item.erase("mastery_skill")
@@ -13933,7 +13953,7 @@ func draw_spawn_elevated_actor(peer:int)->void:
 	draw_set_transform(old_offset)
 
 func necklace_visual(peer:int=0)->int:
-	if peer>0:return clampi(int(remote_players.get(peer,{}).get("necklace",-1)),-1,5)
+	if peer>0:return clampi(int(remote_players.get(peer,{}).get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1)
 	for item in inventory:
 		if int(item.get("uid",-1))==equipped_necklace_uid:return ArcaneNecklaces.index(item)
 	return -1
