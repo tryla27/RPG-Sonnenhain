@@ -78,7 +78,20 @@ const CATALOG := {
 	"truhe_auf": {"path":"welt/truhe_auf", "variants":1, "db":-9.0, "max":1, "prio":5, "pitch":0.02},
 	"heilen": {"path":"welt/heilen", "variants":1, "db":-9.0, "max":1, "prio":6, "pitch":0.0, "duck":1.0},
 	"boss_erscheint": {"path":"welt/boss_erscheint", "variants":1, "db":-7.0, "max":1, "prio":8, "pitch":0.0, "duck":1.8},
+	# Schritte je Untergrund und Rascheln beim Durchlaufen von Büschen.
+	"schritt_gras": {"path":"schritte/schritt_gras", "variants":4, "db":-22.0, "max":1, "prio":1, "pitch":0.07},
+	"schritt_erde": {"path":"schritte/schritt_erde", "variants":4, "db":-21.0, "max":1, "prio":1, "pitch":0.07},
+	"schritt_pflaster": {"path":"schritte/schritt_pflaster", "variants":4, "db":-22.0, "max":1, "prio":1, "pitch":0.06},
+	"schritt_holz": {"path":"schritte/schritt_holz", "variants":4, "db":-21.0, "max":1, "prio":1, "pitch":0.06},
+	"schritt_stein": {"path":"schritte/schritt_stein", "variants":4, "db":-22.0, "max":1, "prio":1, "pitch":0.06},
+	"schritt_sand": {"path":"schritte/schritt_sand", "variants":4, "db":-21.0, "max":1, "prio":1, "pitch":0.07},
+	"busch_rascheln": {"path":"schritte/busch_rascheln", "variants":3, "db":-16.0, "max":1, "prio":2, "pitch":0.08},
 }
+
+## Untergrund -> Schrittklang. Unbekannte Untergründe klingen wie Gras.
+const STEP_SURFACES := {"gras":"schritt_gras", "erde":"schritt_erde", "pflaster":"schritt_pflaster", "holz":"schritt_holz", "stein":"schritt_stein", "sand":"schritt_sand"}
+## Bodenmaterialien des Dorfes (components/map0_ground_plan_32.gd) -> Untergrund.
+const VILLAGE_SURFACES := {"village_stone":"pflaster", "old_cobble":"pflaster", "arcane_floor":"stein", "earth_path":"erde", "grass_meadow":"gras", "grass_moss":"gras", "forest_floor":"gras"}
 
 ## Klangmaterial je Gegnertyp (Index wie GameContent.ENEMY_TYPES).
 const ENEMY_MATERIAL := [
@@ -119,6 +132,12 @@ static func hit_sound_for(type: int) -> String:
 
 static func death_sound_for(type: int) -> String:
 	return ENEMY_DEATH.get(type, "tod_" + material_for(type))
+
+static func step_sound_for(surface: String) -> String:
+	return STEP_SURFACES.get(surface, "schritt_gras")
+
+static func village_surface(material: String) -> String:
+	return VILLAGE_SURFACES.get(material, "gras")
 
 static func loot_sound_for(rarity: int) -> String:
 	if rarity >= 4: return "beute_legendaer"

@@ -2,6 +2,7 @@ extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
 ["Klänge · Menüs und Fortschritt", "Knöpfe, Fenster, Gespräche, Kaufen und Verkaufen klingen eigen; was gerade nicht geht, meldet ein kurzer Fehlerton. Quests, Level-Aufstieg, Skillpunkte, Freischaltungen, Wegsteine, Reisen, Truhen, Heilung und Boss-Auftritte haben eigene Klänge im 16-Bit-Märchenstil. Neuer Lautstärkeregler „Oberfläche“ in den Einstellungen."],
+["Klänge · Schritte und Büsche", "Schritte klingen je nach Untergrund: Gras, Erde, Pflaster, Holz, Stein oder Sand. Wer durch Büsche und Sträucher läuft, hört sie rascheln."],
 ["Klänge · Kampf im 16-Bit-Märchenstil", "Schwert, Stab und Bogen klingen eigen. Treffer hören sich je nach Gegner weich, gepanzert, fellig, steinern, geisterhaft oder metallisch an. Waldschleim, Blütenkäfer, Pilzling und Mooswolf haben eigene Angriffslaute, die ersten drei auch eigene Niederlagenlaute; entfernte Gegner sind leiser. Neue Klänge für Schaden, Ausweichen, Tränke, Niederlage, Rückkehr und das Betreten der Welt sowie Gold und seltene Beute. Unter 25 % Leben schlägt ein Herz, bis du dich erholst."],
 ["Technik · Gegenstandsregeln als Modul", "Erzeugung von Gegenständen und Beute, Stapelgrößen, Verkaufswerte und Anzeigenamen liegen jetzt in einem eigenen, getesteten Modul. Beutechancen und Werte bleiben unverändert."],
 ["Technik · Weltgeometrie als Modul", "Gebietsgrenzen, Wegabstände, Wegsteine sowie Lage der Klassenboss-Arenen und -Häuser liegen jetzt in einem eigenen, getesteten Modul. Karte, Spawns und Teleports verhalten sich unverändert."],

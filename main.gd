@@ -361,6 +361,7 @@ var step_timer := 0.0
 var music_player: AudioStreamPlayer
 var sound_bank=SoundBank.new()
 var ui_volume := 0.8
+var rustle_timer := 0.0
 var last_sound_panel := ""
 var mushroom_sound_seen:Dictionary={}
 var music_incoming: AudioStreamPlayer
@@ -1426,6 +1427,40 @@ func update_panel_sounds() -> void:
 	if before == "world" and after == "window": play_sound("ui_fenster_auf")
 	elif before == "window" and after == "world": play_sound("ui_fenster_zu")
 
+## Untergrund unter den Füßen für Schrittklänge: gras, erde, pflaster, holz, stein, sand.
+func ground_surface_at(pos: Vector2) -> String:
+	if interior_id >= 0: return "stein" if interior_id == VillageInteriors32.ELARA_ID else "holz"
+	if dungeon_id >= 0: return "stein"
+	if arena_mode != "": return "sand"
+	if StartTileMap32.BOUNDS.has_point(pos):
+		var material := StartTileMap32.material_at(pos)
+		if material != "": return SoundBank.village_surface(material)
+	if distance_to_trail(pos) < 60.0: return "erde"
+	match region_at(pos):
+		6: return "sand"
+		3, 7: return "stein" if hash_cell(int(pos.x / 64.0), int(pos.y / 64.0)) % 3 == 0 else "erde"
+		5: return "erde"
+	return "gras"
+
+## Steht die Figur in einem begehbaren Busch oder Strauch?
+const FOLIAGE_ZONES := [1, 2, 8, 9]
+func foliage_at(pos: Vector2) -> bool:
+	if interior_id >= 0 or dungeon_id >= 0 or arena_mode != "": return false
+	for bush in VillageLayout.BUSHES:
+		if pos.distance_to(bush) < 30.0: return true
+	for plant in food_system.plants:
+		if str(plant.get("kind","")) == "fruit" and not bool(plant.get("tree",false)) and pos.distance_to(plant["point"]) < 28.0: return true
+	var cx := int(pos.x / 250.0)
+	var cy := int(pos.y / 250.0)
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var obstacle := obstacle_in_cell(cx + dx, cy + dy)
+			if obstacle.is_empty() or int(obstacle["zone"]) not in FOLIAGE_ZONES: continue
+			var radius := float(obstacle["radius"])
+			var distance := pos.distance_to(obstacle["pos"])
+			if distance < radius * 0.95 and distance > obstacle_collision_radius(obstacle): return true
+	return false
+
 ## Herzschlag läuft, solange die eigene Figur lebt und unter 25 % Leben hat.
 func low_health_alarm_active() -> bool:
 	return character_created and not creative_mode and death_timer <= 0.0 and hp > 0.0 and hp < max_hp() * 0.25
@@ -1722,6 +1757,7 @@ func _process(delta: float) -> void:
 	attack_anim = maxf(0.0, attack_anim - delta)
 	warrior_jump_timer = maxf(0.0, warrior_jump_timer - delta)
 	step_timer = maxf(0.0, step_timer - delta)
+	rustle_timer = maxf(0.0, rustle_timer - delta)
 	for i in cooldowns.size():
 		cooldowns[i] = maxf(0.0, float(cooldowns[i]) - delta * food_system.cooldown_recovery_mult())
 	for i in boss_cooldowns.size():
@@ -2283,7 +2319,10 @@ func update_player(delta: float) -> void:
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
-		play_sound("step")
+		play_sound(SoundBank.step_sound_for(ground_surface_at(player_pos)))
+		if foliage_at(player_pos) and rustle_timer <= 0.0:
+			rustle_timer = 0.45
+			play_sound("busch_rascheln")
 		step_timer = (lerpf(0.43,0.29,sprint_blend) if dash_timer<=0 else 0.25)
 	if controller.used:
 		var stick_aim: Vector2 = controller.stick(true)
