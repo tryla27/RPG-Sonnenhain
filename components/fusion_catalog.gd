@@ -10,11 +10,12 @@ const BUILTIN_FUSIONS := [
 	{"id":43,"a":17,"b":18,"gold":1800,"max_rank":4}
 ]
 
-# Damage-Fusionen lösen ihren Sekundäreffekt am tatsächlichen Trefferpunkt aus.
-# Reine Schutz-/Buff-Fusionen bleiben als ON_CAST-Ausnahme am Spieler.
+# Alle Fusionen lösen ihren Sekundäreffekt am Trefferpunkt aus. Der Reaktorwall
+# (zwei Schilde) schickt einen Träger-Impuls; der Schild selbst schützt weiter
+# den Spieler, die Wand mit Schaden entsteht am Einschlag.
 const IMPACT_PROFILES := {
 	40:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":16,"secondary":0,"effect":"fire_whirl","radius":112.0,"damage_mult":0.34},
-	41:{"trigger":"ON_CAST","spawn":"PLAYER_POSITION","carrier":1,"secondary":36,"effect":"reactor_wall","radius":150.0,"damage_mult":0.22},
+	41:{"trigger":"ON_IMPULSE_HIT","spawn":"IMPULSE_IMPACT_POSITION","carrier":1,"secondary":36,"effect":"reactor_wall","radius":150.0,"damage_mult":0.22},
 	42:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":18,"secondary":37,"effect":"tesla_wave","radius":145.0,"damage_mult":0.38},
 	43:{"trigger":"ON_DAMAGE_HIT","spawn":"DAMAGE_IMPACT_POSITION","carrier":18,"secondary":17,"effect":"iceball","radius":118.0,"damage_mult":0.42}
 }

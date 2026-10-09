@@ -6,6 +6,15 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Fusionsregel D1: `components/fusion_cast.gd` plant Träger, Zündmarke,
+  Träger-Impuls und Zündlimit. `cast_fusion_at_impact` (offline und Server)
+  wirkt den Träger, markiert seine Geschosse und Zonen und zündet die
+  Zweitfähigkeit am ersten Treffer (`trigger_fusion`, `execute_secondary_at`).
+  `fusion_rules.gd` kennt nur noch `DAMAGE_IMPACT_POSITION` und
+  `IMPULSE_IMPACT_POSITION`; alle Rezepte laufen als `CARRIER_IMPACT`.
+  Reaktorwall (41) schickt einen Impuls. Test
+  `tests/fusion/check_fusion_impact_origin.gd` spielt alle 528 Fusionen offline
+  und auf dem Server durch. Vorschau `tools/capture_fusion_impact.gd`.
 - Web-Ton repariert: Audio-Busse stehen jetzt in `default_bus_layout.tres`.
   Im Web-Export ohne Threads (Sample-Wiedergabe) bleiben zur Laufzeit per
   `AudioServer.add_bus()` angelegte Busse stumm; im Browser gemessen (Spitze 0

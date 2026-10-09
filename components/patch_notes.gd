@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Fusionen · Wirkung am Trefferpunkt", "Alle Fusionen zünden jetzt dort, wo ihr Angriff trifft: am ersten getroffenen Gegner, sonst am Hindernis oder am Ende der Reichweite. Bisher lösten viele Fusionen ihren zweiten Teil einfach am Spieler aus. Fusionen aus zwei Schutz- oder Hilfsfähigkeiten schicken einen kurzen Impuls in Blickrichtung. Schilde, Heilung und Stärkungen wirken weiter auf dich. Fächer und Durchschläge zünden höchstens dreimal pro Einsatz. Der Reaktorwall schützt dich sofort, seine Wand entsteht am Einschlag."],
 ["Oberfläche · Größere, eckige Minimap", "Die Minimap oben rechts ist größer, quadratisch und schlicht mit goldenem Rahmen; Kompass und Ringe entfallen. Ein Klick darauf öffnet weiter die große Karte. Kartenname und Stufe stehen direkt darunter."],
 ["Oberfläche · Aktionshinweis unter der Minimap", "Hinweise wie „F · Wegstein“ stehen jetzt rechts unter der Minimap, sind nur so breit wie ihr Text und haben einen hellen Rahmen."],
 ["Fehlerbehebung · Kein Ton im Browser", "Im Browser waren seit dem Klang-Update Musik, Effekte und Menüklänge stumm. Die Lautstärkekanäle sind jetzt fest im Spiel angelegt, damit der Browser sie abspielt."],

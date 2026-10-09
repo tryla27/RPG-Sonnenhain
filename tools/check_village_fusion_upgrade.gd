@@ -32,7 +32,7 @@ func run()->void:
 		assert(g.FusionRules.normalized_key(b,a)==key)
 		assert(float(g.ABILITIES[id]["cd"])>0 and int(g.ABILITIES[id]["cost"])>0)
 		csv+="%s;%s;%s;%d;%d;%d\n" % [g.ABILITIES[a]["name"],g.ABILITIES[b]["name"],g.ABILITIES[id]["name"],id,int(recipe["gold"]),int(g.ABILITIES[id]["req"])]
-		# Each generated output executes both existing spell implementations.
+		# Each generated output runs its carrier; the partner fires at the hit (rule D1).
 		g.execute_ability_effects(id,2,40,g.player_pos,g.facing)
 		g.projectiles.clear();g.impact_zones.clear();g.battle_zones.clear();g.effects.clear();g.spell_visuals.clear()
 		g.player_pos=Vector2(2500,1600)
@@ -53,12 +53,16 @@ func run()->void:
 	g.restore_fusion_progress(snapshot,g.fusion_history)
 	assert(not g.learned[3] and not g.learned[35],"Reload resurrected sacrificed spells")
 	assert(g.fusion_rank_from_network_state({"fusions":g.fusion_progress_rows()},id)==1)
+	# Regel D1: Der Pfeil fliegt, die Reparatur zündet an seinem Ende und heilt den Spieler.
 	g.hp=1;g.projectiles.clear()
 	g.execute_ability_effects(id,1,40,g.player_pos,g.facing)
-	assert(g.hp>1 and not g.projectiles.is_empty(),"Repair/blade fusion must heal and shoot")
-	# Source support components must still work in support/support combinations.
+	assert(not g.projectiles.is_empty(),"Repair/blade fusion must shoot")
+	for frame in 90:g.update_projectiles(1.0/60.0)
+	assert(g.hp>1,"Repair/blade fusion must heal at the impact")
+	# Source support components must still work in support/support combinations (via impulse).
 	g.shield_timer=0;g.rage_timer=0
 	g.execute_ability_effects(int(g.fusion_definition_by_key("1:4")["id"]),1,40,g.player_pos,g.facing)
+	for frame in 60:g.update_projectiles(1.0/60.0)
 	assert(g.shield_timer>0 and g.rage_timer>0)
 	var enemy:Dictionary=g.make_enemy(1,g.player_pos+Vector2(40,0))
 	enemy["hp"]=100000;enemy["max_hp"]=100000

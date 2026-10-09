@@ -87,7 +87,7 @@ static func catalog(abilities:Array,existing:Array)->Array:
 				"id":output_id(a,b),"a":a,"b":b,"max_rank":4,
 				"gold":600+50*maxi(int(abilities[a]["req"]),int(abilities[b]["req"]))}
 			recipe["template"]=template
-			recipe["execution"]="CARRIER_IMPACT" if known.has(key) else "COMPOSITE_CAST"
+			recipe["execution"]="CARRIER_IMPACT"
 			recipes.append(recipe)
 	return recipes
 
@@ -123,23 +123,16 @@ static func choose_carrier(a:int,b:int)->int:
 	if score_a==score_b:return mini(a,b)
 	return a if score_a>score_b else b
 
+# Regel D1 (9.10.2026): Fusionen zünden immer am Trefferpunkt ihres Trägers,
+# nie am Spieler. Auch Sprünge zünden dort, wo der Sprung trifft. Ohne
+# angreifenden Träger fliegt ein kurzer Impuls in Zielrichtung.
 static func trigger_for_carrier(id:int)->String:
-	var meta:=metadata(id)
-	var form:=str(meta.get("form",""))
-	if form=="jump":return "ON_LAND"
-	if bool(meta.get("damage",false)):return "ON_HIT"
-	if str(meta.get("role",""))=="target":return "ON_TARGET"
-	if str(meta.get("role",""))=="reactive":return "ON_BLOCK"
-	return "ON_CAST"
+	if bool(metadata(id).get("damage",false)):return "ON_HIT"
+	return "ON_IMPULSE_HIT"
 
 static func spawn_for_carrier(id:int)->String:
-	var meta:=metadata(id)
-	var form:=str(meta.get("form",""))
-	if form=="jump":return "LANDING_POSITION"
-	if bool(meta.get("damage",false)):return "DAMAGE_IMPACT_POSITION"
-	if str(meta.get("role",""))=="target":return "TARGET_POSITION"
-	if str(meta.get("role",""))=="reactive":return "ATTACKER_POSITION"
-	return "PLAYER_POSITION"
+	if bool(metadata(id).get("damage",false)):return "DAMAGE_IMPACT_POSITION"
+	return "IMPULSE_IMPACT_POSITION"
 
 static func reaction_for_pair(a:int,b:int)->String:
 	var ma:=metadata(a);var mb:=metadata(b)
