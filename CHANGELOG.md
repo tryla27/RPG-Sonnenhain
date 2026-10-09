@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Spielinhalte (Gegner, Fähigkeiten, Quests, NPCs, Händler, Weltereignisse,
+  Wahrzeichen, Wege, Torbogen) aus `main.gd` nach `components/game_content.gd`
+  ausgelagert; `main.gd` stellt sie unter denselben Namen weiter bereit.
 - Repository- und Speicherstruktur bereinigt.
 - Generierte Godot-Webexports aus dem Quellbaum entfernt.
 - Dokumentation nach Themen geordnet.

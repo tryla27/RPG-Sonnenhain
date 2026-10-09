@@ -7,6 +7,10 @@ import subprocess
 
 root = Path(__file__).resolve().parents[1]
 source = (root / 'main.gd').read_text(encoding='utf8')
+# Spielinhalte (Gegner, Fähigkeiten, Quests, NPCs, ...) liegen seit der
+# Modularisierung in components/game_content.gd; main.gd verweist darauf.
+content_source = (root / 'components' / 'game_content.gd').read_text(encoding='utf8')
+data_source = source + '\n' + content_source
 
 # Catch accidental duplicate top-level function declarations before Godot does.
 func_names = re.findall(r'^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(', source, re.M)
@@ -29,12 +33,12 @@ for legacy_entry in ['"INVENTAR"', '"FÄHIGKEITEN"', '"QUESTBUCH"', '"WELTKARTE"
 assert 'INVENTORY_HUD_RECT' not in source, 'legacy standalone inventory HUD button returned'
 
 def block(name):
-    match = re.search(rf'^const {name} := \[', source, re.M)
+    match = re.search(rf'^const {name} := \[', data_source, re.M)
     assert match, f'{name} missing'
     depth, start = 0, match.end() - 1
     quote, escaped = False, False
-    for index in range(start, len(source)):
-        c = source[index]
+    for index in range(start, len(data_source)):
+        c = data_source[index]
         if quote:
             if escaped: escaped = False
             elif c == '\\': escaped = True
@@ -43,7 +47,7 @@ def block(name):
         elif c == '[': depth += 1
         elif c == ']':
             depth -= 1
-            if depth == 0: return source[start:index+1]
+            if depth == 0: return data_source[start:index+1]
     raise AssertionError(f'{name} not closed')
 
 def entries(name):
@@ -96,14 +100,14 @@ for token in [
 ]:
     assert token in source, f'missing feature connection: {token}'
 for index in (0, 16, 25):
-    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":3, "kind":{index}\}}', source)
+    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":3, "kind":{index}\}}', data_source)
 for index in (1, 17, 26):
-    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":8, "kind":{index}\}}', source)
+    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":8, "kind":{index}\}}', data_source)
 for index in (2, 18, 27):
-    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":12, "kind":{index}\}}', source)
+    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":12, "kind":{index}\}}', data_source)
 for index in (15, 33):
-    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":20, "kind":{index}\}}', source)
-assert re.search(r'\{"name":"[^"]+"[^\n]+"req":40, "kind":24\}', source), 'mage ultimate must unlock at level 40'
+    assert re.search(rf'\{{"name":"[^"]+"[^\n]+"req":20, "kind":{index}\}}', data_source)
+assert re.search(r'\{"name":"[^"]+"[^\n]+"req":40, "kind":24\}', data_source), 'mage ultimate must unlock at level 40'
 assert 'slots = [-1, -1, -1]' in source
 assert '"waystone_unlocked":waystone_unlocked' in source
 assert '"shop_stock":shop_stock' in source
@@ -124,7 +128,7 @@ teleport = source.split('\t\t19, 27:', 1)[1].split('\t\t20:', 1)[0]
 assert '\t\t\t\tdraw_arc(point, 18 + echo * 4' in teleport
 assert 'var hue: Color = [Color("a9eafa")' in source
 assert 'func draw_trails() -> void:' in source and 'draw_line(a, b, edge_colors[theme], 116.0, false)' in source
-assert '"name":"Elara"' in source
+assert '"name":"Elara"' in data_source
 assert 'const MUSIC_FADE_SECONDS := 1.35' in source
 assert 'music_incoming.volume_db' in source and 'music_player.volume_db' in source
 assert 'AudioStreamOggVorbis: stream.loop = true' in source
