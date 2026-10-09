@@ -1448,22 +1448,52 @@ func update_panel_sounds() -> void:
 
 ## Steht die Figur in einem begehbaren Busch oder Strauch?
 const FOLIAGE_ZONES := [1, 2, 8, 9]
+const Foliage = preload("res://components/foliage.gd")
 func foliage_at(pos: Vector2) -> bool:
 	if interior_id >= 0 or dungeon_id >= 0 or arena_mode != "": return false
-	for bush in VillageLayout.BUSHES:
-		if pos.distance_to(bush) < 30.0: return true
+	if Foliage.near_any(VillageLayout.BUSHES, pos): return true
+	if Foliage.near_any(VillageLayout.FLOWER_BUSHES, pos): return true
 	for plant in food_system.plants:
-		if str(plant.get("kind","")) == "fruit" and not bool(plant.get("tree",false)) and pos.distance_to(plant["point"]) < 28.0: return true
+		var kind := str(plant.get("kind",""))
+		if (kind == "herb" or kind == "fruit" and not bool(plant.get("tree",false))) and pos.distance_to(plant["point"]) < 28.0: return true
 	var cx := int(pos.x / 250.0)
 	var cy := int(pos.y / 250.0)
 	for dx in range(-1, 2):
 		for dy in range(-1, 2):
 			var obstacle := obstacle_in_cell(cx + dx, cy + dy)
-			if obstacle.is_empty() or int(obstacle["zone"]) not in FOLIAGE_ZONES: continue
+			if obstacle.is_empty(): continue
+			var bush_point := Foliage.obstacle_bush_point(int(obstacle["zone"]), obstacle["pos"], float(obstacle["radius"]))
+			if bush_point != Vector2.INF and pos.distance_to(bush_point) < Foliage.BUSH_RADIUS: return true
+			if int(obstacle["zone"]) not in FOLIAGE_ZONES: continue
 			var radius := float(obstacle["radius"])
 			var distance := pos.distance_to(obstacle["pos"])
 			if distance < radius * 0.95 and distance > obstacle_collision_radius(obstacle): return true
+	return scatter_bush_near(pos)
+
+## Streubüsche auf dem Boden: dieselbe Auswahl wie beim Zeichnen der Bodenkacheln.
+func scatter_bush_near(pos: Vector2) -> bool:
+	var tx0 := int(floor(pos.x / 64.0))
+	var ty0 := int(floor(pos.y / 64.0))
+	for tx in range(tx0 - 1, tx0 + 2):
+		for ty in range(ty0 - 1, ty0 + 2):
+			var key := hash_cell(tx, ty)
+			var tile_origin := Vector2(tx * 64, ty * 64)
+			var zone := visual_region_at(tile_origin + Vector2(32, 32))
+			if not Foliage.scatter_is_bush(zone, key): continue
+			if not region_rect(zone).encloses(Rect2(tile_origin, Vector2(64, 64))): continue
+			if USE_VILLAGE_REFERENCE_BACKGROUND and VILLAGE_REF_RECT.grow(150).has_point(tile_origin + Vector2(32, 32)): continue
+			var p := Vector2(tx * 64 + (key % 23), ty * 64 + ((key / 23) % 25))
+			if pos.distance_to(Foliage.cluster_center(p)) >= Foliage.BUSH_RADIUS: continue
+			if class_boss_arena_index_at(p,55.0)>=0 or point_near_class_boss_house(p,85.0): continue
+			if not region_rect(zone).grow(-45).encloses(Rect2(p-Vector2(100,160),Vector2(200,210))): continue
+			if distance_to_trail(p) < 120.0: continue
+			return true
 	return false
+
+## Teleport-Brummen am Spawnstein: nur draußen in der Welt, leiser mit Abstand.
+func spawn_hum_level() -> float:
+	if not character_created or interior_id >= 0 or dungeon_id >= 0 or arena_mode != "" or konflux.active: return 0.0
+	return SoundBank.spawn_hum_gain(player_pos.distance_to(WAYSTONES[0]))
 
 ## Herzschlag läuft, solange die eigene Figur lebt und unter 25 % Leben hat.
 func low_health_alarm_active() -> bool:
@@ -1672,6 +1702,7 @@ func _process(delta: float) -> void:
 		sound_bank.tick(delta)
 		update_mob_voices()
 		sound_bank.set_loop("spieler_warnung", low_health_alarm_active(), effects_volume)
+		sound_bank.set_loop("teleport_brummen", true, effects_volume * spawn_hum_level())
 		update_panel_sounds()
 	boss_music_hold_timer=maxf(0.0,boss_music_hold_timer-delta)
 	if boss_music_hold_timer<=0.0:boss_music_hold_theme=""
@@ -8249,7 +8280,6 @@ func draw_static_overworld(bounds: Rect2) -> void:
 			var obstacle := obstacle_in_cell(cx, cy)
 			if not obstacle.is_empty() and class_boss_arena_index_at(obstacle['pos'],65.0)<0 and visible_world(obstacle['pos'], 110): draw_obstacle(obstacle)
 
-	draw_village_ground()
 	if bounds.intersects(Rect2(WAYSTONES[0]-Vector2(280,280),Vector2(560,560))):SpawnPlatform32.platform(self,WAYSTONES[0])
 	draw_rect(Rect2(Vector2.ZERO, WORLD), Color('45726d'), false, 7)
 
@@ -8851,29 +8881,6 @@ func draw_shell(p: Vector2) -> void:
 	draw_rect(Rect2(p + Vector2(10, 12), Vector2(12, 9)), Color('f9ebd1'))
 	draw_rect(Rect2(p + Vector2(12, 7), Vector2(8, 5)), Color('eebfad'))
 	draw_rect(Rect2(p + Vector2(14, 14), Vector2(4, 4)), Color('fff7e8'))
-
-func draw_village_ground() -> void:
-	# 32px-Grundstückskanten: flache Einfassung um Häuser, rein visuell.
-	var pads:Array=[
-		Rect2(128,608,288,320),
-		Rect2(128,1088,288,320),
-		Rect2(128,1536,320,352),
-		Rect2(128,2016,352,320),
-		Rect2(1216,288,352,352),
-		Rect2(1248,1056,288,352),
-		Rect2(1088,1872,448,352)
-	]
-	for pad:Rect2 in pads:
-		if not pad.grow(48).intersects(current_static_bounds()):continue
-		draw_rect(pad,Color("8b5732",0.18))
-		draw_rect(pad.grow(-8),Color("a06b3f",0.10))
-		draw_rect(pad,Color("c08a58",0.38),false,3)
-		for x in range(int(pad.position.x)+16,int(pad.end.x)-16,32):
-			draw_rect(Rect2(Vector2(x,pad.position.y-2),Vector2(18,4)),Color("b8ae8f",0.48))
-			draw_rect(Rect2(Vector2(x,pad.end.y-2),Vector2(18,4)),Color("756b55",0.38))
-		for y in range(int(pad.position.y)+16,int(pad.end.y)-16,32):
-			draw_rect(Rect2(Vector2(pad.position.x-2,y),Vector2(4,18)),Color("9f9679",0.42))
-			draw_rect(Rect2(Vector2(pad.end.x-2,y),Vector2(4,18)),Color("6c654f",0.34))
 
 func draw_village_ground_legacy() -> void:
 	for i in range(16):
@@ -9800,7 +9807,6 @@ func draw_hud() -> void:
 	if touch_enabled:
 		draw_touch_controls()
 	else:
-		HudLayout.shadow_text(self,Vector2(22, 604), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge") + " · ZOOM: MAUSRAD / +/-", 11, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 660)
 		var hud_labels:Array=[
 			"%s SPELLS" % binding_short("skills"),
 			"%s INVENTAR" % binding_short("inventory"),
@@ -10646,7 +10652,7 @@ func draw_creation_panel() -> void:
 		for line in 3:
 			text_at(Vector2(312+cls*225,456+line*18), descriptions[cls][line], 10, Color('d8e6dc'), HORIZONTAL_ALIGNMENT_LEFT, 135)
 	ui_button(Rect2(165, 520, 110, 52), "ZURÜCK")
-	ui_button(Rect2(300, 520, 550, 52), "VORSCHAU & FÄHIGKEITEN", creation_name.strip_edges().length() >= 2 and creation_class_selected)
+	ui_button(Rect2(300, 520, 550, 52), "WEITER", creation_name.strip_edges().length() >= 2 and creation_class_selected)
 	text_at(Vector2(305, 592), "Figur anklicken, dann Auswahl bestätigen. Rasse und Geschlecht bestimmen dein Modell.", 12, Color('aebfb9'), HORIZONTAL_ALIGNMENT_CENTER, 540)
 
 func review_character_creation() -> void:

@@ -4,6 +4,12 @@ const ELARA_ID := 7
 const ELARA_BASE_SIZE:=Vector2(1088,624)
 const ELARA_AISLE_GAP:=32.0
 const ELARA_SPLIT_Y:=395.0
+## Freier Steinboden zwischen Altar (endet bei 378) und vorderen Bänken (ab 418).
+const ELARA_FLOOR_BAND_Y:=380.0
+## Mittelgang: Spalten der alten Bodenrune und eine freie Bodenzeile darunter.
+const ELARA_AISLE_X0:=724.0
+const ELARA_AISLE_X1:=936.0
+const ELARA_AISLE_CLEAN_Y:=486.0
 const ELARA_CONCEPT := "res://art/concepts/map0/elara_church_interior_32px.webp"
 const NAMES := ["Alma","Mira","Liora","Arven","Torvald","Fenna","Pip","Elara","Borin"]
 const KINDS := ["inn","elder","elder","arena","smith","style","apprentice","healer","magic"]
@@ -128,7 +134,16 @@ static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:boo
 		var top:=center-room_size(id)*.5
 		var upper_height:=ELARA_SPLIT_Y/source.y*ELARA_BASE_SIZE.y
 		c.draw_texture_rect_region(textures[asset],Rect2(top,Vector2(ELARA_BASE_SIZE.x,upper_height)),Rect2(0,0,source.x,ELARA_SPLIT_Y))
-		c.draw_texture_rect_region(textures[asset],Rect2(top+Vector2(0,upper_height),Vector2(ELARA_BASE_SIZE.x,ELARA_AISLE_GAP)),Rect2(0,ELARA_SPLIT_Y-10,source.x,8))
+		# Die Lücke füllt freier Steinboden zwischen Altar und Bänken in
+		# Originalgröße, zweimal untereinander. Früher wurde ein schmaler Streifen
+		# gedehnt; das verschmierte die Steine.
+		var gap_source:=ELARA_AISLE_GAP/ELARA_BASE_SIZE.y*source.y
+		for half in 2:
+			c.draw_texture_rect_region(textures[asset],Rect2(top+Vector2(0,upper_height+half*ELARA_AISLE_GAP*.5),Vector2(ELARA_BASE_SIZE.x,ELARA_AISLE_GAP*.5)),Rect2(0,ELARA_FLOOR_BAND_Y,source.x,gap_source*.5))
+			# Mittelgang ohne die Spitze der alten Bodenrune.
+			var aisle:=Rect2(ELARA_AISLE_X0,ELARA_AISLE_CLEAN_Y,ELARA_AISLE_X1-ELARA_AISLE_X0,gap_source*.5)
+			var scale_x:=ELARA_BASE_SIZE.x/source.x
+			c.draw_texture_rect_region(textures[asset],Rect2(top+Vector2(aisle.position.x*scale_x,upper_height+half*ELARA_AISLE_GAP*.5),Vector2(aisle.size.x*scale_x,ELARA_AISLE_GAP*.5)),aisle)
 		c.draw_texture_rect_region(textures[asset],Rect2(top+Vector2(0,upper_height+ELARA_AISLE_GAP),Vector2(ELARA_BASE_SIZE.x,ELARA_BASE_SIZE.y-upper_height)),Rect2(0,ELARA_SPLIT_Y,source.x,source.y-ELARA_SPLIT_Y))
 	else:c.draw_texture_rect(textures[asset],Rect2(center-room_size(id)*.5,room_size(id)),false)
 	if id==ELARA_ID:paint_healing_dais(c,healing_field_pos(center,id))

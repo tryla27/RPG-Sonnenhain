@@ -1,6 +1,11 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Sonnenhain · Keine orangenen Rahmen mehr", "Um Rathaus, Kirche, Borin, Fenna, Alma, Schmiede und Arena lag ein halbtransparenter orangener Rahmen mit gestrichelter Kante auf dem Boden. Er stammte aus einer alten Dorfversion und ist entfernt."],
+["Kapelle · Sauberer Steinboden", "Zwischen Altar und vorderen Bänken war der Steinboden seit der Verbreiterung verschmiert. Dort liegt jetzt richtiger Steinboden in Originalgröße."],
+["Klänge · Alle Büsche rascheln", "Auch Blütenbüsche, Kräuter, Büsche an Bäumen und Ruinen sowie die Büsche auf den Wiesen rascheln jetzt, wenn du hindurchläufst."],
+["Klänge · Summen am Spawnstein", "Rund um den Spawnstein summt leise ein magisches Teleport-Brummen; es wird mit Abstand leiser und verstummt in Häusern."],
+["Oberfläche · Aufgeräumt", "Die Steuerungszeile über der unteren Leiste ist entfernt. In der Charaktererstellung heißt der Knopf jetzt „Weiter“."],
 ["Fusionen · Wirkung am Trefferpunkt", "Alle Fusionen zünden jetzt dort, wo ihr Angriff trifft: am ersten getroffenen Gegner, sonst am Hindernis oder am Ende der Reichweite. Bisher lösten viele Fusionen ihren zweiten Teil einfach am Spieler aus. Fusionen aus zwei Schutz- oder Hilfsfähigkeiten schicken einen kurzen Impuls in Blickrichtung. Schilde, Heilung und Stärkungen wirken weiter auf dich. Fächer und Durchschläge zünden höchstens fünfmal pro Einsatz. Enthält eine Fusion den Sprungangriff, springst du weiterhin; sein Landeschlag zündet am Treffer. Der Reaktorwall schützt dich sofort, seine Wand entsteht am Einschlag."],
 ["Reisen · Weltkarte an Wegsteinen", "Spawn und Wegsteine öffnen die Weltkarte. Ein Klick auf eine Region oder einen aktivierten Wegstein reist direkt dorthin; Aktivierungen und Boss-Siegel bleiben gültig. Wegsteine schicken dich beim Öffnen nicht mehr sofort ins Dorf zurück."],
 ["Bossgaben · Zuordnung und Anhänger", "Die drei Meistergaben erkennen ihre Boss- und Klassenzuordnung auch bei älteren Gegenständen zuverlässig. Ungültige Kennungen werden nicht mehr als Kriegergabe behandelt. Anhänger und Amulette tragen Kettenoptik, werden im Halskettenplatz angelegt und behalten ihre Werte."],
