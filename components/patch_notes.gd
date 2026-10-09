@@ -1,7 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
-["Fehlerbehebung · Dunkler Arkanhüter", "Nach dem Umzug ins Kristallmoor konnte der Dunkle Arkanhüter fehlen, obwohl sein Feld da war. Ein Klassenboss außerhalb seines Felds blockiert sein Erscheinen jetzt nicht mehr: Er erscheint wieder zuverlässig in seinem Feld."],
+["Fehlerbehebung · Dunkler Arkanhüter", "Nach dem Umzug ins Kristallmoor konnte der Dunkle Arkanhüter fehlen, obwohl sein Feld da war. Ein Klassenboss außerhalb seines Felds blockiert sein Erscheinen jetzt nicht mehr: Er erscheint wieder zuverlässig in seinem Feld. Der Server schreibt dazu jetzt Prüfmeldungen mit, damit sich weitere Fälle schnell finden lassen."],
 ["Welt · Neue Wegsteine", "Alle Wegsteine außerhalb des Dorfs stehen jetzt auf einem erhöhten Steinplateau mit Treppe, Runenkreis und einem Obelisk, über dem ein Kristall schwebt. Aktivierte Wegsteine leuchten. Hinauf und hinunter geht es über die Treppe."],
 ["Schütze · Ewige Pfeile", "Der Hut des Jagdmeisters verleiht dem Schützen „Ewige Pfeile“: Normale Pfeile fliegen weiter als zuvor, bis sie einen Gegner oder ein Hindernis treffen."],
 ["Fehlerbehebung · Spielstände im Startmenü", "Angemeldet zeigte das Startmenü die Spielstände, die zufällig im Browser lagen, manchmal von einem anderen Konto oder einem alten Charakter. Jetzt zeigen die drei Speicherplätze genau die Charaktere deines Kontos, wie bei der Anmeldung, mit aktueller Stufe. „Spielstand laden“ lädt sie vom Server."],
