@@ -734,6 +734,35 @@ def r_busch_rascheln(rng, v):
     return finish(mix((crackle, 0.9), (swish, 0.5), (twigs, 0.35)), top=9000)
 
 
+def r_teleport_brummen(rng, v):
+    # Magisches Wegstein-Summen als nahtlose Schleife (1,92 s): tiefer Quint-Bordun,
+    # langsam atmendes Schimmern und zwei leise Glöckchen. Alle Frequenzen sind
+    # ganzzahlige Vielfache von 1/d. Gerechnet werden drei Durchläufe; der mittlere
+    # ist eingeschwungen und schließt ohne Knacks an sich selbst an.
+    d = 1.92
+    n = int(round(d * SR))
+    t = np.arange(3 * n) / SR
+    k = lambda f: round(f * d) / d
+    breath = 0.5 + 0.5 * np.cos(2 * np.pi * t / d)
+    shimmer_lfo = 0.5 + 0.5 * np.cos(2 * np.pi * 2 * t / d + 1.0)
+    drone = (np.sin(2 * np.pi * k(110) * t) * 0.55 + np.sin(2 * np.pi * k(165) * t) * 0.32
+             + np.sin(2 * np.pi * k(220) * t) * 0.22 * (0.6 + 0.4 * breath))
+    # Leicht schwebende Zweitstimme (zwei nahe Töne) für das Brummen des Steins.
+    hum = (np.sin(2 * np.pi * k(330) * t) + np.sin(2 * np.pi * k(332.6) * t)) * 0.09 * (0.5 + 0.5 * breath)
+    shimmer = (np.sin(2 * np.pi * k(880) * t) * 0.6 + np.sin(2 * np.pi * k(1320) * t) * 0.4) * 0.06 * shimmer_lfo
+    sparkle = np.zeros_like(t)
+    for rep in range(3):
+        for start, note in ((0.31, NOTE["E5"] * 2), (1.27, NOTE["B5"])):
+            ping = bell(k(note), 0.7, 0.35) * 0.08
+            i0 = int((start + rep * d) * SR)
+            idx = (np.arange(len(ping)) + i0) % len(t)
+            np.add.at(sparkle, idx, ping)
+    x = lp(drone + hum + shimmer + sparkle, 5200, 2)
+    x = console(x, bits=12, top=9000)
+    x = np.resize(x, 3 * n)[n:2 * n]
+    return x / (np.max(np.abs(x)) + 1e-9) * 10 ** (-6 / 20)
+
+
 # Name -> (Bereich, Rezept, Varianten)
 SOUNDS = {
     "schwert_schwung": ("kampf", r_schwert_schwung, 4),
@@ -795,6 +824,7 @@ SOUNDS = {
     "heilen": ("welt", r_heilen, 1),
     "boss_erscheint": ("welt", r_boss_erscheint, 1),
     "busch_rascheln": ("welt", r_busch_rascheln, 3),
+    "teleport_brummen": ("welt", r_teleport_brummen, 1),
 }
 
 

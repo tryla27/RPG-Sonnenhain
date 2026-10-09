@@ -127,6 +127,24 @@ func run()->void:
 	g.panel="";g.update_panel_sounds()
 	expect("ui_fenster_zu","Inventar schließen")
 
+	# Teleport-Brummen: am Spawnstein laut, mit Abstand leiser, drinnen still.
+	g.player_pos=g.WAYSTONES[0]+Vector2(60,0)
+	check(is_equal_approx(g.spawn_hum_level(),1.0),"Brummen am Spawnstein voll")
+	g.sound_bank.set_loop("teleport_brummen",true,g.spawn_hum_level())
+	check(g.sound_bank.loop_players["teleport_brummen"].playing,"Brummen läuft am Spawnstein")
+	check(g.sound_bank.loop_players["teleport_brummen"].bus==Bank.BUS_AMBIENCE,"Brummen auf dem Umgebungs-Bus")
+	g.player_pos=g.WAYSTONES[0]+Vector2(300,0)
+	var mid:float=g.spawn_hum_level()
+	check(mid>0.0 and mid<1.0,"Brummen leiser mit Abstand")
+	g.player_pos=g.WAYSTONES[0]+Vector2(900,0)
+	check(g.spawn_hum_level()==0.0,"Brummen weit weg still")
+	g.sound_bank.set_loop("teleport_brummen",true,g.spawn_hum_level())
+	check(not g.sound_bank.loop_players["teleport_brummen"].playing,"Brummen stoppt weit weg")
+	g.player_pos=g.WAYSTONES[0]
+	g.interior_id=1
+	check(g.spawn_hum_level()==0.0,"Brummen drinnen still")
+	g.interior_id=-1
+
 	# Busch-Rascheln an einem Dorfbusch.
 	check(g.foliage_at(g.VillageLayout.BUSHES[0]),"Dorfbusch erkannt")
 

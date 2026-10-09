@@ -6,6 +6,14 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- `draw_village_ground` (halbtransparente Grundstücksrahmen) entfernt.
+- Kapelle: Gangverbreiterung zeigt freien Steinboden in Originalgröße statt
+  eines gedehnten Streifens (`ELARA_FLOOR_BAND_Y`, `ELARA_AISLE_*`).
+- `components/foliage.gd`: Busch-Erkennung für Blütenbüsche, Kräuter,
+  Hindernis- und Streubüsche; Test `tests/audio/check_bush_rustle.gd`.
+- `teleport_brummen` (nahtlose Schleife, Umgebungs-Bus) mit
+  `SoundBank.spawn_hum_gain`; Steuerungszeile entfernt; Knopf „WEITER“.
+- Werkzeug `tools/capture_village_spots.gd` für Bildschirmfotos an Dorfstellen.
 - Fusionsregel nachgeschärft (Angelo): Zündlimit 5 statt 3; Sprungangriff als
   Partner bewegt den Spieler beim Wirken weiter (`perform_jump_movement`,
   `FusionCast.jumps_at_cast`).

@@ -41,6 +41,7 @@ const CATALOG := {
 	"spieler_ausweichen": {"path":"spieler/spieler_ausweichen", "variants":2, "db":-11.0, "max":1, "prio":4, "pitch":0.05},
 	"spieler_trank": {"path":"spieler/spieler_trank", "variants":1, "db":-10.0, "max":1, "prio":5, "pitch":0.02},
 	"spieler_wiederbeleben": {"path":"spieler/spieler_wiederbeleben", "variants":1, "db":-8.0, "max":1, "prio":8, "pitch":0.0, "duck":1.2},
+	"teleport_brummen": {"path":"welt/teleport_brummen", "variants":1, "db":-11.0, "max":1, "prio":1, "pitch":0.0, "loop":true, "bus":"umgebung"},
 	"spieler_warnung": {"path":"spieler/spieler_warnung", "variants":1, "db":-13.0, "max":1, "prio":7, "pitch":0.0, "loop":true},
 	"schleim_huepfen": {"path":"mobs/schleim_huepfen", "variants":3, "db":-12.0, "max":2, "prio":2, "pitch":0.08},
 	"schleim_tod": {"path":"mobs/schleim_tod", "variants":1, "db":-9.0, "max":2, "prio":4, "pitch":0.06},
@@ -134,6 +135,15 @@ static func loot_sound_for(rarity: int) -> String:
 static func file_path(name: String, variant: int) -> String:
 	return "res://audio/sfx/%s_%02d.wav" % [CATALOG[name]["path"], variant + 1]
 
+## Teleport-Brummen am Spawnstein: voll bis SPAWN_HUM_FULL, leise auslaufend bis SPAWN_HUM_EDGE.
+const SPAWN_HUM_FULL := 150.0
+const SPAWN_HUM_EDGE := 460.0
+
+static func spawn_hum_gain(distance: float) -> float:
+	if distance <= SPAWN_HUM_FULL: return 1.0
+	if distance >= SPAWN_HUM_EDGE: return 0.0
+	return pow(1.0 - (distance - SPAWN_HUM_FULL) / (SPAWN_HUM_EDGE - SPAWN_HUM_FULL), 1.4)
+
 ## Linearer Lautstärkefaktor nach Entfernung zur Spielfigur.
 static func distance_gain(distance: float) -> float:
 	if distance <= NEAR: return 1.0
@@ -160,7 +170,7 @@ func setup(host: Node, voices: int = 16) -> void:
 		if bool(CATALOG[name].get("loop", false)) and not list.is_empty():
 			make_loop(list[0])
 			var loop_player := AudioStreamPlayer.new()
-			loop_player.bus = BUS_SFX
+			loop_player.bus = BUS_AMBIENCE if str(CATALOG[name].get("bus", "")) == "umgebung" else BUS_SFX
 			loop_player.stream = list[0]
 			host.add_child(loop_player)
 			loop_players[name] = loop_player
