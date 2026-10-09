@@ -128,7 +128,7 @@ for connection in ['func draw_volume_slider', 'func set_volume_from_mouse', '"mu
 teleport = source.split('\t\t19, 27:', 1)[1].split('\t\t20:', 1)[0]
 assert '\t\t\t\tdraw_arc(point, 18 + echo * 4' in teleport
 assert 'var hue: Color = [Color("a9eafa")' in source
-assert 'func draw_trails() -> void:' in source and 'draw_line(a, b, edge_colors[theme], 116.0, false)' in source
+assert 'func draw_trails() -> void:' in source and 'draw_trail_band(a, b, 116.0, edge_colors[theme])' in source
 assert '"name":"Elara"' in data_source
 assert 'const MUSIC_FADE_SECONDS := 1.35' in source
 assert 'music_incoming.volume_db' in source and 'music_player.volume_db' in source
@@ -218,8 +218,8 @@ for chapel_token in [
     'ELARA_CONCEPT := "res://art/concepts/map0/elara_church_interior_32px.webp"',
     'static func healing_field_pos',
     '"asset":"kapelle"',
-    'Rect2(397,418,277,106)',
-    'Rect2(984,569,280,102)',
+    'Rect2(397,440,277,62)',
+    'Rect2(984,591,280,58)',
     'pixel_point(id,Vector2(830,433))',
 ]:
     assert chapel_token in interiors32, f'missing Elara chapel feature: {chapel_token}'

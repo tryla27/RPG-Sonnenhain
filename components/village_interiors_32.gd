@@ -31,6 +31,30 @@ static func role_for_id(id:int)->String:
 static func exit_offset(id:int)->Vector2:
 	return Vector2(0,340) if id==3 else (Vector2(0,168) if id==6 else Vector2(0,210))
 
+## Erhöhtes, begehbares Steinpodest unter Elaras Heilfeld (vor dem Altar).
+const DAIS_SIZE:=Vector2(108,58)
+static func dais_rect(field:Vector2)->Rect2:
+	return Rect2(field-Vector2(DAIS_SIZE.x*.5,DAIS_SIZE.y*.5),DAIS_SIZE)
+
+static func paint_healing_dais(c:CanvasItem,field:Vector2)->void:
+	var top:=dais_rect(field)
+	var front:=Rect2(top.position+Vector2(0,top.size.y),Vector2(top.size.x,8))
+	var step:=Rect2(front.position+Vector2(10,8),Vector2(top.size.x-20,6))
+	c.draw_rect(Rect2(top.position+Vector2(3,4),top.size+Vector2(0,14)),Color(0,0,0,0.18))
+	c.draw_rect(step,Color("8a8389"))
+	c.draw_rect(Rect2(step.position,Vector2(step.size.x,2)),Color("a9a2a6"))
+	c.draw_rect(front,Color("6f6870"))
+	c.draw_rect(top,Color("8d868c"))
+	c.draw_rect(top.grow(-3),Color("b3aca9"))
+	c.draw_rect(Rect2(top.position+Vector2(3,3),Vector2(top.size.x-6,2)),Color("cfc8c3"))
+	for x in range(int(top.position.x)+18,int(top.end.x)-6,26):
+		c.draw_line(Vector2(x,top.position.y+4),Vector2(x,top.end.y-4),Color("9e9797"),1.0)
+	c.draw_arc(field,17.0,0.0,TAU,32,Color("8fe3d6"),2.0)
+	c.draw_arc(field,10.0,0.0,TAU,24,Color(0.62,0.95,0.88,0.55),1.0)
+	for k in 4:
+		var dir:=Vector2.RIGHT.rotated(k*PI*0.5)
+		c.draw_rect(Rect2(field+dir*22.0-Vector2(2,2),Vector2(4,4)),Color("8fe3d6"))
+
 static func healing_field_pos(center:Vector2,id:int)->Vector2:
 	return center+pixel_point(id,Vector2(830,433)) if id==ELARA_ID else Vector2(-100000,-100000)
 
@@ -43,7 +67,7 @@ const ROOMS := {
 	4:{"asset":"schmiede","source_size":Vector2(1659,948),"floor":Rect2(171,284,1319,456),"objects":[Rect2(295,277,219,102),Rect2(553,301,106,133),Rect2(520,278,47,61),Rect2(187,239,78,101),Rect2(209,307,56,57),Rect2(181,385,75,205),Rect2(183,545,448,129),Rect2(355,508,53,38),Rect2(1217,350,263,183),Rect2(1348,505,70, 70),Rect2(1294,218,93,116),Rect2(1390,217,92,123)]},
 	5:{"asset":"fenna-atelier","source_size":Vector2(1660,948),"floor":Rect2(204,308,1310,397),"objects":[Rect2(320,94,259,225),Rect2(644,164,283,140),Rect2(929,97,168,185),Rect2(1182,156,219,152),Rect2(1277,266, 60, 70),Rect2(1385,360,92,145),Rect2(1391,512,88,165),Rect2(205,373,76,222),Rect2(261,572,52,62)]},
 	6:{"asset":"pip","source_size":Vector2(1536,1024),"floor":Rect2(333,321,872,434),"objects":[Rect2(354,208,171,158),Rect2(640,288,255,140),Rect2(953,216,135,156),Rect2(1114,283,89,132),Rect2(350,647, 70,84)]},
-	7:{"asset":"kapelle","source_size":Vector2(1659,948),"floor":Rect2(255,287,1150,466),"objects":[Rect2(306,173,170,168),Rect2(480,271,50,65),Rect2(722,251,216,126),Rect2(1185,205,151,134),Rect2(1340,286,36,64),Rect2(397,418,277,106),Rect2(984,418,280,106),Rect2(397,569,277,102),Rect2(984,569,280,102)]},
+	7:{"asset":"kapelle","source_size":Vector2(1659,948),"floor":Rect2(255,287,1150,466),"objects":[Rect2(306,173,170,168),Rect2(480,271,50,65),Rect2(722,251,216,126),Rect2(1185,205,151,134),Rect2(1340,286,36,64),Rect2(397,440,277,62),Rect2(984,440,280,62),Rect2(397,591,277,58),Rect2(984,591,280,58)]},
 	8:{"asset":"borin-skillhaus","source_size":Vector2(1659,948),"floor":Rect2(262,279,1135,474),"objects":[Rect2(302,122,237,235),Rect2(680,195,305,143),Rect2(795,305,70,85),Rect2(1236,233,130,113),Rect2(1298,442,103,309),Rect2(1230,621,66, 80),Rect2(270,606, 70,120),Rect2(1352,376,46,67)]}
 }
 static var textures:Dictionary={}
@@ -87,6 +111,7 @@ static func paint(c:CanvasItem,center:Vector2,id:int,font:Font,touch_enabled:boo
 	var asset:String=room(id)["asset"]
 	if not textures.has(asset):textures[asset]=load("res://art/village/interiors/%s.png" % asset)
 	c.draw_texture_rect(textures[asset],Rect2(center-room_size(id)*.5,room_size(id)),false)
+	if id==ELARA_ID:paint_healing_dais(c,healing_field_pos(center,id))
 	if id==8:
 		var p:=center+link_offset(id)
 		c.draw_rect(Rect2(p+Vector2(-12,-42),Vector2(24,54)),Color("352e35"))

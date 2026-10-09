@@ -1,7 +1,7 @@
 extends RefCounted
 
 const Paths=preload("res://components/village_paths.gd")
-const LAMPS:=[Vector2(592,560),Vector2(608,1280),Vector2(496,1712),Vector2(496,1840),Vector2(496,2448),Vector2(880,1280),Vector2(1040,1360),Vector2(1712,1520),Vector2(1712,1840),Vector2(1712,2240),Vector2(1200,2590),Vector2(880,560)]
+const LAMPS:=[Vector2(592,560),Vector2(616,1280),Vector2(496,1736),Vector2(496,1840),Vector2(496,2448),Vector2(880,1280),Vector2(1040,1360),Vector2(1712,1520),Vector2(1712,1840),Vector2(1712,2240),Vector2(1312,2456),Vector2(880,560)]
 
 static func lamp(c:CanvasItem,p:Vector2)->void:
 	var iron:=Color("30353c")
