@@ -5,6 +5,10 @@
 extends Node2D
 const PatchNotice = preload("res://components/patch_notice.gd")
 const PatchNotes = preload("res://components/patch_notes.gd")
+const MenuFeedback = preload("res://components/menu_feedback.gd")
+var menu_feedback = MenuFeedback.new()
+## Zählt abgespielte Oberflächenklänge, damit Menüklicks nicht doppelt klingen.
+var ui_sound_count := 0
 var patch_notice = PatchNotice.new()
 const ExperienceRules = preload("res://components/experience_rules.gd")
 const ControllerControls = preload("res://components/controller_controls.gd")
@@ -1400,6 +1404,7 @@ func _exit_tree() -> void:
 		player.stream = null
 
 func play_sound(name: String) -> void:
+	if SoundBank.is_ui(name): ui_sound_count += 1
 	if sound_bank.has(name):
 		sound_bank.play(name, ui_volume if SoundBank.is_ui(name) else effects_volume)
 		return
@@ -3188,6 +3193,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and event.keycode == KEY_ESCAPE or event_matches_binding(event, "pause"):
 		if panel in ["arena_reward", "victory", "start"]: return
+		if menu_feedback.cancel_exit(): return
 		if panel == "":
 			panel = "pause"
 			pause_status = "Konflux läuft online weiter." if konflux.active else "Das Spiel ist angehalten."
@@ -5773,7 +5779,49 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	energy = clampf(float(data.get("energy", 100)), 0, max_energy())
 	validate_equipment_slots()
 
+## Jeder Klick auf einen sichtbaren Menüknopf klickt hörbar, wenn die Aktion
+## nicht schon selbst einen Oberflächenklang spielt.
 func handle_panel_click(mouse: Vector2) -> void:
+	if menu_feedback.asking():
+		click_exit_confirm(mouse)
+		return
+	var on_button: bool = menu_feedback.hits_button(mouse)
+	var sounds_before := ui_sound_count
+	panel_click(mouse)
+	if on_button and ui_sound_count == sounds_before: play_sound("ui_klick")
+
+func click_exit_confirm(mouse: Vector2) -> void:
+	var from: String = menu_feedback.exit_from
+	var choice: String = menu_feedback.click_exit(mouse)
+	if choice == "": return
+	play_sound("ui_klick")
+	if choice == "confirm":
+		menu_feedback.exit_from = ""
+		leave_game(from)
+	queue_redraw()
+
+## Verlassen nach bestätigter Rückfrage: aus dem Spielmenü ins Hauptmenü, aus
+## den Einstellungen zusätzlich aus Arena, Gewölbe und Gebäuden heraus.
+func leave_game(from: String) -> void:
+	if from == "pause":
+		save_and_return_to_start()
+		return
+	if arena_mode != "":
+		arena_mode = ""
+		player_pos = arena_return_pos
+		enemies.clear()
+	if dungeon_id >= 0:
+		dungeon_id = -1
+		player_pos = dungeon_return_pos
+		enemies.clear()
+	if interior_id >= 0:
+		interior_id = -1
+		player_pos = interior_return_pos
+	var returned_to_start := save_and_return_to_start()
+	if returned_to_start and is_web_platform():
+		JavaScriptBridge.get_interface("window").location.assign("/")
+
+func panel_click(mouse: Vector2) -> void:
 	if panel=="world_builder":
 		world_builder.click(self,mouse)
 		queue_redraw()
@@ -5960,10 +6008,11 @@ func handle_panel_click(mouse: Vector2) -> void:
 				play_sound("ui_klick")
 				return
 		if Rect2(190,540,300,44).has_point(mouse):
-			save_and_return_to_start()
+			menu_feedback.ask_exit("pause")
 		return
 	if panel == "settings":
 		if set_volume_from_mouse(mouse):
+			play_sound("ui_klick")
 			save_game()
 		elif Rect2(860, 221, 130, 42).has_point(mouse):
 			controls_return_panel = "pause"
@@ -5988,21 +6037,8 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif not creative_mode and Rect2(590,480,260,38).has_point(mouse):
 			import_save_backup()
 		elif Rect2(300, 563, 550, 35).has_point(mouse):
-			if arena_mode != "":
-				arena_mode = ""
-				player_pos = arena_return_pos
-				enemies.clear()
-			if dungeon_id >= 0:
-				dungeon_id = -1
-				player_pos = dungeon_return_pos
-				enemies.clear()
-			if interior_id >= 0:
-				interior_id = -1
-				player_pos = interior_return_pos
-			var returned_to_start := save_and_return_to_start()
-			if returned_to_start and is_web_platform():
-				JavaScriptBridge.get_interface("window").location.assign("/")
-				return
+			menu_feedback.ask_exit("settings")
+			return
 		elif creative_mode:
 			if Rect2(300,510,280,38).has_point(mouse):
 				panel="repair";queue_redraw();return
@@ -7143,6 +7179,7 @@ func sell_item(index: int) -> void:
 	save_game()
 
 func _draw() -> void:
+	menu_feedback.begin_frame()
 	drawing_ui=false
 	if panel in ["account_gate","account_login","account_register","account_migrate","start","creation","creation_review"] and not dedicated_server_mode:
 		character_canvas_offset=Vector2.ZERO
@@ -9536,6 +9573,7 @@ func ui_box(rect: Rect2, fill: Color = Color("304a4b")) -> void:
 		draw_rect(Rect2(corner, Vector2(5, 5)), Color("e3c077"))
 
 func ui_button(rect: Rect2, label: String, enabled: bool = true, active: bool = false) -> void:
+	menu_feedback.note(rect, enabled)
 	var hovering := enabled and rect.has_point(get_viewport().get_mouse_position())
 	var border := Color("ffe0a0") if active or hovering else Color("c9a45e")
 	draw_rect(rect, Color("18252e"))
@@ -9670,8 +9708,7 @@ func draw_hud() -> void:
 	if touch_enabled:
 		draw_touch_controls()
 	else:
-		draw_ref_panel(Rect2(9, 586, 1134, 53))
-		text_at(Vector2(22, 605), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge") + " · ZOOM: MAUSRAD / +/-", 10, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 760)
+		HudLayout.shadow_text(self,Vector2(22, 604), ("LINKER STICK: Laufen · RECHTER STICK: Zielen · " if controller.used else "LAUFEN: %s/%s/%s/%s · " % [binding_short("move_up"),binding_short("move_left"),binding_short("move_down"),binding_short("move_right")]) + "ANGRIFF: " + binding_short("attack") + " · AUSWEICHEN: " + binding_short("dodge") + " · ZOOM: MAUSRAD / +/-", 11, Color("f0e4c5"), HORIZONTAL_ALIGNMENT_LEFT, 660)
 		var hud_labels:Array=[
 			"%s SPELLS" % binding_short("skills"),
 			"%s INVENTAR" % binding_short("inventory"),
@@ -9681,12 +9718,11 @@ func draw_hud() -> void:
 			"%s GRUPPE" % binding_short("party"),
 			"%s CHAT" % binding_short("chat")
 		]
-		for i in hud_labels.size():ui_button(hud_action_rect(i),str(hud_labels[i]))
+		for i in hud_labels.size():HudLayout.draw_hud_button(self,hud_action_rect(i),str(hud_labels[i]),hud_action_rect(i).has_point(mouse_now))
 		for slot in 4:
 			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
 			var x := 694 + slot * 81
-			draw_rect(Rect2(x,593,75,44),Color("d0b67d",0.45 if id>=0 else 0.18),false,1)
-			text_at(Vector2(x + 8, 629), binding_short("ability_%d" % (slot + 1)), 11, Color("ffe2a3") if id >= 0 else Color("a9aa9c"))
+			HudLayout.draw_skill_slot(self,Rect2(x,593,75,44),binding_short("ability_%d" % (slot + 1)),id >= 0)
 			if id >= 0:
 				draw_skill_icon(Vector2(x + 24, 598), id, 30)
 				if float(cooldowns[id]) > 0:
@@ -10013,6 +10049,7 @@ func draw_panel() -> void:
 		"arena_entry": draw_arena_entry_panel()
 		"arena_reward": draw_arena_reward_panel()
 		"victory": draw_victory_panel()
+	if menu_feedback.asking(): menu_feedback.draw_exit(self, is_web_platform())
 
 	controller.draw_cursor(self)
 

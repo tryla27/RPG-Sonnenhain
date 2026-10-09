@@ -1,6 +1,10 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Fehlerbehebung · Kein Ton im Browser", "Im Browser waren seit dem Klang-Update Musik, Effekte und Menüklänge stumm. Die Lautstärkekanäle sind jetzt fest im Spiel angelegt, damit der Browser sie abspielt."],
+["Oberfläche · Durchsichtige untere Leiste", "Die Leiste unten hat keinen Hintergrund mehr. Nur Knöpfe und belegte Fähigkeitsplätze haben einen Rahmen; die Knopfbeschriftungen passen wieder vollständig hinein."],
+["Menüs · Rückfrage beim Verlassen", "„Speichern & zur Startseite“ und „Speichern & Hauptmenü“ fragen jetzt nach, ob du das Spiel wirklich verlassen willst. Abbrechen oder Escape bringt dich zurück ins Menü."],
+["Klänge · Klick für alle Menüknöpfe", "Jeder Knopf in Menüs und Fenstern klickt hörbar, ebenso die Lautstärkeregler. Knöpfe mit eigenem Klang klicken nicht doppelt."],
 ["Oberfläche · Schlankeres HUD", "Leben, Energie und Ausdauer sind jetzt schmale Balken ohne Kasten; die Zahlen samt XP und Gold erscheinen beim Darüberfahren. XP läuft als dünne Linie unter der Fähigkeitenleiste. Das aktuelle Ziel steht als eine halbtransparente Zeile unten über der Leiste und zeigt beim Darüberfahren die Details. Kartenname und Stufe stehen unter der Minimap. Die Speicherzeile erscheint nur noch bei Problemen."],
 ["Oberfläche · Patch Notes als Liste", "Die Patch Notes zeigen nur noch die Überschriften, neueste oben. Ein Klick öffnet den ganzen Text; mit „Neuer“ und „Älter“ blätterst du weiter, Escape führt zurück zur Liste. Das Mausrad blättert durch ältere Einträge."],
 ["Fehlerbehebung · Fenna-Änderungen nach dem Login", "Änderungen bei Fenna, die den Server vor dem Schließen nicht mehr erreicht haben, gehen beim nächsten Anmelden nicht mehr verloren. Ist der Server neuer, wird der lokale Stand als Kopie gesichert. Fenna zeigt an, wann der Server gespeichert hat."],

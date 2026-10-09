@@ -101,6 +101,9 @@ var mob_seen := {}
 var loop_players := {}
 var rng := RandomNumberGenerator.new()
 
+## Die Busse stehen fest in res://default_bus_layout.tres. Im Browser (Web-Export
+## ohne Threads) bleiben zur Laufzeit angelegte Busse stumm; das Anlegen hier ist
+## nur noch Rückfall für Werkzeuge ohne Projekt-Layout.
 static func ensure_buses() -> void:
 	for bus_name in [BUS_MUSIC, BUS_SFX, BUS_UI, BUS_AMBIENCE]:
 		if AudioServer.get_bus_index(bus_name) >= 0: continue

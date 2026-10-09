@@ -81,3 +81,16 @@ static func draw_quest_line(g,rect:Rect2,text:String,hovered:bool)->void:
 
 static func draw_map_label(g,label:String)->void:
 	shadow_text(g,MAP_LABEL_RECT.position+Vector2(0,16),label,13,Color("fff0bf"),HORIZONTAL_ALIGNMENT_CENTER,int(MAP_LABEL_RECT.size.x))
+
+## Untere Leiste ohne Hintergrund: Nur Knöpfe und belegte Fähigkeitsplätze
+## bekommen einen Rahmen.
+static func draw_hud_button(g,rect:Rect2,label:String,hovered:bool)->void:
+	g.draw_rect(rect,Color(0.04,0.09,0.13,0.82 if hovered else 0.62))
+	g.draw_rect(rect,Color("ffe0a0") if hovered else Color("c9a45e",0.85),false,1.0)
+	g.text_at(rect.position+Vector2(0,rect.size.y*0.5+5),label,13,Color("fff1ce"),HORIZONTAL_ALIGNMENT_CENTER,int(rect.size.x))
+
+static func draw_skill_slot(g,rect:Rect2,key:String,filled:bool)->void:
+	if filled:
+		g.draw_rect(rect,Color(0.04,0.09,0.13,0.62))
+		g.draw_rect(rect,Color("c9a45e",0.85),false,1.0)
+	shadow_text(g,rect.position+Vector2(8,36),key,11,Color("ffe2a3") if filled else Color("a9aa9c",0.75))

@@ -6,6 +6,16 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Web-Ton repariert: Audio-Busse stehen jetzt in `default_bus_layout.tres`.
+  Im Web-Export ohne Threads (Sample-Wiedergabe) bleiben zur Laufzeit per
+  `AudioServer.add_bus()` angelegte Busse stumm; im Browser gemessen (Spitze 0
+  vorher, Musik und Klicks hörbar nachher). `check_sound_bank` prüft das Layout.
+- Neues Modul `components/menu_feedback.gd`: Rückfrage vor dem Verlassen
+  (`leave_game`), Klickklang für jeden sichtbaren `ui_button`
+  (`handle_panel_click` umschließt jetzt `panel_click`). Test
+  `tests/ui/check_menu_feedback.gd`.
+- Untere HUD-Leiste ohne Hintergrund (`HudLayout.draw_hud_button`,
+  `draw_skill_slot`).
 - Konzept-Paket 2: Patch Notes als klickbare Überschriftenliste
   (`components/patch_notes.gd`, Zustand `patch_view`), schlankes HUD in
   `components/hud_layout.gd` (Balken, Questzeile unten, XP-Linie, Kartenname
