@@ -71,8 +71,22 @@ static func travel_to_waystone(g, index:int)->bool:
 	g.save_game();return true
 
 
+## Karte zeigt Reiseziele: geöffnet am Wegstein (F) oder mit M in Wegsteinnähe.
+static func travel_ready(g)->bool:
+	return g.travel_map or (g.panel=="map" and g.dungeon_id<0 and source_valid(g))
+
+static func nearest_stone(g)->int:
+	for i in g.WAYSTONES.size():
+		if g.player_pos.distance_to(g.WAYSTONES[i])<185.0:return i
+	return 0
+
 static func click_map(g, mouse:Vector2)->void:
-	if not g.travel_map:return
+	if not g.travel_map:
+		if travel_ready(g):
+			g.travel_map=true;g.travel_from=nearest_stone(g)
+		else:
+			if destination(g,mouse)>=0:g.message("Gehe zu einem Wegstein, um zu teleportieren.")
+			return
 	var index:=destination(g,mouse)
 	if index<0:
 		if RECT.has_point(mouse):g.message("Hier gibt es keinen Wegstein zum Reisen.")
