@@ -124,6 +124,7 @@ const WorldGeometry=preload("res://components/world_geometry.gd")
 const ItemRules=preload("res://components/item_rules.gd")
 const SoundBank=preload("res://components/sound_bank.gd")
 const TypingSound=preload("res://components/typing_sound.gd")
+const WorldSnapshot=preload("res://components/world_snapshot.gd")
 const HeadgearRules=preload("res://components/headgear_rules.gd")
 const AccountSlots=preload("res://components/account_slots.gd")
 const PORTALS := GameContent.PORTALS
@@ -916,6 +917,7 @@ func start_websocket_server() -> void:
 	websocket_port = clampi(int(command_arg_value("--server-port=", "27845")), 1024, 65535)
 	disconnect_multiplayer(false)
 	var peer := WebSocketMultiplayerPeer.new()
+	WorldSnapshot.widen(peer)
 	var err := peer.create_server(websocket_port, "127.0.0.1")
 	if err != OK:
 		network_status = "Dedicated Server konnte nicht starten · Fehler %d" % err
@@ -932,6 +934,7 @@ func join_live_multiplayer() -> void:
 		return
 	disconnect_multiplayer(false)
 	var peer := WebSocketMultiplayerPeer.new()
+	WorldSnapshot.widen(peer)
 	var err := peer.create_client(command_arg_value("--test-server-url=", "ws://127.0.0.1:31879") if "--local-test" in OS.get_cmdline_user_args() else LIVE_MULTIPLAYER_URL)
 	if err != OK:
 		network_status = "Online-Server konnte nicht kontaktiert werden · Fehler %d" % err
@@ -1205,7 +1208,7 @@ func push_world_snapshot() -> void:
 	for peer_id in multiplayer.get_peers():
 		var state: Dictionary = remote_players.get(int(peer_id),{})
 		if str(state.get("context","world")) == "world":
-			rpc_world_snapshot.rpc_id(int(peer_id),snapshot)
+			rpc_world_snapshot.rpc_id(int(peer_id),WorldSnapshot.for_peer(snapshot,network_player_position(int(peer_id))))
 
 @rpc("authority", "call_remote", "unreliable", 1)
 func rpc_world_snapshot(snapshot: Dictionary) -> void:
