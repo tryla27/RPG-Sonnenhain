@@ -135,6 +135,7 @@ jobs:
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_mob_combat.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_woodland_mobs.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_wolf_animation.gd
+          /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_woodland_pose_animation.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_woodland_attacks.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_boss_music.gd
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tools/check_start32_assets.gd

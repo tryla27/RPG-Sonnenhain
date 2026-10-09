@@ -98,6 +98,16 @@ func run()->void:
 	check(gait_phase>0 and bool(wolf.get("walking",false)),"actual movement advances drawn gait")
 	wolf["stun"]=1;game.advance_mob(wolf,.1,false)
 	check(is_equal_approx(float(wolf.get("gait_phase",0.0)),gait_phase) and not bool(wolf.get("walking",false)),"stunned wolf stops stepping")
+	for type in 3:
+		game.player_pos=Vector2(300,0)
+		var normal:=mob(type);normal["attack_wait"]=1;game.enemies=[normal]
+		game.advance_mob(normal,.1,false)
+		var slowed:=mob(type);slowed["attack_wait"]=1;slowed["slow"]=1;game.enemies=[slowed]
+		game.advance_mob(slowed,.1,false)
+		check(float(normal.get("gait_phase",0))>float(slowed.get("gait_phase",0)) and float(slowed.get("gait_phase",0))>0,"slower movement slows animation %d"%type)
+		var frozen_phase:=float(slowed.get("gait_phase",0));slowed["stun"]=1
+		game.advance_mob(slowed,.1,false)
+		check(is_equal_approx(float(slowed.get("gait_phase",0)),frozen_phase) and not bool(slowed.get("walking",false)),"stun stops woodland stepping %d"%type)
 	var timed:Dictionary={"duration":2.6,"pulse_interval":.65}
 	check(Combat.cloud_pulses(timed,2.5)==4 and Combat.cloud_pulses(timed,.1)==0,"pulse schedule survives coarse delta without duplicates")
 	check(VFX.leap_height(.475)>21 and absf(VFX.leap_height(.55))<.01,"wolf rises and lands in active phase")

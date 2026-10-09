@@ -4,6 +4,7 @@ const Sprites=preload("res://components/golden_sprite_runtime.gd")
 const Hero=preload("res://components/rpg_hero.gd")
 const AttackVFX=preload("res://components/woodland_attack_vfx.gd")
 const WolfAnimation=preload("res://components/wolf_animation.gd")
+const PoseAnimation=preload("res://components/woodland_pose_animation.gd")
 const PATHS=[
 	"res://art/sprites/mobs/woodland_v2/forest_slime_8dir.png",
 	"res://art/sprites/mobs/woodland_v2/flower_beetle_8dir.png",
@@ -46,13 +47,16 @@ static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,pha
 	var heading:=direction_index(look)
 	var motion:=pose(type,phase,attack,ability_id)
 	var animated_wolf:=type==3 and WolfAnimation.available(heading)
+	var animated_woodland:=type in [0,1,2] and PoseAnimation.available(type,heading)
 	if animated_wolf:
 		# Joint poses already move the body. Keep only the real leap height.
 		motion={"offset":Vector2(0,-AttackVFX.leap_height(attack)) if ability_id=="sprungbiss" else Vector2.ZERO,"stretch":Vector2.ONE,"lunge":0.0}
+	elif animated_woodland:
+		motion={"offset":Vector2(0,-PoseAnimation.lift(type,phase,attack,visual)),"stretch":Vector2.ONE,"lunge":0.0}
 	var canvas_scale:=stretch*scale_factor
 	c.draw_set_transform(foot,0,canvas_scale)
 	# The ground contact stays fixed when the creature hops or lunges.
-	var shadow_alpha:=1.0-smoothstep(.35,.9,float(visual["death"])) if animated_wolf and float(visual.get("death",-1.0))>=0.0 else 1.0
+	var shadow_alpha:=1.0-smoothstep(.35,.9,float(visual["death"])) if (animated_wolf or animated_woodland) and float(visual.get("death",-1.0))>=0.0 else 1.0
 	c.draw_rect(Rect2(-22,0,44,6),Color("172a23",.18*shadow_alpha))
 	c.draw_rect(Rect2(-17,-2,34,8),Color("172a23",.20*shadow_alpha))
 	var offset:Vector2=motion["offset"]+look.normalized()*float(motion["lunge"])
@@ -63,6 +67,7 @@ static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,pha
 	if base.v<palette.v*.85:tint=Color(base.v/palette.v,base.v/palette.v,base.v/palette.v)
 	elif base.s<palette.s*.7:tint=Color(1.15,1.12,1.08)
 	if animated_wolf:WolfAnimation.draw(c,heading,phase,attack,ability_id,visual,SCALES[type],tint)
+	elif animated_woodland:PoseAnimation.draw(c,type,heading,phase,attack,visual,SCALES[type],tint)
 	else:Sprites.draw_direction_strip(c,PATHS[type],Vector2.ZERO,heading,SIZES[type],ANCHORS[type],SCALES[type],tint)
 	c.draw_set_transform(Vector2.ZERO)
 	return true

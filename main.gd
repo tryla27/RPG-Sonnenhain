@@ -70,6 +70,7 @@ func hud_action_at(pos:Vector2)->String:
 const MobCombat=preload("res://components/mob_combat.gd")
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
 const WolfAnimation=preload("res://components/wolf_animation.gd")
+const WoodlandPoseAnimation=preload("res://components/woodland_pose_animation.gd")
 const MobDesign32=preload("res://components/monster_design_32.gd")
 const ItemStyle32=preload("res://components/item_style_32.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
@@ -2183,10 +2184,12 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			rpc_server_damage.rpc_id(int(event["target"]),int(event["damage"]))
 		elif invulnerable<=0:
 			apply_player_damage(int(event["damage"]))
-	if int(enemy["type"])==3:
+	if int(enemy["type"]) in [0,1,2,3]:
 		enemy["walking"]=moved
 		if moved and str(previous_attack_state.get("ability",{}).get("shape",""))!="leap":
-			enemy["gait_phase"]=WolfAnimation.advance_gait(float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU))),Vector2(enemy["pos"]).distance_to(gait_origin))
+			var previous_phase:=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU)))
+			var distance:=Vector2(enemy["pos"]).distance_to(gait_origin)
+			enemy["gait_phase"]=WolfAnimation.advance_gait(previous_phase,distance) if int(enemy["type"])==3 else WoodlandPoseAnimation.advance_gait(int(enemy["type"]),previous_phase,distance)
 	return moved
 
 func update_dedicated_enemies(delta:float)->void:
@@ -8946,7 +8949,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 	var enemy_color:Color=ENEMY_TYPES[type]["color"]
 	var model_pos:Vector2=p
 	var stride:float=world_time*(3.5 if bool(profile["heavy"]) else 7.0) if bool(enemy.get("walking",false)) else 0.0
-	if type==3:stride=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU))) if bool(enemy.get("walking",false)) else 0.0
+	if type in [0,1,2,3]:stride=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU))) if bool(enemy.get("walking",false)) else 0.0
 	if boss and float(enemy.get("boss_spawn_timer",0.0))>0.0:
 		var spawn_left:float=clampf(float(enemy["boss_spawn_timer"])/1.6,0.0,1.0)
 		var appear:float=1.0-spawn_left
@@ -8962,7 +8965,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 			draw_rect(Rect2(sp-Vector2(3,3),Vector2(6,6)),Color(spawn_color,.7))
 	draw_set_transform(Vector2.ZERO)
 	var motion:=Vector2.ONE
-	if type==0:
+	if type==0 and not WoodlandPoseAnimation.available(type,MobDesign32.WoodlandArt.direction_index(aim)):
 		var creep:=sin(world_time*6+float(enemy.get("seed",0)))
 		motion=Vector2(1+creep*.1,1-creep*.08)
 	if boss:
@@ -8977,6 +8980,8 @@ func draw_enemy(enemy: Dictionary) -> void:
 	if type==3:
 		var leap_lift:=WoodlandAttackVFX.leap_height(animation)*scale_factor if str(state.get("ability",{}).get("id",""))=="sprungbiss" else 0.0
 		label_pos.y-=maxf(0.0,88.0*scale_factor+leap_lift+12.0-54.0)
+	elif type==2 and WoodlandPoseAnimation.available(type,MobDesign32.WoodlandArt.direction_index(aim)):
+		label_pos.y-=maxf(0.0,100.0*MobDesign32.WoodlandArt.SCALES[type]*scale_factor+12.0-54.0)
 	draw_enemy_level(label_pos, type, boss, elite_kind)
 	combat_feedback.health(self,"mob:%d"%int(enemy["uid"]),label_pos+Vector2(0,-135 if type==12 else (-104 if boss else -54)),float(enemy["hp"]),float(enemy["max_hp"]),106 if boss else 54)
 
@@ -12672,8 +12677,11 @@ func update_network_interpolation(delta: float) -> void:
 			var target: Vector2 = enemy["net_target_pos"]
 			var current: Vector2 = enemy["pos"]
 			enemy["pos"] = target if current.distance_to(target) > 360.0 else current.lerp(target,mob_blend)
-			if int(enemy.get("type",-1))==3 and bool(enemy.get("walking",false)) and str(attack.get("ability",{}).get("shape",""))!="leap" and current.distance_to(target)<=360.0:
-				enemy["gait_phase"]=WolfAnimation.advance_gait(float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU))),current.distance_to(enemy["pos"]))
+			var type:=int(enemy.get("type",-1))
+			if type in [0,1,2,3] and bool(enemy.get("walking",false)) and str(attack.get("ability",{}).get("shape",""))!="leap" and current.distance_to(target)<=360.0:
+				var previous_phase:=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU)))
+				var distance:=current.distance_to(enemy["pos"])
+				enemy["gait_phase"]=WolfAnimation.advance_gait(previous_phase,distance) if type==3 else WoodlandPoseAnimation.advance_gait(type,previous_phase,distance)
 
 func export_save_backup() -> void:
 	if not character_created: return
@@ -13807,7 +13815,7 @@ func receive_mob_death(payload:Dictionary)->void:
 		play_sound("hit")
 		boss_death_end_queue.append({"uid":uid,"remaining":1.35})
 	else:
-		row["duration"]=.95 if death_type==3 else .45
+		row["duration"]=.95 if death_type in [0,1,2,3] else .45
 	mob_deaths.append(row)
 	while mob_deaths.size()>24:mob_deaths.pop_front()
 	for key in dead_mob_uids.keys():
@@ -13843,7 +13851,7 @@ func draw_mob_deaths()->void:
 				var distance:float=18.0+burst*105.0
 				var point:=p+Vector2.RIGHT.rotated(angle)*distance
 				draw_rect(Rect2(point-Vector2(3,3),Vector2(6,6)),Color(color,.8*(1.0-progress)))
-		elif type==3:
+		elif type in [0,1,2,3]:
 			var face:Array=row.get("facing",[0.0,1.0])
 			var look:=Vector2(float(face[0]),float(face[1]))
 			MobDesign32.paint(self,p+character_canvas_offset,type,enemy_level(type),look,ENEMY_TYPES[type]["color"],0,-1,float(row["scale"]),Vector2.ONE,"",{"death":age})
