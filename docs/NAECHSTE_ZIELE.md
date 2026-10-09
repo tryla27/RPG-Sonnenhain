@@ -21,7 +21,13 @@ Dorf → Blütenwiesen → erstes Waldstück einmal komplett durchspielen und al
 glätten, was dort hakt: Trefferflächen, Balance, Sounds und Übergänge. Die
 ersten Spielminuten entscheiden, ob jemand weiterspielt.
 
-## 2. Schrittweise Modularisierung von `main.gd`
+## 2. Sounds
+
+Neues Soundkonzept: `docs/sound/KONZEPT.md`. Erst Paket 1 (Kampfgefühl im
+Startbereich), danach Oberfläche, Fähigkeiten, Atmosphäre und übrige Gegner.
+Offene Entscheidungen zu Klangrichtung und Quellen stehen am Ende des Konzepts.
+
+## 3. Schrittweise Modularisierung von `main.gd`
 
 Pausiert (siehe Entscheidungen). Bereits ausgelagert: `game_content.gd`,
 `network_codec.gd`, `world_geometry.gd`, `item_rules.gd`.
