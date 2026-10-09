@@ -22,28 +22,42 @@ Gemessen an den Dateien unter `audio/` und am Code in `main.gd`:
 
 ## 2. Klangidentität
 
-**Leitbild: handgemachtes Märchen in Pixelart.** Natürliche, weiche, warme
-Klänge statt Retro-Piepsen. Holz, Stoff, Leder, Laub, Wasser, Glas und Kristall.
-Magie klingt glitzernd und luftig, nicht elektronisch.
+**Leitbild (von Angelo festgelegt, 9.10.2026): 16-Bit, märchenhaft.** Der Klang
+der großen Konsolen-Rollenspiele der 16-Bit-Zeit: kurze, warme Klangmuster statt
+8-Bit-Piepsen, mit dem typischen weichen Hall und einem Hauch Körnigkeit.
+Freundlich, verspielt, magisch; nie hart oder realistisch-brutal.
+
+Was „16-Bit“ hier konkret heißt:
+
+- **Klangmuster statt reiner Töne:** Jeder Sound ist aus kurzen, gestalteten
+  Bausteinen geschichtet (Anschlag, Körper, Ausklang), wie bei den
+  Sample-Chips der Zeit.
+- **Warme, leicht gedeckte Höhen:** Wir erzeugen in 44,1 kHz, filtern aber
+  die obersten Höhen weich ab (etwa ab 12 kHz) und geben eine zarte
+  Bitreduktion dazu. Das klingt nach Konsole, ohne zu rauschen.
+- **Der typische Echo-Hall:** kurzer, heller Hall mit leichtem Echo, für Magie
+  und Fanfaren deutlicher, für Schläge und Schritte kaum.
+- **Melodische Akzente:** Beute, Level-Aufstieg, Quests und Truhen bekommen
+  kleine Melodien in einer gemeinsamen Tonart (D-Dur), damit sie zur Musik
+  passen und als „Sonnenhain-Klang“ wiedererkennbar sind.
+- **Märchenhaft:** Glöckchen, Harfen- und Glockenspielfarben für Gutes,
+  hölzerne und gedämpfte Töne für Alltägliches, tiefe weiche Pauken für Bosse.
 
 Grundregeln:
 
-1. **Natürlich vor synthetisch.** Waffen, Schritte, Tiere und Gegenstände
-   klingen nach echtem Material. Nur Magie und Benutzeroberfläche dürfen
-   künstlich glänzen.
-2. **Kurz und klar.** Kampfsounds unter 0,4 s mit schnellem Einsatz; der
+1. **Kurz und klar.** Kampfsounds unter 0,4 s mit schnellem Einsatz; der
    wichtigste Teil liegt in den ersten 50 ms.
-3. **Jedes Element hat eine Klangfarbe.** Feuer: Fauchen und Knistern. Eis:
-   Klirren und kristallines Knacken. Blitz: trockenes Knallen und Surren.
-   Gift: Blubbern und Zischen. Arkan: gläserne Glocken, Hall. Physisch:
-   Holz, Metall, Leder.
-4. **Gegner erkennt man am Ohr.** Jeder Gegnertyp hat mindestens Angriffs-,
-   Treffer- und Todeslaut in seiner Materialfarbe (Schleim nass, Käfer
-   chitinartig, Pilz weich, Wolf tierisch).
-5. **Nichts nervt nach 100 Wiederholungen.** Häufige Sounds (Schritte, Schläge,
+2. **Jedes Element hat eine Klangfarbe.** Feuer: fauchendes Rauschen mit
+   Knistern. Eis: hohe, klirrende Glockentöne. Blitz: trockenes Knallen mit
+   surrender Modulation. Gift: blubbernde, abwärts gleitende Töne. Arkan:
+   gläserne Glocken mit langem Hall. Physisch: kurze, holzige Schläge.
+3. **Gegner erkennt man am Ohr.** Jeder Gegnertyp hat mindestens Angriffs-,
+   Treffer- und Todeslaut in seiner Farbe (Schleim nass und federnd, Käfer
+   klickend, Pilz weich und dumpf, Wolf knurrend).
+4. **Nichts nervt nach 100 Wiederholungen.** Häufige Sounds (Schritte, Schläge,
    Treffer, Klicks) haben 3–5 Varianten und leichte Tonhöhenstreuung.
-6. **Nichts ist schrill.** Kein harter Anteil über 8 kHz bei häufigen Sounds,
-   keine Clipping-Spitzen; Pegel einheitlich.
+5. **Nichts ist schrill.** Keine harten Spitzen, kein Clipping, einheitliche
+   Pegel.
 
 ## 3. Technik
 
@@ -128,21 +142,19 @@ neue Grafik kommt. Bosse zusätzlich mit Auftritts-, Phasen- und Siegesklang.
 
 ## 5. Herstellung
 
-Drei Wege, kombiniert nach Art des Sounds:
+Durch die 16-Bit-Richtung entstehen die Sounds **hauptsächlich per Skript**
+(`tools/build_sfx.py`): geschichtete Klangbausteine aus Oszillatoren, Rauschen,
+Filtern, Hüllkurven, Bitreduktion und Echo-Hall. Vorteile: keine Lizenzfragen,
+einheitlicher Stil, jede Änderung ist reproduzierbar und schnell gemacht.
 
-| Weg | Wofür | Qualität | Hinweis |
-|---|---|---|---|
-| **A. Freie Aufnahmen mit CC0-Lizenz** (z. B. Kenney-Sammlungen, CC0-Sounds auf Freesound, Sonniss-GDC-Pakete) | Waffen, Schritte, Gegenstände, Tiere, Umgebung | hoch, weil echte Aufnahmen | Dateien muss Angelo herunterladen und anhängen; Claudes Arbeitsumgebung kann diese Seiten nicht abrufen. Quelle und Lizenz je Datei in `audio/LIZENZEN.md` |
-| **B. Gestaltete Synthese** (Schichten aus Rauschen, Filtern, Hüllkurven, Hall; 44,1 kHz) | Magie, Oberfläche, Glanz-Akzente | gut, wenn sorgfältig geschichtet | erledigt Claude vollständig per Skript; keine Lizenzfragen; leicht anpassbar |
-| **C. Mischung** | Gegnerlaute, Einschläge | hoch | Aufnahme als Grundlage, mit Tonhöhe, Filtern und synthetischen Schichten zu einem eigenen Sonnenhain-Klang verändert |
+Wo ein Klang natürlicher sein muss (z. B. Wolfsknurren, Laub), kann eine freie
+Aufnahme mit CC0-Lizenz als Grundlage dienen und durch dieselbe
+16-Bit-Bearbeitung laufen. Solche Dateien lädt Angelo herunter; Quelle und
+Lizenz je Datei stehen in `audio/LIZENZEN.md`.
 
-Alle Sounds durchlaufen dieselbe Nachbearbeitung per Skript
-(`tools/build_sfx.py`): Stille kürzen, Ein-/Ausblenden, Pegel angleichen,
-44,1 kHz, Prüfung auf Clipping. So bleibt die Qualität einheitlich, egal woher
-ein Sound kommt.
-
-Generierte KI-Sounds sind möglich, wenn der Dienst kommerzielle Nutzung
-erlaubt; dann ebenfalls in `audio/LIZENZEN.md` vermerken.
+Alle Sounds durchlaufen dieselbe Nachbearbeitung: Stille kürzen,
+Ein-/Ausblenden, Pegel angleichen, Prüfung auf Clipping. Die Erzeugung ist
+deterministisch (feste Saat), damit ein erneuter Lauf dieselben Dateien ergibt.
 
 ## 6. Qualitätssicherung und Freigabe
 
@@ -157,12 +169,7 @@ erlaubt; dann ebenfalls in `audio/LIZENZEN.md` vermerken.
   übersteuern; nach 10 Minuten Spielen darf kein Sound nerven.
 - Live geht ein Paket nur nach Angelos Bestätigung (siehe `AGENTS.md`).
 
-## 7. Offene Entscheidungen für Angelo
+## 7. Entscheidungen
 
-1. **Klangrichtung:** Passt das Leitbild „handgemachtes Märchen, natürlich statt
-   Retro-Piepsen“? Oder soll es bewusster nach klassischem 16-Bit klingen?
-2. **Quellen:** Dürfen CC0-Aufnahmen verwendet werden (Weg A/C), oder soll alles
-   selbst erzeugt sein (nur Weg B)? Weg B ist schneller, Weg A/C klingt bei
-   Waffen, Tieren und Schritten deutlich besser.
-3. **Referenzen:** Ein bis drei Spiele, deren Klang dir gefällt, helfen bei der
-   Abstimmung.
+- 9.10.2026: Klangrichtung **16-Bit, märchenhaft** (Angelo).
+- Offen: Referenzspiele, deren Klang gefällt (hilft beim Feinschliff).

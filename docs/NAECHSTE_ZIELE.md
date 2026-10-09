@@ -14,6 +14,8 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 - 9.10.2026: Modularisierung nach vier Modulen (Inhalte, Netzwerk, Weltgeometrie,
   Gegenstände) pausiert. Weitere Teile nur herauslösen, wenn ohnehin dort
   gearbeitet wird. Schwerpunkt jetzt: Spielinhalte und Startbereich.
+- 9.10.2026: Klangrichtung für alle Sounds: 16-Bit, märchenhaft
+  (`docs/sound/KONZEPT.md`).
 
 ## 1. Startbereich abrunden
 
@@ -25,7 +27,7 @@ ersten Spielminuten entscheiden, ob jemand weiterspielt.
 
 Neues Soundkonzept: `docs/sound/KONZEPT.md`. Erst Paket 1 (Kampfgefühl im
 Startbereich), danach Oberfläche, Fähigkeiten, Atmosphäre und übrige Gegner.
-Offene Entscheidungen zu Klangrichtung und Quellen stehen am Ende des Konzepts.
+Klangrichtung: 16-Bit, märchenhaft. Sounds entstehen überwiegend per Skript.
 
 ## 3. Schrittweise Modularisierung von `main.gd`
 
