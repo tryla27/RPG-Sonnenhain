@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Klänge · Schritte je Untergrund", "Deine Schritte klingen jetzt nach dem Boden unter dir: Gras, Waldboden, Erde und Wege, Kopfsteinpflaster, der Spawnstein, Holzdielen in Häusern, Stein in Kapelle, Gewölben und Ruinen, Sand an der Küste und in der Arena, Moor und Pfützen sowie Asche und Kies in den Aschebergen."],
 ["Sonnenhain · Keine orangenen Rahmen mehr", "Um Rathaus, Kirche, Borin, Fenna, Alma, Schmiede und Arena lag ein halbtransparenter orangener Rahmen mit gestrichelter Kante auf dem Boden. Er stammte aus einer alten Dorfversion und ist entfernt."],
 ["Kapelle · Sauberer Steinboden", "Zwischen Altar und vorderen Bänken war der Steinboden seit der Verbreiterung verschmiert. Dort liegt jetzt richtiger Steinboden in Originalgröße."],
 ["Klänge · Alle Büsche rascheln", "Auch Blütenbüsche, Kräuter, Büsche an Bäumen und Ruinen sowie die Büsche auf den Wiesen rascheln jetzt, wenn du hindurchläufst."],

@@ -1490,6 +1490,18 @@ func scatter_bush_near(pos: Vector2) -> bool:
 			return true
 	return false
 
+## Untergrund unter den Füßen für Schrittklänge (siehe SoundBank.STEP_SURFACES).
+func ground_surface_at(pos: Vector2) -> String:
+	if interior_id >= 0: return "stein" if interior_id == VillageInteriors32.ELARA_ID else "holz"
+	if dungeon_id >= 0: return "stein"
+	if arena_mode != "": return "sand"
+	if SpawnPlatform32.bounds(WAYSTONES[0]).grow(-60).has_point(pos): return "spawnstein"
+	if StartTileMap32.BOUNDS.has_point(pos):
+		var family := StartTileMap32.visual_family_at(pos)
+		if family != "": return str(SoundBank.VILLAGE_SURFACES.get(family, "gras"))
+	if distance_to_trail(pos) < 60.0: return "erde"
+	return str(SoundBank.REGION_SURFACES.get(region_at(pos), "gras"))
+
 ## Teleport-Brummen am Spawnstein: nur draußen in der Welt, leiser mit Abstand.
 func spawn_hum_level() -> float:
 	if not character_created or interior_id >= 0 or dungeon_id >= 0 or arena_mode != "" or konflux.active: return 0.0
@@ -2354,7 +2366,7 @@ func update_player(delta: float) -> void:
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
-		play_sound("step")
+		play_sound(SoundBank.step_sound_for(ground_surface_at(player_pos)))
 		if foliage_at(player_pos) and rustle_timer <= 0.0:
 			rustle_timer = 0.45
 			play_sound("busch_rascheln")
