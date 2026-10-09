@@ -299,6 +299,52 @@ def moor_d(rng, v):
     return fin(b.mix((b.pad(splash, d), 0.9), (b.pad(body, d), 1.0), (b.at(spray, 0.03, d), 0.7)), top=9000)
 
 
+# ------------------------------------------------------------------ Runde 3 (9.10.)
+# Gras soll „grasig streichend“ klingen: längeres Durchstreifen der Halme statt
+# kurzem Anschlag. Sand: C (dumpf) war gut, aber heller.
+def gras_e(rng, v):
+    d = 0.34
+    t = b.t_axis(d)
+    shape = np.sin(np.pi * np.minimum(t / (d * 0.92), 1)) ** 1.3
+    brush = b.sweep_bp(b.noise(d, rng), b.glide(1600 + 120 * v, 4200, d, 0.7), q=1.3) * shape
+    blades = grains(d, rng, 380, 3500, 9000, 0.002, 0.6, shape)
+    press = b.lp(b.noise(d, rng), 200) * b.env(d, 0.004, 0.03) * 0.5
+    return fin(b.mix((brush, 1.0), (blades, 0.6), (press, 0.6)), top=9500)
+
+
+def gras_f(rng, v):
+    d = 0.38
+    t = b.t_axis(d)
+    # Zwei Streichbewegungen: Fuß hinein (lauter) und wieder heraus (leiser).
+    into = np.sin(np.pi * np.clip(t / 0.18, 0, 1)) ** 1.5
+    out = np.sin(np.pi * np.clip((t - 0.16) / 0.2, 0, 1)) ** 1.5 * 0.6
+    brush_in = b.sweep_bp(b.noise(d, rng), b.glide(2200, 3600, d, 1.0), q=1.6) * into
+    brush_out = b.sweep_bp(b.noise(d, rng), b.glide(3800, 2600, d, 1.0), q=1.6) * out
+    blades = grains(d, rng, 300, 4000, 9500, 0.002, 0.5, into + out)
+    return fin(b.mix((brush_in, 1.0), (brush_out, 0.9), (blades, 0.5)), top=10000)
+
+
+def sand_e(rng, v):
+    d = 0.3
+    t = b.t_axis(d)
+    shape = np.minimum(t / 0.05, 1) * np.exp(-np.maximum(t - 0.05, 0) / 0.08)
+    give = b.lp(b.noise(d, rng), 1500) * shape
+    crunch = grains(d, rng, 600, 2500, 7500, 0.003, 0.8, shape)
+    hiss = b.bp(b.noise(d, rng), 3500, 8500) * shape * 0.25
+    return fin(b.mix((give, 1.0), (crunch, 0.8), (hiss, 0.6)), top=9000)
+
+
+def sand_f(rng, v):
+    d = 0.3
+    t = b.t_axis(d)
+    shape = np.minimum(t / 0.04, 1) * np.exp(-np.maximum(t - 0.04, 0) / 0.09)
+    give = b.lp(b.noise(d, rng), 2200) * shape
+    crunch = grains(d, rng, 800, 3000, 9000, 0.0025, 0.9, shape)
+    return fin(b.mix((give, 0.9), (crunch, 1.0)), top=10000)
+
+
+ROUND3 = {"gras": (gras_e, gras_f), "sand": (sand_e, sand_f)}
+
 ROUND2 = {"gras": (gras_c, gras_d), "pflaster": (pflaster_c, pflaster_d), "holz": (holz_c, holz_d),
           "sand": (sand_c, sand_d), "moor": (moor_c, moor_d)}
 
@@ -322,10 +368,11 @@ def walk(steps: list) -> np.ndarray:
     return out
 
 
-def build(target: Path, round2: bool = False) -> list:
+def build(target: Path, round_no: int = 1) -> list:
     written = []
-    for surface, recipes in (ROUND2 if round2 else SURFACES).items():
-        for tag, recipe in zip("cd" if round2 else "ab", recipes):
+    table, tags = {1: (SURFACES, "ab"), 2: (ROUND2, "cd"), 3: (ROUND3, "ef")}[round_no]
+    for surface, recipes in table.items():
+        for tag, recipe in zip(tags, recipes):
             steps = []
             for v in range(4):
                 rng = np.random.default_rng(zlib.crc32(f"{surface}:{tag}:{v}".encode()))
@@ -343,5 +390,5 @@ def build(target: Path, round2: bool = False) -> list:
 
 if __name__ == "__main__":
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "build/footsteps_draft")
-    files = build(out, "--runde2" in sys.argv)
+    files = build(out, 3 if "--runde3" in sys.argv else (2 if "--runde2" in sys.argv else 1))
     print(f"{len(files)} Dateien in {out}")
