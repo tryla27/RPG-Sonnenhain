@@ -17,6 +17,13 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 - 9.10.2026: Klangrichtung für alle Sounds: 16-Bit, märchenhaft
   (`docs/sound/KONZEPT.md`).
 
+## 0. Rückmeldungen vom 9.10.2026
+
+Konzept mit Befunden und Reihenfolge: `docs/konzepte/2026-10-09/KONZEPT.md`
+(Fenna-Speicherfehler, Umhänge, Accessoires, Ascheberge-Tor, Kirche,
+Wegsteine, orangene Ecken, Eingangswege, Hausaccessoires, Laternen, Patch
+Notes, HUD, Fusionsregel). Wartet auf Angelos Okay.
+
 ## 1. Startbereich abrunden
 
 Dorf → Blütenwiesen → erstes Waldstück einmal komplett durchspielen und alles
