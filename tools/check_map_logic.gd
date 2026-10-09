@@ -49,7 +49,9 @@ func _initialize() -> void:
 	for i in g.WAYSTONES.size():
 		var stone: Vector2 = g.WAYSTONES[i]
 		var arrival: Vector2 = g.waystone_arrival(i)
-		check(g.is_blocked(stone,stone),"Waystone core has no collider")
+		# Regionale Wegsteine: Die Mitte ist begehbares Plateau, der Obelisk ist fest.
+		var core: Vector2 = stone if i == 0 else stone + Vector2(0,-36)
+		check(g.is_blocked(core,core),"Waystone core has no collider")
 		check(g.region_at(arrival)==g.region_at(stone),"Waystone arrival left its region: %d" % i)
 		check(not g.is_blocked(arrival,arrival),"Waystone arrival obstructed: %d at %s" % [i,arrival])
 	for role in 3:

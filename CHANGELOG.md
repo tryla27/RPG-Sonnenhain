@@ -6,6 +6,12 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Neue Wegsteine: Plateau-Grafik aus `tools/build_waystone_art.py`
+  (`art/village/objects/wegstein-plateau.png`, `wegstein-obelisk.png`), Maße,
+  Begehbarkeit (nur über die Treppe) und Zeichnen in
+  `components/waystone_shrine_32.gd`. Deko, Fackeln und Ankunftspunkte meiden
+  das Plateau; Geschosse stoppen nur am Obelisk. Test
+  `tests/gameplay/check_waystone_plateau.gd`, Bilder `tools/capture_waystone_plateau.gd`.
 - Hut des Jagdmeisters: „Ewige Pfeile“ (`HeadgearRules.eternal_arrows`), normale
   Schützenpfeile leben 8 s statt 1,2 s und enden beim ersten Treffer. Server
   liest `eternal_arrows` aus dem Spielerzustand. Test

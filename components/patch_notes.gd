@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Welt · Neue Wegsteine", "Alle Wegsteine außerhalb des Dorfs stehen jetzt auf einem erhöhten Steinplateau mit Treppe, Runenkreis und einem Obelisk, über dem ein Kristall schwebt. Aktivierte Wegsteine leuchten. Hinauf und hinunter geht es über die Treppe."],
 ["Schütze · Ewige Pfeile", "Der Hut des Jagdmeisters verleiht dem Schützen „Ewige Pfeile“: Normale Pfeile fliegen weiter als zuvor, bis sie einen Gegner oder ein Hindernis treffen."],
 ["Fehlerbehebung · Spielstände im Startmenü", "Angemeldet zeigte das Startmenü die Spielstände, die zufällig im Browser lagen, manchmal von einem anderen Konto oder einem alten Charakter. Jetzt zeigen die drei Speicherplätze genau die Charaktere deines Kontos, wie bei der Anmeldung, mit aktueller Stufe. „Spielstand laden“ lädt sie vom Server."],
 ["Welt · Start im Dunkeln", "Die Welt liegt jetzt im Dunkeln, auch Sonnenhain. Du siehst 20 Meter weit, und alles, was du einmal gesehen hast, bleibt dauerhaft aufgedeckt: im Spielbild, auf der Minikarte und auf der Weltkarte. Bisher erkundete Gebiete bleiben erhalten. Gruppenmitglieder decken nur mit auf, wenn sie in deiner Nähe sind."],
