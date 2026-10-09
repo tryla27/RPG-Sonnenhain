@@ -109,6 +109,7 @@ const GameContent=preload("res://components/game_content.gd")
 const NetworkCodec=preload("res://components/network_codec.gd")
 const WorldGeometry=preload("res://components/world_geometry.gd")
 const ItemRules=preload("res://components/item_rules.gd")
+const SoundBank=preload("res://components/sound_bank.gd")
 const PORTALS := GameContent.PORTALS
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
@@ -358,6 +359,8 @@ var sprint_block_timer := 0.0
 var sprint_exhausted := false
 var step_timer := 0.0
 var music_player: AudioStreamPlayer
+var sound_bank=SoundBank.new()
+var low_hp_warned:=false
 var mushroom_sound_seen:Dictionary={}
 var music_incoming: AudioStreamPlayer
 var music_theme := ""
@@ -711,6 +714,10 @@ func _ready() -> void:
 		player.volume_db = -15.0
 		add_child(player)
 		sound_players.append(player)
+	if not dedicated_server_mode:
+		sound_bank.setup(self)
+		music_player.bus = SoundBank.BUS_MUSIC
+		music_incoming.bus = SoundBank.BUS_MUSIC
 	update_music()
 	if multiplayer_smoke_client_mode:
 		enemies.clear()
@@ -996,15 +1003,17 @@ func rpc_server_combat_reward(tx_id: String, enemy_type: int, xp_reward: int, go
 		gain_xp(xp_reward)
 	if gold_reward > 0:
 		gold += gold_reward
+	var best_rarity := -1
 	for raw_item in item_rewards:
 		if not raw_item is Dictionary: continue
 		var item: Dictionary = sanitize_network_reward_item(raw_item)
+		best_rarity = maxi(best_rarity, int(item.get("rarity",0)))
 		if not add_item(item):
 			var compensation := maxi(1, item_sale_value(item))
 			gold += compensation
 			message("Inventar voll · Beute automatisch für %d Gold verkauft." % compensation)
 	if xp_reward > 0 or gold_reward > 0 or not item_rewards.is_empty():
-		play_sound("pickup")
+		play_sound(SoundBank.loot_sound_for(best_rarity) if best_rarity >= 0 else "beute_muenzen")
 		message("+%d XP · +%d Gold%s" % [xp_reward, gold_reward, " · Beute erhalten" if not item_rewards.is_empty() else ""])
 		save_game()
 	ack_server_transaction(tx_id)
@@ -1284,7 +1293,7 @@ func rpc_world_drop_granted(drop_uid:int,raw_item:Dictionary) -> void:
 	if not add_item(item):
 		message("Inventar voll · der Fund konnte nicht aufgenommen werden.")
 		return
-	play_sound("pickup")
+	play_sound(SoundBank.loot_sound_for(int(item.get("rarity",0))))
 	message("Aufgehoben: %s · %s" % [item["name"],RARITY_NAMES[int(item["rarity"])]])
 	world_drop_request_times.erase(drop_uid)
 	save_game()
@@ -1382,6 +1391,9 @@ func _exit_tree() -> void:
 		player.stream = null
 
 func play_sound(name: String) -> void:
+	if sound_bank.has(name):
+		sound_bank.play(name, effects_volume)
+		return
 	if sound_players.is_empty() or not sound_streams.has(name): return
 	var player: AudioStreamPlayer = sound_players[next_sound_player]
 	next_sound_player = (next_sound_player + 1) % sound_players.size()
@@ -1390,6 +1402,22 @@ func play_sound(name: String) -> void:
 	player.volume_db = -80.0 if effects_volume <= 0.0 else ((-29.0 if name == "step" else -11.0) + linear_to_db(effects_volume))
 	player.pitch_scale = 0.92 if name == "step" and next_sound_player % 2 == 0 else 1.0
 	player.play()
+
+## Weltgeräusch am Ort pos: leiser mit Entfernung zur eigenen Figur.
+func play_world_sound(name: String, pos: Vector2) -> void:
+	if dedicated_server_mode: return
+	sound_bank.play(name, effects_volume, pos.distance_to(player_pos))
+
+func normal_attack_sound() -> String:
+	var variant := equipped_weapon_variant()
+	if variant == "crossbow" or (class_id == 2 and variant != "axe"): return "bogen_schuss"
+	if class_id == 1 and variant != "axe": return "stab_schwung"
+	return "schwert_schwung"
+
+func update_mob_voices() -> void:
+	if dedicated_server_mode or not character_created: return
+	for voice in sound_bank.observe_mobs(enemies, player_pos, uses_server_world()):
+		play_world_sound(str(voice[0]), voice[1])
 
 func play_mushroom_poison(position:Vector2)->void:
 	if dedicated_server_mode or position.distance_to(player_pos)>620.0:return
@@ -1579,6 +1607,9 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 
 func _process(delta: float) -> void:
 	combat_feedback.step(delta)
+	if not dedicated_server_mode:
+		sound_bank.tick(delta)
+		update_mob_voices()
 	boss_music_hold_timer=maxf(0.0,boss_music_hold_timer-delta)
 	if boss_music_hold_timer<=0.0:boss_music_hold_theme=""
 	for boss_fx_index in range(boss_death_end_queue.size()-1,-1,-1):
@@ -2111,7 +2142,9 @@ func advance_mob_shots(delta:float,server:bool)->void:
 			var damage:int=int(shot["damage"])
 			enemy_projectiles.remove_at(i)
 			if server:rpc_server_damage.rpc_id(int(nearest["id"]),damage)
-			elif invulnerable<=0:apply_player_damage(damage)
+			elif invulnerable<=0:
+				if int(shot.get("type",-1))==1:play_sound("kaefer_sekret")
+				apply_player_damage(damage)
 			if not server and panel=="arena_reward":return
 
 func update_dedicated_enemy_projectiles(delta:float)->void:
@@ -3181,7 +3214,7 @@ func mage_rift_blink() -> bool:
 	invulnerable=0.22
 	spell_visuals.append({"kind":19,"pos":origin,"end":player_pos,"dir":dir,"rank":1,"life":0.55,"max":0.55})
 	effect(player_pos+Vector2(0,-48),"RISSSPRUNG",Color("c7b5ff"),0.7)
-	play_sound("dodge")
+	play_sound("spieler_ausweichen")
 	return true
 
 func dodge() -> void:
@@ -3212,7 +3245,7 @@ func dodge() -> void:
 		effect(player_pos+Vector2(0,-60),"ORK-SPRUNG",Color("d8b47a"),0.65)
 	else:
 		effect(player_pos+Vector2(0,-60),"SCHATTENROLLE" if class_id == 2 and class_mastery_unlocked else "ROLLE",Color("d8f3ff"),0.65)
-	play_sound("dodge")
+	play_sound("spieler_ausweichen")
 
 
 @rpc("any_peer","call_remote","reliable")
@@ -3399,7 +3432,7 @@ func normal_attack() -> void:
 	swing_duration = 0.29 if variant == "axe" else (0.20 if variant == "crossbow" else (0.24 if class_id == 0 else 0.32))
 	swing_timer = swing_duration
 	attack_anim = swing_timer
-	play_sound("swing")
+	play_sound(normal_attack_sound())
 	var power := normal_attack_power()
 	rune_attack_count+=1
 	if essence.rank(0,2)==4 and rune_attack_count%4==0:power=roundi(power*1.30)
@@ -3474,8 +3507,8 @@ func move_enemy_with_collision(enemy: Dictionary, displacement: Vector2) -> void
 
 func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, element: String = "", source_peer: int = 0, apply_runes:bool=true,direct_hit:bool=true) -> void:
 	if index < 0 or index >= enemies.size(): return
-	play_sound("hit")
 	var enemy: Dictionary = enemies[index]
+	play_world_sound(SoundBank.hit_sound_for(int(enemy.get("type",-1))), enemy["pos"])
 	if source_peer > 0:
 		enemy["last_hit_peer"] = source_peer
 		var damage_by_peer: Dictionary = enemy.get("damage_by_peer",{})
@@ -3496,6 +3529,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	if critical:
 		amount=maxi(1,roundi(float(amount)*(warrior_crit_multiplier()+(.25 if apply_runes and rune_rank(0,0,source_peer)==4 else 0.0))))
 		effect(enemy["pos"]+Vector2(0,-48),"KRIT!",Color("ffd36f"),0.7)
+		play_world_sound("krit", enemy["pos"])
 	var falcon_active:=ranger_falcon_rune if source_peer<=0 else bool(remote_players.get(source_peer,{}).get("ranger_falcon_rune",false))
 	if apply_runes and falcon_active and (class_id==2 or source_peer>0):
 		if float(enemy.get("falcon_mark",0.0))>0.0:
@@ -4582,7 +4616,14 @@ func apply_player_damage(raw: int) -> void:
 	hurt_until=combat_feedback.clock+.18
 	invulnerable = 0.5
 	effect(player_pos + Vector2(0, -30), "-%d" % dealt, Color("ff888d"), 0.75)
-	play_sound("hit")
+	if hp <= 0:
+		play_sound("spieler_tod")
+	else:
+		play_sound("spieler_schaden")
+		if hp < max_hp() * 0.25 and not low_hp_warned:
+			low_hp_warned = true
+			play_sound("spieler_warnung")
+	if hp >= max_hp() * 0.4: low_hp_warned = false
 	if hp <= 0:
 		hp = 0
 		death_timer = DEATH_DURATION
@@ -4615,6 +4656,8 @@ func respawn() -> void:
 	death_timer = 0.0
 	dash_timer = 0.0
 	invulnerable = 1.0
+	low_hp_warned = false
+	play_sound("spieler_wiederbeleben")
 	if arena_mode == "survival":
 		finish_survival_run()
 		return
@@ -4708,6 +4751,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var invasion: bool = bool(enemy.get("invasion", false))
 	var type: int = int(enemy["type"])
 	var pos: Vector2 = enemy["pos"]
+	play_world_sound(SoundBank.death_sound_for(type), pos)
 	enemies.remove_at(index)
 	if type==12:
 		for j in range(enemies.size()-1,-1,-1):
@@ -4896,7 +4940,7 @@ func collect_drops() -> void:
 			var amount: int = int(drops[i]["gold"])
 			gold += amount
 			drops.remove_at(i)
-			play_sound("pickup")
+			play_sound("beute_muenzen")
 			effect(player_pos + Vector2(0, -36), "+%d Gold" % amount, Color("ffdb83"), 1.0)
 			continue
 		var item: Dictionary = drops[i]["item"]
@@ -4906,7 +4950,7 @@ func collect_drops() -> void:
 			continue
 		add_item(item)
 		drops.remove_at(i)
-		play_sound("pickup")
+		play_sound(SoundBank.loot_sound_for(int(item.get("rarity",0))))
 		message("Gefunden: %s · %s" % [item["name"], RARITY_NAMES[int(item["rarity"])]])
 		save_game()
 
@@ -6858,6 +6902,7 @@ func use_item(index: int) -> void:
 		message("%s gelernt · durch %s" % [ABILITIES[unlock_id]["name"],name])
 		play_sound("level");save_game();return
 	if item["icon"] == "potion":
+		play_sound("spieler_trank")
 		if name in ["Energietrank", "Manatrank"]: energy = minf(max_energy(), energy + 65)
 		else: heal_player(max_hp() * (0.8 if name == "Großer Heiltrank" else 0.5))
 		if int(item.get("count", 1)) > 1:

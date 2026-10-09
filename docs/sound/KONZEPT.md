@@ -169,7 +169,21 @@ deterministisch (feste Saat), damit ein erneuter Lauf dieselben Dateien ergibt.
   übersteuern; nach 10 Minuten Spielen darf kein Sound nerven.
 - Live geht ein Paket nur nach Angelos Bestätigung (siehe `AGENTS.md`).
 
-## 7. Entscheidungen
+## 7. Stand
+
+- **Paket 1 umgesetzt** (9.10.2026): 41 Sounds in 71 Dateien unter
+  `audio/sfx/{kampf,treffer,spieler,mobs,beute}/`, erzeugt mit
+  `python3 tools/build_sfx.py`. Katalog, Busse (`Musik`, `Effekte` mit
+  Begrenzer, `Oberfläche`, `Umgebung`), Stimmenlimits, Varianten,
+  Entfernungsdämpfung und Ducking in `components/sound_bank.gd`;
+  Test `tests/audio/check_sound_bank.gd`.
+- Noch nicht in Paket 1: Stereo-Richtung (zurzeit nur Entfernung), eigene
+  Regler für Oberfläche und Umgebung (Paket 2), Laute der übrigen Monster
+  (Paket 5). `bogen_spannen` ist vorbereitet, wird aber noch nicht abgespielt.
+- Alle Sounds sind selbst erzeugt; es gibt keine Fremdlizenzen.
+- Freigabe läuft über die Hörvorschau „Sonnenhain Klangprobe“.
+
+## 8. Entscheidungen
 
 - 9.10.2026: Klangrichtung **16-Bit, märchenhaft** (Angelo).
 - Offen: Referenzspiele, deren Klang gefällt (hilft beim Feinschliff).
