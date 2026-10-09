@@ -42,6 +42,8 @@ jobs:
           echo "out_of_memory=$(printf '%s\n' "$all" | grep -c 'ERR_OUT_OF_MEMORY')"
           echo "boss_spawn=$(printf '%s\n' "$all" | grep -c 'BOSS_SPAWN')"
           echo "boss_stray=$(printf '%s\n' "$all" | grep -c 'BOSS_STRAY')"
+          echo "hb_journal=$(journalctl --user -u sonnenhain.service --since '-36h' --no-pager -o cat 2>/dev/null | grep -c SERVER_HEARTBEAT) hb_log=$(grep -c SERVER_HEARTBEAT "$HOME/sonnenhain-server/server.log" 2>/dev/null) log_lines=$(wc -l < "$HOME/sonnenhain-server/server.log" 2>/dev/null)"
+          for pid in $(pgrep -f '[s]onnenhain-server.x86_64'); do echo "proc_age=$(ps -o etime= -p $pid | tr -d ' ') bin_age=$(( $(date +%s) - $(stat -c %Y "$HOME/sonnenhain-server/releases/current/sonnenhain-server.x86_64" 2>/dev/null || echo 0) ))s"; done
           echo "procs=$(pgrep -fc '[s]onnenhain-server.x86_64')"
           echo "restarts=$(printf '%s\n' "$all" | grep -c 'restarted\|forcing dedicated')"
           printf '%s\n' "$all" | grep -A1 'SCRIPT ERROR' | grep -v '^--$' | cut -c1-180 | sort | uniq -c | sort -rn | head -12 | sed 's/^/ERR /'
