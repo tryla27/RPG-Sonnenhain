@@ -59,7 +59,7 @@ func run() -> void:
 	var mouse := InputEventMouseButton.new()
 	mouse.button_index = MOUSE_BUTTON_LEFT
 	mouse.pressed = true
-	mouse.position = Vector2(100,140)
+	mouse.position = g.quest_hud_rect().get_center()
 	g._unhandled_input(mouse)
 	assert(g.panel == "quest_details")
 	var key := InputEventKey.new()
