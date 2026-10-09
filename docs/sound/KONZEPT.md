@@ -219,3 +219,12 @@ Im Web-Export ohne Threads spielt Godot Klänge als Web-Audio-Samples. Busse,
 die erst zur Laufzeit mit `AudioServer.add_bus()` entstehen, kommen dort nicht
 an und bleiben stumm. Deshalb stehen alle Busse (Musik, Effekte, Oberfläche,
 Umgebung) fest in `default_bus_layout.tres`. Neue Busse immer dort eintragen.
+
+## Schritte je Untergrund (9.10.2026, freigegeben)
+
+Gewählt in der Schrittprobe in vier Runden (Angelo): Gras G, Waldboden B,
+Erde/Weg B, Kopfsteinpflaster C, Spawnstein D, Holzdielen C, Stein innen B,
+Sand F, Moor C, Asche/Kies B. Rezepte in `tools/build_footsteps_draft.py`,
+Übernahme in `tools/build_sfx.py` (`STEP_PICKS`, gleiche Saat wie in der Probe).
+Zuordnung der Untergründe: `main.gd: ground_surface_at`, Tabellen in
+`components/sound_bank.gd`. Test `tests/audio/check_footsteps.gd`.

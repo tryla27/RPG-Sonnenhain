@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Schritte je Untergrund: 10 Klänge × 4 Varianten unter `audio/sfx/schritte/`,
+  `ground_surface_at` (Dorf über sichtbare Bodenfamilie, Spawnstein, Wege,
+  Gebiete, innen/Gewölbe/Arena), Test `tests/audio/check_footsteps.gd`.
 - `draw_village_ground` (halbtransparente Grundstücksrahmen) entfernt.
 - Kapelle: Gangverbreiterung zeigt freien Steinboden in Originalgröße statt
   eines gedehnten Streifens (`ELARA_FLOOR_BAND_Y`, `ELARA_AISLE_*`).

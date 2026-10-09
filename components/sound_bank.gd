@@ -41,6 +41,18 @@ const CATALOG := {
 	"spieler_ausweichen": {"path":"spieler/spieler_ausweichen", "variants":2, "db":-11.0, "max":1, "prio":4, "pitch":0.05},
 	"spieler_trank": {"path":"spieler/spieler_trank", "variants":1, "db":-10.0, "max":1, "prio":5, "pitch":0.02},
 	"spieler_wiederbeleben": {"path":"spieler/spieler_wiederbeleben", "variants":1, "db":-8.0, "max":1, "prio":8, "pitch":0.0, "duck":1.2},
+	# Schritte je Untergrund (Schrittprobe 9.10.2026). db = Grundpegel -21 plus
+	# Ausgleich der auf -3 dBFS angehobenen Dateien (tools/build_sfx.py --step-gains).
+	"schritt_gras": {"path":"schritte/schritt_gras", "variants":4, "db":-22.4, "max":1, "prio":1, "pitch":0.05},
+	"schritt_laub": {"path":"schritte/schritt_laub", "variants":4, "db":-22.4, "max":1, "prio":1, "pitch":0.05},
+	"schritt_erde": {"path":"schritte/schritt_erde", "variants":4, "db":-24.8, "max":1, "prio":1, "pitch":0.05},
+	"schritt_pflaster": {"path":"schritte/schritt_pflaster", "variants":4, "db":-22.4, "max":1, "prio":1, "pitch":0.05},
+	"schritt_spawnstein": {"path":"schritte/schritt_spawnstein", "variants":4, "db":-25.5, "max":1, "prio":1, "pitch":0.05},
+	"schritt_holz": {"path":"schritte/schritt_holz", "variants":4, "db":-28.0, "max":1, "prio":1, "pitch":0.05},
+	"schritt_stein": {"path":"schritte/schritt_stein", "variants":4, "db":-22.4, "max":1, "prio":1, "pitch":0.05},
+	"schritt_sand": {"path":"schritte/schritt_sand", "variants":4, "db":-24.6, "max":1, "prio":1, "pitch":0.05},
+	"schritt_moor": {"path":"schritte/schritt_moor", "variants":4, "db":-22.4, "max":1, "prio":1, "pitch":0.05},
+	"schritt_asche": {"path":"schritte/schritt_asche", "variants":4, "db":-22.4, "max":1, "prio":1, "pitch":0.05},
 	"teleport_brummen": {"path":"welt/teleport_brummen", "variants":1, "db":-11.0, "max":1, "prio":1, "pitch":0.0, "loop":true, "bus":"umgebung"},
 	"spieler_warnung": {"path":"spieler/spieler_warnung", "variants":1, "db":-13.0, "max":1, "prio":7, "pitch":0.0, "loop":true},
 	"schleim_huepfen": {"path":"mobs/schleim_huepfen", "variants":3, "db":-12.0, "max":2, "prio":2, "pitch":0.08},
@@ -134,6 +146,16 @@ static func loot_sound_for(rarity: int) -> String:
 
 static func file_path(name: String, variant: int) -> String:
 	return "res://audio/sfx/%s_%02d.wav" % [CATALOG[name]["path"], variant + 1]
+
+## Untergrund -> Schrittklang. Unbekannte Untergründe klingen wie Gras.
+const STEP_SURFACES := {"gras":"schritt_gras", "laub":"schritt_laub", "erde":"schritt_erde", "pflaster":"schritt_pflaster", "spawnstein":"schritt_spawnstein", "holz":"schritt_holz", "stein":"schritt_stein", "sand":"schritt_sand", "moor":"schritt_moor", "asche":"schritt_asche"}
+## Sichtbare Bodenfamilien im Dorf (start_tilemap_32.gd) -> Untergrund.
+const VILLAGE_SURFACES := {"village_grass":"gras", "moss_grass":"gras", "village_stone":"pflaster", "plaza_stone":"pflaster", "building_apron":"pflaster", "arena_entry_stone":"pflaster", "spawn_crossing":"pflaster"}
+## Gebiete draußen -> Untergrund abseits der Wege (Index wie region_at).
+const REGION_SURFACES := {0:"gras", 1:"gras", 2:"laub", 3:"stein", 4:"moor", 5:"asche", 6:"sand", 7:"stein", 8:"gras", 9:"laub", 10:"moor", 11:"stein", 12:"gras"}
+
+static func step_sound_for(surface: String) -> String:
+	return STEP_SURFACES.get(surface, "schritt_gras")
 
 ## Teleport-Brummen am Spawnstein: voll bis SPAWN_HUM_FULL, leise auslaufend bis SPAWN_HUM_EDGE.
 const SPAWN_HUM_FULL := 150.0

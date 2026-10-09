@@ -828,6 +828,39 @@ SOUNDS = {
 }
 
 
+# Schritte je Untergrund: von Angelo in der Schrittprobe gewählt (9.10.2026).
+# Die Rezepte stehen in build_footsteps_draft.py; gleiche Saat wie in der Probe,
+# damit genau das klingt, was gewählt wurde. Die Dateien werden auf -3 dBFS
+# angehoben; STEP_GAIN_DB in sound_bank.gd gleicht das wieder aus.
+STEP_PICKS = {
+    "schritt_gras": ("gras", "g"), "schritt_laub": ("laub", "b"), "schritt_erde": ("erde", "b"),
+    "schritt_pflaster": ("pflaster", "c"), "schritt_spawnstein": ("pflaster", "d"), "schritt_holz": ("holz", "c"),
+    "schritt_stein": ("stein", "b"), "schritt_sand": ("sand", "f"), "schritt_moor": ("moor", "c"),
+    "schritt_asche": ("asche", "b"),
+}
+
+
+def _picked_step(surface: str, tag: str):
+    def recipe(_rng, v):
+        import build_footsteps_draft as drafts
+        fn = getattr(drafts, f"{surface}_{tag}")
+        x = fn(np.random.default_rng(zlib.crc32(f"{surface}:{tag}:{v}".encode())), v)
+        return x / (np.max(np.abs(x)) + 1e-9) * 10 ** (-3 / 20)
+    return recipe
+
+
+def step_gain_db(name: str) -> float:
+    """Wie viel leiser als die Datei der Schritt in der Probe klang (Variante 1)."""
+    import build_footsteps_draft as drafts
+    surface, tag = STEP_PICKS[name]
+    x = getattr(drafts, f"{surface}_{tag}")(np.random.default_rng(zlib.crc32(f"{surface}:{tag}:0".encode())), 0)
+    return float(20 * np.log10((np.max(np.abs(x)) + 1e-9) / 10 ** (-3 / 20)))
+
+
+for _name, (_surface, _tag) in STEP_PICKS.items():
+    SOUNDS[_name] = ("schritte", _picked_step(_surface, _tag), 4)
+
+
 def write_wav(path: Path, x: np.ndarray) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = np.clip(np.round(x * 32767), -32768, 32767).astype("<i2")
@@ -854,5 +887,9 @@ def build(filter_text: str = "") -> list[Path]:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--step-gains":
+        for name in STEP_PICKS:
+            print(f'\t"{name}": {step_gain_db(name):.1f},')
+        sys.exit(0)
     files = build(sys.argv[1] if len(sys.argv) > 1 else "")
     print(f"{len(files)} Sounds geschrieben nach {OUT.relative_to(ROOT)}/")
