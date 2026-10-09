@@ -65,7 +65,7 @@ static func profile(type:int,info:Dictionary,level:int,raw_damage:int)->Dictiona
 	elif type==3:
 		abilities=[
 			{"id":"biss","shape":"arc","range":38.0,"damage":damage,"half_angle":.7,"phase":1.0},
-			{"id":"sprungbiss","shape":"leap","range":180.0,"min_range":80.0,"landing_range":38.0,"damage":damage,"half_angle":.8,"phase":1.0,"dash":165.0,"windup":.8,"active_time":.32,"recovery":.75,"attack_cycle":3.1}
+			{"id":"sprungbiss","shape":"leap","range":180.0,"min_range":80.0,"landing_range":38.0,"damage":damage,"half_angle":.8,"phase":1.0,"dash":165.0,"windup":.4,"active_time":.32,"recovery":.75,"attack_cycle":3.1}
 		]
 	if not early:
 		if type in [4,7,9,16,24,26]:
@@ -99,11 +99,12 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 	var target:Dictionary={}
 	var best=INF
 	var remembered=int(enemy.get("target_peer",-1))
+	var boss:=int(enemy["type"]) in [12,13,14]
 	for candidate in targets:
 		var distance=position.distance_to(candidate["pos"])
-		var limit=float(config["leash_range"]) if int(candidate["id"])==remembered else float(config["aggro_range"])
+		var limit:float=(float(config["leash_range"]) if boss else INF) if int(candidate["id"])==remembered else float(config["aggro_range"])
 		if int(candidate["id"])!=remembered:limit*=float(candidate.get("detection_mult",1.0))
-		if distance>=limit or home.distance_to(candidate["pos"])>=float(config["leash_range"]):continue
+		if distance>=limit or (boss and home.distance_to(candidate["pos"])>=float(config["leash_range"])):continue
 		var score:float=distance
 		# Klassenbosse wechseln intelligent auf verwundbare Ziele statt stumpf
 		# immer nur den nächsten Spieler zu verfolgen.
@@ -112,7 +113,7 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 			score*=.72+hp_ratio*.38
 		if score<best:
 			target=candidate;best=score
-	if position.distance_to(home)>float(config["leash_range"]) or target.is_empty():
+	if (boss and position.distance_to(home)>float(config["leash_range"])) or target.is_empty():
 		cancel(enemy,.6)
 		enemy["target_peer"]=-1
 		if position.distance_to(home)>8:
@@ -123,6 +124,7 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 		return result
 	enemy["returning"]=false
 	enemy["target_peer"]=target["id"]
+	enemy["pursuit_target"]=target["pos"]
 	var toward:Vector2=(Vector2(target["pos"])-position).normalized()
 	if toward.length_squared()<.001:toward=Vector2.DOWN
 	var state:Dictionary=enemy.get("attack_state",{})
@@ -171,6 +173,9 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 			enemy["attack_wait"]=maxf(0,float(timing["attack_cycle"])-float(state["age"]))
 			enemy["attack_state"]={}
 		else:enemy["attack_state"]=state
+		# Resume forward pursuit during recovery when the victim moves away.
+		if previous>=strike+float(timing["active_time"]) and position.distance_to(target["pos"])>38.0:
+			result["move"]=toward
 		return result
 	var abilities:Array=[]
 	var hp_ratio:=clampf(float(enemy["hp"])/maxf(1.0,float(enemy["max_hp"])),0.0,1.0)
@@ -186,24 +191,13 @@ static func step(enemy:Dictionary,config:Dictionary,targets:Array,delta:float)->
 			var candidate:Dictionary=abilities[(sequence+offset)%abilities.size()]
 			if best>=float(candidate.get("min_range",0.0)) and best<=float(candidate["range"])+float(config["hit_radius"]):
 				ability=candidate;break
-	if best>=float(ability.get("min_range",0.0)) and best<=float(ability["range"])+float(config["hit_radius"]) and float(enemy["attack_wait"])<=0:
+	if bool(target.get("attack_clear",true)) and best>=float(ability.get("min_range",0.0)) and best<=float(ability["range"])+float(config["hit_radius"]) and float(enemy["attack_wait"])<=0:
 		enemy["attack_sequence"]=sequence+1
 		enemy["attack_state"]={"id":sequence+1,"age":0.0,"dir":toward,"ability":ability.duplicate(),"fired":false}
 		enemy["facing"]=toward
 		return result
-	var preferred_min:=float(config.get("preferred_min",140.0))
-	var preferred_max:=float(config.get("preferred_max",250.0))
-	if bool(config["ranged"]):
-		if best<preferred_min:
-			result["move"]=-toward
-		elif best>preferred_max:
-			result["move"]=toward
-		elif int(enemy["type"]) in [13,14]:
-			var side:=1.0 if (sequence+int(absf(float(enemy.get("seed",0))*10.0)))%2==0 else -1.0
-			result["move"]=toward.rotated(side*PI*.5)*.82
-	else:
-		if best>preferred_max:result["move"]=toward
-		elif int(enemy["type"])==12 and best<58.0:result["move"]=-toward*.35
+	# No automatic retreat or ranged kiting after acquiring a target.
+	if position.distance_to(target["pos"])>38.0 or not bool(target.get("attack_clear",true)):result["move"]=toward
 	enemy["facing"]=toward
 	return result
 static func shot_hits(a:Vector2,b:Vector2,p:Vector2,radius:float)->bool:

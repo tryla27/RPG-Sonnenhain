@@ -68,7 +68,7 @@ func run()->void:
 	var wolf:=mob(3);game.enemies=[wolf]
 	game.advance_mob(wolf,.01,false)
 	check(wolf["attack_state"]["ability"]["id"]=="sprungbiss","wolf leaps at distant target")
-	game.advance_mob(wolf,.8,false)
+	game.advance_mob(wolf,.4,false)
 	check(game.hits.is_empty() and Vector2(wolf["pos"]).is_zero_approx(),"no damage or teleport at takeoff")
 	for frame in 20:game.advance_mob(wolf,1.0/60,false)
 	check(Vector2(wolf["pos"]).distance_to(game.player_pos)<1 and game.hits.size()==1,"smooth leap, one landing bite")
@@ -79,18 +79,18 @@ func run()->void:
 	check(wolf["attack_state"]["ability"]["id"]=="biss","close wolf chooses bite")
 	game.advance_mob(wolf,.66,false)
 	check(game.hits.size()==1 and Vector2(wolf["pos"]).is_zero_approx(),"close bite without jump")
-	game.hits.clear();wolf=mob(3);game.enemies=[wolf];game.player_pos=Vector2(150,0);game.barrier=true;game.invulnerable=0
-	game.advance_mob(wolf,.01,false);game.advance_mob(wolf,1.13,false)
+	game.hits.clear();wolf=mob(3);game.enemies=[wolf];game.player_pos=Vector2(150,0);game.invulnerable=0
+	game.advance_mob(wolf,.01,false);game.barrier=true;game.advance_mob(wolf,1.13,false)
 	check(Vector2(wolf["pos"]).x<70 and game.hits.is_empty(),"large frame cannot jump through wall or damage beyond it")
 	game.barrier=false;wolf=mob(3);game.enemies=[wolf]
-	game.advance_mob(wolf,.01,false);game.advance_mob(wolf,.9,false)
+	game.advance_mob(wolf,.01,false);game.advance_mob(wolf,.5,false)
 	wolf["stun"]=1;game.advance_mob(wolf,.5,false)
 	check(wolf["attack_state"].is_empty() and game.hits.is_empty(),"airborne stun cancels landing hit")
 	wolf=mob(3);game.enemies=[wolf];game.player_pos=Vector2(150,0)
-	game.advance_mob(wolf,.01,false);game.advance_mob(wolf,.81,false)
+	game.advance_mob(wolf,.01,false);game.advance_mob(wolf,.41,false)
 	game.player_pos=Vector2(150,100)
 	for frame in 20:game.advance_mob(wolf,1.0/60,false)
-	check(game.hits.is_empty() and Vector2(wolf["pos"]).distance_to(Vector2(150,0))<1,"sideways dodge avoids locked leap")
+	check(game.hits.is_empty() and Vector2(wolf["pos"]).distance_to(Vector2(150,0))<10,"sideways dodge avoids locked leap before recovery pursuit")
 	wolf=mob(3);wolf["attack_sequence"]=1;game.enemies=[wolf];game.player_pos=Vector2(65,0)
 	game.advance_mob(wolf,.1,false)
 	check(wolf.get("attack_state",{}).is_empty() and Vector2(wolf["pos"]).x>0,"gap between bite and leap ranges causes approach")

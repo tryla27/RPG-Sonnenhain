@@ -70,12 +70,26 @@ func run() -> void:
 	for i in 10: await process_frame
 	assert(server.server_pending_transactions.is_empty())
 	print("PARTY_XP_NETWORK_OK local-range group XP +2% bonus=",shared_reward," acknowledgments received")
+	# All attacks respect terrain; use a genuinely clear multiplayer test strip.
+	var woodland_site:=Vector2(6000,1000)
+	var found_site:=false
+	for y in range(-320,321,32):
+		for x in range(-320,321,32):
+			var candidate:=Vector2(6000+x,1000+y)
+			var clear:bool=server.region_at(candidate)!=0
+			for distance in [0,30,60,100,150,200]:
+				var probe:=candidate+Vector2(distance,0)
+				clear=clear and not server.terrain_blocked(probe,30) and not server.waystone_safe_at(probe) and server.region_at(probe)==server.region_at(candidate)
+			if clear and not server.projectile_collision(candidate,candidate+Vector2(200,10),true)["hit"]:
+				woodland_site=candidate;found_site=true;break
+		if found_site:break
+	assert(found_site,"Need an unobstructed multiplayer combat test site")
 	low.hp=1000.0;high.hp=1000.0
 	low.invulnerable=0.0;high.invulnerable=0.0
-	low.player_pos=Vector2(6000,1035);high.player_pos=Vector2(6000,1045)
-	server.remote_players[low_id].merge({"pos":[6000.0,1035.0],"hp":1000.0},true)
-	server.remote_players[high_id].merge({"pos":[6000.0,1045.0],"hp":1000.0},true)
-	var mob:Dictionary=server.make_enemy(4,Vector2(6000,1000))
+	low.player_pos=woodland_site+Vector2(35,0);high.player_pos=woodland_site+Vector2(45,0)
+	server.remote_players[low_id].merge({"pos":[low.player_pos.x,low.player_pos.y],"hp":1000.0},true)
+	server.remote_players[high_id].merge({"pos":[high.player_pos.x,high.player_pos.y],"hp":1000.0},true)
+	var mob:Dictionary=server.make_enemy(4,woodland_site)
 	mob["uid"]=818;mob["attack_wait"]=0.0
 	server.enemies=[mob]
 	low.enemies.clear();high.enemies.clear()
@@ -102,22 +116,6 @@ func run() -> void:
 		server.update_dedicated_enemies(1.0/60.0)
 		await process_frame
 	assert(low.hp==1000-damage and high.hp==1000-damage)
-	# New woodland attacks use the same authoritative snapshots and damage RPCs.
-	# The legacy golem test point is inside terrain; find a real unobstructed
-	# strip for attacks that now correctly respect walls.
-	var woodland_site:=Vector2(6000,1000)
-	var found_site:=false
-	for y in range(-320,321,32):
-		for x in range(-320,321,32):
-			var candidate:=Vector2(6000+x,1000+y)
-			var clear:bool=server.region_at(candidate)!=0
-			for distance in [0,30,60,100,150,200]:
-				var probe:=candidate+Vector2(distance,0)
-				clear=clear and not server.terrain_blocked(probe,30) and not server.waystone_safe_at(probe) and server.region_at(probe)==server.region_at(candidate)
-			if clear and not server.projectile_collision(candidate,candidate+Vector2(200,10),true)["hit"]:
-				woodland_site=candidate;found_site=true;break
-		if found_site:break
-	assert(found_site,"Need an unobstructed multiplayer combat test site")
 	low.hp=1000;high.hp=1000;low.invulnerable=0;high.invulnerable=0
 	low.player_pos=woodland_site+Vector2(25,10);high.player_pos=woodland_site+Vector2(35,10)
 	server.remote_players[low_id].merge({"pos":[low.player_pos.x,low.player_pos.y],"hp":1000.0},true)
@@ -159,7 +157,7 @@ func run() -> void:
 		await process_frame
 	assert(low.enemies[0]["attack_state"]["ability"]["id"]=="sprungbiss")
 	low.hp=1000;high.hp=1000;low.invulnerable=0;high.invulnerable=0
-	server.update_dedicated_enemies(.8)
+	server.update_dedicated_enemies(.4)
 	assert(Vector2(wolf["pos"]).distance_to(woodland_site)<.01 and low.hp==1000)
 	for frame in 20:
 		server.update_dedicated_enemies(1.0/60)

@@ -68,6 +68,7 @@ func hud_action_at(pos:Vector2)->String:
 		if hud_action_rect(i).has_point(pos):return str(actions[i])
 	return ""
 const MobCombat=preload("res://components/mob_combat.gd")
+const MobNavigation=preload("res://components/mob_navigation.gd")
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
 const WolfAnimation=preload("res://components/wolf_animation.gd")
 const WoodlandPoseAnimation=preload("res://components/woodland_pose_animation.gd")
@@ -419,6 +420,7 @@ var opened_chests: Array = [false, false, false, false, false, false, false, fal
 var chest_respawn_until: Array = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
 const CHEST_RESPAWN_SECONDS := 360.0
 var obstacle_cache: Dictionary = {}
+var decorative_tree_cache: Dictionary = {}
 var boss_cooldowns: Array = [0.0, 0.0, 0.0]
 var bosses_defeated: Array = [false, false, false]
 var final_completed := false
@@ -2048,6 +2050,16 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 			result.append({"id":0,"pos":player_pos,"hp":hp,"max_hp":maxf(1.0,hp),"detection_mult":1.0-.08*essence.rank(3,3)})
 	return result
 
+func mob_walkable(point:Vector2,origin:Vector2,enemy:Dictionary,server:bool)->bool:
+	if terrain_blocked(point,mob_hit_radius(enemy)) or blocked_by_region_wall(point) or region_at(point)!=region_at(origin):return false
+	if server or (arena_mode=="" and dungeon_id<0):
+		if waystone_safe_at(point):return false
+	if not server and arena_mode!="":return point.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
+	if not server and dungeon_id>=0:return not dungeon_blocked(point)
+	if int(enemy["type"]) in [12,13,14]:
+		return point.distance_to(CLASS_BOSS_SITES[int(enemy["type"])-12])<CLASS_BOSS_ARENA_RADIUS-38.0
+	return true
+
 func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 	necklaces.tick_enemy(enemy,delta,Callable(self,"necklace_visual"))
 	if int(enemy.get("type",-1)) in [12,13,14] and float(enemy.get("boss_spawn_timer",0.0))>0.0:
@@ -2080,6 +2092,19 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		MobCombat.cancel(enemy);return false
 	var profile:=mob_profile(enemy)
 	var targets:=mob_targets(enemy,server)
+	# Check attack sight only for nearby candidates; cache until either endpoint moves.
+	var sight:Dictionary=enemy.get("attack_sight",{})
+	enemy["sight_wait"]=maxf(0.0,float(enemy.get("sight_wait",0.0))-delta)
+	for candidate in targets:
+		if Vector2(enemy["pos"]).distance_to(candidate["pos"])>400.0:continue
+		var id:int=candidate["id"]
+		var cached:Dictionary=sight.get(id,{})
+		if cached.is_empty() or float(enemy["sight_wait"])<=0.0 or Vector2(cached["from"]).distance_to(enemy["pos"])>16.0 or Vector2(cached["to"]).distance_to(candidate["pos"])>16.0:
+			cached={"from":enemy["pos"],"to":candidate["pos"],"clear":not projectile_collision(enemy["pos"],candidate["pos"],server)["hit"]}
+			sight[id]=cached
+		candidate["attack_clear"]=cached["clear"]
+	if float(enemy["sight_wait"])<=0.0:enemy["sight_wait"]=.25
+	enemy["attack_sight"]=sight
 	var previous_attack_state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
 	var gait_origin:Vector2=enemy["pos"]
 	var action:=MobCombat.step(enemy,profile,targets,delta)
@@ -2101,34 +2126,26 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			var away:Vector2=origin-Vector2(other["pos"])
 			var spacing:float=mob_hit_radius(enemy)+mob_hit_radius(other)+8
 			if away.length_squared()>.01 and away.length()<spacing:separation+=away.normalized()*(spacing-away.length())/spacing
-		if separation.length_squared()>.01:movement=(movement+separation.normalized()*.6).normalized()
-		for angle in [0.0,.52,-.52,.92,-.92,1.35,-1.35,PI]:
-			var next:Vector2=origin+movement.rotated(angle)*speed*delta
-			var valid:bool=not terrain_blocked(next,mob_hit_radius(enemy)) and not blocked_by_region_wall(next) and region_at(next)==region_at(origin)
-			if server or (arena_mode=="" and dungeon_id<0): valid = valid and not waystone_safe_at(next)
-			if not server and arena_mode!="":valid=next.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
-			elif not server and dungeon_id>=0:valid=not dungeon_blocked(next)
-			if valid:
-				enemy["pos"]=next
-				enemy["walking"]=true
-				moved=true;break
-	else:enemy["walking"]=false
-	if movement.length_squared()>.001 and not moved:
-		enemy["stuck_time"]=float(enemy.get("stuck_time",0.0))+delta
-		if float(enemy["stuck_time"])>=0.35:
-			var origin_retry:Vector2=enemy["pos"]
-			var seed_angle:=float(enemy.get("seed",0.0))+float(Time.get_ticks_msec()%997)*0.001
-			for step in 12:
-				var dir:=Vector2.RIGHT.rotated(seed_angle+float(step)*TAU/12.0)
-				var candidate:=origin_retry+dir*float(profile["movement_speed"])*delta*1.35
-				var ok:=not terrain_blocked(candidate,mob_hit_radius(enemy)) and not blocked_by_region_wall(candidate) and region_at(candidate)==region_at(origin_retry)
-				if ok and (server or not waystone_safe_at(candidate)):
-					enemy["pos"]=candidate
-					enemy["walking"]=true
-					moved=true
-					break
-			enemy["stuck_time"]=0.0
+		var walkable:=func(point:Vector2)->bool:return mob_walkable(point,origin,enemy,server)
+		var destination:Vector2=enemy.get("pursuit_target",origin+movement*240.0) if not bool(enemy.get("returning",false)) else enemy["home"]
+		var routed:=MobNavigation.direction(enemy,destination,delta,walkable)
+		if routed.length_squared()>.001:
+			# Separation only influences a route when the resulting segment remains clear.
+			var direction:=routed
+			if separation.length_squared()>.01:
+				var spaced:Vector2=(routed+separation.normalized()*.3).normalized()
+				if MobNavigation.clear_segment(origin,origin+spaced*maxf(32.0,speed*delta),walkable):direction=spaced
+			var path:Array=enemy.get("nav_path",[])
+			var distance:=speed*delta
+			if not path.is_empty():distance=minf(distance,origin.distance_to(path[0]))
+			var next:=origin+direction*distance
+			if MobNavigation.clear_segment(origin,next,walkable):
+				enemy["pos"]=next;moved=distance>.001
+			else:enemy["nav_wait"]=0.0
+		enemy["walking"]=moved
+		enemy["stuck_time"]=0.0 if moved else float(enemy.get("stuck_time",0.0))+delta
 	else:
+		enemy["walking"]=false
 		enemy["stuck_time"]=0.0
 	# Klassenbosse dürfen sich weder aus ihrer Kampflichtung ziehen lassen noch
 	# dauerhaft an prozeduralen Kanten festfahren.
@@ -2157,6 +2174,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		elif event["kind"]=="cloud":
 			enemy_projectiles.append({"kind":"cloud","ability_id":"giftstaub","pos":enemy["pos"],"dir":Vector2.ZERO,"speed":0.0,"life":event["duration"],"duration":event["duration"],"age":0.0,"next_pulse":0.0,"pulse_interval":event["pulse_interval"],"radius":event["radius"],"damage":event["damage"],"type":enemy["type"],"owner_uid":enemy.get("uid",-1),"source_region":region_at(enemy["pos"])})
 		elif event["kind"]=="leap_move":
+			enemy["nav_wait"]=0.0;enemy["nav_path"]=[]
 			var distance:float=event["distance"]
 			var steps:=maxi(1,ceili(distance/8.0))
 			for part in steps:
@@ -2175,6 +2193,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 					if server:rpc_server_damage.rpc_id(int(victim["id"]),int(event["damage"]))
 					elif invulnerable<=0:apply_player_damage(int(event["damage"]))
 		elif event["kind"]=="boss_move":
+			enemy["nav_wait"]=0.0;enemy["nav_path"]=[]
 			var move_dir:Vector2=Vector2(event.get("dir",Vector2.ZERO)).normalized()
 			var desired:Vector2=Vector2(enemy["pos"])+move_dir*float(event.get("distance",0.0))
 			if (int(enemy["type"]) not in [12,13,14] or class_boss_arena_walkable(desired,mob_hit_radius(enemy))) and region_at(desired)==region_at(enemy["pos"]) and not terrain_blocked(desired,mob_hit_radius(enemy)) and not blocked_by_region_wall(desired) and not waystone_safe_at(desired):
@@ -2622,6 +2641,14 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	return {"pos":p, "radius":radius, "zone":zone, "key":key}
 
 func decorative_tree_in_cell(tx:int,ty:int) -> Dictionary:
+	var cell:=Vector2i(tx,ty)
+	if decorative_tree_cache.has(cell):return decorative_tree_cache[cell]
+	if decorative_tree_cache.size()>=8192:decorative_tree_cache.clear()
+	var tree:=make_decorative_tree(tx,ty)
+	decorative_tree_cache[cell]=tree
+	return tree
+
+func make_decorative_tree(tx:int,ty:int) -> Dictionary:
 	var key := hash_cell(tx,ty)
 	var tile_origin := Vector2(tx*64,ty*64)
 	var center := tile_origin+Vector2(32,32)
@@ -4715,7 +4742,7 @@ func update_enemies(delta:float)->void:
 		if float(enemy.get("hp",0))<=0:
 			MobCombat.cancel(enemy);defeat_enemy(i);continue
 		var despawn_range:=3600.0 if int(enemy.get("type",-1)) in [12,13,14] else 1250.0
-		if enemy["pos"].distance_to(player_pos)>despawn_range and arena_mode=="":
+		if enemy["pos"].distance_to(player_pos)>despawn_range and arena_mode=="" and int(enemy.get("target_peer",-1))<0:
 			enemies.remove_at(i);continue
 		advance_mob(enemy,delta,false)
 		if panel=="arena_reward":return
@@ -8938,9 +8965,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 			if ability["shape"]=="cloud":
 				draw_arc(p,float(ability["range"]),0,TAU,48,Color("b9d965",.75),2)
 			elif ability["shape"]=="leap":
-				var landing:=p+aim*minf(float(ability["dash"]),p.distance_to(mob_attack_target_position(enemy)))
-				PixelStyle32.line(self,p,landing,Color(warn,.45),3)
-				draw_arc(landing,float(ability["landing_range"]),0,TAU,32,warn,2)
+				pass # Wolf anticipation is shown by its pose, without a target marker.
 			elif ability["shape"]=="line":
 				PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.25),20)
 			elif ability["shape"]=="arc":
