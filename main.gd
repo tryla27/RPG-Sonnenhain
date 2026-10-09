@@ -8907,9 +8907,6 @@ func draw_enemy(enemy: Dictionary) -> void:
 	if type==0:
 		var creep:=sin(world_time*6+float(enemy.get("seed",0)))
 		motion=Vector2(1+creep*.1,1-creep*.08)
-	if type==1:
-		model_pos.y-=9+sin(world_time*7+float(enemy.get("seed",0)))*3
-		stride=world_time*18
 	if boss:
 		draw_class_boss_actor(enemy,model_pos,aim,scale_factor,animation)
 	else:

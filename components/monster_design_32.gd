@@ -3,6 +3,7 @@ extends RefCounted
 const Combat=preload("res://components/mob_combat.gd")
 const Hero=preload("res://components/rpg_hero.gd")
 const GoldenSprites=preload("res://components/golden_sprite_runtime.gd")
+const WoodlandArt=preload("res://components/woodland_mob_art.gd")
 const GOLDEN_FOREST_SLIME_IDLE:="res://art/sprites/mobs/golden_forest_slime/idle_8dir.png"
 const HEAVY=[4,7,9,12,13,14,16,24,26]
 const ARMED=[2,4,7,8,9,12,13,14,15,16,20,24,26]
@@ -138,6 +139,7 @@ static func paint_waldschleim(c:CanvasItem,p:Vector2,look:Vector2,base:Color,pha
 	c.draw_set_transform(Vector2.ZERO)
 
 static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color,phase:float=0.0,attack:float=-1.0,scale_factor:float=1.0,stretch:Vector2=Vector2.ONE)->void:
+	if WoodlandArt.paint(c,p,t,look,base,phase,attack,scale_factor,stretch):return
 	if t==0:
 		paint_waldschleim(c,p,look,base,phase,attack,scale_factor,stretch)
 		return
