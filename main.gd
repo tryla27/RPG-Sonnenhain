@@ -4679,9 +4679,20 @@ func spawn_dedicated_bosses()->void:
 				nearby_test=nearby_test or bool(state.get("test_mode",false))
 		if not nearby:continue
 		if boss_cooldowns[i]>0 and not nearby_test:continue
+		# Nur ein lebender Boss in seinem eigenen Feld zählt. Ein Boss desselben
+		# Typs außerhalb (z. B. vom alten Platz vor dem Versetzen oder
+		# festgefahren) blockierte sonst den Spawn dauerhaft, denn Bosse werden
+		# auf dem Server nie aufgeräumt.
 		var exists:=false
-		for mob in enemies:
-			if int(mob["type"])==type:exists=true
+		for m in range(enemies.size()-1,-1,-1):
+			var mob:Dictionary=enemies[m]
+			if int(mob.get("type",-1))!=type:continue
+			if class_boss_home_ok(mob,i):
+				exists=true
+			else:
+				print("BOSS_STRAY_REMOVED type=",type," pos=",mob.get("pos",Vector2.ZERO)," site=",site)
+				MobCombat.cancel(mob)
+				enemies.remove_at(m)
 		if exists:continue
 		var boss:=make_enemy(type,site)
 		boss["uid"]=server_next_mob_uid;server_next_mob_uid+=1
@@ -4689,6 +4700,13 @@ func spawn_dedicated_bosses()->void:
 		boss["context"]="world";boss["instance_id"]="world";boss["boss_spawn_timer"]=1.6
 		enemies.append(boss)
 		spawn_tower_guardians(boss)
+		print("BOSS_SPAWN type=",type," pos=",boss["pos"])
+
+## Lebt der Klassenboss in seinem Feld (mit etwas Spielraum)?
+func class_boss_home_ok(mob:Dictionary,index:int)->bool:
+	if float(mob.get("hp",0.0))<=0.0:return true
+	if str(mob.get("context","world"))!="world":return false
+	return Vector2(mob.get("pos",Vector2.ZERO)).distance_to(CLASS_BOSS_SITES[index])<=CLASS_BOSS_ARENA_RADIUS+120.0
 
 func spawn_nearby_boss() -> void:
 	if uses_server_world():return
@@ -4697,10 +4715,10 @@ func spawn_nearby_boss() -> void:
 		if player_pos.distance_to(site) > 700 or boss_cooldowns[i] > 0 or region_at(player_pos) != region_at(site): continue
 		var boss_type := 12 + i
 		var exists := false
-		for enemy in enemies:
-			if enemy["type"] == boss_type:
-				exists = true
-				break
+		for m in range(enemies.size() - 1, -1, -1):
+			if int(enemies[m]["type"]) != boss_type: continue
+			if class_boss_home_ok(enemies[m], i): exists = true
+			else: enemies.remove_at(m)
 		if exists: continue
 		var info: Dictionary = ENEMY_TYPES[boss_type]
 		var boss_hp: float = boss_max_hp(boss_type)

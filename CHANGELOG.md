@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Klassenbosse: Spawn zählt nur einen Boss im eigenen Feld
+  (`class_boss_home_ok`), Streuner werden entfernt und geloggt
+  (`BOSS_STRAY_REMOVED`, `BOSS_SPAWN`). Test
+  `tests/gameplay/check_class_boss_stray.gd`. Neuer Workflow
+  `diagnose-server.yml` (nur lesen) für Fehler- und Boss-Meldungen im Serverlog.
 - Neue Wegsteine: Plateau-Grafik aus `tools/build_waystone_art.py`
   (`art/village/objects/wegstein-plateau.png`, `wegstein-obelisk.png`), Maße,
   Begehbarkeit (nur über die Treppe) und Zeichnen in

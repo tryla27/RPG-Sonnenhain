@@ -1,0 +1,55 @@
+name: Diagnose game server (read-only)
+
+# Liest Fehlermeldungen und Boss-Meldungen aus dem Log des Spielservers.
+# Nur lesen: Nichts auf dem Server wird verändert oder neu gestartet.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-22.04
+    env:
+      VSERVER_HOST: ${{ secrets.VSERVER_HOST }}
+      VSERVER_USER: ${{ secrets.VSERVER_USER }}
+      VSERVER_SSH_KEY: ${{ secrets.VSERVER_SSH_KEY }}
+      VSERVER_PORT: ${{ secrets.VSERVER_PORT }}
+    steps:
+      - name: Read server log summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          port="${VSERVER_PORT:-22}"
+          umask 077
+          install -d -m 700 "$HOME/.ssh"
+          trap 'rm -f "$HOME/.ssh/vserver_diag"' EXIT
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          raw = os.environ["VSERVER_SSH_KEY"].replace("\r", "").strip()
+          key = raw.replace("\\n", "\n") if "BEGIN OPENSSH PRIVATE KEY" in raw else base64.b64decode("".join(raw.split()), validate=True).decode().replace("\r", "").strip()
+          Path.home().joinpath(".ssh/vserver_diag").write_text(key + "\n")
+          PY
+          chmod 600 "$HOME/.ssh/vserver_diag"
+          ssh -4 -i "$HOME/.ssh/vserver_diag" -p "$port" -o ConnectTimeout=15 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+            "$VSERVER_USER@$VSERVER_HOST" 'bash -s' > diag.txt <<'REMOTE'
+          set +e
+          logs() { journalctl --user -u sonnenhain.service --since "-36h" --no-pager -o cat 2>/dev/null; cat "$HOME/sonnenhain-server/server.log" 2>/dev/null | tail -n 20000; }
+          all=$(logs)
+          echo "errors=$(printf '%s\n' "$all" | grep -c 'SCRIPT ERROR')"
+          echo "boss_spawn=$(printf '%s\n' "$all" | grep -c 'BOSS_SPAWN')"
+          echo "boss_stray=$(printf '%s\n' "$all" | grep -c 'BOSS_STRAY')"
+          echo "restarts=$(printf '%s\n' "$all" | grep -c 'restarted\|forcing dedicated')"
+          printf '%s\n' "$all" | grep -A1 'SCRIPT ERROR' | grep -v '^--$' | cut -c1-180 | sort | uniq -c | sort -rn | head -12 | sed 's/^/ERR /'
+          printf '%s\n' "$all" | grep 'BOSS_' | tail -5 | cut -c1-160 | sed 's/^/BOSS /'
+          uptime -p 2>/dev/null | sed 's/^/UPTIME /'
+          pgrep -af "[s]onnenhain-server.x86_64" | sed 's/^/PROC /' | cut -c1-120
+          ps -o etime= -p "$(pgrep -f '[s]onnenhain-server.x86_64 --headless' | head -1)" 2>/dev/null | sed 's/^/PROC_AGE /'
+          REMOTE
+          cat diag.txt >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            safe=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
+            echo "::notice title=Server-Diagnose::$safe"
+          done < <(head -24 diag.txt)
