@@ -273,6 +273,13 @@ anderen Effekte zünden immer am Trefferort.
   dazu `tests/audio/check_sounds_in_game` für die Klänge im Spielablauf.
   Hinweis B7: Nur die Laterne auf der Südmauer und drei Teile auf Pflaster
   wurden versetzt; die übrigen Straßenlaternen stehen bewusst am Wegrand.
+- **Paket 2 umgesetzt (9.10.2026):** C1 Patch Notes als Überschriftenliste mit
+  Detailansicht, C2 schlankes HUD (`components/hud_layout.gd`). Bilder:
+  `hud-vorher-nachher.png` (100/85/70 %), `hud-hover-zahlen.png`,
+  `hud-hover-ziel.png`, `patchnotes-liste.png`, `patchnotes-detail.png`.
+  Werkzeug `tools/capture_hud.gd`, Test `tests/ui/check_hud_slim.gd`.
+  Am Touchgerät bleibt die Questzeile oben links unter den Balken, weil unten
+  die Touch-Steuerung liegt.
 
 ## E. Vorgeschlagene Reihenfolge
 

@@ -6,6 +6,14 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Konzept-Paket 2: Patch Notes als klickbare Überschriftenliste
+  (`components/patch_notes.gd`, Zustand `patch_view`), schlankes HUD in
+  `components/hud_layout.gd` (Balken, Questzeile unten, XP-Linie, Kartenname
+  unter der Minimap). `server_save_client.problem` steuert die Speicherzeile.
+  `quest_guide.draw_hud_hover` nimmt eine Position. Test
+  `tests/ui/check_hud_slim.gd`, Vorschau `tools/capture_hud.gd`; HUD-Textsuchen
+  in `tools/check_content.py` entfernt, `check_quest_guide.gd` klickt die neue
+  Questzeile.
 - Sound-Paket 1: `components/sound_bank.gd` (Katalog, Audio-Busse, Stimmenlimits
   mit Vorrang, Varianten, Entfernungsdämpfung, Ducking, Monsterlaute aus dem
   Angriffszustand), Generator `tools/build_sfx.py`, 71 neue Dateien unter

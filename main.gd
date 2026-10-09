@@ -4,6 +4,7 @@
 # Release marker: production rollout for class bosses, HUD separation, Borin route, harvest timers and boss audiovisual combat.
 extends Node2D
 const PatchNotice = preload("res://components/patch_notice.gd")
+const PatchNotes = preload("res://components/patch_notes.gd")
 var patch_notice = PatchNotice.new()
 const ExperienceRules = preload("res://components/experience_rules.gd")
 const ControllerControls = preload("res://components/controller_controls.gd")
@@ -57,7 +58,10 @@ var boss_attack_sound_seen:Dictionary={}
 var boss_death_end_queue:Array=[]
 var boss_music_hold_timer:=0.0
 var boss_music_hold_theme:=""
-const QUEST_HUD_RECT:=Rect2(10,118,348,46)
+const HudLayout = preload("res://components/hud_layout.gd")
+
+func quest_hud_rect()->Rect2:
+	return HudLayout.quest_rect(touch_enabled)
 
 func hud_action_rect(index:int)->Rect2:
 	return Rect2(18+index*94,610,88,26)
@@ -342,6 +346,7 @@ var pending_purchase := -1
 var pending_purchase_item: Dictionary = {}
 var merchant_kind := ""
 var menu_scroll := 0
+var patch_view: Dictionary = PatchNotes.new_view()
 var attack_anim := 0.0
 var warrior_jump_timer := 0.0
 var warrior_jump_duration := 0.56
@@ -3013,7 +3018,7 @@ func handle_account_key(event:InputEventKey)->void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		var hud_hovered:=panel=="" and (hud_action_at(event.position)!="" or QUEST_HUD_RECT.has_point(event.position))
+		var hud_hovered:=panel=="" and (hud_action_at(event.position)!="" or quest_hud_rect().has_point(event.position))
 		Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if hud_hovered else Input.CURSOR_ARROW)
 	if server_save.loading: return
 	if world_builder.active and world_builder.input(self,event):return
@@ -3157,7 +3162,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				toggle_panel(hud_action)
 			return
-		if QUEST_HUD_RECT.has_point(event.position):
+		if quest_hud_rect().has_point(event.position):
 			quest_guide.open(self,quest_guide.current_id(self),"")
 			return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and party_widget_rect().has_point(event.position) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
@@ -3173,6 +3178,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		if not event.pressed:return
 		if event.button_index == MOUSE_BUTTON_LEFT: handle_panel_click(event.position)
+		elif panel=="patches" and event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN]:
+			PatchNotes.scroll(patch_view,-1 if event.button_index==MOUSE_BUTTON_WHEEL_UP else 1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and panel in ["skills", "skill_loadout", "journal"]:
 			var skill_scroll_max := maxi(0, ceili(float(SKILL_TREES[skill_tree_tab].size()-6)/3.0)) if panel=="skills" else (maxi(0, learned_loadout_skills().size()-7) if panel=="skill_loadout" else 0)
 			menu_scroll = mini(maxi(0, QUESTS.size() - 6) if panel == "journal" else skill_scroll_max, menu_scroll + 1)
@@ -3187,6 +3194,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif panel == "controls": panel = controls_return_panel
 		elif panel == "controller": panel = "pause"
 		elif panel == "quest_details": panel = quest_guide.return_panel
+		elif panel == "patches" and PatchNotes.back(patch_view): pass
 		else: panel = ""
 		return
 	if panel in ["pause", "start", "controls", "arena_reward", "victory"]: return
@@ -5779,6 +5787,10 @@ func handle_panel_click(mouse: Vector2) -> void:
 	if panel=="repair":
 		click_repair_panel(mouse)
 		return
+	if panel=="patches" and PatchNotes.click(patch_view,mouse):
+		play_sound("ui_klick")
+		queue_redraw()
+		return
 	if panel == "pause" and Rect2(860,319,130,42).has_point(mouse):
 		panel = "controller"
 		return
@@ -5932,6 +5944,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 	if panel == "pause":
 		if Rect2(190,485,300,36).has_point(mouse):
 			panel="patches"
+			patch_view=PatchNotes.new_view()
 			return
 		if Rect2(540,512,410,42).has_point(mouse):
 			save_game()
@@ -9533,42 +9546,38 @@ func ui_button(rect: Rect2, label: String, enabled: bool = true, active: bool = 
 
 func draw_hud() -> void:
 	var nearby_food := food_system.nearest(self)
-	draw_ref_panel(Rect2(10, 8, 348, 104))
-	draw_rect(Rect2(22, 16, 5, 17), [Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id])
-	text_at(Vector2(34, 32), "%s · %s · STUFE %d" % [hero_name if hero_name != "" else CLASS_NAMES[class_id].to_upper(), RACE_NAMES[hero_race], level], 15, Color("ffe9b8"))
-	if creative_mode:
-		draw_rect(Rect2(301, 17, 46, 17), Color("806a4e"))
-		text_at(Vector2(304, 30), "TEST", 12, Color("fff1cb"))
-	bar(Rect2(23, 40, 324, 20), hp, max_hp(), Color("d94f4f"), "HP  %d / %d" % [ceili(hp), ceili(max_hp())])
-	bar(Rect2(23, 63, 324, 15), energy, max_energy(), Color("3f7fd9") if class_id == 1 else Color("35b381"), "%s  %d / %d" % ["MANA" if class_id == 1 else "ENERGIE", ceili(energy), ceili(max_energy())])
+	var mouse_now:=get_viewport().get_mouse_position()
+	var energy_color:=Color("3f7fd9") if class_id == 1 else Color("35b381")
 	var stamina_color:=Color("e5bd62") if stamina/maxf(1.0,max_stamina())>=0.20 else (Color("f08a63") if int(world_time*6.0)%2==0 else Color("d75f52"))
-	bar(Rect2(23, 81, 324, 11), stamina, max_stamina(), stamina_color, "AUSDAUER  %d / %d%s" % [ceili(stamina),ceili(max_stamina())," · RENNEN" if is_sprinting else ""])
-	bar(Rect2(23, 95, 324, 10), float(xp), float(xp_required()), Color("d9932e"), "XP %d/%d  ·  %d GOLD" % [xp, xp_required(), gold])
+	HudLayout.draw_status(self,"%s · %s · Stufe %d%s" % [hero_name if hero_name != "" else CLASS_NAMES[class_id], RACE_NAMES[hero_race], level, " · TEST" if creative_mode else ""],[Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id],hp,max_hp(),energy,max_energy(),energy_color,stamina,max_stamina(),stamina_color)
+	HudLayout.draw_xp_line(self,float(xp),float(xp_required()),mouse_now,"XP %d / %d" % [xp, xp_required()])
 	if party_reward_notice_timer>0.0 and party_reward_notice!="":
 		draw_ref_panel(Rect2(365,8,410,42))
 		text_at(Vector2(378,35),party_reward_notice,13,Color("bfe8ad"),HORIZONTAL_ALIGNMENT_CENTER,384)
 	if class_mastery_unlocked and class_id==0: text_at(Vector2(365,30),"WUT %.0f%%" % warrior_rage,12,Color("efaa75"))
 	elif class_mastery_unlocked and class_id==2: text_at(Vector2(365,30),"JAGD %.0f%%%s" % [ranger_hunt_meter," · %.0fs" % ranger_hunt_buff if ranger_hunt_buff>0 else ""],12,Color("f3d68e"))
 	elif class_mastery_unlocked and class_id==1: text_at(Vector2(365,30),"LEERTASTE · ARKANER SCHRITT",12,Color("cdbaff"))
-	draw_ref_panel(QUEST_HUD_RECT)
-	text_at(Vector2(23, 137), "◆  AKTUELLES ZIEL · HOVER FÜR INFOS", 13, Color("f0cf92"))
-	text_at(Vector2(23, 155), tracked_quest().substr(0, 44), 14, Color("fff2d9"))
-	if not touch_enabled and QUEST_HUD_RECT.has_point(get_viewport().get_mouse_position()):
-		quest_guide.draw_hud_hover(self)
+	var quest_rect:=quest_hud_rect()
+	var quest_hovered:=not touch_enabled and quest_rect.has_point(mouse_now)
+	HudLayout.draw_quest_line(self,quest_rect,tracked_quest(),quest_hovered)
+	var food_y:=HudLayout.food_top(touch_enabled)
+	var status_bottom:=food_y
 	if food_system.meal_active():
 		var food_index:int=FoodSystem.index_for(food_system.active_food_name)
-		draw_ref_panel(Rect2(10,168,348,58))
-		if food_index>=0: FoodSystem.icon(self,Vector2(18,174),food_index,0.95)
+		draw_ref_panel(Rect2(10,food_y,348,58))
+		if food_index>=0: FoodSystem.icon(self,Vector2(18,food_y+6),food_index,0.95)
 		var remain:int=food_system.meal_remaining()
-		text_at(Vector2(58,188),food_system.active_food_name,12,Color("ffe5b5"))
-		text_at(Vector2(58,205),food_system.meal_effect_text(),10,Color("bde8bd"))
-		text_at(Vector2(300,188),"%02d:%02d" % [int(remain/60),remain%60],11,Color("d8e7ff"))
+		text_at(Vector2(58,food_y+20),food_system.active_food_name,12,Color("ffe5b5"))
+		text_at(Vector2(58,food_y+37),food_system.meal_effect_text(),10,Color("bde8bd"))
+		text_at(Vector2(300,food_y+20),"%02d:%02d" % [int(remain/60),remain%60],11,Color("d8e7ff"))
 		var progress:float=clampf(float(remain)/360.0,0.0,1.0)
-		draw_rect(Rect2(58,212,276,5),Color("1b2f35"))
-		draw_rect(Rect2(58,212,276*progress,5),Color("6fbf79") if food_system.meal_mana_regen<=0 else Color("4f8bd8"))
+		draw_rect(Rect2(58,food_y+44,276,5),Color("1b2f35"))
+		draw_rect(Rect2(58,food_y+44,276*progress,5),Color("6fbf79") if food_system.meal_mana_regen<=0 else Color("4f8bd8"))
+		status_bottom=food_y+62
 	elif food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system():
-		draw_ref_panel(Rect2(10,168,348,30))
-		text_at(Vector2(23,188),"SNACK · +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],10,Color("aed48c"))
+		draw_ref_panel(Rect2(10,food_y,348,30))
+		text_at(Vector2(23,food_y+20),"SNACK · +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],10,Color("aed48c"))
+		status_bottom=food_y+34
 	for enemy in enemies:
 		if int(enemy["type"]) in [12, 13, 14] and enemy["pos"].distance_to(player_pos) < 620:
 			ui_box(Rect2(430, 10, 480, 64), Color("5b4547"))
@@ -9581,9 +9590,8 @@ func draw_hud() -> void:
 		text_at(Vector2(966, 98), "WELLE %d%s" % [arena_wave, "/10" if arena_mode == "final" else ""], 19, Color("ffecbc"), HORIZONTAL_ALIGNMENT_CENTER, 150)
 		text_at(Vector2(970, 126), "%d Gegner" % enemies.size(), 15, Color("e4d3b0"), HORIZONTAL_ALIGNMENT_CENTER, 140)
 	else:
-		var map_center := Vector2(1035, 116)
-		draw_ref_panel(Rect2(918, 8, 234, 30))
-		text_at(Vector2(935, 29), ("KONFLUX · "+(KonfluxMap.BIOMES[konflux.room] if konflux.room>=0 else KonfluxMap.BIOMES[KonfluxMap.biome(player_pos)])) if konflux.active else (("LETZTE WACHE" if arena_mode == "final" else "ENDLOSE ARENA") if arena_mode != "" else (VillageInteriors32.name_for_id(interior_id).to_upper() if interior_id >= 0 else (DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "%s · LV %d" % [region_name(region_at(player_pos)), region_level(region_at(player_pos))]))), 13, Color("fff0bf"), HORIZONTAL_ALIGNMENT_CENTER, 200)
+		var map_center := HudLayout.MAP_CENTER
+		HudLayout.draw_map_label(self, ("KONFLUX · "+(KonfluxMap.BIOMES[konflux.room] if konflux.room>=0 else KonfluxMap.BIOMES[KonfluxMap.biome(player_pos)])) if konflux.active else (("LETZTE WACHE" if arena_mode == "final" else "ENDLOSE ARENA") if arena_mode != "" else (VillageInteriors32.name_for_id(interior_id).to_upper() if interior_id >= 0 else (DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "%s · LV %d" % [region_name(region_at(player_pos)), region_level(region_at(player_pos))]))))
 		draw_minimap(Rect2(980, 61, 110, 110), true)
 		draw_arc(map_center, 70, 0, TAU, 64, Color("0b1220"), 16)
 		draw_arc(map_center, 70, 0, TAU, 64, Color("c9a45e"), 4)
@@ -9595,16 +9603,15 @@ func draw_hud() -> void:
 		text_at(map_center + Vector2(-6, 81), "+", 14, Color("ffe9b0"))
 	if network_mode != "offline":
 		var ping_text := " · %d ms" % network_ping_ms if network_ping_ms >= 0 else ""
-		text_at(Vector2(925, 188), "KOOP %d/4%s" % [remote_players.size()+1,ping_text], 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, 180)
-	if character_created and not creative_mode:
-		var save_status_y:float=239.0 if food_system.meal_active() else (207.0 if food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system() else 181.0)
-		text_at(Vector2(14,save_status_y),server_save.status,10,Color("c9f0c4") if not server_save.dirty and server_save.ready else Color("ffe498"))
+		text_at(Vector2(925, HudLayout.KOOP_Y), "KOOP %d/4%s" % [remote_players.size()+1,ping_text], 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+	if HudLayout.save_status_visible(server_save.problem,creative_mode,character_created):
+		HudLayout.shadow_text(self,Vector2(14,status_bottom+12),server_save.status,11,Color("ffe498"))
 	if save_notice_timer > 0.0:
-		text_at(Vector2(925, 204), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+		text_at(Vector2(925, HudLayout.SAVE_NOTICE_Y), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, 180)
 	if notice_timer > 0:
-		ui_box(Rect2(12, 549, 510, 36), Color("415f59"))
+		ui_box(HudLayout.NOTICE_RECT, Color("415f59"))
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
-		text_at(Vector2(23, 573), short_notice, 15, Color("fff3c3"))
+		text_at(HudLayout.NOTICE_RECT.position+Vector2(11, 23), short_notice, 15, Color("fff3c3"))
 	var nearest := ""
 	if not nearby_food.is_empty():
 		var nearby_food_info:Dictionary=FoodSystem.FOODS[int(nearby_food["food"])]
@@ -9685,6 +9692,10 @@ func draw_hud() -> void:
 				if float(cooldowns[id]) > 0:
 					draw_rect(Rect2(x + 3, 596, 68, 38), Color(0.1, 0.16, 0.2, 0.7))
 					text_at(Vector2(x + 23, 620), "%.1f" % float(cooldowns[id]), 15)
+	if not touch_enabled and HudLayout.STATUS_RECT.has_point(mouse_now):
+		HudLayout.draw_status_numbers(self,["Leben  %d / %d" % [ceili(hp), ceili(max_hp())],"%s  %d / %d" % ["Mana" if class_id == 1 else "Energie", ceili(energy), ceili(max_energy())],"Ausdauer  %d / %d%s" % [ceili(stamina),ceili(max_stamina())," · rennt" if is_sprinting else ""],"XP  %d / %d" % [xp, xp_required()],"Gold  %d" % gold])
+	if quest_hovered:
+		quest_guide.draw_hud_hover(self,Vector2(quest_rect.position.x,quest_rect.position.y-186))
 
 func draw_touch_controls() -> void:
 	# Klassisches Mobile-Layout: Bewegung links, Skills unten mittig,
@@ -9978,7 +9989,7 @@ func draw_panel() -> void:
 		"creation_review": draw_creation_review_panel()
 		"multiplayer": draw_multiplayer_panel()
 		"intro": draw_intro_panel()
-		"patches": preload("res://components/patch_notes.gd").draw(self)
+		"patches": PatchNotes.draw(self)
 		"pause": draw_game_menu()
 		"settings": draw_pause_panel()
 		"repair": draw_repair_panel()
@@ -12467,7 +12478,7 @@ func draw_party_widget() -> void:
 
 func multiplayer_debug_rect() -> Rect2:
 	# Oberhalb liegen Regionskopf + Minimap + KOOP/Save-Hinweise.
-	return Rect2(VIEW.x-265.0,218.0,253.0,39.0)
+	return Rect2(VIEW.x-265.0,HudLayout.RIGHT_STATUS_BOTTOM+6.0,253.0,39.0)
 
 func draw_multiplayer_debug_overlay() -> void:
 	if not is_web_platform() or network_mode == "offline" or not character_created:return

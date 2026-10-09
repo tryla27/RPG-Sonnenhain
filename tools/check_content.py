@@ -19,12 +19,11 @@ duplicates = sorted({name for name in func_names if func_names.count(name) > 1})
 assert not duplicates, f'duplicate functions: {duplicates}'
 
 # HUD navigation is intentionally outside the ESC menu: mouse and keyboard share
-# the same actions, while hovering the tracked quest reveals its live details.
+# the same actions. Quest line and hover details are checked by
+# tests/ui/check_hud_slim.gd.
 for token in [
-    'const QUEST_HUD_RECT:=Rect2(10,118,348,46)',
     'var actions:Array=["skills","inventory","journal","map","mechanics","party","chat"]',
     'var hud_action:=hud_action_at(event.position)',
-    'quest_guide.draw_hud_hover(self)',
     'Input.CURSOR_POINTING_HAND if hud_hovered else Input.CURSOR_ARROW',
 ]:
     assert token in source, f'missing clickable HUD/quest-hover behavior: {token}'

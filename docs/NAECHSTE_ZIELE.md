@@ -22,7 +22,9 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 Konzept mit Befunden und Reihenfolge: `docs/konzepte/2026-10-09/KONZEPT.md`
 (Fenna-Speicherfehler, Umhänge, Accessoires, Ascheberge-Tor, Kirche,
 Wegsteine, orangene Ecken, Eingangswege, Hausaccessoires, Laternen, Patch
-Notes, HUD, Fusionsregel). Wartet auf Angelos Okay.
+Notes, HUD, Fusionsregel). Von Angelo freigegeben. Paket 1 ist live,
+Paket 2 (Patch Notes, HUD) ist umgesetzt und wartet auf den nächsten Live-Gang.
+Als Nächstes: Paket 3 (Fusionsregel D1).
 
 ## 1. Startbereich abrunden
 
