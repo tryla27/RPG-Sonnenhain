@@ -167,6 +167,17 @@ def vibrato(base: np.ndarray, rate: float, depth: float) -> np.ndarray:
     return base * (1 + depth * np.sin(2 * np.pi * rate * t))
 
 
+def voice(f0, seconds: float, formants, breath: float = 0.12, rng=None) -> np.ndarray:
+    """Stimmähnlicher Laut: obertonreicher Puls durch Formantfilter (für Ächzen, Winseln)."""
+    pulse = lp(osc(f0, seconds, "saw"), 3800)
+    out = np.zeros_like(pulse)
+    for freq, width, gain in formants:
+        out += gain * bp(pulse, freq - width / 2, freq + width / 2, 2)
+    if breath > 0 and rng is not None:
+        out += breath * bp(noise(seconds, rng), formants[0][0] * 0.8, formants[0][0] * 3)
+    return out / (np.max(np.abs(out)) + 1e-9)
+
+
 # ------------------------------------------------------------- 16-Bit-Finish
 
 def console(x: np.ndarray, bits: int = 12, rate: int = 32000, top: float = 11500) -> np.ndarray:
@@ -226,43 +237,66 @@ def finish(x: np.ndarray, *, echo_wet: float = 0.0, echo_delay: float = 0.11, ec
 # Jedes Rezept: (rng, v) -> Signal; v ist die Variantennummer (0..n-1).
 
 def r_schwert_schwung(rng, v):
-    d = 0.24 + 0.02 * v
-    centers = glide(700 + 120 * v, 3600 - 200 * v, d, 0.7)
-    whoosh = sweep_bp(noise(d, rng), centers, q=1.6) * env(d, 0.05, 0.12, 3)
-    edge = osc(glide(1900 + 90 * v, 1300, d), d, "tri") * env(d, 0.03, 0.08) * 0.08
-    return finish(mix((whoosh, 1.0), (edge, 1.0)), echo_wet=0.06)
+    # Klinge schlitzt durch die Luft: tiefer, weicher Luftzug, kurzer Klingenschliff, kein Pfeifton.
+    d = 0.2 + 0.015 * v
+    whoosh = sweep_bp(noise(d, rng), glide(420 + 60 * v, 1600 + 90 * v, d, 0.6), q=1.2) * env(d, 0.025, 0.07, 3)
+    scrape = at(bp(noise(0.06, rng), 2100, 4000) * env(0.06, 0.002, 0.022), 0.028 + 0.004 * v, d) * 0.32
+    air = lp(noise(d, rng), 650) * env(d, 0.02, 0.05) * 0.35
+    return finish(mix((whoosh, 1.0), (scrape, 1.0), (air, 1.0)), top=7000)
 
 
 def r_stab_schwung(rng, v):
-    d = 0.32
-    whoosh = sweep_bp(noise(d, rng), glide(400, 1600, d, 0.8), q=1.4) * env(d, 0.06, 0.14, 3)
-    notes = [NOTE["A5"], NOTE["D6"], NOTE["F#6"]]
-    sparkle = at(bell(notes[v % 3], 0.4, 0.25), 0.05, 0.45) * 0.35
-    return finish(mix((whoosh, 0.8), (sparkle, 1.0)), echo_wet=0.18, echo_delay=0.09)
+    # Zauberei und Alchemie: wirbelnder Luftzug, blubbernde Tinktur, funkelnde Glöckchen, schwebender Schimmer.
+    d = 0.62
+    swirl = sweep_bp(noise(d, rng), glide(300, 1100, d, 0.7), q=2.5) * env(d, 0.05, 0.25, 2)
+    bubbles = np.zeros(int(SR * d))
+    for k in range(6):
+        f = rng.uniform(380, 820)
+        bubbles += at(osc(glide(f, f * 1.9, 0.05), 0.05) * env(0.05, 0.003, 0.03), rng.uniform(0.02, 0.32), d)
+    scale = [NOTE["D6"], NOTE["E5"] * 2, NOTE["F#6"], NOTE["A6"], NOTE["B5"] * 2]
+    sparkle = np.zeros(int(SR * d))
+    for k in range(4):
+        sparkle += at(bell(scale[int(rng.integers(0, len(scale)))], 0.3, 0.12), 0.08 + 0.07 * k + rng.uniform(0, 0.03), d) * (0.5 - 0.08 * k)
+    t = t_axis(d)
+    shimmer = osc(NOTE["A5"] * (1 + 0.004 * v), d, "tri") * (0.5 + 0.5 * np.sin(2 * np.pi * 17 * t)) * np.sin(np.pi * t / d) * 0.12
+    return finish(mix((swirl, 0.7), (bubbles, 0.45), (sparkle, 0.7), (shimmer, 1.0)), echo_wet=0.22, echo_delay=0.09)
 
 
 def r_bogen_spannen(rng, v):
-    d = 0.38
-    creak = bp(noise(d, rng), 900, 2600) * (0.5 + 0.5 * np.sin(2 * np.pi * glide(28, 46, d) * t_axis(d))) ** 3
-    creak *= np.linspace(0.3, 1, len(creak)) * env(d, 0.02, 0.6, 1)
-    tension = osc(glide(240, 330, d), d, "tri") * np.linspace(0, 0.06, int(SR * d))
-    return finish(mix((creak, 0.9), (tension, 1.0)), peak_db=-6)
+    # Holz und Sehne knarzen beim Spannen: dichter werdende kleine Reibeklicks, kein Ton.
+    d = 0.45
+    out = np.zeros(int(SR * d))
+    t = 0.01
+    while t < d - 0.02:
+        click = bp(noise(0.007, rng), 700, 2600) * env(0.007, 0.0004, 0.0025)
+        wood = bp(noise(0.012, rng), 260, 620) * env(0.012, 0.0008, 0.005)
+        out += at(mix((click, 1.0), (wood, 0.6)), t, d) * (0.4 + 0.6 * t / d)
+        t += 1.0 / (24 + 60 * (t / d)) * rng.uniform(0.7, 1.3)
+    stretch = bp(noise(d, rng), 1100, 3200) * np.linspace(0, 1, int(SR * d)) ** 2 * 0.12
+    return finish(mix((out, 1.0), (stretch, 1.0)), peak_db=-6, top=9000)
 
 
 def r_bogen_schuss(rng, v):
-    d = 0.32
-    string = pluck(165 + 18 * v, d, rng, bright=0.65, damp=0.993) * env(d, 0.001, 0.16, 3)
-    air = sweep_bp(noise(d, rng), glide(2800, 900, d), q=2.2) * env(d, 0.01, 0.12) * 0.6
-    snap = hp(noise(0.02, rng), 2500) * env(0.02, 0.0005, 0.008)
-    return finish(mix((string, 1.0), (air, 1.0), (snap, 0.6)), echo_wet=0.05)
+    # Natürlich und trocken: Sehnenschlag, kurzes Holz-Thump, Pfeil zischt davon. Kein Hall.
+    d = 0.17 + 0.01 * (v % 3)
+    slap = thump(170 + 12 * (v % 4), 85, d, 0.03 + 0.004 * (v % 3))
+    snap = bp(noise(0.02, rng), 300 + 40 * v, 1500 + 60 * v) * env(0.02, 0.0005, 0.008)
+    string = pluck(105 + 9 * v, d, rng, 0.25, 0.985) * env(d, 0.001, 0.035, 3) * 0.25
+    hiss = sweep_bp(noise(d, rng), glide(1900 + 70 * v, 650 + 30 * v, d), q=1.8) * env(d, 0.015, 0.09, 2.5)
+    return finish(mix((slap, 0.8), (pad(snap, d), 0.7), (string, 1.0), (hiss, 1.6 + 0.08 * (v % 4))), bits=14, top=9000)
 
 
 def r_krit(rng, v):
-    d = 0.42
-    ping = bell(NOTE["A6"] * (1 + 0.03 * v), d, 0.22, ((1, 1), (2.4, 0.5), (4.1, 0.25)))
-    body = thump(260, 70, d, 0.09)
-    crack = hp(noise(0.05, rng), 1800) * env(0.05, 0.0005, 0.02)
-    return finish(mix((ping, 0.55), (body, 1.0), (crack, 0.5)), echo_wet=0.2, echo_delay=0.08)
+    # Rüstung bricht: harter Knacks, kurzes Metallscheppern, dann herabfallende Splitter.
+    d = 0.6
+    crack = hp(noise(0.03, rng), 1500) * env(0.03, 0.0005, 0.01)
+    clang = bell(330 + 45 * v, 0.35, 0.11, ((1, 1), (1.53, 0.7), (2.31, 0.5), (3.17, 0.3)))
+    crunch = bp(noise(0.12, rng), 800, 3500) * (rng.random(int(SR * 0.12)) > 0.75) * env(0.12, 0.001, 0.05)
+    shards = np.zeros(int(SR * d))
+    for k in range(7):
+        f = rng.uniform(2000, 4600)
+        shards += at(bell(f, 0.08, 0.05, ((1, 1), (1.7, 0.4))), 0.05 + 0.045 * k + rng.uniform(0, 0.02), d) * (0.4 - 0.045 * k)
+    return finish(mix((pad(crack, d), 1.0), (pad(clang, d), 0.55), (pad(crunch, d), 0.8), (shards, 0.6)), echo_wet=0.06, top=10000)
 
 
 def _hit_base(rng, v, body_from, body_to, decay, noise_band, noise_gain, length=0.22):
@@ -302,10 +336,12 @@ def r_treffer_stein(rng, v):
 
 
 def r_treffer_geist(rng, v):
-    d = 0.4
-    glass = bell([NOTE["E5"], NOTE["F#5"], NOTE["A5"]][v % 3], d, 0.3)
-    breath = sweep_bp(noise(d, rng), glide(3000, 700, d), q=3) * env(d, 0.01, 0.18)
-    return finish(mix((glass, 0.8), (breath, 0.6), (thump(300, 120, d, 0.06), 0.5)), echo_wet=0.3, echo_delay=0.1)
+    # Wie ein Schlag auf Pappe: dumpfe, hohle Schachtel ohne Klingen.
+    d = 0.14
+    box = bp(noise(d, rng), 230 + 30 * v, 880 + 40 * v) * env(d, 0.0008, 0.05, 2.5)
+    hollow = thump(230 + 15 * v, 150, d, 0.04)
+    paper = bp(noise(d, rng), 2500, 6000) * env(d, 0.0005, 0.007)
+    return finish(mix((box, 1.0), (hollow, 0.6), (paper, 0.35)), top=9000)
 
 
 def r_treffer_metall(rng, v):
@@ -328,11 +364,13 @@ def r_tod(material):
 
 
 def r_schaden(rng, v):
-    d = 0.3
-    blip = osc(glide(620 - 40 * v, 180, d, 0.5), d, "square") * env(d, 0.002, 0.12) * 0.55
-    thud = thump(160, 60, d, 0.08)
-    crush = lp(noise(d, rng), 2400) * env(d, 0.001, 0.05) * 0.5
-    return finish(mix((blip, 1.0), (thud, 1.0), (crush, 1.0)), echo_wet=0.05)
+    # Kurzes, stimmhaftes "Uff" mit Schlag: sofort verständlich, nicht piepsig.
+    d = 0.22
+    f0 = glide(185 + 18 * v, 115 + 8 * v, d, 0.7)
+    oof = voice(f0, d, [(450, 160, 1.0), (850, 200, 0.55), (2500, 300, 0.12)], 0.1, rng) * env(d, 0.008, 0.09, 2.5)
+    punch = thump(150, 60, d, 0.04)
+    click = pad(hp(noise(0.008, rng), 1500) * env(0.008, 0.0004, 0.003), d)
+    return finish(mix((oof, 1.0), (punch, 0.7), (click, 0.35)), top=8000)
 
 
 def r_spieler_tod(rng, v):
@@ -351,11 +389,16 @@ def r_ausweichen(rng, v):
 
 
 def r_trank(rng, v):
-    d = 0.9
-    bubbles = sum(at(osc(glide(500 + 90 * k, 1300 + 120 * k, 0.07), 0.07) * env(0.07, 0.004, 0.04),
-                     0.05 + 0.09 * k + rng.uniform(0, 0.02), d) for k in range(5))
-    shine = at(bell(NOTE["A5"], 0.5, 0.3), 0.48, d) * 0.5 + at(bell(NOTE["D6"], 0.4, 0.3), 0.58, d) * 0.5
-    return finish(mix((bubbles, 0.8), (shine, 1.0)), echo_wet=0.22)
+    # Nur Trinken: drei Schlucke, ohne Glöckchen.
+    d = 0.72
+    out = np.zeros(int(SR * d))
+    for k, start in enumerate((0.0, 0.22, 0.45)):
+        g = 0.1
+        gulp = sweep_bp(noise(g, rng), glide(950 - 60 * k, 340, g, 0.6), q=6) * env(g, 0.006, 0.05)
+        body = thump(190 - 10 * k, 95, g, 0.03)
+        bubble = at(osc(glide(500, 900, 0.03), 0.03) * env(0.03, 0.002, 0.015), 0.06, g)
+        out += at(mix((gulp, 1.0), (body, 0.6), (bubble, 0.2)), start, d)
+    return finish(out, top=8000)
 
 
 def r_wiederbeleben(rng, v):
@@ -366,9 +409,13 @@ def r_wiederbeleben(rng, v):
 
 
 def r_warnung(rng, v):
-    d = 0.5
-    beat = at(thump(90, 50, 0.16, 0.08), 0, d) + at(thump(80, 45, 0.16, 0.08), 0.18, d) * 0.7
-    return finish(beat, peak_db=-6)
+    # Herzschlag als nahtlose Schleife (Lub-Dub, 0,95 s). Läuft, solange das Leben unter 25 % liegt.
+    d = 0.95
+    beat = at(thump(72, 44, 0.2, 0.07), 0.0, d) + at(thump(64, 40, 0.2, 0.06), 0.27, d) * 0.7
+    beat += at(lp(noise(0.05, rng), 220) * env(0.05, 0.002, 0.02), 0.0, d) * 0.3
+    beat = lp(hp(beat, 30, 2), 900, 2)
+    beat[-int(SR * 0.02):] *= np.linspace(1, 0, int(SR * 0.02))
+    return beat / (np.max(np.abs(beat)) + 1e-9) * 10 ** (-6 / 20)
 
 
 def r_schleim_huepfen(rng, v):
@@ -459,16 +506,24 @@ def r_wolf_biss(rng, v):
 
 
 def r_wolf_landung(rng, v):
-    d = 0.3
-    return finish(mix((thump(120, 45, d, 0.1), 1.0), (lp(noise(d, rng), 900) * env(d, 0.002, 0.06), 0.8)))
+    # Pfoten landen im Gras: weicher Plumps und raschelnde Halme.
+    d = 0.32
+    thud = thump(110, 50, d, 0.05)
+    crackle = bp(noise(d, rng), 1500, 6000) * (rng.random(int(SR * d)) > 0.62) * env(d, 0.004, 0.2, 2)
+    rustle = lp(noise(d, rng), 2600) * env(d, 0.006, 0.14, 2)
+    return finish(mix((thud, 0.6), (crackle, 1.3), (rustle, 0.9)), top=9000)
 
 
 def r_wolf_tod(rng, v):
-    d = 0.9
-    yelp = osc(vibrato(glide(900, 380, 0.7, 0.6), 7, 0.04), 0.7, "saw") * env(0.7, 0.01, 0.4, 2)
-    yelp = lp(yelp, 2200)
-    fall = at(thump(110, 50, 0.3, 0.12), 0.45, d) * 0.6
-    return finish(mix((pad(yelp, d), 1.0), (fall, 1.0)), echo_wet=0.14)
+    # Natürliches Winseln: zwei kurze Jauler, dann ein leiser, abfallender Klagelaut und ein Plumps.
+    d = 1.0
+    formants = [(900, 260, 1.0), (1700, 320, 0.45)]
+    yelp1 = voice(glide(780, 610, 0.12), 0.12, formants, 0.08, rng) * env(0.12, 0.005, 0.06)
+    yelp2 = voice(glide(720, 520, 0.14), 0.14, formants, 0.08, rng) * env(0.14, 0.005, 0.07)
+    whine = voice(vibrato(glide(560, 320, 0.6, 0.8), 6, 0.03), 0.6, [(800, 220, 1.0), (1500, 260, 0.4)], 0.1, rng) * env(0.6, 0.03, 0.35, 2)
+    fall = thump(100, 45, 0.3, 0.1)
+    out = mix((at(yelp1, 0.0, d), 1.0), (at(yelp2, 0.16, d), 0.85), (at(whine, 0.34, d), 0.7), (at(fall, 0.55, d), 0.45))
+    return finish(out, echo_wet=0.06, top=8000)
 
 
 def r_muenzen(rng, v):
@@ -513,7 +568,7 @@ SOUNDS = {
     "schwert_schwung": ("kampf", r_schwert_schwung, 4),
     "stab_schwung": ("kampf", r_stab_schwung, 3),
     "bogen_spannen": ("kampf", r_bogen_spannen, 1),
-    "bogen_schuss": ("kampf", r_bogen_schuss, 3),
+    "bogen_schuss": ("kampf", r_bogen_schuss, 10),
     "krit": ("kampf", r_krit, 2),
     "treffer_weich": ("treffer", r_treffer_weich, 3),
     "treffer_chitin": ("treffer", r_treffer_chitin, 3),

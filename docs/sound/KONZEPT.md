@@ -180,6 +180,12 @@ deterministisch (feste Saat), damit ein erneuter Lauf dieselben Dateien ergibt.
 - Noch nicht in Paket 1: Stereo-Richtung (zurzeit nur Entfernung), eigene
   Regler für Oberfläche und Umgebung (Paket 2), Laute der übrigen Monster
   (Paket 5). `bogen_spannen` ist vorbereitet, wird aber noch nicht abgespielt.
+- Runde 1 der Freigabe: 30 passt, 11 überarbeitet (Schwert schlitzt statt
+  pfeift, Stab nach Alchemie, Bogen trocken mit 10 Varianten, Spannen ohne
+  Ton, Krit als brechende Rüstung, Geisttreffer wie Pappe, Schaden als
+  stimmhaftes „Uff“, Trank nur Schlucke, Wolf landet auf Gras und winselt).
+  Wenig Leben ist jetzt ein Herzschlag als Schleife, solange das Leben unter
+  25 % liegt.
 - Alle Sounds sind selbst erzeugt; es gibt keine Fremdlizenzen.
 - Freigabe läuft über die Hörvorschau „Sonnenhain Klangprobe“.
 

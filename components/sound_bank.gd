@@ -22,7 +22,7 @@ const CATALOG := {
 	"schwert_schwung": {"path":"kampf/schwert_schwung", "variants":4, "db":-9.0, "max":2, "prio":3, "pitch":0.05},
 	"stab_schwung": {"path":"kampf/stab_schwung", "variants":3, "db":-10.0, "max":2, "prio":3, "pitch":0.04},
 	"bogen_spannen": {"path":"kampf/bogen_spannen", "variants":1, "db":-14.0, "max":1, "prio":2, "pitch":0.03},
-	"bogen_schuss": {"path":"kampf/bogen_schuss", "variants":3, "db":-9.0, "max":2, "prio":3, "pitch":0.05},
+	"bogen_schuss": {"path":"kampf/bogen_schuss", "variants":10, "db":-9.0, "max":2, "prio":3, "pitch":0.05},
 	"krit": {"path":"kampf/krit", "variants":2, "db":-8.0, "max":2, "prio":4, "pitch":0.03},
 	"treffer_weich": {"path":"treffer/treffer_weich", "variants":3, "db":-9.0, "max":3, "prio":3, "pitch":0.07},
 	"treffer_chitin": {"path":"treffer/treffer_chitin", "variants":3, "db":-10.0, "max":3, "prio":3, "pitch":0.07},
@@ -41,7 +41,7 @@ const CATALOG := {
 	"spieler_ausweichen": {"path":"spieler/spieler_ausweichen", "variants":2, "db":-11.0, "max":1, "prio":4, "pitch":0.05},
 	"spieler_trank": {"path":"spieler/spieler_trank", "variants":1, "db":-10.0, "max":1, "prio":5, "pitch":0.02},
 	"spieler_wiederbeleben": {"path":"spieler/spieler_wiederbeleben", "variants":1, "db":-8.0, "max":1, "prio":8, "pitch":0.0, "duck":1.2},
-	"spieler_warnung": {"path":"spieler/spieler_warnung", "variants":1, "db":-9.0, "max":1, "prio":7, "pitch":0.0},
+	"spieler_warnung": {"path":"spieler/spieler_warnung", "variants":1, "db":-13.0, "max":1, "prio":7, "pitch":0.0, "loop":true},
 	"schleim_huepfen": {"path":"mobs/schleim_huepfen", "variants":3, "db":-12.0, "max":2, "prio":2, "pitch":0.08},
 	"schleim_tod": {"path":"mobs/schleim_tod", "variants":1, "db":-9.0, "max":2, "prio":4, "pitch":0.06},
 	"kaefer_zirpen": {"path":"mobs/kaefer_zirpen", "variants":2, "db":-15.0, "max":2, "prio":2, "pitch":0.06},
@@ -78,6 +78,7 @@ var last_variant := {}
 var music_bus := -1
 var duck_timer := 0.0
 var mob_seen := {}
+var loop_players := {}
 var rng := RandomNumberGenerator.new()
 
 static func ensure_buses() -> void:
@@ -129,12 +130,39 @@ func setup(host: Node, voices: int = 16) -> void:
 			var stream: AudioStream = load(file_path(name, variant))
 			if stream != null: list.append(stream)
 		streams[name] = list
+		if bool(CATALOG[name].get("loop", false)) and not list.is_empty():
+			make_loop(list[0])
+			var loop_player := AudioStreamPlayer.new()
+			loop_player.bus = BUS_SFX
+			loop_player.stream = list[0]
+			host.add_child(loop_player)
+			loop_players[name] = loop_player
 	for i in voices:
 		var player := AudioStreamPlayer.new()
 		player.bus = BUS_SFX
 		host.add_child(player)
 		players.append(player)
 		voice_info.append({"name":"", "prio":-1, "started":0})
+
+## Macht aus einer WAV-Datei eine nahtlose Schleife über die ganze Länge.
+static func make_loop(stream: AudioStream) -> void:
+	if not stream is AudioStreamWAV: return
+	var wav: AudioStreamWAV = stream
+	# Importierte WAVs sind komprimiert; die Länge daher aus Dauer und Abtastrate.
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_begin = 0
+	wav.loop_end = int(round(wav.get_length() * wav.mix_rate))
+
+## Startet oder stoppt einen Schleifensound (z. B. Herzschlag bei wenig Leben).
+func set_loop(name: String, active: bool, volume: float = 1.0) -> void:
+	var player: AudioStreamPlayer = loop_players.get(name)
+	if player == null: return
+	var on := active and volume > 0.0
+	if on:
+		player.volume_db = float(CATALOG[name]["db"]) + linear_to_db(volume)
+		if not player.playing: player.play()
+	elif player.playing:
+		player.stop()
 
 ## Spielt einen Katalogsound. volume = Effektlautstärke 0..1, distance in Weltpixeln.
 func play(name: String, volume: float = 1.0, distance: float = 0.0) -> bool:

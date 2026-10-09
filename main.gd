@@ -360,7 +360,6 @@ var sprint_exhausted := false
 var step_timer := 0.0
 var music_player: AudioStreamPlayer
 var sound_bank=SoundBank.new()
-var low_hp_warned:=false
 var mushroom_sound_seen:Dictionary={}
 var music_incoming: AudioStreamPlayer
 var music_theme := ""
@@ -1408,6 +1407,10 @@ func play_world_sound(name: String, pos: Vector2) -> void:
 	if dedicated_server_mode: return
 	sound_bank.play(name, effects_volume, pos.distance_to(player_pos))
 
+## Herzschlag läuft, solange die eigene Figur lebt und unter 25 % Leben hat.
+func low_health_alarm_active() -> bool:
+	return character_created and not creative_mode and death_timer <= 0.0 and hp > 0.0 and hp < max_hp() * 0.25
+
 func normal_attack_sound() -> String:
 	var variant := equipped_weapon_variant()
 	if variant == "crossbow" or (class_id == 2 and variant != "axe"): return "bogen_schuss"
@@ -1610,6 +1613,7 @@ func _process(delta: float) -> void:
 	if not dedicated_server_mode:
 		sound_bank.tick(delta)
 		update_mob_voices()
+		sound_bank.set_loop("spieler_warnung", low_health_alarm_active(), effects_volume)
 	boss_music_hold_timer=maxf(0.0,boss_music_hold_timer-delta)
 	if boss_music_hold_timer<=0.0:boss_music_hold_theme=""
 	for boss_fx_index in range(boss_death_end_queue.size()-1,-1,-1):
@@ -4616,14 +4620,7 @@ func apply_player_damage(raw: int) -> void:
 	hurt_until=combat_feedback.clock+.18
 	invulnerable = 0.5
 	effect(player_pos + Vector2(0, -30), "-%d" % dealt, Color("ff888d"), 0.75)
-	if hp <= 0:
-		play_sound("spieler_tod")
-	else:
-		play_sound("spieler_schaden")
-		if hp < max_hp() * 0.25 and not low_hp_warned:
-			low_hp_warned = true
-			play_sound("spieler_warnung")
-	if hp >= max_hp() * 0.4: low_hp_warned = false
+	play_sound("spieler_tod" if hp <= 0 else "spieler_schaden")
 	if hp <= 0:
 		hp = 0
 		death_timer = DEATH_DURATION
@@ -4656,7 +4653,6 @@ func respawn() -> void:
 	death_timer = 0.0
 	dash_timer = 0.0
 	invulnerable = 1.0
-	low_hp_warned = false
 	play_sound("spieler_wiederbeleben")
 	if arena_mode == "survival":
 		finish_survival_run()

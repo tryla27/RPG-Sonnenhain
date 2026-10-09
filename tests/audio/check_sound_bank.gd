@@ -82,8 +82,24 @@ func check_voices()->void:
 	for i in bank.players.size():
 		if bank.players[i].playing and bank.voice_info[i]["name"]=="wolf_biss":same+=1
 	check(same<=2,"Limit gleichzeitiger Stimmen")
+	check(bank.loop_players.has("spieler_warnung"),"Herzschlag als Schleife")
+	var heart:AudioStreamWAV=bank.loop_players["spieler_warnung"].stream
+	check(heart.loop_mode==AudioStreamWAV.LOOP_FORWARD and heart.loop_end>40000,"Herzschlag schleift ueber volle Laenge")
+	bank.set_loop("spieler_warnung",true)
+	check(bank.loop_players["spieler_warnung"].playing,"Herzschlag startet")
+	bank.set_loop("spieler_warnung",true)
+	check(bank.loop_players["spieler_warnung"].playing,"Herzschlag laeuft weiter")
+	bank.set_loop("spieler_warnung",false)
+	check(not bank.loop_players["spieler_warnung"].playing,"Herzschlag stoppt")
+	bank.set_loop("spieler_warnung",true,0.0)
+	check(not bank.loop_players["spieler_warnung"].playing,"stumm bei Lautstaerke 0")
 	check(bank.play("spieler_tod"),"Spielertod spielt")
 	check(bank.duck_timer>0.0,"Ducking bei Spielertod")
+	for player in bank.loop_players.values():
+		player.stop()
+		player.stream=null
+		player.free()
+	bank.loop_players.clear()
 	for player in bank.players:
 		player.stop()
 		player.stream=null
