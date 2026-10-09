@@ -42,6 +42,7 @@ jobs:
           echo "out_of_memory=$(printf '%s\n' "$all" | grep -c 'ERR_OUT_OF_MEMORY')"
           echo "boss_spawn=$(printf '%s\n' "$all" | grep -c 'BOSS_SPAWN')"
           echo "boss_stray=$(printf '%s\n' "$all" | grep -c 'BOSS_STRAY')"
+          echo "procs=$(pgrep -fc '[s]onnenhain-server.x86_64')"
           echo "restarts=$(printf '%s\n' "$all" | grep -c 'restarted\|forcing dedicated')"
           printf '%s\n' "$all" | grep -A1 'SCRIPT ERROR' | grep -v '^--$' | cut -c1-180 | sort | uniq -c | sort -rn | head -12 | sed 's/^/ERR /'
           echo "patch_notice=$(printf '%s\n' "$all" | grep -c 'SERVER_PATCH_NOTICE_SENT')"
@@ -56,4 +57,4 @@ jobs:
           while IFS= read -r line; do
             safe=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
             echo "::notice title=Server-Diagnose::$safe"
-          done < <(grep -E "^(HB|BOSS) " diag.txt | tail -6; grep -vE "^(HB|BOSS|ERR|PROC|UPTIME) " diag.txt | head -4)
+          done < <(grep -E "^(HB|BOSS) " diag.txt | tail -6; grep -vE "^(HB|BOSS|ERR|PROC|UPTIME) " diag.txt | head -6)
