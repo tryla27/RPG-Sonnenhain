@@ -17,19 +17,21 @@ func _initialize()->void:
 	assert(g.region_at(Vector2(1801,1120))==1)
 	assert(fog.explored_world(Vector2(1801,1120)))
 
-	# A party member in the same overworld instance contributes vision far away.
+	# A party member nearby shares vision; one far away does not.
 	g.party_state={"members":[
 		{"uuid":g.player_uuid,"context":"world","instance_id":"world","pos":[1740.0,1120.0]},
-		{"uuid":"friend","context":"world","instance_id":"world","pos":[7200.0,3200.0]}
+		{"uuid":"friend","context":"world","instance_id":"world","pos":[2940.0,1120.0]},
+		{"uuid":"far","context":"world","instance_id":"world","pos":[7200.0,3200.0]}
 	]}
 	fog.update_from_game(g)
-	assert(fog.explored_world(Vector2(7200,3200)))
+	assert(fog.explored_world(Vector2(3400,1120)))
+	assert(not fog.explored_world(Vector2(7200,3200)))
 	var before:=fog.snapshot()
 	var restored=Fog.new()
-	restored.restore(before,g.WORLD)
-	assert(restored.explored_world(Vector2(7200,3200)))
+	restored.restore([],g.WORLD,before)
+	assert(restored.explored_world(Vector2(3400,1120)))
 	assert(restored.explored_world(Vector2(1801,1120)))
-	assert(before.size()<=512)
+	assert(fog.legacy_snapshot().size()<=512)
 
 	# Material families stay native 32px and contain both floor and wall sets.
 	assert(Palette.TILE==32)
@@ -58,5 +60,5 @@ func _initialize()->void:
 	assert(loaded.cells["ground"].has(loaded.key(cell)))
 
 	g.free()
-	print("WORLD_BUILDER_FOG_OK 32px palettes, undo/redo, validation, export, cross-region and party vision")
+	print("WORLD_BUILDER_FOG_OK 32px palettes, undo/redo, validation, export, cross-region and nearby party vision")
 	quit()

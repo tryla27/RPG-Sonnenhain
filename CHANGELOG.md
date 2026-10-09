@@ -6,6 +6,12 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- C1 Start im Dunkeln: `WorldFog` auf 64-px-Zellen, Sicht 640 px, Gruppe nur
+  bis 1600 px. Neues Spielstandfeld `world_fog_fine` (Base64), `world_fog`
+  bleibt als grobes 256-px-Feld; alte Stände werden beim Laden hochgerechnet.
+  Dunkelheit im Spielbild als Dreiecksnetz mit Eckfarben (weicher Rand),
+  Minikarte und Weltkarte dunkel. Server: `valid_snapshot`, Feldgrenze 80 → 96.
+  Test `tests/gameplay/check_dark_start.gd`, Bilder `tools/capture_dark_start.gd`.
 - B2 Tippgeräusch: `ui_tippen` (3 Varianten) und `ui_tippen_loeschen` in
   `tools/build_sfx.py`/`sound_bank.gd`, Regel in `components/typing_sound.gd`
   (max. 25 Anschläge/s), verdrahtet in Konto, Koop-Code, Name und Chat über
