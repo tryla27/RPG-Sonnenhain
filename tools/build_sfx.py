@@ -691,16 +691,18 @@ def r_reise(rng, v):
 
 
 def r_truhe_auf(rng, v):
-    d = 0.9
-    creak = np.zeros(int(SR * 0.35))
+    # Nur die Truhe: langes Holzknarzen beim Aufklappen, Riegel, Deckel schlägt auf. Kein Glanz.
+    d = 0.75
+    creak = np.zeros(int(SR * 0.5))
     tt = 0.0
-    while tt < 0.3:
-        creak += at(bp(noise(0.012, rng), 350, 1400) * env(0.012, 0.001, 0.005), tt, 0.35) * (0.5 + tt)
-        tt += 1.0 / (40 - 60 * tt) * rng.uniform(0.8, 1.2)
-    latch = at(hp(noise(0.01, rng), 1800) * env(0.01, 0.0005, 0.003), 0.36, d)
-    lid = at(thump(160, 90, 0.15, 0.05), 0.38, d)
-    sparkle = sum(at(bell(f, 0.4, 0.2), 0.45 + 0.06 * i, d) for i, f in enumerate([NOTE["A5"], NOTE["D6"], NOTE["F#6"]])) * 0.35
-    return finish(mix((pad(creak, d), 0.8), (latch, 0.7), (lid, 0.6), (sparkle, 1.0)), echo_wet=0.18)
+    while tt < 0.46:
+        grain = bp(noise(0.014, rng), 300, 1300) * env(0.014, 0.001, 0.006)
+        body = bp(noise(0.02, rng), 140, 420) * env(0.02, 0.002, 0.008) * 0.6
+        creak += at(mix((grain, 1.0), (body, 1.0)), tt, 0.5) * (0.45 + 0.9 * tt)
+        tt += 1.0 / (55 - 70 * tt) * rng.uniform(0.75, 1.25)
+    latch = at(hp(noise(0.012, rng), 1600) * env(0.012, 0.0005, 0.004), 0.0, d)
+    lid = at(mix((thump(150, 80, 0.2, 0.06), 1.0), (lp(noise(0.08, rng), 1200) * env(0.08, 0.002, 0.03), 0.6)), 0.52, d)
+    return finish(mix((at(creak, 0.03, d), 1.0), (latch, 0.6), (lid, 0.8)), top=8000)
 
 
 def r_heilen(rng, v):
