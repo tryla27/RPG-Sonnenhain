@@ -360,6 +360,9 @@ var sprint_exhausted := false
 var step_timer := 0.0
 var music_player: AudioStreamPlayer
 var sound_bank=SoundBank.new()
+var ui_volume := 0.8
+var rustle_timer := 0.0
+var last_sound_panel := ""
 var mushroom_sound_seen:Dictionary={}
 var music_incoming: AudioStreamPlayer
 var music_theme := ""
@@ -959,7 +962,7 @@ func save_and_return_to_start() -> bool:
 		save_game()
 		pause_status = "Andere Spieler sind noch verbunden. Als Host kannst du erst ins Hauptmenü, wenn sie die Sitzung verlassen haben."
 		message(pause_status)
-		play_sound("menu")
+		play_sound("ui_klick")
 		return false
 	save_game()
 	refresh_save_slot_labels()
@@ -969,7 +972,7 @@ func save_and_return_to_start() -> bool:
 		disconnect_multiplayer(false)
 	panel = "start"
 	selected_save_slot = active_save_slot
-	play_sound("menu")
+	play_sound("ui_klick")
 	return true
 
 func server_action_allowed(peer_id: int, action_key: String, cooldown_ms: int) -> bool:
@@ -1220,7 +1223,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 			copy["pos"] = target
 			if int(copy.get("type",-1)) in [12,13,14] and float(copy.get("boss_spawn_timer",0.0))>0.0 and not boss_spawn_sound_seen.has(uid):
 				boss_spawn_sound_seen[uid]=true
-				play_sound("menu")
+				play_sound("boss_erscheint")
 		rebuilt.append(copy)
 		if int(copy.get("type",-1))==2:
 			var dust_state:Dictionary=copy.get("attack_state",{})
@@ -1392,7 +1395,7 @@ func _exit_tree() -> void:
 
 func play_sound(name: String) -> void:
 	if sound_bank.has(name):
-		sound_bank.play(name, effects_volume)
+		sound_bank.play(name, ui_volume if SoundBank.is_ui(name) else effects_volume)
 		return
 	if sound_players.is_empty() or not sound_streams.has(name): return
 	var player: AudioStreamPlayer = sound_players[next_sound_player]
@@ -1407,6 +1410,41 @@ func play_sound(name: String) -> void:
 func play_world_sound(name: String, pos: Vector2) -> void:
 	if dedicated_server_mode: return
 	sound_bank.play(name, effects_volume, pos.distance_to(player_pos))
+
+## Fenster auf/zu: spielt, wenn ein Spielfenster aus der Welt heraus geöffnet
+## oder zurück in die Welt geschlossen wird. Start-, Konto- und Szenenbilder zählen nicht.
+const SILENT_PANELS := ["death","intro","start","creation","creation_review","arena_reward","victory"]
+func sound_panel_kind(value: String) -> String:
+	if value == "": return "world"
+	if value in SILENT_PANELS or value.begins_with("account"): return "scene"
+	return "window"
+
+func update_panel_sounds() -> void:
+	if panel == last_sound_panel: return
+	var before := sound_panel_kind(last_sound_panel)
+	var after := sound_panel_kind(panel)
+	last_sound_panel = panel
+	if before == "world" and after == "window": play_sound("ui_fenster_auf")
+	elif before == "window" and after == "world": play_sound("ui_fenster_zu")
+
+## Steht die Figur in einem begehbaren Busch oder Strauch?
+const FOLIAGE_ZONES := [1, 2, 8, 9]
+func foliage_at(pos: Vector2) -> bool:
+	if interior_id >= 0 or dungeon_id >= 0 or arena_mode != "": return false
+	for bush in VillageLayout.BUSHES:
+		if pos.distance_to(bush) < 30.0: return true
+	for plant in food_system.plants:
+		if str(plant.get("kind","")) == "fruit" and not bool(plant.get("tree",false)) and pos.distance_to(plant["point"]) < 28.0: return true
+	var cx := int(pos.x / 250.0)
+	var cy := int(pos.y / 250.0)
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var obstacle := obstacle_in_cell(cx + dx, cy + dy)
+			if obstacle.is_empty() or int(obstacle["zone"]) not in FOLIAGE_ZONES: continue
+			var radius := float(obstacle["radius"])
+			var distance := pos.distance_to(obstacle["pos"])
+			if distance < radius * 0.95 and distance > obstacle_collision_radius(obstacle): return true
+	return false
 
 ## Herzschlag läuft, solange die eigene Figur lebt und unter 25 % Leben hat.
 func low_health_alarm_active() -> bool:
@@ -1615,12 +1653,13 @@ func _process(delta: float) -> void:
 		sound_bank.tick(delta)
 		update_mob_voices()
 		sound_bank.set_loop("spieler_warnung", low_health_alarm_active(), effects_volume)
+		update_panel_sounds()
 	boss_music_hold_timer=maxf(0.0,boss_music_hold_timer-delta)
 	if boss_music_hold_timer<=0.0:boss_music_hold_theme=""
 	for boss_fx_index in range(boss_death_end_queue.size()-1,-1,-1):
 		boss_death_end_queue[boss_fx_index]["remaining"]=float(boss_death_end_queue[boss_fx_index].get("remaining",0.0))-delta
 		if float(boss_death_end_queue[boss_fx_index]["remaining"])<=0.0:
-			play_sound("level")
+			play_sound("quest_abgeschlossen")
 			boss_death_end_queue.remove_at(boss_fx_index)
 	if character_created and Vector2(hp,max_hp())!=last_vitals:push_vital_state()
 	if not dedicated_server_mode: food_system.tick(self,delta)
@@ -1703,6 +1742,7 @@ func _process(delta: float) -> void:
 	attack_anim = maxf(0.0, attack_anim - delta)
 	warrior_jump_timer = maxf(0.0, warrior_jump_timer - delta)
 	step_timer = maxf(0.0, step_timer - delta)
+	rustle_timer = maxf(0.0, rustle_timer - delta)
 	for i in cooldowns.size():
 		cooldowns[i] = maxf(0.0, float(cooldowns[i]) - delta * food_system.cooldown_recovery_mult())
 	for i in boss_cooldowns.size():
@@ -2265,6 +2305,9 @@ func update_player(delta: float) -> void:
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
 		play_sound("step")
+		if foliage_at(player_pos) and rustle_timer <= 0.0:
+			rustle_timer = 0.45
+			play_sound("busch_rascheln")
 		step_timer = (lerpf(0.43,0.29,sprint_blend) if dash_timer<=0 else 0.25)
 	if controller.used:
 		var stick_aim: Vector2 = controller.stick(true)
@@ -2820,7 +2863,7 @@ func handle_touch_event(event: InputEvent) -> bool:
 
 		if party_widget_rect().has_point(pos) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 			panel = "party"
-			play_sound("menu")
+			play_sound("ui_klick")
 			queue_redraw()
 			return true
 
@@ -3118,7 +3161,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and party_widget_rect().has_point(event.position) and (int(party_state.get("invite_from",0)) > 0 or not (party_state.get("members",[]) as Array).is_empty()):
 		panel = "party"
-		play_sound("menu")
+		play_sound("ui_klick")
 		queue_redraw()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and (event.position.distance_to(Vector2(1035,116)) <= 90.0 or (touch_enabled and Rect2(984,16,145,105).has_point(event.position))):
@@ -4094,7 +4137,7 @@ func enter_arena(mode: String) -> void:
 	hp = max_hp()
 	energy = max_energy()
 	message("%s · Die erste Welle naht!" % ("LETZTE WACHE" if mode == "final" else "ARENA DER EWIGEN WACHT"))
-	play_sound("level")
+	play_sound("reise")
 	announce_multiplayer_context()
 
 func update_arena(delta: float) -> void:
@@ -4130,14 +4173,14 @@ func update_arena(delta: float) -> void:
 			enemy["arena"] = true
 			enemies.append(enemy)
 		message("WELLE %d%s · %d Feinde!" % [arena_wave, "/10" if arena_mode == "final" else "", count])
-		play_sound("menu")
+		play_sound("ui_hinweis")
 
 func finish_final_arena() -> void:
 	final_completed = true
 	arena_return_pos = Vector2(900, 1050)
 	panel = "victory"
 	enemies.clear()
-	play_sound("level")
+	play_sound("quest_abgeschlossen")
 	save_game()
 
 func finish_survival_run() -> void:
@@ -4151,7 +4194,7 @@ func finish_survival_run() -> void:
 	enemy_projectiles.clear()
 	ensure_arena_reward_item()
 	panel = "arena_reward"
-	play_sound("level")
+	play_sound("quest_abgeschlossen")
 	save_game()
 
 func arena_new_weapon_chance(wave:int) -> float:
@@ -4390,7 +4433,7 @@ func enter_dungeon(index: int) -> void:
 		if dungeon_blocked(position): position.y = DUNGEON_CENTER.y + (85 if i % 2 == 0 else -85)
 		enemies.append(make_enemy(int(DUNGEON_ENEMIES[index][i % 2]), position, 2 if i == 7 + index * 2 else (1 if i % 5 == 0 else 0)))
 	message("%s · Die Fackeln weisen dir den Weg. E an der Tür führt hinaus." % DUNGEON_NAMES[index])
-	play_sound("menu")
+	play_sound("reise")
 	announce_multiplayer_context()
 
 func reset_combat_transition_state() -> void:
@@ -4417,7 +4460,7 @@ func leave_dungeon() -> void:
 	battle_zones.clear()
 	previous_region = region_at(player_pos)
 	message("Du kehrst ans Tageslicht zurück.")
-	play_sound("dodge")
+	play_sound("reise")
 	save_game()
 	announce_multiplayer_context()
 
@@ -4437,7 +4480,7 @@ func open_dungeon_chest() -> void:
 	add_item(treasure)
 	dungeon_chests_opened[dungeon_id] = true
 	dungeon_chest_respawn_until[dungeon_id] = Time.get_unix_time_from_system()+CHEST_RESPAWN_SECONDS
-	play_sound("level")
+	play_sound("truhe_auf")
 	message("Gewölbe geräumt! %s erhalten." % treasure["name"])
 	save_game()
 
@@ -4550,7 +4593,7 @@ func spawn_nearby_boss() -> void:
 		var boss_hp: float = boss_max_hp(boss_type)
 		enemies.append({"uid":randi(), "type":boss_type, "pos":site, "home":site, "facing":Vector2.DOWN, "hp":boss_hp, "max_hp":boss_hp, "flash":0.0, "hit":0.0, "stun":0.0, "slow":0.0, "poison":0.0, "poison_tick":1.0, "shot":1.5, "seed":randf() * 6.28,"boss_spawn_timer":1.6})
 		spawn_tower_guardians(enemies.back())
-		play_sound("menu")
+		play_sound("boss_erscheint")
 		message("Boss erscheint: %s!" % info["name"])
 
 func update_rescue() -> void:
@@ -4561,7 +4604,7 @@ func update_rescue() -> void:
 		rescue_banner_timer = 5.0
 		effect(RESCUE_POS + Vector2(0, -210), "DORF IN GEFAHR", Color("ffcf72"), 5.0)
 		message("Alarm! Blütenweiler wird angegriffen. Die Bewohner rufen um Hilfe!")
-		play_sound("menu")
+		play_sound("ui_hinweis")
 		save_game()
 		if uses_server_world():
 			announce_multiplayer_context()
@@ -4766,7 +4809,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 		if event_progress[event_index] >= int(WORLD_EVENTS[event_index]["goal"]):
 			event_states[event_index] = 2
 			message("%s ist in Sicherheit! Sprich erneut mit %s (E)." % [WORLD_EVENTS[event_index]["role"], WORLD_EVENTS[event_index]["name"]])
-			play_sound("level")
+			play_sound("quest_bereit")
 	if invasion and rescue_state == 1:
 		apply_rescue_progress(1,false)
 	if type in [12, 13, 14]:
@@ -4794,6 +4837,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 			if int(bstate["progress"])>=int(bq["count"]):
 				bstate["state"]=2
 				message("Borins Prüfung geschafft: %s. Kehre zu Borin zurück!" % bq["title"])
+				play_sound("quest_bereit")
 	for qindex in quests.size():
 		var quest: Dictionary = quests[qindex]
 		if quest["state"] == 1 and int(QUESTS[qindex]["target"]) == type:
@@ -4801,6 +4845,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 			if quest["progress"] >= QUESTS[qindex]["count"]:
 				quest["state"] = 2
 				message("Questziel erreicht: %s. Kehre zurück!" % QUESTS[qindex]["title"])
+				play_sound("quest_bereit")
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
 		var item: Dictionary = random_loot(type)
 		drops.append({"pos":safe_drop_position(pos), "item":item, "life":90.0})
@@ -4835,7 +4880,7 @@ func gain_xp(amount: int) -> void:
 		hp = max_hp()
 		energy = max_energy()
 		message("LEVEL %d! +1 SKILLPUNKT · +1 ESSENZ · %d/%d Essenz frei" % [level,essence.available(level),essence.total_for_level(level)])
-		play_sound("level")
+		play_sound("level_auf")
 
 func restore_level_skill_point_progress(data:Dictionary)->int:
 	var expected:=maxi(0,level-1)
@@ -4943,7 +4988,7 @@ func collect_drops() -> void:
 		var item: Dictionary = drops[i]["item"]
 		if class_relic_locked_for_player(drops[i],class_id):continue
 		if not can_add_item(item):
-			message("Inventar voll! Verkaufe Gegenstände im Dorf.")
+			message_error("Inventar voll! Verkaufe Gegenstände im Dorf.")
 			continue
 		add_item(item)
 		drops.remove_at(i)
@@ -4953,7 +4998,7 @@ func collect_drops() -> void:
 
 func interact() -> void:
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and player_pos.distance_to(BORIN_CRYSTAL_POS) < 95.0:
-		panel="fusion";play_sound("menu");return
+		panel="fusion";play_sound("ui_dialog");return
 	if konflux.active:
 		konflux.interact(self)
 		return
@@ -4985,7 +5030,7 @@ func interact() -> void:
 		elif in_elara_healing_field(72.0):
 			hp=max_hp()
 			energy=max_energy()
-			play_sound("level")
+			play_sound("heilen")
 			effect(player_pos+Vector2(0,-48),"VOLLSTÄNDIG GEHEILT",Color("b7f7de"),1.2)
 			message("Elaras Heilungsfeld füllt Leben und Energie vollständig auf.")
 			save_game()
@@ -5028,7 +5073,7 @@ func interact() -> void:
 			enemies.clear()
 			enemy_projectiles.clear()
 			message("Der alte Torbogen führt nach %s." % region_name(region_at(player_pos)))
-			play_sound("dodge")
+			play_sound("reise")
 			save_game()
 			return
 	if rescue_state >= 2 and player_pos.distance_to(RESCUE_POS + Vector2(0, 120)) < 120:
@@ -5042,7 +5087,7 @@ func interact() -> void:
 			rescue_state = 3
 			gain_xp(160)
 			reward_scene_timer = 7.0
-			play_sound("level")
+			play_sound("quest_abgeschlossen")
 			message("Nela: Danke! Die Dornen kamen aus den Alten Ruinen. +160 XP, +80 Gold und eine seltene Klassenwaffe.")
 			save_game()
 			announce_quest_state()
@@ -5068,7 +5113,7 @@ func interact() -> void:
 	if closest.is_empty():
 		food_system.harvest(self)
 		return
-	play_sound("menu")
+	play_sound("ui_dialog")
 	if closest["kind"] == "quest":
 		if String(closest["name"])=="Borin": panel="essence";essence.selected_tree=0;menu_scroll=0
 		else: quest_dialogue(String(closest["name"]))
@@ -5106,7 +5151,7 @@ func interact_world_event(index: int) -> void:
 		gold += int(encounter["gold"])
 		hp = minf(max_hp(), hp + 28.0)
 		message("%s: %s +%d XP, +%d Gold, +28 HP." % [encounter["name"], encounter["after"], encounter["xp"], encounter["gold"]])
-		play_sound("level")
+		play_sound("quest_abgeschlossen")
 	else:
 		message("%s: %s" % [encounter["name"], encounter["after"]])
 	save_game()
@@ -5125,7 +5170,7 @@ func visit_healer() -> void:
 		return
 	gold -= cost
 	hp = max_hp()
-	play_sound("level")
+	play_sound("heilen")
 	message("Elara hat deine Wunden geheilt. -%d Gold · HP vollständig." % cost)
 	save_game()
 
@@ -5157,11 +5202,11 @@ func open_chest(index: int) -> void:
 		message("Die Truhe erscheint in %ds erneut." % chest_cooldown_seconds(index))
 		return
 	if inventory.size() >= 42:
-		message("Inventar voll — verkaufe erst etwas im Dorf.")
+		message_error("Inventar voll — verkaufe erst etwas im Dorf.")
 		return
 	opened_chests[index] = true
 	chest_respawn_until[index] = Time.get_unix_time_from_system()+CHEST_RESPAWN_SECONDS
-	play_sound("pickup")
+	play_sound("truhe_auf")
 	var element: String = ["eis", "gift", "blitz"][index % 3]
 	var region := region_at(chest_position(index))
 	var rarity := 3 if region_level(region) >= 30 else 2
@@ -5199,7 +5244,7 @@ func update_waystone_activation() -> void:
 			waystone_unlocked[i]=true
 			last_waystone=i
 			message("Wegstein %s aktiviert. Reise vom Dorf aus dorthin." % region_name(region_at(WAYSTONES[i])))
-			play_sound("level")
+			play_sound("wegstein_aktiviert")
 			save_game()
 			break
 
@@ -5229,7 +5274,7 @@ func click_travel(mouse: Vector2) -> void:
 		var row := (i - 1) / 3
 		if Rect2(166 + col * 271, 175 + row * 96, 255, 79).has_point(mouse):
 			if not waystone_unlocked[i] or not region_available(region_at(WAYSTONES[i])):
-				message("Diesen Wegstein musst du zunächst vor Ort aktivieren.")
+				message_error("Diesen Wegstein musst du zunächst vor Ort aktivieren.")
 				return
 			if dungeon_id >= 0: dungeon_id = -1
 			player_pos = waystone_arrival(i)
@@ -5238,7 +5283,7 @@ func click_travel(mouse: Vector2) -> void:
 			panel = ""
 			enemies.clear()
 			enemy_projectiles.clear()
-			play_sound("dodge")
+			play_sound("reise")
 			message("Reise nach %s." % region_name(region_at(player_pos)))
 			save_game()
 			return
@@ -5253,7 +5298,7 @@ func quick_potion(restore_energy: bool) -> void:
 		if (item["name"] in ["Energietrank", "Manatrank"]) == restore_energy:
 			use_item(i)
 			return
-	message("Kein passender Trank im Inventar.")
+	message_error("Kein passender Trank im Inventar.")
 
 func borin_reward_item(quest_index:int)->Dictionary:
 	var q:Dictionary=BORIN_QUESTS[quest_index]
@@ -5275,12 +5320,13 @@ func borin_quest_dialogue()->void:
 			skill_points+=int(q["skill_points"])
 			add_item(reward)
 			message("Borin: Prüfung bestanden! +%d Skillpunkte · %s" % [int(q["skill_points"]),reward["name"]])
-			play_sound("level");save_game();return
+			play_sound("quest_abgeschlossen");save_game();return
 	for i in BORIN_QUESTS.size():
 		var q:Dictionary=BORIN_QUESTS[i]
 		if int(borin_quests[i]["state"])==0 and level>=int(q["req"]):
 			borin_quests[i]["state"]=1
 			message("Borin: %s — besiege %d %s." % [q["title"],int(q["count"]),ENEMY_TYPES[int(q["target"])]["name"]])
+			play_sound("quest_angenommen")
 			save_game();return
 	var next_req:=-1
 	for i in BORIN_QUESTS.size():
@@ -5310,7 +5356,7 @@ func pip_return_loan_weapon()->String:
 	validate_equipment_slots()
 	pip_loan_received=false
 	pip_loan_level=0
-	play_sound("pickup")
+	play_sound("beute_aufheben")
 	save_game()
 	return item_name
 
@@ -5348,7 +5394,7 @@ func pip_dialogue()->void:
 	pip_loan_received=true
 	pip_loan_level=level
 	message("Pip: Für den Anfang leihe ich dir %s. Nach deinem nächsten Level brauche ich sie zurück." % loan["name"])
-	play_sound("pickup");save_game()
+	play_sound("beute_aufheben");save_game()
 
 func quest_dialogue(npc_name: String) -> void:
 	for i in QUESTS.size():
@@ -5359,13 +5405,14 @@ func quest_dialogue(npc_name: String) -> void:
 			var reward_power := (6 + i * 3) if reward_icon in ["sword", "staff", "bow"] else (4 + int(i / 2.0) if reward_icon == "armor" else (12 + i * 2 if reward_icon == "ring" else 0))
 			var reward_item := make_item(reward_name, reward_icon, mini(4, 1 + i / 3), reward_power, 75 + i * 30, "blitz" if i == 12 else ("gift" if i == 14 else ""))
 			if not can_add_item(reward_item):
-				message("Dein Inventar ist voll. Verkaufe erst etwas und hole dann die Questbelohnung ab.")
+				message_error("Dein Inventar ist voll. Verkaufe erst etwas und hole dann die Questbelohnung ab.")
 				return
 			quests[i]["state"] = 3
 			gold += int(QUESTS[i]["gold"])
 			gain_xp(int(QUESTS[i]["xp"]))
 			add_item(reward_item)
 			message("Quest abgeschlossen: %s! +%d XP, +%d Gold" % [QUESTS[i]["title"], QUESTS[i]["xp"], QUESTS[i]["gold"]])
+			play_sound("quest_abgeschlossen")
 			save_game()
 			announce_quest_state()
 			return
@@ -5373,6 +5420,7 @@ func quest_dialogue(npc_name: String) -> void:
 		if QUESTS[i]["npc"] == npc_name and quests[i]["state"] == 0 and level + 3 >= region_level(int(ENEMY_TYPES[int(QUESTS[i]["target"])]["region"])):
 			quests[i]["state"] = 1
 			message("%s: %s — besiege %d %s!" % [npc_name, QUESTS[i]["title"], QUESTS[i]["count"], ENEMY_TYPES[int(QUESTS[i]["target"])]["name"]])
+			play_sound("quest_angenommen")
 			save_game()
 			announce_quest_state()
 			return
@@ -5381,6 +5429,11 @@ func quest_dialogue(npc_name: String) -> void:
 func message(value: String) -> void:
 	notice = value
 	notice_timer = 5.0
+
+## Meldung für etwas, das gerade nicht geht: mit kurzem Fehlerklang.
+func message_error(value: String) -> void:
+	message(value)
+	play_sound("ui_fehler")
 
 func effect(pos: Vector2, value: String, color: Color, life: float) -> void:
 	effects.append({"pos":pos, "text":value, "color":color, "life":life, "max":life})
@@ -5409,7 +5462,7 @@ func refresh_save_slot_labels() -> void:
 func capture_save_data() -> Dictionary:
 	var safe_pos: Vector2 = konflux.return_position if konflux.active else (arena_return_pos if arena_mode != "" else (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)))
 	var safe_hp: float = konflux.hp_before if konflux.active else (max_hp() if arena_mode != "" else hp)
-	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "skill_level_points_granted":skill_level_points_granted, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "equipped_necklace_uid":equipped_necklace_uid,"necklace_cooldown_ms":maxi(0,int(necklaces.state(0,necklace_visual(),Time.get_ticks_msec())["ready"])-Time.get_ticks_msec()), "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_rotation":shop_rotation,"shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
+	var data := {"world_version":8, "player_uuid":player_uuid, "recent_players":recent_players, "processed_server_transactions":processed_server_transactions, "discovered_regions":discovered_regions, "position":[safe_pos.x, safe_pos.y], "hp":safe_hp, "energy":energy, "level":level, "xp":xp, "gold":gold, "skill_points":skill_points, "skill_level_points_granted":skill_level_points_granted, "learned":learned, "skill_levels":skill_levels, "slots":slots, "class_id":class_id, "hero_name":hero_name, "hero_gender":hero_gender, "hero_race":hero_race, "cosmetic_hair":cosmetic_hair, "cosmetic_cloak":cosmetic_cloak, "cosmetic_jewelry":cosmetic_jewelry, "cosmetic_accent":cosmetic_accent, "character_created":character_created, "inventory":inventory, "equipped_uid":equipped_uid, "equipped_armor_uid":equipped_armor_uid,"equipped_head_uid":equipped_head_uid, "equipped_ring_uid":equipped_ring_uid, "equipped_ring2_uid":equipped_ring2_uid, "equipped_necklace_uid":equipped_necklace_uid,"necklace_cooldown_ms":maxi(0,int(necklaces.state(0,necklace_visual(),Time.get_ticks_msec())["ready"])-Time.get_ticks_msec()), "last_waystone":last_waystone, "waystone_unlocked":waystone_unlocked, "shop_rotation":shop_rotation,"shop_timer":shop_timer, "shop_stock":shop_stock, "opened_chests":opened_chests, "chest_respawn_until":chest_respawn_until, "dungeon_chests_opened":dungeon_chests_opened, "dungeon_chest_respawn_until":dungeon_chest_respawn_until, "bosses_defeated":bosses_defeated, "final_completed":final_completed, "arena_best":arena_best, "arena_leaderboard":arena_leaderboard, "arena_reward_pending":arena_mode == "survival" and panel == "arena_reward" and not arena_reward_claimed, "arena_reward_wave":arena_reward_wave,"arena_reward_item":arena_reward_item, "next_uid":next_uid, "quests":quests, "borin_quests":borin_quests, "pip_loan_received":pip_loan_received, "pip_loan_level":pip_loan_level, "pip_return_dialogue_index":pip_return_dialogue_index, "fusion_history":fusion_history,"learned_fusions":fusion_progress_snapshot(), "tracked_quest_id":quest_guide.tracked_id, "music_enabled":music_enabled, "music_volume":music_volume, "effects_volume":effects_volume, "ui_volume":ui_volume, "event_states":event_states, "event_progress":event_progress, "rescue_state":rescue_state, "rescue_kills":rescue_kills, "test_level_lock":test_level_lock}
 	data["arcane_step_learned"] = arcane_step_learned
 	data["class_mastery_unlocked"] = class_mastery_unlocked
 	data["warrior_rage"] = warrior_rage
@@ -5550,6 +5603,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	music_enabled = bool(data.get("music_enabled", true))
 	music_volume = clampf(float(data.get("music_volume", 0.90)), 0.0, 1.0)
 	effects_volume = clampf(float(data.get("effects_volume", 0.75)), 0.0, 1.0)
+	ui_volume = clampf(float(data.get("ui_volume", 0.8)), 0.0, 1.0)
 	if not music_enabled:
 		music_volume = 0.0
 		music_enabled = true
@@ -5748,17 +5802,17 @@ func handle_panel_click(mouse: Vector2) -> void:
 		for candidate in 3:
 			if Rect2(168 + candidate * 273, 530, 260, 57).has_point(mouse):
 				selected_save_slot = candidate + 1
-				play_sound("menu")
+				play_sound("ui_klick")
 				return
 		if Rect2(300, 378, 550, 54).has_point(mouse):
-			play_sound("menu")
+			play_sound("ui_klick")
 			active_save_slot = selected_save_slot
 			begin_character_creation()
 		elif Rect2(300, 448, 550, 54).has_point(mouse):
 			if not FileAccess.file_exists(slot_save_path(selected_save_slot)):
-				message("Noch kein Spielstand vorhanden. Wähle eine Klasse und starte ein neues Spiel.")
+				message_error("Noch kein Spielstand vorhanden. Wähle eine Klasse und starte ein neues Spiel.")
 				return
-			play_sound("menu")
+			play_sound("ui_klick")
 			active_save_slot = selected_save_slot
 			load_game()
 			enemies.clear()
@@ -5783,7 +5837,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(590,540,365,44).has_point(mouse):
 			if FileAccess.file_exists(slot_save_path(active_save_slot)) and not creation_replace_confirmed:
 				creation_replace_confirmed=true
-				play_sound("menu")
+				play_sound("ui_klick")
 			else:
 				start_new_game()
 		return
@@ -5792,7 +5846,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if Rect2(245+cls*225,414,205,100).has_point(mouse):
 				pending_class=cls
 				creation_class_selected=true
-				play_sound("menu")
+				play_sound("ui_klick")
 				queue_redraw()
 				return
 		if Rect2(300, 228, 550, 48).has_point(mouse):
@@ -5802,11 +5856,11 @@ func handle_panel_click(mouse: Vector2) -> void:
 		for i in 2:
 			if Rect2(300 + i * 210, 300, 195, 40).has_point(mouse):
 				pending_gender = i
-				play_sound("menu")
+				play_sound("ui_klick")
 		for i in 3:
 			if Rect2(245 + i * 220, 365, 205, 44).has_point(mouse):
 				pending_race = i
-				play_sound("menu")
+				play_sound("ui_klick")
 		if Rect2(300, 520, 550, 52).has_point(mouse) and creation_name.strip_edges().length() >= 2 and creation_class_selected:
 			review_character_creation()
 		elif Rect2(165, 520, 110, 52).has_point(mouse):
@@ -5847,7 +5901,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 		for tab in 4:
 			if Rect2(190 + tab * 195, 142, 180, 38).has_point(mouse):
 				mechanics_page = tab
-				play_sound("menu")
+				play_sound("ui_klick")
 				return
 		if Rect2(820, 548, 160, 38).has_point(mouse):
 			panel = ""
@@ -5859,7 +5913,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 			return
 		if Rect2(540,512,410,42).has_point(mouse):
 			save_game()
-			play_sound("menu")
+			play_sound("ui_klick")
 			return
 		var destinations:Array=["","party","settings","settings"]
 		for i in destinations.size():
@@ -5868,7 +5922,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 				if i==3 and not creative_mode:
 					toggle_creative_mode()
 					panel="settings"
-				play_sound("menu")
+				play_sound("ui_klick")
 				return
 		if Rect2(190,540,300,44).has_point(mouse):
 			save_and_return_to_start()
@@ -5879,20 +5933,20 @@ func handle_panel_click(mouse: Vector2) -> void:
 		elif Rect2(860, 221, 130, 42).has_point(mouse):
 			controls_return_panel = "pause"
 			panel = "controls"
-			play_sound("menu")
+			play_sound("ui_klick")
 		elif Rect2(300, 221, 550, 42).has_point(mouse):
-			play_sound("menu")
+			play_sound("ui_klick")
 			panel = ""
 		elif Rect2(860, 270, 130, 42).has_point(mouse):
 			mechanics_page = 0
 			panel = "mechanics"
-			play_sound("menu")
+			play_sound("ui_klick")
 		elif Rect2(300, 270, 550, 42).has_point(mouse):
-			play_sound("menu")
+			play_sound("ui_klick")
 			save_game()
 
 		elif Rect2(300, 432, 550, 42).has_point(mouse):
-			play_sound("menu")
+			play_sound("ui_klick")
 			toggle_creative_mode()
 		elif not creative_mode and Rect2(300,480,260,38).has_point(mouse):
 			export_save_backup()
@@ -5935,15 +5989,15 @@ func handle_panel_click(mouse: Vector2) -> void:
 			if Rect2(170 + column * 420, 195 + row * 29, 390, 30).has_point(mouse):
 				awaiting_bind = BIND_ACTIONS[index]
 				controls_status = "%s: neue Taste oder Maustaste drücken · ESC bricht ab." % BIND_NAMES[index]
-				play_sound("menu")
+				play_sound("ui_klick")
 				return
 		if Rect2(175, 562, 385, 36).has_point(mouse):
 			reset_bindings()
-			play_sound("menu")
+			play_sound("ui_klick")
 		elif Rect2(585, 562, 385, 36).has_point(mouse):
 			panel = controls_return_panel
 			awaiting_bind = ""
-			play_sound("menu")
+			play_sound("ui_klick")
 		return
 	if panel == "arena_entry":
 		if Rect2(307, 391, 260, 48).has_point(mouse):
@@ -5978,13 +6032,16 @@ func handle_panel_click(mouse: Vector2) -> void:
 		"quest_details": quest_guide.click_details(self,mouse)
 
 func set_volume_from_mouse(mouse: Vector2) -> bool:
-	if Rect2(300, 337, 550, 25).has_point(mouse):
+	if Rect2(300, 339, 550, 21).has_point(mouse):
 		music_volume = clampf((mouse.x - 315.0) / 520.0, 0.0, 1.0)
 		music_enabled = true
 		update_music()
 		return true
-	if Rect2(300, 391, 550, 25).has_point(mouse):
+	if Rect2(300, 375, 550, 21).has_point(mouse):
 		effects_volume = clampf((mouse.x - 315.0) / 520.0, 0.0, 1.0)
+		return true
+	if Rect2(300, 411, 550, 21).has_point(mouse):
+		ui_volume = clampf((mouse.x - 315.0) / 520.0, 0.0, 1.0)
 		return true
 	return false
 
@@ -5996,7 +6053,7 @@ func begin_character_creation() -> void:
 	pending_race = 0
 	character_created = false
 	panel = "creation"
-	play_sound("menu")
+	play_sound("ui_klick")
 
 func start_new_game() -> void:
 	arena_reward_item.clear()
@@ -6574,12 +6631,12 @@ func buy_fusion(index:int) -> bool:
 
 func click_skills(mouse: Vector2) -> void:
 	for tab in 3:
-		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("menu");return
+		if Rect2(165+tab*180,145,168,38).has_point(mouse): skill_tree_tab=tab;menu_scroll=0;play_sound("ui_klick");return
 	if Rect2(718,145,118,38).has_point(mouse):
 		if near_borin():borin_quest_dialogue()
 		else:message("Borins Prüfungen besprichst du bei Borin; Spells kannst du hier überall skillen.")
 		return
-	if Rect2(848,145,118,38).has_point(mouse): panel="skill_loadout";menu_scroll=0;play_sound("menu");return
+	if Rect2(848,145,118,38).has_point(mouse): panel="skill_loadout";menu_scroll=0;play_sound("ui_klick");return
 	for slot in 3:
 		if Rect2(165+slot*204,190,193,40).has_point(mouse):selected_slot=slot;return
 	var ids:Array=SKILL_TREES[skill_tree_tab];var start:=menu_scroll*3
@@ -6622,7 +6679,7 @@ func click_skill_loadout(mouse:Vector2)->void:
 				if slots[s]==id:slots[s]=-1
 			slots[selected_slot]=id
 			save_game()
-			play_sound("menu")
+			play_sound("ui_klick")
 			return
 
 func upgrade_skill(index:int)->bool:
@@ -6652,7 +6709,7 @@ func upgrade_skill(index:int)->bool:
 	skill_points-=price
 	skill_levels[index]=next_rank
 	message("%s verbessert · STUFE %d/4 · -%d SP" % [ABILITIES[index]["name"],next_rank,price])
-	play_sound("level")
+	play_sound("skillpunkt")
 	save_game()
 	return true
 
@@ -6843,6 +6900,7 @@ func sell_all_unequipped() -> void:
 	gold += total
 	selected_item = -1
 	sell_all_confirm = false
+	if count > 0: play_sound("verkaufen")
 	message("%d Items verkauft: +%d Gold. Ausrüstung behalten." % [count, total])
 	save_game()
 
@@ -6868,7 +6926,7 @@ func use_item(index: int) -> void:
 		ranger_falcon_rune=true
 		inventory.remove_at(index);selected_item=-1
 		message("Rune des Falken gebunden: Pfeile markieren Ziele.")
-		play_sound("level");save_game();return
+		play_sound("freischaltung");save_game();return
 	if bool(item.get("class_relic",false)):
 		var required:=clampi(int(item.get("mastery_class",-1)),0,2)
 		if class_id!=required:
@@ -6881,7 +6939,7 @@ func use_item(index: int) -> void:
 		arcane_step_learned=class_id==1
 		inventory.remove_at(index);selected_item=-1
 		message("%s freigeschaltet: %s" % [CLASS_NAMES[class_id],CLASS_RELIC_SKILLS[class_id]])
-		play_sound("level");save_game();return
+		play_sound("freischaltung");save_game();return
 	var unlock_id:=item_skill_unlock_id(item)
 	if unlock_id>=0:
 		ensure_skill_state_size()
@@ -6899,7 +6957,7 @@ func use_item(index: int) -> void:
 		skill_levels[unlock_id]=maxi(1,int(skill_levels[unlock_id]))
 		inventory.remove_at(index);selected_item=-1
 		message("%s gelernt · durch %s" % [ABILITIES[unlock_id]["name"],name])
-		play_sound("level");save_game();return
+		play_sound("freischaltung");save_game();return
 	if item["icon"] == "potion":
 		play_sound("spieler_trank")
 		if name in ["Energietrank", "Manatrank"]: energy = minf(max_energy(), energy + 65)
@@ -7001,7 +7059,7 @@ func buy_item(stock_item: Dictionary) -> void:
 	ArcaneNecklaces.normalize(stock_item)
 	var price := maxi(0,int(stock_item.get("price",0)))
 	if gold < price:
-		message("Dafür fehlen dir %d Gold." % (price-gold))
+		message_error("Dafür fehlen dir %d Gold." % (price-gold))
 		return
 	var icon := str(stock_item.get("icon","gem"))
 	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food","head","necklace"]:
@@ -7015,7 +7073,7 @@ func buy_item(stock_item: Dictionary) -> void:
 		purchased["skill_unlock"]=int(stock_item["skill_unlock"])
 		purchased["tooltip"]="Lernen: %s" % ABILITIES[int(stock_item["skill_unlock"])]["name"]
 	if not can_add_item(purchased):
-		message("Dein Inventar ist voll.")
+		message_error("Dein Inventar ist voll.")
 		return
 	var gold_before := gold
 	gold -= price
@@ -7024,20 +7082,22 @@ func buy_item(stock_item: Dictionary) -> void:
 		message("Kauf abgebrochen · Inventar konnte nicht aktualisiert werden.")
 		return
 	validate_equipment_slots()
+	play_sound("kaufen")
 	message("Gekauft: %s" % stock_item.get("name","Fundstück"))
 	save_game()
 
 func sell_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
 	if bool(inventory[index].get("locked",false)):
-		message("Dieses Item ist als unverkäuflich markiert.")
+		message_error("Dieses Item ist als unverkäuflich markiert.")
 		return
 	var item: Dictionary = inventory[index]
 	if is_equipped_uid(int(item.get("uid",-1))):
-		message("Ausgerüstete Gegenstände können nicht verkauft werden. Erst ausziehen.")
+		message_error("Ausgerüstete Gegenstände können nicht verkauft werden. Erst ausziehen.")
 		return
 	var gain := int(round(float(item_sale_value(item)) / maxi(1, int(item.get("count", 1)))))
 	gold += gain
+	play_sound("verkaufen")
 	message("Verkauft: %s für %d Gold" % [item["name"], gain])
 	if int(item.get("count", 1)) > 1:
 		item["count"] = int(item["count"]) - 1
@@ -9994,9 +10054,9 @@ func click_appearance(mouse:Vector2) -> void:
 	if Rect2(555,518,300,44).has_point(mouse):
 		save_game();panel="";return
 	if Rect2(205,494,62,36).has_point(mouse):
-		appearance_preview_dir=posmod(appearance_preview_dir-1,4);play_sound("menu");queue_redraw();return
+		appearance_preview_dir=posmod(appearance_preview_dir-1,4);play_sound("ui_klick");queue_redraw();return
 	if Rect2(413,494,62,36).has_point(mouse):
-		appearance_preview_dir=posmod(appearance_preview_dir+1,4);play_sound("menu");queue_redraw();return
+		appearance_preview_dir=posmod(appearance_preview_dir+1,4);play_sound("ui_klick");queue_redraw();return
 	var limits:=[11 if hero_race==2 else 4,4,11,COSMETIC_ACCENT_HEX.size()]
 	for row in 4:
 		var y:=220+row*72
@@ -10009,7 +10069,7 @@ func click_appearance(mouse:Vector2) -> void:
 			1: cosmetic_cloak=posmod(cosmetic_cloak+delta,limits[row])
 			2: cosmetic_jewelry=posmod(cosmetic_jewelry+delta,limits[row])
 			3: cosmetic_accent=posmod(cosmetic_accent+delta,limits[row])
-		play_sound("menu")
+		play_sound("ui_klick")
 		save_game()
 		return
 
@@ -10455,8 +10515,9 @@ func draw_pause_panel() -> void:
 	ui_button(Rect2(860, 221, 130, 42), "TOUCH" if touch_enabled else "TASTEN")
 	ui_button(Rect2(860, 270, 130, 42), "MECHANIK")
 	ui_button(Rect2(300, 270, 550, 42), "TESTSTAND SPEICHERN" if creative_mode else "SPIEL SPEICHERN")
-	draw_volume_slider(Vector2(300, 326), "MUSIK", music_volume, Color("d9b67b"))
-	draw_volume_slider(Vector2(300, 380), "EFFEKTE", effects_volume, Color("9bcfd0"))
+	draw_volume_slider(Vector2(300, 328), "MUSIK", music_volume, Color("d9b67b"))
+	draw_volume_slider(Vector2(300, 364), "EFFEKTE", effects_volume, Color("9bcfd0"))
+	draw_volume_slider(Vector2(300, 400), "OBERFLÄCHE", ui_volume, Color("c7b3e2"))
 	ui_button(Rect2(300, 432, 550, 42), "TESTMODUS VERLASSEN" if creative_mode else "TESTMODUS STARTEN")
 	if not creative_mode:
 		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
@@ -10605,7 +10666,7 @@ func click_essence(mouse:Vector2)->void:
 	for tree in EssenceSystem.TREE_COUNT:
 		if Rect2(165+tree*162,148,152,36).has_point(mouse):
 			essence.selected_tree=tree
-			play_sound("menu")
+			play_sound("ui_klick")
 			queue_redraw()
 			return
 	for talent in EssenceSystem.TALENTS_PER_TREE:
@@ -10613,7 +10674,7 @@ func click_essence(mouse:Vector2)->void:
 			if essence.invest(level,essence.selected_tree,talent):
 				var info:Dictionary=EssenceSystem.TALENTS[essence.selected_tree][talent]
 				message("%s · Rang %d/4" % [info["name"],essence.rank(essence.selected_tree,talent)])
-				play_sound("level")
+				play_sound("skillpunkt")
 				save_game()
 			else:
 				message("Dafür fehlt freie Essenz oder mehr Bindung an diesen Baum.")
@@ -12890,7 +12951,7 @@ func apply_rescue_progress(amount: int, shared: bool = false) -> void:
 		rescue_intro_timer = 5.0
 		effect(RESCUE_POS+Vector2(0,-210),"BLÜTENWEILER GERETTET",Color("a8edb5"),5.0)
 		message(("Gemeinsam gerettet! " if shared else "")+"Blütenweiler gerettet! Nela wartet am Dorfplatz auf dich (E).")
-		play_sound("level")
+		play_sound("quest_bereit")
 	else:
 		message("%sBlütenweiler verteidigt: %d/%d Dornenwesen besiegt." % ["Gruppe · " if shared else "",rescue_kills,RESCUE_GOAL])
 	save_game()
@@ -13078,6 +13139,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 		if int(borin_state["progress"])>=int(BORIN_QUESTS[borin_id]["count"]):
 			borin_state["state"]=2
 			message("%sBorins Prüfung geschafft: %s. Kehre zu Borin zurück!" % ["Gruppe · " if shared else "",BORIN_QUESTS[borin_id]["title"]])
+			play_sound("quest_bereit")
 	for raw_id in (payload.get("quests",[]) as Array):
 		var quest_id := int(raw_id)
 		if quest_id < 0 or quest_id >= quests.size(): continue
@@ -13088,6 +13150,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 		if int(quest["progress"]) >= int(QUESTS[quest_id]["count"]):
 			quest["state"] = 2
 			message("%sQuestziel erreicht: %s. Kehre zurück!" % ["Gruppe · " if shared else "",QUESTS[quest_id]["title"]])
+			play_sound("quest_bereit")
 		changed = true
 	for raw_id in (payload.get("events",[]) as Array):
 		var event_id := int(raw_id)
@@ -13098,7 +13161,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 		if int(event_progress[event_id]) >= int(WORLD_EVENTS[event_id]["goal"]):
 			event_states[event_id] = 2
 			message("%s%s ist in Sicherheit! Sprich erneut mit %s (E)." % ["Gruppe · " if shared else "",WORLD_EVENTS[event_id]["role"],WORLD_EVENTS[event_id]["name"]])
-			play_sound("level")
+			play_sound("quest_bereit")
 		changed = true
 	if bool(payload.get("rescue",false)):
 		apply_rescue_progress(1,shared)

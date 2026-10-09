@@ -547,6 +547,193 @@ def r_beute_legendaer(rng, v):
     return _arp(rng, [NOTE["A4"], NOTE["D5"], NOTE["F#5"], NOTE["A5"], NOTE["D6"], NOTE["F#6"], NOTE["A6"]], 0.07, 0.9, 0.5, 0.35, chord=True)
 
 
+# ------------------------------------------------- Paket 2: Oberfläche, Fortschritt
+
+def brass(freq: float, seconds: float, attack: float = 0.04, decay: float = 0.5) -> np.ndarray:
+    """Weiche 16-Bit-Blechbläser: Sägezahn mit sich öffnendem Filter."""
+    t = t_axis(seconds)
+    raw = osc(freq * (1 + 0.003 * np.sin(2 * np.pi * 5 * t)), seconds, "saw")
+    opening = lp(raw, 900) * (1 - np.exp(-t / 0.05)) + lp(raw, 2600) * np.exp(-t / 0.05) * 0.3
+    return opening * env(seconds, attack, decay, 2)
+
+
+def timpani(freq: float, seconds: float, rng) -> np.ndarray:
+    return thump(freq * 1.6, freq, seconds, seconds * 0.4) + lp(noise(seconds, rng), 500) * env(seconds, 0.002, 0.05) * 0.4
+
+
+def r_ui_klick(rng, v):
+    d = 0.07
+    tick = bp(noise(d, rng), 1500 + 200 * v, 4200) * env(d, 0.0008, 0.006)
+    blip = osc(NOTE["D6"] * (1 + 0.06 * v), d, "tri") * env(d, 0.001, 0.02) * 0.35
+    return finish(mix((tick, 1.0), (blip, 1.0)), peak_db=-6, top=9000)
+
+
+def r_ui_fenster_auf(rng, v):
+    d = 0.3
+    swish = sweep_bp(noise(d, rng), glide(700, 2600, d, 0.6), q=2) * env(d, 0.03, 0.08, 3)
+    note = at(pluck(NOTE["A5"], 0.25, rng, 0.6, 0.997) * env(0.25, 0.001, 0.15), 0.08, d) * 0.5
+    return finish(mix((swish, 0.8), (note, 1.0)), peak_db=-6, echo_wet=0.12)
+
+
+def r_ui_fenster_zu(rng, v):
+    d = 0.25
+    swish = sweep_bp(noise(d, rng), glide(2400, 700, d, 0.6), q=2) * env(d, 0.01, 0.07, 3)
+    note = at(pluck(NOTE["D5"], 0.22, rng, 0.5, 0.996) * env(0.22, 0.001, 0.12), 0.05, d) * 0.5
+    return finish(mix((swish, 0.8), (note, 1.0)), peak_db=-7, echo_wet=0.08)
+
+
+def r_ui_fehler(rng, v):
+    d = 0.28
+    a = osc(NOTE["D4"], 0.08, "square") * env(0.08, 0.002, 0.05)
+    b = osc(NOTE["D4"] * 0.944, 0.1, "square") * env(0.1, 0.002, 0.06)
+    return finish(lp(mix((pad(a, d), 1.0), (at(b, 0.11, d), 1.0)), 1800), peak_db=-6)
+
+
+def r_ui_dialog(rng, v):
+    d = 0.4
+    first, second = [(NOTE["A4"], NOTE["D5"]), (NOTE["F#4"], NOTE["A4"])][v % 2]
+    line = at(pluck(first, 0.3, rng, 0.55, 0.997), 0, d) + at(pluck(second, 0.3, rng, 0.55, 0.997), 0.07, d)
+    return finish(line * np.concatenate([env(d, 0.001, 0.25, 2)]), peak_db=-6, echo_wet=0.15)
+
+
+def r_ui_hinweis(rng, v):
+    d = 0.6
+    chime = at(bell(NOTE["D6"], 0.5, 0.3), 0, d) + at(bell(NOTE["A6"], 0.5, 0.3), 0.08, d) * 0.8
+    return finish(chime, peak_db=-6, echo_wet=0.2)
+
+
+def r_kaufen(rng, v):
+    d = 0.65
+    thunk = thump(220, 110, 0.12, 0.04)
+    coins = sum(at(bell(f, 0.25, 0.08, ((1, 1), (2.0, 0.3), (3.1, 0.15))), 0.05 + 0.045 * k, d) * (0.8 - 0.1 * k)
+                for k, f in enumerate([NOTE["D6"], NOTE["F#6"], NOTE["A6"]]))
+    ching = at(bell(NOTE["D7"], 0.35, 0.18), 0.22, d) * 0.6
+    return finish(mix((pad(thunk, d), 0.7), (coins, 0.8), (ching, 1.0)), peak_db=-5, echo_wet=0.12)
+
+
+def r_verkaufen(rng, v):
+    d = 0.7
+    out = np.zeros(int(SR * d))
+    for k in range(6):
+        f = rng.uniform(1900, 3200) * (1 - 0.05 * k)
+        out += at(bell(f, 0.12, 0.05, ((1, 1), (2.1, 0.3))), 0.03 + 0.06 * k + rng.uniform(0, 0.02), d) * (0.75 - 0.08 * k)
+    pouch = at(lp(noise(0.12, rng), 900) * env(0.12, 0.004, 0.05), 0.42, d) * 0.6
+    return finish(mix((out, 1.0), (pouch, 1.0)), peak_db=-5, echo_wet=0.08)
+
+
+def r_quest_angenommen(rng, v):
+    d = 0.9
+    harp = sum(at(pluck(f, 0.6, rng, 0.6, 0.998) * env(0.6, 0.001, 0.45, 2), 0.06 * i, d)
+               for i, f in enumerate([NOTE["D5"], NOTE["F#5"], NOTE["A5"]]))
+    return finish(harp, peak_db=-5, echo_wet=0.25, echo_delay=0.12)
+
+
+def r_quest_bereit(rng, v):
+    d = 0.75
+    chime = at(bell(NOTE["A5"], 0.5, 0.35), 0, d) + at(bell(NOTE["D6"], 0.6, 0.4), 0.12, d)
+    return finish(chime, peak_db=-5, echo_wet=0.25)
+
+
+def r_quest_abgeschlossen(rng, v):
+    d = 1.5
+    notes = [NOTE["D5"], NOTE["F#5"], NOTE["A5"], NOTE["D6"]]
+    run = sum(at(brass(f, 0.18, 0.01, 0.12), 0.09 * i, d) for i, f in enumerate(notes))
+    chord = at(sum(brass(f, 0.9, 0.03, 0.55) for f in (NOTE["D5"], NOTE["F#5"], NOTE["A5"])), 0.36, d)
+    drum = at(timpani(NOTE["D3"], 0.5, rng), 0.36, d)
+    sparkle = at(bell(NOTE["D7"], 0.5, 0.25), 0.4, d) * 0.3
+    return finish(mix((run, 0.8), (chord, 0.55), (drum, 0.7), (sparkle, 1.0)), echo_wet=0.2, echo_delay=0.12, tail=0.3)
+
+
+def r_level_auf(rng, v):
+    d = 2.0
+    scale = [NOTE["D4"], NOTE["E4"], NOTE["F#4"], NOTE["A4"], NOTE["D5"], NOTE["E5"], NOTE["F#5"], NOTE["A5"], NOTE["D6"]]
+    gliss = sum(at(pluck(f, 0.5, rng, 0.7, 0.998) * env(0.5, 0.001, 0.4, 2), 0.035 * i, d) for i, f in enumerate(scale))
+    chord = at(sum(brass(f, 1.2, 0.05, 0.8) for f in (NOTE["D4"], NOTE["A4"], NOTE["D5"], NOTE["F#5"])), 0.34, d)
+    roll = at(sum(at(timpani(NOTE["D3"], 0.2, rng), 0.03 * k, 0.4) * (0.4 + 0.06 * k) for k in range(8)), 0.1, d)
+    hit = at(timpani(NOTE["D3"], 0.7, rng), 0.36, d)
+    sparkle = sum(at(bell(f, 0.5, 0.25), 0.5 + 0.08 * i, d) for i, f in enumerate([NOTE["A6"], NOTE["D7"], NOTE["F#6"]])) * 0.3
+    return finish(mix((gliss, 0.7), (chord, 0.5), (roll, 0.35), (hit, 0.7), (sparkle, 1.0)), echo_wet=0.22, echo_delay=0.13, tail=0.35)
+
+
+def r_skillpunkt(rng, v):
+    d = 0.75
+    rise = osc(glide(NOTE["D5"], NOTE["D6"], 0.35, 0.8), 0.35, "sine") * env(0.35, 0.02, 0.2, 2) * 0.3
+    bells = sum(at(bell(f, 0.4, 0.2), 0.05 + 0.07 * i, d) * (0.6 + 0.1 * i)
+                for i, f in enumerate([NOTE["A5"], NOTE["B5"], NOTE["D6"], NOTE["F#6"]]))
+    return finish(mix((pad(rise, d), 1.0), (bells, 0.8)), peak_db=-4, echo_wet=0.25)
+
+
+def r_freischaltung(rng, v):
+    d = 1.3
+    t = t_axis(d)
+    swell = sum(osc(f, d, "tri") for f in (NOTE["D4"], NOTE["A4"], NOTE["E5"])) * np.sin(np.pi * np.minimum(t / 1.1, 1)) ** 2 * 0.3
+    air = sweep_bp(noise(d, rng), glide(400, 2400, d, 0.7), q=3) * np.sin(np.pi * np.minimum(t / 1.0, 1)) * 0.4
+    chime = at(bell(NOTE["D6"], 0.7, 0.45), 0.55, d) + at(bell(NOTE["A6"], 0.6, 0.4), 0.63, d) * 0.7
+    return finish(mix((swell, 1.0), (air, 0.7), (chime, 0.8)), echo_wet=0.3, echo_delay=0.14, tail=0.3)
+
+
+def r_wegstein_aktiviert(rng, v):
+    d = 1.3
+    t = t_axis(d)
+    hum = osc(glide(NOTE["D3"], NOTE["A3"], d, 0.6), d, "tri") * np.sin(np.pi * t / d) * 0.5
+    cluster = sum(at(bell(f, 0.8, 0.5), 0.3 + 0.05 * i, d) for i, f in enumerate([NOTE["D6"], NOTE["F#6"], NOTE["A6"], NOTE["D7"]])) * 0.35
+    shimmer = hp(noise(d, rng), 6000) * np.sin(np.pi * t / d) ** 3 * 0.15
+    return finish(mix((hum, 1.0), (cluster, 1.0), (shimmer, 1.0)), echo_wet=0.3, echo_delay=0.13, tail=0.3)
+
+
+def r_reise(rng, v):
+    d = 0.95
+    t = t_axis(d)
+    whoosh = sweep_bp(noise(d, rng), glide(300, 4200, d, 0.8), q=2) * np.sin(np.pi * t / d) ** 1.5
+    glow = osc(glide(NOTE["A4"], NOTE["A6"], d, 0.7), d, "sine") * np.sin(np.pi * t / d) ** 2 * 0.3
+    pop = at(bell(NOTE["D6"], 0.4, 0.2), 0.7, d) * 0.4
+    return finish(mix((whoosh, 0.9), (glow, 1.0), (pop, 1.0)), echo_wet=0.25, echo_delay=0.11)
+
+
+def r_truhe_auf(rng, v):
+    # Nur die Truhe: langes Holzknarzen beim Aufklappen, Riegel, Deckel schlägt auf. Kein Glanz.
+    d = 0.75
+    creak = np.zeros(int(SR * 0.5))
+    tt = 0.0
+    while tt < 0.46:
+        grain = bp(noise(0.014, rng), 300, 1300) * env(0.014, 0.001, 0.006)
+        body = bp(noise(0.02, rng), 140, 420) * env(0.02, 0.002, 0.008) * 0.6
+        creak += at(mix((grain, 1.0), (body, 1.0)), tt, 0.5) * (0.45 + 0.9 * tt)
+        tt += 1.0 / (55 - 70 * tt) * rng.uniform(0.75, 1.25)
+    latch = at(hp(noise(0.012, rng), 1600) * env(0.012, 0.0005, 0.004), 0.0, d)
+    lid = at(mix((thump(150, 80, 0.2, 0.06), 1.0), (lp(noise(0.08, rng), 1200) * env(0.08, 0.002, 0.03), 0.6)), 0.52, d)
+    return finish(mix((at(creak, 0.03, d), 1.0), (latch, 0.6), (lid, 0.8)), top=8000)
+
+
+def r_heilen(rng, v):
+    d = 1.3
+    notes = [NOTE["D5"], NOTE["F#5"], NOTE["A5"], NOTE["D6"], NOTE["F#6"], NOTE["A6"]]
+    harp = sum(at(pluck(f, 0.7, rng, 0.55, 0.998) * env(0.7, 0.001, 0.55, 2), 0.05 * i, d) for i, f in enumerate(notes))
+    t = t_axis(d)
+    pad_sig = sum(osc(f, d, "sine") for f in (NOTE["D4"], NOTE["A4"], NOTE["F#5"])) * np.sin(np.pi * t / d) ** 2 * 0.18
+    return finish(mix((harp, 0.8), (pad_sig, 1.0)), echo_wet=0.3, echo_delay=0.13, tail=0.3)
+
+
+def r_boss_erscheint(rng, v):
+    d = 1.7
+    hits = at(timpani(NOTE["D2"] * 2, 0.6, rng), 0, d) + at(timpani(NOTE["D2"] * 2, 0.7, rng), 0.34, d) * 1.1
+    swell = at(sum(brass(f, 1.2, 0.25, 0.9) for f in (NOTE["D3"], NOTE["F4"] / 2, NOTE["A3"])), 0.34, d)
+    rumble = lp(noise(d, rng), 160) * env(d, 0.2, 0.9, 2) * 0.5
+    return finish(mix((hits, 0.9), (swell, 0.6), (rumble, 1.0)), echo_wet=0.2, echo_delay=0.15, tail=0.3)
+
+
+# ------------------------------------------------- Büsche
+
+def r_busch_rascheln(rng, v):
+    d = 0.42
+    t = t_axis(d)
+    shape = np.sin(np.pi * np.minimum(t / (d * 0.9), 1)) ** 1.2
+    crackle = bp(noise(d, rng), 2000, 7000) * (rng.random(int(SR * d)) > 0.88) * shape
+    swish = sweep_bp(noise(d, rng), glide(900 + 150 * v, 2600, d, 0.8), q=1.6) * shape
+    twigs = sum(at(hp(noise(0.006, rng), 2500) * env(0.006, 0.0003, 0.002), rng.uniform(0.05, 0.3), d) for _ in range(3))
+    return finish(mix((crackle, 0.9), (swish, 0.5), (twigs, 0.35)), top=9000)
+
+
 # Name -> (Bereich, Rezept, Varianten)
 SOUNDS = {
     "schwert_schwung": ("kampf", r_schwert_schwung, 4),
@@ -588,6 +775,26 @@ SOUNDS = {
     "beute_selten": ("beute", r_beute_selten, 1),
     "beute_episch": ("beute", r_beute_episch, 1),
     "beute_legendaer": ("beute", r_beute_legendaer, 1),
+    "ui_klick": ("ui", r_ui_klick, 3),
+    "ui_fenster_auf": ("ui", r_ui_fenster_auf, 1),
+    "ui_fenster_zu": ("ui", r_ui_fenster_zu, 1),
+    "ui_fehler": ("ui", r_ui_fehler, 1),
+    "ui_dialog": ("ui", r_ui_dialog, 2),
+    "ui_hinweis": ("ui", r_ui_hinweis, 1),
+    "kaufen": ("ui", r_kaufen, 1),
+    "verkaufen": ("ui", r_verkaufen, 1),
+    "quest_angenommen": ("fortschritt", r_quest_angenommen, 1),
+    "quest_bereit": ("fortschritt", r_quest_bereit, 1),
+    "quest_abgeschlossen": ("fortschritt", r_quest_abgeschlossen, 1),
+    "level_auf": ("fortschritt", r_level_auf, 1),
+    "skillpunkt": ("fortschritt", r_skillpunkt, 1),
+    "freischaltung": ("fortschritt", r_freischaltung, 1),
+    "wegstein_aktiviert": ("welt", r_wegstein_aktiviert, 1),
+    "reise": ("welt", r_reise, 1),
+    "truhe_auf": ("welt", r_truhe_auf, 1),
+    "heilen": ("welt", r_heilen, 1),
+    "boss_erscheint": ("welt", r_boss_erscheint, 1),
+    "busch_rascheln": ("welt", r_busch_rascheln, 3),
 }
 
 

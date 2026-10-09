@@ -192,6 +192,19 @@ deterministisch (feste Saat), damit ein erneuter Lauf dieselben Dateien ergibt.
   Rückkehr-Klang spielt auch beim Betreten der Welt (Fortsetzen, Koop-Start,
   nach dem Prolog). Bogenschuss: alle 10 Varianten im Spiel.
 - Runde 3 (9.10.2026): alle 39 Sounds von Angelo freigegeben. Paket 1 abgeschlossen.
+- **Paket 2 umgesetzt** (9.10.2026): 19 Klänge unter
+  `audio/sfx/{ui,fortschritt,welt}/`, eigener Regler „Oberfläche“
+  (gespeichert als `ui_volume`), automatische Fenster-auf/zu-Klänge,
+  `message_error()` für Meldungen mit Fehlerton. Die generischen Klänge
+  `menu`, `level`, `pickup` und `dodge` sind an allen Stellen durch passende
+  ersetzt (ausgenommen ein Klassen-Buff, der zu Paket 3 gehört). Freigabe
+  läuft über die Klangprobe.
+- **Busch-Rascheln vorgezogen** (9.10.2026, freigegeben): `welt/busch_rascheln`,
+  Erkennung in `foliage_at()` (Dorfbüsche, Fruchtbüsche, Sträucher an
+  Hindernissen in Blütenwiesen, Pilzwald, Nebelheide, Bernsteinforst).
+  Schritte je Untergrund wurden ausprobiert und auf Angelos Wunsch wieder
+  entfernt; sie kommen später überarbeitet in Paket 4.
+- Paket 2 von Angelo freigegeben (9.10.2026).
 - Alle Sounds sind selbst erzeugt; es gibt keine Fremdlizenzen.
 - Freigabe läuft über die Hörvorschau „Sonnenhain Klangprobe“.
 
