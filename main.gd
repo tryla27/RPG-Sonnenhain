@@ -3808,12 +3808,7 @@ func execute_ability_effects(id:int,rank:int,power:int,cast_pos:Vector2,cast_dir
 			battle_zones.append({"kind":"banner", "pos":player_pos, "radius":180.0 + rank * 12.0, "life":6.0 + rank, "max":6.0 + rank, "tick":0.0, "damage":0})
 			effect(player_pos, "SCHILDWALL", Color("b5e6fb"), 0.8)
 		2:
-			warrior_jump_duration = 0.72
-			warrior_jump_timer = warrior_jump_duration
-			warrior_jump_direction = facing
-			var destination := player_pos + facing * (215 + (rank - 1) * 25)
-			move_with_collision(destination-player_pos)
-			invulnerable = 0.5
+			perform_jump_movement(rank)
 			hit_arc(player_pos, facing, 100, -0.3, power + 12, true)
 		3:
 			projectiles.append({"pos":player_pos, "dir":facing, "speed":650.0, "life":0.9, "damage":power + 15, "kind":0, "pierce":true, "hits":[]})
@@ -6487,6 +6482,7 @@ func cast_fusion_at_impact(fusion_id:int,fusion:Dictionary,rank:int,power:int,ca
 		if server_peer<=0:projectiles.append(FusionCast.impulse_projectile(cast_pos,cast_dir,fusion_tag))
 		return
 	var carrier:=int(fusion_plan["carrier"])
+	if server_peer<=0 and FusionCast.jumps_at_cast(fusion_plan):perform_jump_movement(rank)
 	var shots_before:=projectiles.size()
 	var zones_before:=impact_zones.size()
 	fusion_capture.clear()
@@ -6529,12 +6525,21 @@ func trigger_fusion(fusion_tag:Dictionary,point:Vector2,dir:Vector2)->void:
 		if peer>0:server_ability_effects(int(source),point,aim,int(fusion_tag["class"]),power,rank,peer)
 		else:execute_secondary_at(int(source),rank,power,point,aim)
 
+## Sprung des Kriegers: Bewegung nach vorn mit kurzer Unverwundbarkeit.
+func perform_jump_movement(rank:int)->void:
+	warrior_jump_duration = 0.72
+	warrior_jump_timer = warrior_jump_duration
+	warrior_jump_direction = facing
+	var destination := player_pos + facing * (215 + (rank - 1) * 25)
+	move_with_collision(destination-player_pos)
+	invulnerable = 0.5
+
 ## Wirkt eine Fähigkeit als Fusionsteil am Trefferpunkt. Zustände wie Schild,
 ## Heilung und Buffs gelten weiter für den Spieler; alles Sichtbare und
 ## Schadende entsteht am Punkt.
 func execute_secondary_at(id:int,rank:int,power:int,point:Vector2,dir:Vector2)->void:
 	if id==2:
-		# Der Sprung bewegt den Spieler nicht; sein Landeschlag zündet am Treffer.
+		# Gesprungen wurde schon beim Wirken; hier zündet nur der Landeschlag am Treffer.
 		hit_arc(point,dir,100,-0.3,power+12,true)
 		spell_visuals.append({"kind":2,"pos":point,"end":point,"dir":dir,"rank":rank,"life":0.85,"max":0.85})
 		play_sound("skill_2")

@@ -33,11 +33,12 @@ Fusionseffekte zünden **immer am Trefferpunkt, nie beim Spieler**
    getroffenen Gegner, sonst am Hindernis, sonst am Ende der Reichweite.
 2. Ist keine der beiden Fähigkeiten ein Angriff, fliegt ein kurzer
    Träger-Impuls in Zielrichtung; der Effekt zündet an dessen Einschlag.
-3. Sprungfusionen zünden dort, wo der Sprung trifft. Als Zweitfähigkeit
-   bewegt der Sprung den Spieler nicht, nur sein Landeschlag zündet.
+3. Sprungfusionen zünden dort, wo der Sprung trifft. Sprünge bleiben in jeder
+   Fusion erhalten: Ist der Sprungangriff nur Partner, springt der Spieler
+   trotzdem beim Wirken, und der Landeschlag zündet am Treffer des Trägers.
 4. Schutzschilde, Heilung und Buffs gelten weiter für den Spieler.
    Alles Sichtbare und Schadende entsteht am Trefferort.
-5. Mehrfachtreffer (Fächer, Durchschlag, Kette): höchstens drei Zündungen
+5. Mehrfachtreffer (Fächer, Durchschlag, Kette): höchstens fünf Zündungen
    pro Wirken, je Geschoss am ersten Treffer. Zonen zünden einmal.
 6. Erlaubte Zündorte: `DAMAGE_IMPACT_POSITION`, `IMPULSE_IMPACT_POSITION`,
    `TARGET_POSITION`, `ATTACKER_POSITION`. Spieler- und Landeposition sind

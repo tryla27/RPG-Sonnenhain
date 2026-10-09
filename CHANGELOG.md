@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Fusionsregel nachgeschärft (Angelo): Zündlimit 5 statt 3; Sprungangriff als
+  Partner bewegt den Spieler beim Wirken weiter (`perform_jump_movement`,
+  `FusionCast.jumps_at_cast`).
 - Fusionsregel D1: `components/fusion_cast.gd` plant Träger, Zündmarke,
   Träger-Impuls und Zündlimit. `cast_fusion_at_impact` (offline und Server)
   wirkt den Träger, markiert seine Geschosse und Zonen und zündet die

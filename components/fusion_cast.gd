@@ -4,12 +4,15 @@ extends RefCounted
 # trifft – erster getroffener Gegner, sonst Hindernis, sonst Reichweitenende.
 # Ohne angreifenden Träger fliegt ein kurzer Träger-Impuls in Zielrichtung.
 # Schutzschilde wirken weiter direkt auf den Spieler (Entscheidung Angelo).
+# Sprünge bleiben in jeder Fusion erhalten: Der Spieler springt beim Wirken,
+# der Landeschlag zündet am Treffer (Entscheidung Angelo, 9.10.2026).
 # Nicht hier: die Fähigkeiten selbst (main.gd), Paarregeln (fusion_rules.gd).
 
 const FusionRules=preload("res://components/fusion_rules.gd")
 
 ## Höchstens so viele Zündungen pro Wirken (Fächer, Durchschlag, Kette).
-const MAX_TRIGGERS:=3
+## Angelo, 9.10.2026: fünf.
+const MAX_TRIGGERS:=5
 ## Erlaubte Zündorte. Spieler- und Landeposition sind verboten.
 const ALLOWED_SPAWNS:=["DAMAGE_IMPACT_POSITION","TARGET_POSITION","ATTACKER_POSITION","IMPULSE_IMPACT_POSITION"]
 const IMPULSE_SPEED:=760.0
@@ -48,3 +51,8 @@ static func fallback_point(carrier:int,origin:Vector2,dir:Vector2)->Vector2:
 
 static func spawn_allowed(spawn:String)->bool:
 	return spawn in ALLOWED_SPAWNS
+
+## Sprungangriff (2) ist Teil der Fusion, aber nicht ihr Träger: Der Spieler
+## springt trotzdem beim Wirken.
+static func jumps_at_cast(fusion_plan:Dictionary)->bool:
+	return int(fusion_plan.get("carrier",-1))!=2 and 2 in fusion_plan.get("secondaries",[])

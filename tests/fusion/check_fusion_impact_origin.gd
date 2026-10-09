@@ -122,7 +122,16 @@ func run()->void:
 	var server_wall:Array=cast(g,41,Vector2(200,0),true)
 	check(server_wall.size()==1 and (server_wall[0]["point"] as Vector2).distance_to(Vector2(2800,1500))<40.0,"Server: Reaktorwall am Gegner")
 
-	# 5. Fächer: höchstens drei Zündungen, jede am ersten Treffer ihres Geschosses.
+	# 6. Sprünge bleiben erhalten: Mit Sprungangriff als Partner springt der Spieler.
+	for partner in [16,18,22]:
+		var jump_id:=fusion_id_for(g,2,partner)
+		var plan:=FusionCast.plan(2,partner)
+		if not FusionCast.jumps_at_cast(plan):continue
+		cast(g,jump_id,Vector2(400,0),false)
+		check(g.player_pos.distance_to(Vector2(2600,1500))>150.0,"Sprung + %d: Spieler springt" % partner)
+	check(FusionCast.MAX_TRIGGERS==5,"Limit fünf Zündungen")
+
+	# 5. Fächer: höchstens fünf Zündungen, jede am ersten Treffer ihres Geschosses.
 	var fan:=fusion_id_for(g,17,26)
 	check(cast(g,fan,Vector2(130,0),false).size()<=FusionCast.MAX_TRIGGERS,"Fächer höchstens dreimal")
 
