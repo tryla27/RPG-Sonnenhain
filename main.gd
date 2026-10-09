@@ -1328,6 +1328,7 @@ func start_coop_world() -> void:
 		previous_region = region_at(player_pos)
 		panel = ""
 		if network_mode == "host": push_world_snapshot()
+		play_sound("spieler_wiederbeleben")
 		message("Koop-Welt gestartet. Willkommen, %s!" % hero_name)
 	else:
 		begin_character_creation()
@@ -5772,6 +5773,7 @@ func handle_panel_click(mouse: Vector2) -> void:
 				arena_pending_loaded = false
 			else: panel = ""
 			ensure_live_multiplayer()
+			play_sound("spieler_wiederbeleben")
 			message("Spielstand %d geladen. Willkommen zurück!" % active_save_slot)
 		return
 	if panel == "creation_review":
@@ -6114,6 +6116,7 @@ func finish_intro() -> void:
 		ensure_live_multiplayer()
 		if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 			rpc_player_presence.rpc_id(1, local_player_state())
+	play_sound("spieler_wiederbeleben")
 	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
 
 func begin_repair_session()->void:

@@ -53,8 +53,6 @@ const CATALOG := {
 	"wolf_knurren": {"path":"mobs/wolf_knurren", "variants":2, "db":-10.0, "max":2, "prio":3, "pitch":0.06},
 	"wolf_sprung": {"path":"mobs/wolf_sprung", "variants":1, "db":-10.0, "max":2, "prio":3, "pitch":0.05},
 	"wolf_biss": {"path":"mobs/wolf_biss", "variants":1, "db":-9.0, "max":2, "prio":4, "pitch":0.07},
-	"wolf_landung": {"path":"mobs/wolf_landung", "variants":1, "db":-11.0, "max":2, "prio":3, "pitch":0.06},
-	"wolf_tod": {"path":"mobs/wolf_tod", "variants":1, "db":-9.0, "max":2, "prio":4, "pitch":0.04},
 	"beute_muenzen": {"path":"beute/beute_muenzen", "variants":3, "db":-11.0, "max":2, "prio":3, "pitch":0.02},
 	"beute_aufheben": {"path":"beute/beute_aufheben", "variants":2, "db":-11.0, "max":2, "prio":3, "pitch":0.02},
 	"beute_selten": {"path":"beute/beute_selten", "variants":1, "db":-10.0, "max":1, "prio":5, "pitch":0.0},
@@ -68,8 +66,8 @@ const ENEMY_MATERIAL := [
 	"chitin", "geist", "metall", "geist", "fell", "geist", "stein", "fell", "geist", "weich",
 	"weich", "weich", "geist", "fell", "metall", "chitin", "metall",
 ]
-## Eigene Todeslaute der erneuerten Waldmonster.
-const ENEMY_DEATH := {0:"schleim_tod", 1:"kaefer_tod", 2:"pilz_tod", 3:"wolf_tod"}
+## Eigene Todeslaute der erneuerten Waldmonster (der Mooswolf nutzt "tod_fell").
+const ENEMY_DEATH := {0:"schleim_tod", 1:"kaefer_tod", 2:"pilz_tod"}
 
 var streams := {}
 var players: Array = []
@@ -239,7 +237,7 @@ func observe_mobs(enemies: Array, listener: Vector2, detect_deaths: bool = false
 		var pos: Vector2 = enemy.get("pos", Vector2.ZERO)
 		if pos.distance_to(listener) >= HEARING: continue
 		var state: Dictionary = enemy.get("attack_state", {})
-		var memory: Dictionary = mob_seen.get(uid, {"attack":-1, "fired":false, "landed":false})
+		var memory: Dictionary = mob_seen.get(uid, {"attack":-1, "fired":false})
 		memory["type"] = int(enemy.get("type", -1))
 		memory["pos"] = pos
 		memory["hp_ratio"] = clampf(float(enemy.get("hp", 1.0)) / maxf(1.0, float(enemy.get("max_hp", 1.0))), 0.0, 1.0)
@@ -249,16 +247,13 @@ func observe_mobs(enemies: Array, listener: Vector2, detect_deaths: bool = false
 			var ability_id := str(ability.get("id", ""))
 			var shape := str(ability.get("shape", ""))
 			if attack_id != int(memory["attack"]):
-				memory.merge({"attack":attack_id, "fired":false, "landed":false}, true)
+				memory.merge({"attack":attack_id, "fired":false}, true)
 				var windup := windup_sound(int(enemy.get("type", -1)), ability_id)
 				if windup != "": out.append([windup, pos])
 			if bool(state.get("fired", false)) and not bool(memory["fired"]):
 				memory["fired"] = true
 				var strike := strike_sound(int(enemy.get("type", -1)), shape)
 				if strike != "": out.append([strike, pos])
-			if bool(state.get("landed", false)) and not bool(memory["landed"]):
-				memory["landed"] = true
-				out.append(["wolf_landung", pos])
 		mob_seen[uid] = memory
 	for uid in mob_seen.keys():
 		if alive.has(uid): continue

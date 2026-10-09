@@ -54,7 +54,7 @@ func check_rules()->void:
 	for type in Content.ENEMY_TYPES.size():
 		check(Bank.CATALOG.has(Bank.hit_sound_for(type)),"Trefferlaut fuer Gegner %d" % type)
 		check(Bank.CATALOG.has(Bank.death_sound_for(type)),"Todeslaut fuer Gegner %d" % type)
-	check(Bank.death_sound_for(3)=="wolf_tod" and Bank.hit_sound_for(0)=="treffer_weich","Waldmonster")
+	check(Bank.death_sound_for(3)=="tod_fell" and Bank.death_sound_for(0)=="schleim_tod" and Bank.hit_sound_for(0)=="treffer_weich","Waldmonster")
 	for rarity in range(-1,6):check(Bank.CATALOG.has(Bank.loot_sound_for(rarity)),"Beute %d" % rarity)
 	check(Bank.distance_gain(0)==1.0 and Bank.distance_gain(Bank.HEARING)==0.0,"Entfernung Grenzen")
 	var previous:=2.0
@@ -120,8 +120,8 @@ func check_mob_voices()->void:
 	wolf["attack_state"]["fired"]=true
 	check(names.call(bank.observe_mobs([wolf],listener))==["wolf_sprung"],"Wolf springt")
 	wolf["attack_state"]["landed"]=true
-	check(names.call(bank.observe_mobs([wolf],listener))==["wolf_landung"],"Wolf landet")
-	check(names.call(bank.observe_mobs([],listener,true))==["wolf_tod"],"Koop: verschwundener Wolf jault")
+	check(bank.observe_mobs([wolf],listener).is_empty(),"Landung ohne eigenen Laut")
+	check(names.call(bank.observe_mobs([],listener,true))==["tod_fell"],"Koop: verschwundener Wolf mit Fell-Laut")
 	var beetle:={"uid":8,"type":1,"pos":Vector2(9000,0),"hp":30.0,"max_hp":32.0,"attack_state":{"id":1,"fired":false,"ability":{"id":"druesensekret","shape":"projectile"}}}
 	check(bank.observe_mobs([beetle],listener).is_empty(),"zu weit weg: still")
 	var mushroom:={"uid":9,"type":2,"pos":listener,"hp":60.0,"max_hp":65.0,"attack_state":{"id":4,"fired":false,"ability":{"id":"giftstaub","shape":"cloud"}}}

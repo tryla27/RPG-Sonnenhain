@@ -1,7 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
-["Klänge · Kampf im 16-Bit-Märchenstil", "Schwert, Stab und Bogen klingen eigen. Treffer hören sich je nach Gegner weich, gepanzert, fellig, steinern, geisterhaft oder metallisch an. Waldschleim, Blütenkäfer, Pilzling und Mooswolf haben eigene Angriffs- und Niederlagenlaute; entfernte Gegner sind leiser. Neue Klänge für Schaden, Ausweichen, Tränke, Niederlage, Rückkehr sowie Gold und seltene Beute. Unter 25 % Leben schlägt ein Herz, bis du dich erholst."],
+["Klänge · Kampf im 16-Bit-Märchenstil", "Schwert, Stab und Bogen klingen eigen. Treffer hören sich je nach Gegner weich, gepanzert, fellig, steinern, geisterhaft oder metallisch an. Waldschleim, Blütenkäfer, Pilzling und Mooswolf haben eigene Angriffslaute, die ersten drei auch eigene Niederlagenlaute; entfernte Gegner sind leiser. Neue Klänge für Schaden, Ausweichen, Tränke, Niederlage, Rückkehr und das Betreten der Welt sowie Gold und seltene Beute. Unter 25 % Leben schlägt ein Herz, bis du dich erholst."],
 ["Technik · Gegenstandsregeln als Modul", "Erzeugung von Gegenständen und Beute, Stapelgrößen, Verkaufswerte und Anzeigenamen liegen jetzt in einem eigenen, getesteten Modul. Beutechancen und Werte bleiben unverändert."],
 ["Technik · Weltgeometrie als Modul", "Gebietsgrenzen, Wegabstände, Wegsteine sowie Lage der Klassenboss-Arenen und -Häuser liegen jetzt in einem eigenen, getesteten Modul. Karte, Spawns und Teleports verhalten sich unverändert."],
 ["Technik · Netzwerk-Hilfen als Modul", "Koop-Einladungscodes und die Prüfung eingehender Quest-, Ereignis- und Beutedaten liegen jetzt in einem eigenen, getesteten Modul. Spielverhalten und Einladungscodes bleiben unverändert."],

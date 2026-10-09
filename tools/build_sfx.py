@@ -336,12 +336,16 @@ def r_treffer_stein(rng, v):
 
 
 def r_treffer_geist(rng, v):
-    # Wie ein Schlag auf Pappe: dumpfe, hohle Schachtel ohne Klingen.
-    d = 0.14
-    box = bp(noise(d, rng), 230 + 30 * v, 880 + 40 * v) * env(d, 0.0008, 0.05, 2.5)
-    hollow = thump(230 + 15 * v, 150, d, 0.04)
-    paper = bp(noise(d, rng), 2500, 6000) * env(d, 0.0005, 0.007)
-    return finish(mix((box, 1.0), (hollow, 0.6), (paper, 0.35)), top=9000)
+    # Geisterhaft: hohler Pappe-Anschlag als Kern, dazu ein luftiges Seufzen und ein
+    # leiser, verstimmter Schimmer, der kurz nachhallt.
+    d = 0.42
+    box = bp(noise(d, rng), 230 + 30 * v, 880 + 40 * v) * env(d, 0.0008, 0.045, 2.5)
+    hollow = thump(230 + 15 * v, 140, d, 0.04)
+    breath = sweep_bp(noise(d, rng), glide(2400 - 150 * v, 650, d, 0.8), q=3.5) * env(d, 0.02, 0.18, 2)
+    t = t_axis(d)
+    base = (NOTE["A4"], NOTE["B4"], NOTE["F#4"])[v % 3]
+    shimmer = (osc(base * 2, d, "sine") + osc(base * 2 * 1.012, d, "sine")) * env(d, 0.03, 0.22, 2) * (0.6 + 0.4 * np.sin(2 * np.pi * 5 * t))
+    return finish(mix((box, 0.9), (hollow, 0.5), (breath, 0.55), (shimmer, 0.18)), echo_wet=0.22, echo_delay=0.1, top=9000)
 
 
 def r_treffer_metall(rng, v):
@@ -389,15 +393,16 @@ def r_ausweichen(rng, v):
 
 
 def r_trank(rng, v):
-    # Nur Trinken: drei Schlucke, ohne Glöckchen.
-    d = 0.72
+    # Schnelles Gluckern beim Trinken: sechs kurze, blubbernde Schlucke, keine Glöckchen.
+    d = 0.78
     out = np.zeros(int(SR * d))
-    for k, start in enumerate((0.0, 0.22, 0.45)):
-        g = 0.1
-        gulp = sweep_bp(noise(g, rng), glide(950 - 60 * k, 340, g, 0.6), q=6) * env(g, 0.006, 0.05)
-        body = thump(190 - 10 * k, 95, g, 0.03)
-        bubble = at(osc(glide(500, 900, 0.03), 0.03) * env(0.03, 0.002, 0.015), 0.06, g)
-        out += at(mix((gulp, 1.0), (body, 0.6), (bubble, 0.2)), start, d)
+    for k in range(6):
+        g = 0.09
+        base = rng.uniform(300, 380) - 12 * k
+        bubble = osc(glide(base, base * 2.3, g, 0.5), g) * env(g, 0.004, 0.045)
+        gulp = sweep_bp(noise(g, rng), glide(800, 320, g, 0.6), q=5) * env(g, 0.004, 0.035)
+        body = thump(170, 90, g, 0.025)
+        out += at(mix((bubble, 0.8), (gulp, 0.6), (body, 0.45)), 0.02 + 0.115 * k + rng.uniform(0, 0.012), d)
     return finish(out, top=8000)
 
 
@@ -505,27 +510,6 @@ def r_wolf_biss(rng, v):
     return finish(mix((pad(snap1, d), 1.0), (snap2, 1.0), (crunch, 0.8), (at(thump(200, 80, 0.12, 0.04), 0.05, d), 0.6)))
 
 
-def r_wolf_landung(rng, v):
-    # Pfoten landen im Gras: weicher Plumps und raschelnde Halme.
-    d = 0.32
-    thud = thump(110, 50, d, 0.05)
-    crackle = bp(noise(d, rng), 1500, 6000) * (rng.random(int(SR * d)) > 0.62) * env(d, 0.004, 0.2, 2)
-    rustle = lp(noise(d, rng), 2600) * env(d, 0.006, 0.14, 2)
-    return finish(mix((thud, 0.6), (crackle, 1.3), (rustle, 0.9)), top=9000)
-
-
-def r_wolf_tod(rng, v):
-    # Natürliches Winseln: zwei kurze Jauler, dann ein leiser, abfallender Klagelaut und ein Plumps.
-    d = 1.0
-    formants = [(900, 260, 1.0), (1700, 320, 0.45)]
-    yelp1 = voice(glide(780, 610, 0.12), 0.12, formants, 0.08, rng) * env(0.12, 0.005, 0.06)
-    yelp2 = voice(glide(720, 520, 0.14), 0.14, formants, 0.08, rng) * env(0.14, 0.005, 0.07)
-    whine = voice(vibrato(glide(560, 320, 0.6, 0.8), 6, 0.03), 0.6, [(800, 220, 1.0), (1500, 260, 0.4)], 0.1, rng) * env(0.6, 0.03, 0.35, 2)
-    fall = thump(100, 45, 0.3, 0.1)
-    out = mix((at(yelp1, 0.0, d), 1.0), (at(yelp2, 0.16, d), 0.85), (at(whine, 0.34, d), 0.7), (at(fall, 0.55, d), 0.45))
-    return finish(out, echo_wet=0.06, top=8000)
-
-
 def r_muenzen(rng, v):
     d = 0.6
     pairs = [(NOTE["D6"], NOTE["A6"]), (NOTE["E5"] * 2, NOTE["A6"]), (NOTE["F#6"], NOTE["D7"])]
@@ -599,8 +583,6 @@ SOUNDS = {
     "wolf_knurren": ("mobs", r_wolf_knurren, 2),
     "wolf_sprung": ("mobs", r_wolf_sprung, 1),
     "wolf_biss": ("mobs", r_wolf_biss, 1),
-    "wolf_landung": ("mobs", r_wolf_landung, 1),
-    "wolf_tod": ("mobs", r_wolf_tod, 1),
     "beute_muenzen": ("beute", r_muenzen, 3),
     "beute_aufheben": ("beute", r_aufheben, 2),
     "beute_selten": ("beute", r_beute_selten, 1),

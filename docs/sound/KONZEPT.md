@@ -186,6 +186,11 @@ deterministisch (feste Saat), damit ein erneuter Lauf dieselben Dateien ergibt.
   stimmhaftes „Uff“, Trank nur Schlucke, Wolf landet auf Gras und winselt).
   Wenig Leben ist jetzt ein Herzschlag als Schleife, solange das Leben unter
   25 % liegt.
+- Runde 2: 36 passt. Geisttreffer geisterhafter (Pappe-Kern plus Seufzen und
+  Nachklang), Trank als schnelles Gluckern. Wolf-Landung und eigener
+  Wolf-Todeslaut auf Wunsch entfernt; der Mooswolf nutzt „tod_fell“. Der
+  Rückkehr-Klang spielt auch beim Betreten der Welt (Fortsetzen, Koop-Start,
+  nach dem Prolog). Bogenschuss: alle 10 Varianten im Spiel.
 - Alle Sounds sind selbst erzeugt; es gibt keine Fremdlizenzen.
 - Freigabe läuft über die Hörvorschau „Sonnenhain Klangprobe“.
 
