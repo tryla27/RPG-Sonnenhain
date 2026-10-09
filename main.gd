@@ -3175,7 +3175,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		play_sound("ui_klick")
 		queue_redraw()
 		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and (event.position.distance_to(Vector2(1035,116)) <= 90.0 or (touch_enabled and Rect2(984,16,145,105).has_point(event.position))):
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and panel == "" and (HudLayout.MINIMAP_RECT.grow(6).has_point(event.position)):
 		panel = "map"
 		menu_scroll = 0
 		return
@@ -9628,24 +9628,15 @@ func draw_hud() -> void:
 		text_at(Vector2(966, 98), "WELLE %d%s" % [arena_wave, "/10" if arena_mode == "final" else ""], 19, Color("ffecbc"), HORIZONTAL_ALIGNMENT_CENTER, 150)
 		text_at(Vector2(970, 126), "%d Gegner" % enemies.size(), 15, Color("e4d3b0"), HORIZONTAL_ALIGNMENT_CENTER, 140)
 	else:
-		var map_center := HudLayout.MAP_CENTER
 		HudLayout.draw_map_label(self, ("KONFLUX · "+(KonfluxMap.BIOMES[konflux.room] if konflux.room>=0 else KonfluxMap.BIOMES[KonfluxMap.biome(player_pos)])) if konflux.active else (("LETZTE WACHE" if arena_mode == "final" else "ENDLOSE ARENA") if arena_mode != "" else (VillageInteriors32.name_for_id(interior_id).to_upper() if interior_id >= 0 else (DUNGEON_NAMES[dungeon_id].to_upper() if dungeon_id >= 0 else "%s · LV %d" % [region_name(region_at(player_pos)), region_level(region_at(player_pos))]))))
-		draw_minimap(Rect2(980, 61, 110, 110), true)
-		draw_arc(map_center, 70, 0, TAU, 64, Color("0b1220"), 16)
-		draw_arc(map_center, 70, 0, TAU, 64, Color("c9a45e"), 4)
-		draw_circle(map_center + Vector2(0, -76), 13, Color("0e1626"))
-		draw_arc(map_center + Vector2(0, -76), 13, 0, TAU, 20, Color("c9a45e"), 2)
-		text_at(map_center + Vector2(-8, -69), "N", 13, Color("ffe9b0"))
-		draw_circle(map_center + Vector2(0, 76), 13, Color("0e1626"))
-		draw_arc(map_center + Vector2(0, 76), 13, 0, TAU, 20, Color("c9a45e"), 2)
-		text_at(map_center + Vector2(-6, 81), "+", 14, Color("ffe9b0"))
+		draw_minimap(HudLayout.MINIMAP_RECT, true)
 	if network_mode != "offline":
 		var ping_text := " · %d ms" % network_ping_ms if network_ping_ms >= 0 else ""
-		text_at(Vector2(925, HudLayout.KOOP_Y), "KOOP %d/4%s" % [remote_players.size()+1,ping_text], 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+		text_at(Vector2(HudLayout.MAP_LABEL_RECT.position.x, HudLayout.KOOP_Y), "KOOP %d/4%s" % [remote_players.size()+1,ping_text], 12, Color("a9e8d0"), HORIZONTAL_ALIGNMENT_CENTER, int(HudLayout.MAP_LABEL_RECT.size.x))
 	if HudLayout.save_status_visible(server_save.problem,creative_mode,character_created):
 		HudLayout.shadow_text(self,Vector2(14,status_bottom+12),server_save.status,11,Color("ffe498"))
 	if save_notice_timer > 0.0:
-		text_at(Vector2(925, HudLayout.SAVE_NOTICE_Y), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, 180)
+		text_at(Vector2(HudLayout.MAP_LABEL_RECT.position.x, HudLayout.SAVE_NOTICE_Y), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, int(HudLayout.MAP_LABEL_RECT.size.x))
 	if notice_timer > 0:
 		ui_box(HudLayout.NOTICE_RECT, Color("415f59"))
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
@@ -9703,8 +9694,7 @@ func draw_hud() -> void:
 			ui_box(mobile_hint, Color("587767"))
 			text_at(Vector2(398, 500), nearest.replace("E  ·", "AKTION  ·"), 14, Color("fff4ca"), HORIZONTAL_ALIGNMENT_CENTER, 356)
 		else:
-			ui_box(Rect2(610, 549, 520, 36), Color("587767"))
-			text_at(Vector2(623, 573), nearest.replace("E  ·", "%s  ·" % binding_short("interact")), 15, Color("fff4ca"))
+			HudLayout.draw_prompt(self, nearest.replace("E  ·", "%s  ·" % binding_short("interact")))
 	if touch_enabled:
 		draw_touch_controls()
 	else:
@@ -9874,32 +9864,29 @@ func region_available(zone: int) -> bool:
 	var needed_boss:=region_required_boss(zone)
 	return needed_boss<0 or bosses_defeated[needed_boss]
 
+## Kleine Karte oben rechts: quadratisch, schlicht, goldener Rahmen.
 func draw_local_minimap(rect: Rect2) -> void:
+	draw_rect(rect, Color("16242e"))
 	if interior_id >= 0:
 		var center := rect.get_center()
-		draw_circle(center, 70, Color("c9a77a"))
-		draw_circle(center, 64, Color("57443e"))
+		draw_rect(rect.grow(-6), Color("57443e"))
 		draw_rect(Rect2(center + Vector2(-46, -43), Vector2(92, 85)), Color("927051"))
 		draw_rect(Rect2(center + Vector2(-25, -35), Vector2(50, 8)), Color("c29b69"))
-		var marker := center + (player_pos - INTERIOR_CENTER) * 0.09
-		draw_circle(marker, 4, Color("ffefbd"))
+		draw_circle(center + (player_pos - INTERIOR_CENTER) * 0.09, 4, Color("ffefbd"))
+		HudLayout.draw_map_frame(self, rect)
 		return
 	if dungeon_id >= 0:
 		draw_dungeon_minimap(rect)
+		HudLayout.draw_map_frame(self, rect)
 		return
-	var circle_center := rect.get_center()
-	var circle_radius := minf(rect.size.x, rect.size.y) * 0.5 - 5.0
-	draw_circle(circle_center, circle_radius + 4.0, Color("c5a46e"))
-	draw_circle(circle_center, circle_radius, Color("1e343a"))
-	var inset := rect.grow(-4)
+	var inner := rect.grow(-5)
+	var inset := rect
 	var radius := 1500.0
 	var scale_map := inset.size / (radius * 2.0)
 	var start := player_pos - Vector2(radius, radius)
-	for gx in 17:
-		for gy in 13:
-			var tile_center := inset.position + Vector2((gx + 0.5) * inset.size.x / 17.0, (gy + 0.5) * inset.size.y / 13.0)
-			if tile_center.distance_to(circle_center) > circle_radius - 6.0: continue
-			var point := start + Vector2((gx + 0.5) * radius * 2.0 / 17.0, (gy + 0.5) * radius * 2.0 / 13.0)
+	for gx in 21:
+		for gy in 21:
+			var point := start + Vector2((gx + 0.5) * radius * 2.0 / 21.0, (gy + 0.5) * radius * 2.0 / 21.0)
 			var area := visual_region_at(point)
 			var tint: Color = [Color("699b73"), Color("7da66b"), Color("365b50"), Color("535b61"), Color("355a68"), Color("755045"), Color("b7a578"), Color("48415c"), Color("52696a"), Color("a48a52"), Color("477579"), Color("575b73"), Color("6e6384")][area]
 			if area == 0:
@@ -9907,32 +9894,32 @@ func draw_local_minimap(rect: Rect2) -> void:
 				if ground_kind == 2: tint = Color("a4aa91")
 				elif ground_kind == 1: tint = Color("a0b47d")
 			elif distance_to_trail(point) < 110: tint = Color("d2ba86")
-			draw_rect(Rect2(inset.position + Vector2(gx * inset.size.x / 17.0, gy * inset.size.y / 13.0), inset.size / Vector2(17, 13) + Vector2.ONE), tint)
+			draw_rect(Rect2(inset.position + Vector2(gx, gy) * inset.size / 21.0, inset.size / 21.0 + Vector2.ONE), tint)
 	for stone in WAYSTONES:
 		var p: Vector2 = inset.position + (stone - start) * scale_map
-		if p.distance_to(circle_center) < circle_radius - 5.0: draw_circle(p, 3, Color("8af0e9"))
+		if inner.has_point(p): draw_circle(p, 3, Color("8af0e9"))
 	for portal in PORTALS:
 		for end in [portal[0], portal[1]]:
 			var p: Vector2 = inset.position + (end - start) * scale_map
-			if p.distance_to(circle_center) < circle_radius - 5.0 and region_available(int(portal[2])): draw_circle(p, 3, Color("efccfa"))
+			if inner.has_point(p) and region_available(int(portal[2])): draw_circle(p, 3, Color("efccfa"))
 	for index in DUNGEON_ENTRANCES.size():
 		var entrance: Vector2 = LANDMARKS[int(DUNGEON_ENTRANCES[index])]["pos"]
 		if not region_available(region_at(entrance)): continue
 		var mark: Vector2 = inset.position + (entrance - start) * scale_map
-		if mark.distance_to(circle_center) < circle_radius - 6.0:
+		if inner.has_point(mark):
 			draw_rect(Rect2(mark - Vector2(3, 3), Vector2(6, 6)), Color("f5d6aa"), false, 2)
 	if rescue_state < 3:
 		var rescue: Vector2 = inset.position + (RESCUE_POS - start) * scale_map
-		if rescue.distance_to(circle_center) < circle_radius - 7.0: draw_arc(rescue, 6, 0, TAU, 18, Color("ffae78"), 2)
+		if inner.has_point(rescue): draw_arc(rescue, 6, 0, TAU, 18, Color("ffae78"), 2)
 	for i in WORLD_EVENTS.size():
 		if int(event_states[i]) == 3: continue
 		var encounter: Vector2 = inset.position + (WORLD_EVENTS[i]["pos"] - start) * scale_map
-		if encounter.distance_to(circle_center) < circle_radius - 5.0 and region_available(int(WORLD_EVENTS[i]["region"])):
+		if inner.has_point(encounter) and region_available(int(WORLD_EVENTS[i]["region"])):
 			draw_circle(encounter, 4, Color("293e46"))
 			draw_circle(encounter, 2, Color("ffe399") if int(event_states[i]) in [0, 2] else Color("a7d2c3"))
 	for enemy in enemies:
 		var p: Vector2 = inset.position + (enemy["pos"] - start) * scale_map
-		if p.distance_to(circle_center) < circle_radius - 4.0: draw_circle(p, 2, Color("ef8584"))
+		if inner.has_point(p): draw_circle(p, 2, Color("ef8584"))
 	for member in (party_state.get("members",[]) as Array):
 		if not member is Dictionary or str(member.get("uuid","")) == player_uuid: continue
 		if str(member.get("context","world")) != "world": continue
@@ -9940,24 +9927,22 @@ func draw_local_minimap(rect: Rect2) -> void:
 		if member_data.size() < 2: continue
 		var member_world := Vector2(float(member_data[0]),float(member_data[1]))
 		var member_mark := inset.position + (member_world-start)*scale_map
-		if member_mark.distance_to(circle_center) < circle_radius-4.0:
+		if inner.has_point(member_mark):
 			draw_circle(member_mark,4,Color("8ff1c1"))
 			draw_arc(member_mark,5,0.0,TAU,14,Color("eaffd9"),1)
-	quest_guide.draw_on_minimap(self,circle_center,circle_radius,scale_map,start)
+	quest_guide.draw_on_minimap(self,rect,scale_map)
 	draw_circle(rect.get_center(), 4, Color.WHITE)
 	draw_line(rect.get_center(), rect.get_center() + facing.normalized() * 10, Color("fff1ad"), 2)
-	draw_arc(circle_center, circle_radius + 3.0, 0.0, TAU, 64, Color("f0d393"), 3)
+	HudLayout.draw_map_frame(self, rect)
 
 func draw_dungeon_minimap(rect: Rect2) -> void:
 	var center := rect.get_center()
-	var radius := rect.size.x * 0.5 - 5.0
-	draw_circle(center, radius + 4.0, Color("c2aa79"))
-	draw_circle(center, radius, Color("16242e"))
-	for gx in 13:
-		for gy in 13:
-			var tile := center + Vector2((gx - 6) * 10, (gy - 6) * 10)
-			if tile.distance_to(center) > radius - 7.0: continue
-			var world_point := player_pos + Vector2((gx - 6) * 65, (gy - 6) * 65)
+	var inner := rect.grow(-6)
+	for gx in 15:
+		for gy in 15:
+			var tile := center + Vector2((gx - 7) * 10, (gy - 7) * 10)
+			if not inner.has_point(tile): continue
+			var world_point := player_pos + Vector2((gx - 7) * 65, (gy - 7) * 65)
 			var seen := world_point.distance_to(player_pos) < 340
 			for torch_pos in dungeon_torches():
 				if world_point.distance_to(torch_pos) < 125: seen = true
@@ -9967,14 +9952,13 @@ func draw_dungeon_minimap(rect: Rect2) -> void:
 	for enemy in enemies:
 		if enemy["pos"].distance_to(player_pos) < 330:
 			var enemy_point: Vector2 = center + (enemy["pos"] - player_pos) / 65.0 * 10.0
-			if enemy_point.distance_to(center) < radius - 5.0: draw_circle(enemy_point, 2, Color("ed9b82"))
+			if inner.has_point(enemy_point): draw_circle(enemy_point, 2, Color("ed9b82"))
 	for marker in [DUNGEON_CENTER + Vector2(-570, 0), DUNGEON_CENTER + Vector2(555, 0)]:
 		if marker.distance_to(player_pos) < 350:
 			var point: Vector2 = center + (marker - player_pos) / 65.0 * 10.0
-			if point.distance_to(center) < radius - 5.0: draw_rect(Rect2(point - Vector2(3, 3), Vector2(6, 6)), Color("ffe0a0"))
+			if inner.has_point(point): draw_rect(Rect2(point - Vector2(3, 3), Vector2(6, 6)), Color("ffe0a0"))
 	draw_circle(center, 4, Color.WHITE)
 	draw_line(rect.get_center(), rect.get_center() + facing.normalized() * 10, Color("fff1ad"), 2)
-	draw_arc(center, radius + 3.0, 0.0, TAU, 64, Color("f0d393"), 3)
 
 func draw_portal(p: Vector2, region: int) -> void:
 	var glow := Color("b6a5e9") if region_available(region) else Color("a76e73")
