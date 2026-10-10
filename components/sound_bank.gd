@@ -97,12 +97,15 @@ const CATALOG := {
 	"busch_rascheln": {"path":"welt/busch_rascheln", "variants":3, "db":-16.0, "max":1, "prio":2, "pitch":0.08},
 	# Dunkler Golem (components/golem_boss.gd): schwer, steinern, brechend.
 	"golem_schritt": {"path":"golem/golem_schritt", "variants":2, "db":-7.0, "max":2, "prio":6, "pitch":0.04},
+	# Halbe Golems: eigener, tieferer Stampfer (Klangprobe B).
+	"golem_schritt_klein": {"path":"golem/golem_schritt_klein", "variants":2, "db":-8.0, "max":2, "prio":5, "pitch":0.05},
 	"golem_schild": {"path":"golem/golem_schild", "variants":1, "db":-6.0, "max":1, "prio":8, "pitch":0.0, "duck":1.0},
 	"golem_schaben": {"path":"golem/golem_schaben", "variants":1, "db":-6.0, "max":2, "prio":8, "pitch":0.03},
 	"golem_wurf": {"path":"golem/golem_wurf", "variants":1, "db":-7.0, "max":2, "prio":7, "pitch":0.04},
 	"brocken_landen": {"path":"golem/brocken_landen", "variants":2, "db":-6.0, "max":3, "prio":7, "pitch":0.05},
 	"steinhagel": {"path":"golem/steinhagel", "variants":3, "db":-13.0, "max":4, "prio":4, "pitch":0.1},
-	"golem_schrei": {"path":"golem/golem_schrei", "variants":1, "db":-4.0, "max":1, "prio":9, "pitch":0.0, "duck":2.4},
+	# Zwei Schreie, zufällig gewählt (random: auch zweimal derselbe möglich).
+	"golem_schrei": {"path":"golem/golem_schrei", "variants":2, "db":-4.0, "max":1, "prio":9, "pitch":0.0, "duck":2.4, "random":true},
 	"golem_zerfall": {"path":"golem/golem_zerfall", "variants":1, "db":-5.0, "max":1, "prio":9, "pitch":0.0, "duck":2.0},
 }
 
@@ -279,6 +282,7 @@ func oldest(indices: Array) -> int:
 
 func pick_variant(name: String, count: int) -> int:
 	if count <= 1: return 0
+	if bool(CATALOG.get(name, {}).get("random", false)): return rng.randi_range(0, count - 1)
 	var choice := rng.randi_range(0, count - 2)
 	if choice >= int(last_variant.get(name, -1)): choice += 1
 	choice = mini(choice, count - 1)

@@ -6,6 +6,12 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Golem-Klänge nach Angelos Wahl (Klangprobe Runde 1): `golem_schritt_klein`
+  (halbe Golems, Probe B), `brocken_landen` = Probe B, `golem_schrei` mit zwei
+  Varianten (bisher + Probe C), zufällig (`"random":true` im Katalog,
+  `SoundBank.pick_variant`). Rezepte bleiben in `tools/build_golem_sfx_draft.py`,
+  `tools/build_sfx.py` übernimmt sie mit gleicher Saat. Vorbereitet:
+  `GolemBoss.HAIL_RAIN_SOUND` für einen langen Felsregen pro Feld.
 - 3D-Landschaft: Rückfall auf 2D, wenn der 3D-Viewport nach 0,8 s keine
   Pixel zeigt (`WorldObstacles3D.active`, `probe`, `visible_pixels`; Log
   `OBSTACLES_3D_FALLBACK`). Alte Ostmauern zeichnen im Rückfall wieder.

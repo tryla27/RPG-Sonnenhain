@@ -207,6 +207,20 @@ func run()->void:
 	check(not g.golem_world.fight_active,"Kampf vorbei")
 	check(int(MasterArmor.ARMORS[MasterArmor.GOLEM]["power"])==100,"Golem-Rüstung 100 Schutz")
 
+	# Klangwahl aus der Golem-Klangprobe (10.10.).
+	var bank=preload("res://components/sound_bank.gd")
+	check(GolemBoss.step_sound(GolemBoss.TYPE_BIG)=="golem_schritt" and GolemBoss.step_sound(GolemBoss.TYPE_HALF)=="golem_schritt_klein","eigener Schritt für die halben Golems")
+	check(int(bank.CATALOG["golem_schrei"]["variants"])==2 and bool(bank.CATALOG["golem_schrei"].get("random",false)),"zwei Schreie, zufällig gewählt")
+	var sounds:=bank.new()
+	var seen:={}
+	var repeats:=0
+	var last:=-1
+	for i in 200:
+		var v:int=sounds.pick_variant("golem_schrei",2)
+		seen[v]=true
+		if v==last:repeats+=1
+		last=v
+	check(seen.size()==2 and repeats>0,"Schrei unregelmäßig: beide kommen vor, auch zweimal hintereinander")
 	g.free()
 	if failures>0:
 		push_error("DARK_GOLEM_FAILURES %d" % failures)

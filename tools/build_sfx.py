@@ -815,6 +815,28 @@ def r_golem_zerfall(rng, v):
     return finish(mix((breaks, 1.0), (crunch, 0.7), (pebbles, 0.35)), echo_wet=0.22, echo_delay=0.14, tail=0.2, low_cut=24)
 
 
+# Angelos Wahl in der Golem-Klangprobe (10.10.2026). Die Rezepte stehen in
+# tools/build_golem_sfx_draft.py; gleiche Saat wie in der Probe, damit genau
+# das klingt, was gewählt wurde.
+def _golem_pick(recipe_name: str, draft_tag: str = ""):
+    def recipe(_rng, v):
+        import build_golem_sfx_draft as drafts
+        action, tag = {"schritt_b": ("golem_schritt", "b"), "landen_b": ("brocken_landen", "b"),
+                       "schrei_c": ("golem_schrei", "c")}[recipe_name]
+        # Variante 1 = exakt der Klang aus der Probe, weitere mit eigener Saat.
+        seed = f"{action}:draft:{tag}" if v == 0 else f"{action}:draft:{tag}:{v}"
+        return getattr(drafts, recipe_name)(np.random.default_rng(zlib.crc32(seed.encode())))
+    return recipe
+
+
+def _golem_schrei_mix(rng, v):
+    """Schrei: Variante 1 = bisheriger Schrei, Variante 2 = Probe C. Im Spiel
+    zufällig gewählt (Angelo: „unregelmäßig abwechselnd beide“)."""
+    if v == 0:
+        return r_golem_schrei(rng, v)
+    return _golem_pick("schrei_c")(rng, 0)
+
+
 # ------------------------------------------------- Büsche
 
 def r_busch_rascheln(rng, v):
@@ -921,12 +943,13 @@ SOUNDS = {
     "busch_rascheln": ("welt", r_busch_rascheln, 3),
     "teleport_brummen": ("welt", r_teleport_brummen, 1),
     "golem_schritt": ("golem", r_golem_schritt, 2),
+    "golem_schritt_klein": ("golem", _golem_pick("schritt_b"), 2),
     "golem_schild": ("golem", r_golem_schild, 1),
     "golem_schaben": ("golem", r_golem_schaben, 1),
     "golem_wurf": ("golem", r_golem_wurf, 1),
-    "brocken_landen": ("golem", r_brocken_landen, 2),
+    "brocken_landen": ("golem", _golem_pick("landen_b"), 2),
     "steinhagel": ("golem", r_steinhagel, 3),
-    "golem_schrei": ("golem", r_golem_schrei, 1),
+    "golem_schrei": ("golem", _golem_schrei_mix, 2),
     "golem_zerfall": ("golem", r_golem_zerfall, 1),
 }
 
