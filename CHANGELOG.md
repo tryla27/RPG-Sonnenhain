@@ -14,6 +14,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
   `audio/sfx/golem/` (`tools/build_sfx.py`), Musikthema `boss_golem`
   (`music/boss_golem.ogg`, bis dahin Bossmusik). Test
   `tests/gameplay/check_dark_golem.gd`, Bild `tools/capture_dark_golem.gd`.
+- Golem online geprüft: `tools/check_dark_golem_network.gd` (Server + 3 Spieler
+  über WebSocket: Beschwören, Kampf, Schrei, Zerfall, Rüstung nur für
+  Beteiligte, `golem_world.json`). Golem ohne Rückstoß/Betäubung, Nahkampf
+  rechnet seinen Körperradius ein. `server_action_allowed` blockt die erste
+  Aktion kurz nach Serverstart nicht mehr.
 - Legendäre Rüstungen: `components/master_armor.gd` (Daten, Wirkungen),
   Aussehen 6–12 in `rpg_hero.gd`, Torvald ab Stufe 40, Drops (Klassenbosse 10 %,
   Elite ab Stufe 33 2 %), Dornen/Lebensraub auf dem Server. Test
