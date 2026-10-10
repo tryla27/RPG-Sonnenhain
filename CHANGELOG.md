@@ -10,6 +10,12 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
   je Gebiet (`spread_points`, `bush_spot_ok`, deterministisch). Alte Erntezeiten
   an den bisherigen drei Plätzen verfallen. Test
   `tests/gameplay/check_food_bushes.gd`, Bild `tools/capture_food_bushes.gd`.
+- Geschosse: `projectile_world_blocked` (Server) kennt jetzt Laternen, Zäune,
+  Brett, Brunnen, Dorfbäume, Vorplätze und Wegstein-Obelisken; Clients nutzen in
+  der Oberwelt dieselbe Regel. Eigene Online-Schüsse zerschellen lokal sofort
+  (`local_projectile_breaks` gegen doppelte Server-Meldungen),
+  `play_break_sound` + `projectile_material` (stein/metall/holz). Test
+  `tests/gameplay/check_arrow_impacts.gd`.
 - Golem-Klänge nach Angelos Wahl (Klangprobe Runde 1): `golem_schritt_klein`
   (halbe Golems, Probe B), `brocken_landen` = Probe B, `golem_schrei` mit zwei
   Varianten (bisher + Probe C), zufällig (`"random":true` im Katalog,
