@@ -6,6 +6,8 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- `GolemBoss.load_state`: liegengebliebene Brocken zerbröseln nach Neustart
+  (`crumble`), Kampf gilt als beendet.
 - Golem v2 Teil 2 (Optik): `tools/build_golem_art.py` erzeugt
   `art/monsters/golem/golem_sheet.png` + `golem_glow.png` (128 px, 3 Ansichten ×
   11 Bilder); `GolemDesign.draw_golem` zeichnet das Sprite (2,5×/1,25×),

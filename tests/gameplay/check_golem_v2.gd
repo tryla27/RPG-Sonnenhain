@@ -122,6 +122,12 @@ func run()->void:
 	var stored:=GolemBoss.new()
 	stored.load_state(JSON.parse_string(JSON.stringify(g.golem_world.save_state())))
 	check(is_equal_approx(stored.cooldown_until,1900.0),"Pause übersteht Neustart")
+	# Neustart mit liegengebliebenen Brocken: sie zerbröseln auch dann.
+	var leftover:=GolemBoss.new()
+	leftover.load_state({"boulders":[[gp.x+200,gp.y],[gp.x+260,gp.y]],"trees":{}})
+	check(leftover.crumble>0.0 and not leftover.fight_active,"Neustart: alte Brocken zerbröseln")
+	for i in 70:leftover.update_world(g,0.05,true)
+	check(leftover.boulders.is_empty(),"Neustart: Brocken nach 3 s weg")
 	# Allein: Pause blockiert die Beschwörung am Altar, Testmodus nicht.
 	g.golem_world.cooldown_until=Time.get_unix_time_from_system()+600.0
 	g.player_pos=GolemBoss.ALTAR+Vector2(0,60)
