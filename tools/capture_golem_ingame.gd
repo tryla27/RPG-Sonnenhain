@@ -18,6 +18,7 @@ func capture()->void:
 	var g:=Game.new();vp.add_child(g)
 	for i in 8:await process_frame
 	g.character_created=true;g.level=42;g.panel=""
+	g.hp=g.max_hp();g.death_timer=0.0
 	g.player_pos=GolemBoss.ALTAR+Vector2(-260,260)
 	g.enemies.clear()
 	var golem:Dictionary=g.golem_world.summon(g,1)

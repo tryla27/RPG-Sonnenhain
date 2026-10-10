@@ -14797,7 +14797,7 @@ func on_golem_defeated(enemy: Dictionary) -> void:
 	var result: String = golem_world.on_defeated(self, enemy)
 	for i in range(before, enemies.size()): golem_register_enemy(enemies[i])
 	if result == "split":
-		if not dedicated_server_mode: message("Der Dunkle Golem zerbricht – zwei halbe Golems kämpfen weiter!")
+		if not dedicated_server_mode: message("Der Dunkle Golem zerbricht – zwei Dunkle kleine Golems kämpfen weiter!")
 	elif result == "victory":
 		golem_victory(Vector2(enemy["pos"]))
 
