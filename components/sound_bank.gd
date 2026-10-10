@@ -95,13 +95,22 @@ const CATALOG := {
 	"boss_erscheint": {"path":"welt/boss_erscheint", "variants":1, "db":-7.0, "max":1, "prio":8, "pitch":0.0, "duck":1.8},
 	# Rascheln beim Durchlaufen von Büschen.
 	"busch_rascheln": {"path":"welt/busch_rascheln", "variants":3, "db":-16.0, "max":1, "prio":2, "pitch":0.08},
+	# Dunkler Golem (components/golem_boss.gd): schwer, steinern, brechend.
+	"golem_schritt": {"path":"golem/golem_schritt", "variants":2, "db":-7.0, "max":2, "prio":6, "pitch":0.04},
+	"golem_schild": {"path":"golem/golem_schild", "variants":1, "db":-6.0, "max":1, "prio":8, "pitch":0.0, "duck":1.0},
+	"golem_schaben": {"path":"golem/golem_schaben", "variants":1, "db":-6.0, "max":2, "prio":8, "pitch":0.03},
+	"golem_wurf": {"path":"golem/golem_wurf", "variants":1, "db":-7.0, "max":2, "prio":7, "pitch":0.04},
+	"brocken_landen": {"path":"golem/brocken_landen", "variants":2, "db":-6.0, "max":3, "prio":7, "pitch":0.05},
+	"steinhagel": {"path":"golem/steinhagel", "variants":3, "db":-13.0, "max":4, "prio":4, "pitch":0.1},
+	"golem_schrei": {"path":"golem/golem_schrei", "variants":1, "db":-4.0, "max":1, "prio":9, "pitch":0.0, "duck":2.4},
+	"golem_zerfall": {"path":"golem/golem_zerfall", "variants":1, "db":-5.0, "max":1, "prio":9, "pitch":0.0, "duck":2.0},
 }
 
 ## Klangmaterial je Gegnertyp (Index wie GameContent.ENEMY_TYPES).
 const ENEMY_MATERIAL := [
 	"weich", "chitin", "weich", "fell", "stein", "geist", "chitin", "stein", "fell", "stein",
 	"chitin", "geist", "metall", "geist", "fell", "geist", "stein", "fell", "geist", "weich",
-	"weich", "weich", "geist", "fell", "metall", "chitin", "metall",
+	"weich", "weich", "geist", "fell", "metall", "chitin", "metall", "stein", "stein",
 ]
 ## Eigene Todeslaute der erneuerten Waldmonster (der Mooswolf nutzt "tod_fell").
 const ENEMY_DEATH := {0:"schleim_tod", 1:"kaefer_tod", 2:"pilz_tod"}

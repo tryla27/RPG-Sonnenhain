@@ -73,10 +73,10 @@ Ascheberge-Tor, E2, E1, D2; Golem nach Angelos Antworten.
   Bild.
 - **Pfeiltreffer in der Umgebung:** passender Ton je nach getroffenem Objekt
   (Holz, Stein, Busch, Wasser …).
-- **Golem-Endgegner:** Vorgaben (Bossmusik Hardtekk, Beschwörung mit 30
-  Steinbeeren + Rot-/Blaukuchen, 3D-Modell mit Ragdoll, Schild, Steinhagel-Feld,
-  Brockenwurf, Schrei) in `docs/konzepte/2026-10-09-golem/KONZEPT.md`, mit
-  Bauliste und 8 offenen Fragen.
+- **Golem-Endgegner:** umgesetzt am 10.10. (Branch `feature/dark-golem`,
+  Umsetzung in `docs/konzepte/2026-10-10-golem/UMSETZUNG.md`). Offen: Angelos
+  Hardtekk-Lied als `music/boss_golem.ogg`; echtes 3D-Modell mit Ragdoll
+  später mit D2.
 
 Noch offen aus der Nacht davor: Shop (Maus + Enter kaufen, Menge, Gesamtwert
 beim Verkaufen) ist als PR #99 fertig. Konzept LV-40-Rüstungen:

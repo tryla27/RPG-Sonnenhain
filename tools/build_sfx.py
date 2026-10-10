@@ -738,6 +738,83 @@ def r_boss_erscheint(rng, v):
     return finish(mix((hits, 0.9), (swell, 0.6), (rumble, 1.0)), echo_wet=0.2, echo_delay=0.15, tail=0.3)
 
 
+# ------------------------------------------------- Dunkler Golem
+# Schwer, steinern, brechend (Wunsch 10.10.2026): tiefe Schläge, Knirschen, Schaben.
+
+def _grind(rng, d, low=180, high=1400, density=0.93):
+    """Knirschen: gefilterte Knackser, die wie brechender Stein klingen."""
+    crack = bp(noise(d, rng), low, high) * (rng.random(int(SR * d)) > density)
+    return lp(crack, high * 1.4) * 3.0
+
+
+def r_golem_schritt(rng, v):
+    d = 0.9
+    boom = thump(70 - 6 * v, 32, d, 0.35)
+    crunch = _grind(rng, d, 220, 1800, 0.9) * env(d, 0.002, 0.35, 3)
+    rumble = lp(noise(d, rng, "brown"), 120) * env(d, 0.01, 0.6, 2)
+    return finish(mix((boom, 1.0), (crunch, 0.55), (rumble, 0.8)), echo_wet=0.12, echo_delay=0.09, low_cut=28)
+
+
+def r_golem_schild(rng, v):
+    d = 1.3
+    t = t_axis(d)
+    shut = at(thump(90, 40, 0.6, 0.25), 0.0, d) + at(thump(80, 36, 0.6, 0.25), 0.18, d)
+    grind = _grind(rng, d, 160, 1100, 0.88) * env(d, 0.05, 0.9, 2)
+    hum = (osc(55, d, "saw") * 0.4 + osc(82.5, d) * 0.3) * np.minimum(t / 0.4, 1) * env(d, 0.3, 1.0, 1.5)
+    shimmer = bp(noise(d, rng), 3000, 6500) * env(d, 0.4, 0.9, 2) * 0.25
+    return finish(mix((shut, 1.0), (grind, 0.6), (lp(hum, 400), 0.5), (shimmer, 0.4)), echo_wet=0.18, echo_delay=0.13, low_cut=28)
+
+
+def r_golem_schaben(rng, v):
+    d = 1.05
+    t = t_axis(d)
+    shape = np.minimum(t / 0.15, 1) * np.minimum((d - t) / 0.12, 1)
+    scrape = sweep_bp(noise(d, rng), glide(400, 1400, d, 1.2), q=2.4) * shape
+    grit = _grind(rng, d, 600, 3200, 0.86) * shape
+    drag = lp(noise(d, rng, "brown"), 200) * shape
+    return finish(mix((scrape, 0.9), (grit, 0.6), (drag, 0.7)), echo_wet=0.08, low_cut=35)
+
+
+def r_golem_wurf(rng, v):
+    d = 0.8
+    heave = thump(110, 45, 0.5, 0.2)
+    whoosh = sweep_bp(noise(d, rng), glide(300, 1800, d, 0.6), q=1.4) * env(d, 0.08, 0.7, 2)
+    return finish(mix((heave, 1.0), (whoosh, 0.7)), echo_wet=0.1, low_cut=30)
+
+
+def r_brocken_landen(rng, v):
+    d = 1.1
+    boom = thump(64 - 4 * v, 28, d, 0.45)
+    crack = _grind(rng, 0.5, 300, 2600, 0.8) * env(0.5, 0.001, 0.3, 3)
+    pebbles = sum(at(bp(noise(0.03, rng), 1500, 5000) * env(0.03, 0.001, 0.02), rng.uniform(0.08, 0.7), d) for _ in range(8))
+    return finish(mix((boom, 1.0), (at(crack, 0, d), 0.7), (pebbles, 0.35)), echo_wet=0.15, echo_delay=0.1, low_cut=26)
+
+
+def r_steinhagel(rng, v):
+    d = 0.45
+    knock = thump(150 + 25 * v, 60, d, 0.12)
+    crack = _grind(rng, d, 500, 3500, 0.82) * env(d, 0.001, 0.18, 3)
+    return finish(mix((knock, 0.9), (crack, 0.7)), low_cut=40)
+
+
+def r_golem_schrei(rng, v):
+    d = 1.5
+    t = t_axis(d)
+    roar = voice(glide(95, 70, d, 1.0), d, ((420, 120, 1.0), (900, 160, 0.6), (2400, 300, 0.25)), breath=0.35, rng=rng)
+    growl = osc(glide(48, 38, d), d, "saw") * (1 + 0.5 * np.sin(2 * np.pi * 23 * t))
+    quake = lp(noise(d, rng, "brown"), 90) * 1.5
+    shape = np.minimum(t / 0.2, 1) * env(d, 0.2, 1.4, 1.4)
+    return finish(mix((roar, 1.0), (lp(growl, 600), 0.6), (quake, 0.8)) * shape, echo_wet=0.3, echo_delay=0.17, echo_fb=0.35, tail=0.25, low_cut=24)
+
+
+def r_golem_zerfall(rng, v):
+    d = 1.55
+    breaks = sum(at(thump(rng.uniform(55, 95), 30, 0.6, 0.28), off, d) for off in (0.0, 0.18, 0.4, 0.68, 0.95))
+    crunch = _grind(rng, d, 200, 2800, 0.84) * env(d, 0.01, 1.3, 1.6)
+    pebbles = sum(at(bp(noise(0.03, rng), 1500, 5500) * env(0.03, 0.001, 0.02), rng.uniform(0.3, 1.4), d) for _ in range(18))
+    return finish(mix((breaks, 1.0), (crunch, 0.7), (pebbles, 0.35)), echo_wet=0.22, echo_delay=0.14, tail=0.2, low_cut=24)
+
+
 # ------------------------------------------------- Büsche
 
 def r_busch_rascheln(rng, v):
@@ -843,6 +920,14 @@ SOUNDS = {
     "boss_erscheint": ("welt", r_boss_erscheint, 1),
     "busch_rascheln": ("welt", r_busch_rascheln, 3),
     "teleport_brummen": ("welt", r_teleport_brummen, 1),
+    "golem_schritt": ("golem", r_golem_schritt, 2),
+    "golem_schild": ("golem", r_golem_schild, 1),
+    "golem_schaben": ("golem", r_golem_schaben, 1),
+    "golem_wurf": ("golem", r_golem_wurf, 1),
+    "brocken_landen": ("golem", r_brocken_landen, 2),
+    "steinhagel": ("golem", r_steinhagel, 3),
+    "golem_schrei": ("golem", r_golem_schrei, 1),
+    "golem_zerfall": ("golem", r_golem_zerfall, 1),
 }
 
 

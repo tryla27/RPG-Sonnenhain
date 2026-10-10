@@ -6,6 +6,14 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Dunkler Golem: `components/golem_boss.gd` (Altar, Schild, Steinhagel-Feld,
+  Brockenwurf mit liegenden Brocken und umgeworfenen Bäumen, Schrei, Zerfall in
+  zwei Hälften, Himmelsfalter-Wellen, Netzpaket, Speichern) und
+  `components/golem_design.gd` (Bild). Gegnertypen 27/28, Server rechnet den
+  Kampf, Brocken/Bäume in `golem_world.json` neben den Spielständen. Klänge
+  `audio/sfx/golem/` (`tools/build_sfx.py`), Musikthema `boss_golem`
+  (`music/boss_golem.ogg`, bis dahin Bossmusik). Test
+  `tests/gameplay/check_dark_golem.gd`, Bild `tools/capture_dark_golem.gd`.
 - Legendäre Rüstungen: `components/master_armor.gd` (Daten, Wirkungen),
   Aussehen 6–12 in `rpg_hero.gd`, Torvald ab Stufe 40, Drops (Klassenbosse 10 %,
   Elite ab Stufe 33 2 %), Dornen/Lebensraub auf dem Server. Test
