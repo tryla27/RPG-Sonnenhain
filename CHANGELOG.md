@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Nahrungsbüsche: `FoodSystem.configure` verteilt 8–12 Fruchtbüsche + 3 Kräuter
+  je Gebiet (`spread_points`, `bush_spot_ok`, deterministisch). Alte Erntezeiten
+  an den bisherigen drei Plätzen verfallen. Test
+  `tests/gameplay/check_food_bushes.gd`, Bild `tools/capture_food_bushes.gd`.
 - Spawn-Brummen aus (`SPAWN_HUM_ENABLED`). Vollbild: `DisplayMode.lock_escape`
   (Keyboard Lock im Browser), `EscapeCounter` für den F11-Hinweis.
   Ausrüstung: `toggle_equipment_item` tauscht neues und altes Teil im Inventar
