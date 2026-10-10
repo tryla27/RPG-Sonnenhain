@@ -11929,6 +11929,8 @@ func draw_world_atlas(rect: Rect2) -> void:
 		draw_circle(point, 5, Color("222e35"))
 		draw_circle(point, 3, Color("ffe09a") if int(event_states[i]) in [0, 2] else Color("98d6c8"))
 
+	if region_available(region_at(GolemBoss.ALTAR)):
+		GolemDesign.draw_map_marker(self, inset.position + GolemBoss.ALTAR * map_scale, golem_world.fight_active, world_time)
 	for boss_index in 3:
 		var boss_pos: Vector2 = CLASS_BOSS_SITES[boss_index]
 		if not region_available(region_at(boss_pos)): continue
@@ -14222,6 +14224,11 @@ func mark_network_teleport()->void:
 func valid_network_teleport(origin:Vector2,target:Vector2,previous:Dictionary,context:String)->bool:
 	if context!="world":return false
 	if float(previous.get("hp",1))<=0 and target.distance_to(Vector2(825,1020))<80:return true
+	# Testmodus: Reisen über die Karte geht von überall (WaystoneMap.source_valid),
+	# also auch hier – aber nur zu einem Wegstein-Ankunftspunkt.
+	if bool(previous.get("test_mode",false)):
+		for destination_index in WAYSTONES.size():
+			if target.distance_to(waystone_arrival(destination_index))<95:return true
 	for stone in WAYSTONES:
 		if origin.distance_to(stone)>210:continue
 		for destination_index in WAYSTONES.size():

@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Testmodus online: `valid_network_teleport` nimmt Kartenreisen von Spielern mit
+  `test_mode` an (nur zu Wegstein-Ankunftspunkten), passend zu
+  `WaystoneMap.source_valid`. Test `tests/network/check_testmode_travel.gd`.
+- Golem-Altar auf der Karte: `GolemDesign.draw_map_marker`, Bild
+  `tools/capture_golem_map_marker.gd`.
 - Dunkler Golem: `components/golem_boss.gd` (Altar, Schild, Steinhagel-Feld,
   Brockenwurf mit liegenden Brocken und umgeworfenen Bäumen, Schrei, Zerfall in
   zwei Hälften, Himmelsfalter-Wellen, Netzpaket, Speichern) und

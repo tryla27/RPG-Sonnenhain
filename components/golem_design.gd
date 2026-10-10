@@ -136,6 +136,14 @@ static func draw_altar(c:CanvasItem,pos:Vector2,active:bool,time:float)->void:
 		c.draw_rect(Rect2(bowl-Vector2(14,6),Vector2(28,10)),Color("4a4450"))
 		c.draw_rect(Rect2(bowl-Vector2(10,9),Vector2(20,4)),[Color("8a8580"),Color("c84f55"),Color("547bd1")][k])
 
+## Kartensymbol des Altars: dunkler Stein mit lila Riss, pulsiert im Kampf.
+static func draw_map_marker(c:CanvasItem,point:Vector2,active:bool,time:float)->void:
+	var pulse:=0.5+0.5*sin(time*(6.0 if active else 2.0))
+	c.draw_circle(point,10,OUTLINE)
+	c.draw_colored_polygon(PackedVector2Array([point+Vector2(-7,-4),point+Vector2(-3,-8),point+Vector2(4,-8),point+Vector2(8,-3),point+Vector2(7,5),point+Vector2(-6,6)]),BASALT_LIGHT)
+	c.draw_polyline(PackedVector2Array([point+Vector2(-5,-1),point+Vector2(-1,2),point+Vector2(2,-3),point+Vector2(5,1)]),Color(CRACK,0.7+0.3*pulse),2.0)
+	c.draw_arc(point,11+(2.0*pulse if active else 0.0),0,TAU,20,Color(CRACK_GLOW,0.5+0.4*pulse),2.0)
+
 ## Steinhagel-Feld, Vorwarnungen, fallende Steine, Würfe, liegende Brocken.
 static func draw_world_fx(c:CanvasItem,world,time:float)->void:
 	for f in world.fields:
