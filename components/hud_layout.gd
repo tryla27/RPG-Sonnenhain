@@ -1,4 +1,5 @@
 extends RefCounted
+const FoodSystem=preload("res://components/food_system.gd")
 # Schlankes HUD: Lage der HUD-Teile und Zeichnen der Statusbalken, der
 # Questzeile, der XP-Linie und des Kartennamens unter der Minimap.
 # Nicht hier: Minimap selbst, Fähigkeitenleiste, Bossleiste, Interaktionshinweise
@@ -114,3 +115,40 @@ static func draw_prompt(g,text:String)->void:
 	g.draw_rect(rect,Color(0.03,0.07,0.1,0.78))
 	g.draw_rect(rect.grow(1),Color("fff3c4"),false,2.0)
 	g.text_at(rect.position+Vector2(14,18),text,14,Color("fff8dc"),HORIZONTAL_ALIGNMENT_LEFT,int(rect.size.x)-20)
+
+## Kleine Effekt-Kacheln (Essen, Snack …): 92×28 px nebeneinander, höchstens
+## vier pro Reihe. Beim Darüberfahren erscheinen Name und Wirkung.
+## Rückgabe: Unterkante der Kacheln.
+const CHIP_SIZE:=Vector2(92,28)
+const CHIPS_PER_ROW:=4
+static func chip_rect(origin:Vector2,index:int)->Rect2:
+	return Rect2(origin+Vector2((index%CHIPS_PER_ROW)*(CHIP_SIZE.x+4),int(index/CHIPS_PER_ROW)*(CHIP_SIZE.y+4)),CHIP_SIZE)
+
+static func draw_effect_chips(g,origin:Vector2,chips:Array,mouse:Vector2)->float:
+	var bottom:=origin.y
+	var hovered:=-1
+	for i in chips.size():
+		var chip:Dictionary=chips[i]
+		var r:=chip_rect(origin,i)
+		g.draw_rect(r,Color(0.03,0.07,0.1,0.78))
+		g.draw_rect(r,Color("c9a45e",0.7),false,1.0)
+		if int(chip.get("icon",-1))>=0:
+			FoodSystem.icon(g,r.position+Vector2(2,1),int(chip["icon"]),0.55)
+		else:
+			g.draw_circle(r.position+Vector2(14,14),6,Color(chip.get("color",Color.WHITE)))
+		var t:=int(chip.get("time",0))
+		shadow_text(g,r.position+Vector2(30,17),"%d:%02d" % [int(t/60),t%60],12,Color("e8f0ff"))
+		g.draw_rect(Rect2(r.position+Vector2(30,21),Vector2(r.size.x-36,3)),Color("1b2f35"))
+		g.draw_rect(Rect2(r.position+Vector2(30,21),Vector2((r.size.x-36)*clampf(float(chip.get("progress",0.0)),0.0,1.0),3)),Color(chip.get("color",Color.WHITE)))
+		bottom=maxf(bottom,r.end.y)
+		if r.has_point(mouse):hovered=i
+	if hovered>=0:
+		var chip:Dictionary=chips[hovered]
+		var r:=chip_rect(origin,hovered)
+		var box:=Rect2(r.position+Vector2(0,r.size.y+4),Vector2(260,40))
+		g.draw_rect(box,Color(0.03,0.07,0.1,0.9))
+		g.draw_rect(box,Color("c9a45e",0.8),false,1.0)
+		g.text_at(box.position+Vector2(8,16),str(chip.get("title","")),12,Color("ffe5b5"))
+		g.text_at(box.position+Vector2(8,32),str(chip.get("detail","")),10,Color("bde8bd"),HORIZONTAL_ALIGNMENT_LEFT,244)
+	return bottom+4.0
+

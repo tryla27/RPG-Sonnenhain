@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Essensanzeige: `HudLayout.draw_effect_chips` (92×28-Kacheln, 4 pro Reihe,
+  Details beim Darüberfahren) statt 348×58-Leiste. Test
+  `tests/ui/check_effect_chips.gd`, Bild `tools/capture_food_chips.gd`.
 - Nahrungsbüsche: `FoodSystem.configure` verteilt 8–12 Fruchtbüsche + 3 Kräuter
   je Gebiet (`spread_points`, `bush_spot_ok`, deterministisch). Alte Erntezeiten
   an den bisherigen drei Plätzen verfallen. Test

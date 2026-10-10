@@ -10140,24 +10140,19 @@ func draw_hud() -> void:
 	var quest_rect:=quest_hud_rect()
 	var quest_hovered:=not touch_enabled and quest_rect.has_point(mouse_now)
 	HudLayout.draw_quest_line(self,quest_rect,tracked_quest(),quest_hovered)
+	# Aktive Verbesserungen als kleine Kacheln nebeneinander (Wunsch 10.10.2026):
+	# Symbol, Restzeit, dünner Balken; Details erst beim Darüberfahren.
 	var food_y:=HudLayout.food_top(touch_enabled)
 	var status_bottom:=food_y
+	var chips:Array=[]
 	if food_system.meal_active():
-		var food_index:int=FoodSystem.index_for(food_system.active_food_name)
-		draw_ref_panel(Rect2(10,food_y,348,58))
-		if food_index>=0: FoodSystem.icon(self,Vector2(18,food_y+6),food_index,0.95)
 		var remain:int=food_system.meal_remaining()
-		text_at(Vector2(58,food_y+20),food_system.active_food_name,12,Color("ffe5b5"))
-		text_at(Vector2(58,food_y+37),food_system.meal_effect_text(),10,Color("bde8bd"))
-		text_at(Vector2(300,food_y+20),"%02d:%02d" % [int(remain/60),remain%60],11,Color("d8e7ff"))
-		var progress:float=clampf(float(remain)/360.0,0.0,1.0)
-		draw_rect(Rect2(58,food_y+44,276,5),Color("1b2f35"))
-		draw_rect(Rect2(58,food_y+44,276*progress,5),Color("6fbf79") if food_system.meal_mana_regen<=0 else Color("4f8bd8"))
-		status_bottom=food_y+62
-	elif food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system():
-		draw_ref_panel(Rect2(10,food_y,348,30))
-		text_at(Vector2(23,food_y+20),"SNACK · +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],10,Color("aed48c"))
-		status_bottom=food_y+34
+		chips.append({"icon":FoodSystem.index_for(food_system.active_food_name),"time":remain,"progress":clampf(float(remain)/360.0,0.0,1.0),"color":Color("6fbf79") if food_system.meal_mana_regen<=0 else Color("4f8bd8"),"title":food_system.active_food_name,"detail":food_system.meal_effect_text()})
+	if food_system.regen_rate>0 and food_system.regen_until>Time.get_unix_time_from_system():
+		var left:int=ceili(food_system.regen_until-Time.get_unix_time_from_system())
+		chips.append({"icon":-1,"time":left,"progress":clampf(float(left)/30.0,0.0,1.0),"color":Color("aed48c"),"title":"Snack","detail":"+%.1f HP/s" % food_system.regen_rate})
+	if not chips.is_empty():
+		status_bottom=HudLayout.draw_effect_chips(self,Vector2(10,food_y),chips,mouse_now)
 	for enemy in enemies:
 		if int(enemy["type"]) in [12, 13, 14, 27, 28] and enemy["pos"].distance_to(player_pos) < (1100 if GolemBoss.is_golem(enemy) else 620):
 			ui_box(Rect2(430, 10, 480, 64), Color("5b4547"))
