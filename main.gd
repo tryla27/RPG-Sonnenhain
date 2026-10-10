@@ -19,6 +19,7 @@ var golem_world = GolemBoss.new()
 var golem_debris: Array = []
 var golem_world_path := ""
 var golem_save_timer := 0.0
+var golem_saved_version := -1
 var golem_summon_pending := false
 ## Borin: Spells abgeben (components/spell_return.gd).
 var spell_return_selected := -1
@@ -1034,7 +1035,7 @@ func server_action_allowed(peer_id: int, action_key: String, cooldown_ms: int) -
 	if peer_id <= 0: return false
 	var now := Time.get_ticks_msec()
 	var key := "%d:%s" % [peer_id, action_key]
-	var previous := int(server_action_times.get(key, 0))
+	var previous := int(server_action_times.get(key, now - cooldown_ms))
 	if now - previous < cooldown_ms: return false
 	server_action_times[key] = now
 	return true
@@ -2248,9 +2249,11 @@ func update_dedicated_enemies(delta:float)->void:
 		elif advance_mob(enemy,delta,true):server_moving_mobs+=1
 		if float(enemy.get("hp",0))<=0:defeat_enemy(i,int(enemy.get("last_hit_peer",0)))
 	golem_world.update_world(self,delta,true)
+	# Brocken und Bäume sichern, sobald sich etwas ändert (höchstens alle 2 s).
 	golem_save_timer+=delta
-	if golem_save_timer>=20.0:
+	if golem_save_timer>=2.0 and golem_world.version!=golem_saved_version:
 		golem_save_timer=0.0
+		golem_saved_version=golem_world.version
 		save_golem_world()
 
 
@@ -3698,7 +3701,9 @@ func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float
 		if i>=enemies.size():continue
 		var enemy: Dictionary = enemies[i]
 		var offset: Vector2 = enemy["pos"] - origin
-		if offset.length() <= reach and (offset.length() < 25 or direction.dot(offset.normalized()) > threshold):
+		# Große Golems: Nahkampf trifft schon an ihrer Außenkante.
+		var body := mob_hit_radius(enemy) - 28.0 if GolemBoss.is_golem(enemy) else 0.0
+		if offset.length() <= reach + body and (offset.length() < 25 + body or direction.dot(offset.normalized()) > threshold):
 			damage_enemy(i, damage, direction, stun, element, source_peer)
 
 func move_enemy_with_collision(enemy: Dictionary, displacement: Vector2) -> void:
@@ -3783,8 +3788,10 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	enemy["flash"] = 0.16
 	if source_peer > 0 and network_mode == "host":
 		server_broadcast_hit_confirm(source_peer,enemy,amount)
-	move_enemy_with_collision(enemy,push*18.0)
-	if stun: enemy["stun"] = 1.2
+	# Der Golem lässt sich weder wegstoßen noch betäuben.
+	if not GolemBoss.is_golem(enemy):
+		move_enemy_with_collision(enemy,push*18.0)
+		if stun: enemy["stun"] = 1.2
 	if apply_runes and rune_rank(3,4,source_peer)==4 and rune_hit_from_behind(enemy,source_peer):
 		enemy["stun"]=maxf(float(enemy.get("stun",0)),0.35)
 	effect(enemy["pos"] + Vector2(0, -25), str(amount), Color("fff1a1"), 0.75)
