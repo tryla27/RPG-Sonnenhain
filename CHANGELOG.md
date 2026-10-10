@@ -6,6 +6,12 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Spawn-Brummen aus (`SPAWN_HUM_ENABLED`). Vollbild: `DisplayMode.lock_escape`
+  (Keyboard Lock im Browser), `EscapeCounter` für den F11-Hinweis.
+  Ausrüstung: `toggle_equipment_item` tauscht neues und altes Teil im Inventar
+  (`toggle_equipment_item_core` enthält die bisherige Logik). Infos für getragene
+  Teile: `worn_item_at`, `worn_slot_rects`. Test
+  `tests/ui/check_equipment_swap.gd`, Bild `tools/capture_worn_tooltip.gd`.
 - Golem-Klänge nach Angelos Wahl (Klangprobe Runde 1): `golem_schritt_klein`
   (halbe Golems, Probe B), `brocken_landen` = Probe B, `golem_schrei` mit zwei
   Varianten (bisher + Probe C), zufällig (`"random":true` im Katalog,

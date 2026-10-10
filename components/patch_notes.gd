@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Oberfläche · Kleine Verbesserungen", "Das Brummen am Spawn-Stein ist weg. Escape beendet im Vollbild nicht mehr das Vollbild, sondern schließt wie gewohnt Spielfenster; nach zweimal Escape erscheint der Hinweis, dass F11 das Vollbild beendet (in Chrome, Edge, Brave und Opera; Escape gedrückt halten beendet es dort ebenfalls). Legst du ein Ausrüstungsteil anstelle eines getragenen an, tauschen die beiden ihre Plätze im Inventar. Im Inventar zeigen auch die getragenen Teile am Charakter ihre Infos, wenn du mit der Maus darüberfährst."],
 ["Klang · Dunkler Golem", "Neue Golem-Klänge nach Klangprobe: Die halben Golems stampfen mit eigenem, tieferem Schritt, einschlagende Brocken krachen schwerer mit Beben und Schutt, und der Schrei wechselt zufällig zwischen zwei Varianten."],
 ["Fehlerbehebung · Landschaft fehlte", "Bei manchen Browsern blieben die neuen 3D-Bäume, -Büsche und -Felsen unsichtbar, nur ihre Schatten waren zu sehen. Das Spiel prüft jetzt nach dem ersten Bild, ob die 3D-Landschaft wirklich erscheint, und zeigt sonst automatisch wieder die bisherige Landschaft."],
 ["Fehlerbehebung · Testmodus online", "Wer im Testmodus über die Karte von irgendwo zu einem Wegstein reiste, stand für den Server noch am alten Ort: Gegner erschienen dort statt beim Spieler, griffen nicht an, und der Golem-Altar meldete „zu weit weg“. Der Server übernimmt die Reise jetzt auch im Testmodus. Neu: Der Golem-Altar hat ein lila Symbol auf der Karte."],
