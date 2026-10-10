@@ -61,8 +61,9 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	var cloth: String = ["416579","544477","386454"][role]
 	var trim: String = ["d9b964","c5a7e6","c1ac76"][role]
 	if armor >= 0:
-		cloth = ["95734e","536d86","674e8c","426b55","963f40","a7aeb0"][clampi(armor,0,5)]
-		trim = ["cfb47c","d5c5a0","8fdedd","d2be79","e7c46b","86d8ed"][clampi(armor,0,5)]
+		# 0–5 Grundrüstungen, 6–12 legendäre Rüstungen (master_armor.gd).
+		cloth = ["95734e","536d86","674e8c","426b55","963f40","a7aeb0","6f8a4e","3b2a6b","2f5a3a","8c96a0","7a1f2b","6aa8d6","26232b"][clampi(armor,0,12)]
+		trim = ["cfb47c","d5c5a0","8fdedd","d2be79","e7c46b","86d8ed","ece4b4","8fe6ff","a8c36a","e0b85a","d9dde6","f3f0c8","b45cff"][clampi(armor,0,12)]
 	var hair: String = "ba7147" if female else "604737"
 	var run_stride:float=([5.5,5.0,7.0][clampi(role,0,2)]+([0.0,0.5,0.8][clampi(race,0,2)] if running else 0.0)) if running else 4.0
 	var stride := int(sin(phase)*run_stride)
@@ -155,6 +156,7 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 				r(c,28+side*17-5,30,10,3,trim)
 		if armor in [2,3]:
 			for y in [43,48,53]: r(c,19,y,3,3,trim)
+		if armor >= 6: paint_master_armor(c,armor-6,cloth,trim,back)
 	for side in [-1,1]:
 		var x: int = 28+side*(width+2)-4
 		r(c,x,37-stride*side/2,8,16,cloth)
@@ -273,3 +275,48 @@ static func paint_boss_hat(c:CanvasItem,boss:int,female:bool)->void:
 			r(c,30,6,4,2,"8fbf5a")
 			poly(c,Vector2.ZERO,[[40,6],[50,-18],[54,-24],[53,-14],[44,8]],Color("e8d39a"))
 			poly(c,Vector2.ZERO,[[45,0],[52,-18],[53,-14],[47,2]],Color("b5462e" if not female else "c76a9a"))
+
+
+## Legendäre Rüstungen: eigene Details über dem Grundkörper (Brust 16–40 x, 29–53 y).
+static func paint_master_armor(c:CanvasItem,id:int,cloth:String,trim:String,back:bool)->void:
+	match id:
+		0: # Windläufer: helles Leder, Schärpe quer, flatternde Bänder.
+			poly(c,Vector2.ZERO,[[16,36],[20,36],[40,50],[36,52]],Color("3f7a3a"))
+			poly(c,Vector2.ZERO,[[38,50],[46,56],[44,60],[36,53]],Color("5f9c4c"))
+			r(c,18,47,20,3,trim)
+		1: # Arkanweber: lange Robe bis über die Knie, leuchtende Runennähte.
+			r(c,15,50,26,14,cloth)
+			r(c,15,62,26,2,trim)
+			for y in [40,46,52,58]:r(c,27,y,2,2,trim)
+			r(c,19,38,2,22,"5b4a9b");r(c,35,38,2,22,"5b4a9b")
+		2: # Dornenpanzer: Platten mit Dornen an Schultern und Armen.
+			for side in [-1,1]:
+				var x:int=28+side*17
+				poly(c,Vector2.ZERO,[[x-4,30],[x,22],[x+4,30]],Color("d6e2a8"))
+				poly(c,Vector2.ZERO,[[x+side*6,38],[x+side*11,35],[x+side*6,42]],Color("d6e2a8"))
+			for y in [40,47]:r(c,20,y,16,2,"1d3a25")
+		3: # Bollwerk: breite Schulterplatten, Brustplatte mit Goldkante.
+			for side in [-1,1]:
+				r(c,28+side*19-8,27,16,12,cloth)
+				r(c,28+side*19-8,27,16,3,trim)
+				r(c,28+side*19-8,38,16,2,"5c646c")
+			r(c,20,38,16,12,"a9b3bc");r(c,20,38,16,2,trim)
+		4: # Blutmond: tiefroter Mantel, silberner Mond (hinten) bzw. Schließe (vorn).
+			r(c,13,33,30,4,cloth)
+			if back:
+				r(c,14,36,28,26,cloth)
+				poly(c,Vector2.ZERO,[[25,42],[31,40],[34,46],[31,52],[25,50],[29,46]],Color(trim))
+			else:
+				r(c,26,34,5,5,trim)
+		5: # Sternenquell: helles Gewand mit Sternfunken.
+			for pt in [[20,40],[34,44],[24,50],[37,37]]:
+				r(c,pt[0],pt[1],2,2,trim);r(c,pt[0]-1,pt[1]+0.5,4,1,trim)
+			r(c,16,51,24,3,"4a86b8")
+		6: # Golem-Rüstung: Basaltblöcke mit lila Elixier-Rissen.
+			for side in [-1,1]:
+				r(c,28+side*19-8,26,16,13,"3a3540")
+				r(c,28+side*19-8,26,16,3,"4c4654")
+				r(c,28+side*19-2,30,2,7,trim)
+			r(c,19,37,18,15,"332f39")
+			poly(c,Vector2.ZERO,[[24,38],[27,43],[25,47],[29,51]],Color(trim))
+			r(c,31,40,2,6,trim)

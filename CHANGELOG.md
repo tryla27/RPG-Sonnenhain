@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Legendäre Rüstungen: `components/master_armor.gd` (Daten, Wirkungen),
+  Aussehen 6–12 in `rpg_hero.gd`, Torvald ab Stufe 40, Drops (Klassenbosse 10 %,
+  Elite ab Stufe 33 2 %), Dornen/Lebensraub auf dem Server. Test
+  `tests/gameplay/check_master_armor.gd`, Bild `tools/capture_master_armor.gd`.
 - Shop: `components/shop_trade.gd` (Menge, Gesamtwerte), `buy_items`,
   `sell_items`, `shop_quick_buy` (Enter über Angebot), `sell_all_preview`.
   Test `tests/ui/check_shop_trade.gd`, Bilder `tools/capture_shop_trade.gd`.
