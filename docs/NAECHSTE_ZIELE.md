@@ -59,6 +59,29 @@ Ascheberge-Tor, E2, E1, D2; Golem nach Angelos Antworten.
   `docs/konzepte/2026-10-09-golem/KONZEPT.md`. Umsetzung erst nach Angelos
   Antworten.
 
+## 0d. Gemerkt für später (Angelo, 10.10.2026, 02:18)
+
+- **Krieger fertigstellen:** fehlende Anzeigen bei Animationen; er braucht sein
+  geplantes Update.
+- **High-Level-Mobs** an die Anfangsmobs angleichen: gleiche Sprite-Qualität,
+  8 Bewegungsrichtungen, intelligenteres Verhalten.
+- **Level-Cap 40 aufheben:** weiterleveln bis 100 im bestehenden XP-System, ab
+  Level 100 jedes Level 4× schwerer.
+- **Shop-Items** an das Level des Käufers anpassen.
+- **Almas Shop** auf eine Seite beschränken: nur „Kochen“.
+- **Pop-up beim ersten Betreten einer Map:** freigeschaltete Items mit Name und
+  Bild.
+- **Pfeiltreffer in der Umgebung:** passender Ton je nach getroffenem Objekt
+  (Holz, Stein, Busch, Wasser …).
+- **Golem-Endgegner:** Vorgaben (Bossmusik Hardtekk, Beschwörung mit 30
+  Steinbeeren + Rot-/Blaukuchen, 3D-Modell mit Ragdoll, Schild, Steinhagel-Feld,
+  Brockenwurf, Schrei) in `docs/konzepte/2026-10-09-golem/KONZEPT.md`, mit
+  Bauliste und 8 offenen Fragen.
+
+Noch offen aus der Nacht davor: Shop (Maus + Enter kaufen, Menge, Gesamtwert
+beim Verkaufen), Konzept LV-40-Rüstungen, Fusionen nach Relog (lokal nicht
+nachstellbar, braucht Details).
+
 ## 1. Startbereich abrunden
 
 Dorf → Blütenwiesen → erstes Waldstück einmal komplett durchspielen und alles
