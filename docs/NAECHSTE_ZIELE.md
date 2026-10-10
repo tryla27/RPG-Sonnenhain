@@ -79,8 +79,9 @@ Ascheberge-Tor, E2, E1, D2; Golem nach Angelos Antworten.
   Bauliste und 8 offenen Fragen.
 
 Noch offen aus der Nacht davor: Shop (Maus + Enter kaufen, Menge, Gesamtwert
-beim Verkaufen), Konzept LV-40-Rüstungen, Fusionen nach Relog (lokal nicht
-nachstellbar, braucht Details).
+beim Verkaufen) ist als PR #99 fertig. Konzept LV-40-Rüstungen:
+`docs/konzepte/2026-10-10-ruestungen/KONZEPT.md`. Fusionen nach Relog (lokal
+nicht nachstellbar, braucht Details).
 
 ## 1. Startbereich abrunden
 
