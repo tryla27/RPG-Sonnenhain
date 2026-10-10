@@ -42,36 +42,33 @@ func run()->void:
 	var confirm:Rect2=g.MenuFeedback.CONFIRM_RECT
 	var cancel:Rect2=g.MenuFeedback.CANCEL_RECT
 
-	# Einstellungen: Verlassen fragt nach, Abbrechen bleibt im Menü.
+	# Einstellungen: kein Verlassen-Knopf mehr (Angelo 10.10.2026), der alte Platz tut nichts.
 	g.panel="settings"
-	shown(g,[exit_settings])
+	shown(g,[])
 	g.handle_panel_click(exit_settings.get_center())
-	check(g.menu_feedback.asking() and g.panel=="settings" and g.left.is_empty(),"Verlassen fragt erst nach")
+	check(not g.menu_feedback.asking() and g.panel=="settings" and g.left.is_empty(),"Einstellungen haben keinen Verlassen-Knopf mehr")
+
+	# Spielmenü: Verlassen fragt nach, Abbrechen bleibt im Menü.
+	g.panel="pause"
+	shown(g,[exit_menu])
+	g.handle_panel_click(exit_menu.get_center())
+	check(g.menu_feedback.asking() and g.panel=="pause" and g.left.is_empty(),"Verlassen fragt erst nach")
 	check(clicks(g)==1,"Klick beim Verlassen-Knopf")
 	g.handle_panel_click(Vector2(200,150))
 	check(g.menu_feedback.asking(),"Klick daneben schließt die Rückfrage nicht")
 	g.handle_panel_click(cancel.get_center())
-	check(not g.menu_feedback.asking() and g.panel=="settings" and g.left.is_empty(),"Abbrechen bleibt im Spiel")
+	check(not g.menu_feedback.asking() and g.panel=="pause" and g.left.is_empty(),"Abbrechen bleibt im Spiel")
 
 	# Escape bricht ab, ohne das Menü zu schließen.
-	g.handle_panel_click(exit_settings.get_center())
+	g.handle_panel_click(exit_menu.get_center())
 	var key:=InputEventKey.new()
 	key.keycode=KEY_ESCAPE
 	key.pressed=true
 	g._unhandled_input(key)
-	check(not g.menu_feedback.asking() and g.panel=="settings","Escape bricht die Rückfrage ab")
+	check(not g.menu_feedback.asking() and g.panel=="pause","Escape bricht die Rückfrage ab")
 
 	# Bestätigen verlässt das Spiel.
-	g.handle_panel_click(exit_settings.get_center())
-	g.handle_panel_click(confirm.get_center())
-	check(g.left==["settings"],"Bestätigen verlässt aus den Einstellungen")
-
-	# Spielmenü: gleiche Rückfrage.
-	g.left.clear()
-	g.panel="pause"
-	shown(g,[exit_menu])
 	g.handle_panel_click(exit_menu.get_center())
-	check(g.menu_feedback.asking() and g.left.is_empty(),"Spielmenü fragt nach")
 	g.handle_panel_click(confirm.get_center())
 	check(g.left==["pause"],"Spielmenü verlässt nach Bestätigung")
 
