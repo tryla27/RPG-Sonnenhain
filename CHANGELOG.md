@@ -6,6 +6,16 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- App-Symbol: `tools/build_app_icon.py` erzeugt `art/app_icon/` (Hintergrund,
+  Vordergrund, 192er); Export-Preset „Android“ setzt `launcher_icons/*`. Nur die
+  App, Web und Desktop behalten ihr Symbol.
+- App-Steuerung (nur `app_mode`): `components/app_layout.gd` (Knopfmitten und
+  -maßstab, Zielwahl, `user://app_controls.cfg`), `components/app_layout_editor.gd`
+  (Fenster `app_controls`, Editor `app_layout`), `app_touch.gd` liest die
+  Anordnung. Fähigkeiten wirken beim Loslassen (Tippen = Auto-Ziel, Ziehen =
+  Richtung mit Pfeil, Abbruchkreis `CANCEL_CENTER`), `nearest_target` mit
+  Wahl nearest/lowest/strongest. Test `tests/ui/check_app_controls.gd`,
+  Vorschau `tools/capture_app_touch.gd`.
 - App: Bewegungsstick fest bei `AppTouch.MOVE_REST`, greifbar im Umkreis
   `MOVE_GRAB` (150), kein Mitwandern (`update_touch_joystick` bei `app_mode`).
 - `build_android_apk.sh`: Versionscode = Minuten seit 01.01.2026 UTC statt

@@ -151,6 +151,8 @@ const GolemDesign=preload("res://components/golem_design.gd")
 const PerfOverlay=preload("res://components/perf_overlay.gd")
 const AppKeyboard=preload("res://components/app_keyboard.gd")
 const AppTouch=preload("res://components/app_touch.gd")
+const AppLayout=preload("res://components/app_layout.gd")
+const AppEditor=preload("res://components/app_layout_editor.gd")
 const HimmelsfalterArt=preload("res://components/himmelsfalter_art.gd")
 const ShopTrade=preload("res://components/shop_trade.gd")
 var fullscreen_escape = DisplayMode.EscapeCounter.new()
@@ -457,6 +459,7 @@ var touch_aim_vector := Vector2.RIGHT
 var app_mode := false
 var app_keyboard := AppKeyboard.new()
 var app_touch := AppTouch.new()
+var app_editor := AppEditor.new()
 var touch_aim_manual := false
 var app_action_hint := false
 var sound_players: Array = []
@@ -564,6 +567,7 @@ func detect_touch_capability() -> bool:
 	return bool(bridge.touchCapability()) if bridge!=null else DisplayServer.is_touchscreen_available()
 
 func clear_touch_inputs() -> void:
+	app_touch.cancel_skill()
 	touch_attack_ids.clear()
 	reset_touch_joystick()
 	reset_touch_aim()
@@ -740,6 +744,7 @@ func _ready() -> void:
 	app_mode = OS.has_feature("android")
 	if app_mode:
 		touch_enabled = true
+		AppLayout.load_settings()
 		reset_touch_joystick()
 		reset_touch_aim()
 		# Zurück-Taste schließt Fenster statt die App zu beenden.
@@ -2928,28 +2933,29 @@ func touch_button_at(pos: Vector2) -> String:
 	return ""
 
 func update_touch_joystick(pos: Vector2) -> void:
-	const MAX_RADIUS := 82.0
-	const DEADZONE := 14.0
+	var move_scale := AppLayout.scale("move") if app_mode else 1.0
+	var max_radius := 82.0 * move_scale
+	var deadzone := 14.0 * move_scale
 	var delta := pos - touch_move_base
 	var distance := delta.length()
-	if distance > MAX_RADIUS and not app_mode:
+	if distance > max_radius and not app_mode:
 		# Follow-Joystick: die Basis wandert mit, damit der Daumen nicht an einer
 		# festen Bildschirmposition "hängen bleibt". In der App bleibt er fest.
-		touch_move_base += delta.normalized() * (distance - MAX_RADIUS)
+		touch_move_base += delta.normalized() * (distance - max_radius)
 		delta = pos - touch_move_base
 		distance = delta.length()
-	if distance <= DEADZONE:
+	if distance <= deadzone:
 		touch_move_vector = Vector2.ZERO
 		touch_move_knob = touch_move_base
 		return
-	var strength := clampf((distance - DEADZONE) / (MAX_RADIUS - DEADZONE), 0.0, 1.0)
+	var strength := clampf((distance - deadzone) / (max_radius - deadzone), 0.0, 1.0)
 	touch_move_vector = delta.normalized() * strength
-	touch_move_knob = touch_move_base + delta.normalized() * minf(distance, 52.0)
+	touch_move_knob = touch_move_base + delta.normalized() * minf(distance, 52.0 * move_scale)
 
 func reset_touch_joystick() -> void:
 	touch_move_id = -1
 	touch_move_vector = Vector2.ZERO
-	touch_move_base = AppTouch.MOVE_REST if app_mode else Vector2(118, 526)
+	touch_move_base = AppLayout.center("move") if app_mode else Vector2(118, 526)
 	touch_move_knob = touch_move_base
 
 func update_touch_aim(pos: Vector2) -> void:
@@ -2971,7 +2977,7 @@ func update_touch_aim(pos: Vector2) -> void:
 func begin_touch_aim(index: int, pos: Vector2) -> void:
 	touch_aim_id = index
 	touch_aim_base = Vector2(clampf(pos.x, 850.0, 1080.0), clampf(pos.y, 390.0, 555.0))
-	if app_mode: touch_aim_base = AppTouch.ATTACK + (pos - AppTouch.ATTACK).limit_length(18.0)
+	if app_mode: touch_aim_base = AppLayout.center("attack") + (pos - AppLayout.center("attack")).limit_length(18.0)
 	touch_aim_knob = touch_aim_base
 	touch_aim_vector = facing.normalized() if facing.length_squared() > 0.01 else Vector2.RIGHT
 	touch_aim_manual = false
@@ -2987,7 +2993,7 @@ func reset_touch_aim(index: int = -1) -> void:
 				touch_attack_ids.erase(key)
 	touch_aim_id = -1
 	touch_aim_manual = false
-	touch_aim_base = AppTouch.ATTACK if app_mode else Vector2(1032, 526)
+	touch_aim_base = AppLayout.center("attack") if app_mode else Vector2(1032, 526)
 	touch_aim_knob = touch_aim_base
 
 func handle_touch_event(event: InputEvent) -> bool:
@@ -3180,7 +3186,7 @@ func app_go_back() -> void:
 
 ## Angriff und Fähigkeiten ohne Ziehen: auf den nächsten Gegner zielen.
 func app_auto_aim(snap: bool = false) -> void:
-	var target := AppTouch.nearest_target(player_pos, enemies)
+	var target := AppTouch.nearest_target(player_pos, enemies, AppTouch.AIM_RANGE, AppLayout.priority)
 	if target == Vector2.INF: return
 	var dir := target - player_pos
 	if dir.length_squared() < 1.0: return
@@ -3191,6 +3197,11 @@ func app_auto_aim(snap: bool = false) -> void:
 func app_interact() -> void:
 	if interaction_prompt(food_system.nearest(self)).begins_with("F"): use_waystone()
 	else: interact()
+
+## Neue Knopfanordnung übernehmen (Editor, Zurücksetzen).
+func app_apply_layout() -> void:
+	if touch_move_id < 0: reset_touch_joystick()
+	if touch_aim_id < 0: reset_touch_aim()
 
 func app_menu_click(mouse: Vector2) -> void:
 	var action := AppTouch.menu_action_at(mouse)
@@ -3223,7 +3234,9 @@ func app_draw_touch_controls() -> void:
 		"dodge_label": "SCHRITT" if class_id == 1 else "ROLLE",
 		"action_hint": app_action_hint, "clock": world_time,
 		"resource_label": "MANA" if class_id == 1 else "ENERGIE",
-		"chat_unread": chat_fade > 0.0 and not chat_open})
+		"chat_unread": chat_fade > 0.0 and not chat_open,
+		"player_ui": (player_pos - camera_pos) * effective_camera_zoom() + Vector2(0, -16),
+		"zoom": effective_camera_zoom()})
 
 func _input(event:InputEvent)->void:
 	if PerfOverlay.is_toggle_key(event):
@@ -3319,6 +3332,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		online_list_open = event.pressed
 		queue_redraw()
 		return
+	if app_mode and panel == "app_layout" and AppEditor.input(self, event): return
 	if app_mode and AppTouch.skip_mouse(self, event): return
 	if handle_touch_event(event): return
 	# Mobile Browser senden nach einem Touch oft noch einen künstlichen
@@ -6486,6 +6500,7 @@ func panel_click(mouse: Vector2) -> void:
 		return
 	match panel:
 		"app_menu": app_menu_click(mouse)
+		"app_controls": AppEditor.click_settings(self, mouse)
 		"essence": click_essence(mouse)
 		"spell_return": SpellReturn.click(self,mouse)
 		"skills": click_skills(mouse)
@@ -10683,6 +10698,9 @@ func npc_position(name: String) -> Vector2:
 	return Vector2(900, 1050)
 
 func draw_panel() -> void:
+	if panel == "app_layout":
+		AppEditor.draw_editor(self)
+		return
 	draw_rect(Rect2(Vector2.ZERO, VIEW), Color(0.06, 0.11, 0.15, 0.76))
 	draw_rect(Rect2(128, 72, 896, 544), Color("061525"))
 	ui_box(Rect2(135, 79, 882, 530), Color("40514d"))
@@ -10705,6 +10723,7 @@ func draw_panel() -> void:
 		"patches": PatchNotes.draw(self)
 		"pause": draw_game_menu()
 		"app_menu": AppTouch.draw_menu(self)
+		"app_controls": AppEditor.draw_settings(self)
 		"settings": draw_pause_panel()
 		"repair": draw_repair_panel()
 		"world_builder": world_builder.draw(self)
