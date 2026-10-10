@@ -8,6 +8,19 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 - Bestätigten Golem-Hardtekk-Loop (120 s, erste 24 s fünfmal) unter `music/boss_golem.wav` eingebunden; Spawn und Hälften nutzen die bestehende Boss-Erkennung. Musikübergänge in `MusicPlayback` ausgelagert, Golem blendet über 6 s ein, andere Themen weiterhin über 1,35 s. Bearbeitbare Quelle und Loop-Prüfung unter `music/source/golem/`.
 
+- Goldener Ritter: `tools/build_golden_warrior.py` erzeugt aus dem ersten
+  Sprungbild jeder Richtung `knight_8dir.png` (64×80, 8 Richtungen × Stehen 4,
+  Gehen 6, Laufen 6, Angriff 4, Treffer 2). `rpg_hero.gd`: `uses_knight`,
+  `knight_row` (Richtungen nach Bildschirm wie die Dateinamen; `direction_index`
+  zählt andersherum, die Sprungbilder liefen dadurch spiegelverkehrt bei
+  Diagonalen/Seiten), `knight_frame`, `paint_knight` (Rolle/Sturz per Drehung),
+  `knight_attack` aus main.gd. Sprung im richtigen Seitenverhältnis.
+  Vorschau `tools/capture_golden_knight.gd`, Test `check_golden_knight.gd`.
+- Krieger: `rpg_hero.gd` zeichnete die goldenen Sprites (Stehen, Sprung) an
+  `p+offset` unter der bereits gesetzten Welt-Verschiebung → doppelt verschoben,
+  unsichtbar. Jetzt `draw_set_transform(Vector2.ZERO)` davor. Standbild
+  (`GOLDEN_IDLE_ENABLED=false`) abgeschaltet. Vorschau
+  `tools/capture_warrior_ingame.gd`. Typ 28 heißt „Dunkler kleiner Golem“.
 - Golem-Sprite: Zeile 3 im Blatt = Seite nach links (gespiegelt erzeugt);
   `draw_texture_rect_region` mit negativer Breite zeichnete nichts.
   Vorschau im echten Spielbild `tools/capture_golem_ingame.gd`.

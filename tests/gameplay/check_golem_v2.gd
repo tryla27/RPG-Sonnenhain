@@ -29,6 +29,8 @@ func the_golem(g)->Dictionary:
 
 func run()->void:
 	var g:=Game.new()
+	# Magier: keine zufälligen Krieger-Krits, damit die Zonen-Schäden fest sind.
+	g.class_id=1
 	g.reset_class_skills();g.character_created=true;g.level=40
 	g.hp=g.max_hp()
 	for i in g.QUESTS.size():g.quests.append({"state":0,"progress":0})

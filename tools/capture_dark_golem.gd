@@ -35,7 +35,7 @@ class Sheet extends Node2D:
 		label(Vector2(850,960),"Altar: E drücken (Opfergaben später)")
 		for side in [-1,1]:
 			GolemDesign.draw_golem(self,Vector2(1380+side*100,930),GolemBoss.TYPE_HALF,{"state":"walk"},Vector2.DOWN,side*0.7,0.0)
-		label(Vector2(1250,1030),"Zerfall: zwei halbe Golems")
+		label(Vector2(1250,1030),"Zerfall: zwei Dunkle kleine Golems")
 		GolemDesign.draw_debris(self,debris)
 		label(Vector2(1660,620),"Zerfall in Einzelteile")
 

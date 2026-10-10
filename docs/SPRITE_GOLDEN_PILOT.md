@@ -158,3 +158,20 @@ Noch offen aus dem ursprünglichen Pixelart-Plan:
 - anschließend Ausrüstung in getrennte Sprite-Layer überführen, sobald die Basisanimationen vollständig abgenommen sind
 
 Wichtig: Diese offenen Reihen werden nicht durch alte Branches blind zurückgemerged. Neue Sprite-Arbeit muss auf dem aktuellen `main` aufsetzen, damit Atelier-, Umhang-, Skill-, Save- und Multiplayer-Fixes erhalten bleiben.
+
+## Stand 2026-10-10: goldener Ritter vollständig
+
+Angelo: Der Krieger soll vollständig der neue Ritter sein, die Vorlagen liegen
+im Repo. Vorlage sind die Sprungbilder (`jump/jump-<richtung>-8f-v1.png`);
+deren erstes Bild zeigt den Ritter stehend in allen 8 Richtungen.
+
+- `tools/build_golden_warrior.py` erzeugt daraus `knight_8dir.png`:
+  Stehen (Atmen), Gehen, Laufen, Angriff, Treffer; Beine werden an der Hüfte
+  getrennt und abwechselnd gehoben bzw. geschwungen.
+- Rolle und Sturz entstehen im Spiel durch Drehen des Standbilds.
+- Gilt für alle menschlichen Krieger (beide Geschlechter); Orks und Roboter
+  behalten den gezeichneten Körper. Rüstungen ändern das Aussehen des Ritters
+  noch nicht (eigene Ebenen folgen).
+- Das alte 24-px-Standbild (`idle_8dir.png`) wird nicht mehr benutzt.
+- Vorschau: `docs/konzepte/2026-10-10-bugliste/ritter.png`,
+  `ritter_blatt.png`, `krieger.png`.

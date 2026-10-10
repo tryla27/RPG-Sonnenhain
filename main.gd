@@ -8246,6 +8246,8 @@ func draw_character_sprite(p: Vector2, visual_class: int, walking: bool, look: V
 	if panel in ["creation","creation_review"]:neck=-1
 	var canvas_zoom:=effective_camera_zoom() if drawing_ui else 1.0
 	if drawing_ui:draw_set_transform(Vector2.ZERO)
+	# Goldener Ritter: Angriffsbild nur für den eigenen Krieger während des Schwungs.
+	ReferenceScenery.Hero.knight_attack=clampf(1.0-swing_timer/maxf(0.01,swing_duration),0.0,1.0) if local and _attack and swing_timer>0.0 else -1.0
 	ReferenceScenery.Hero.paint(self,p/canvas_zoom,visual_class,hero_race if race_override < 0 else race_override,hero_gender if gender_override < 0 else gender_override,look,(walk_phase if local else world_time*10.0) if walking else 0.0,scale_factor/canvas_zoom,character_canvas_offset/canvas_zoom,roll,dash_dir,outfit,death,maxf(hurt,clampf((hurt_until-combat_feedback.clock)/.18,0,1) if local else 0),head,rings,(is_sprinting if local else running_override),jump_progress,neck)
 	restore_canvas_transform()
 
@@ -9785,7 +9787,7 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	draw_character_sprite(p, visual_class, walking, look, scale_factor, attack_now, use_race, use_gender,-2,-1.0,0.0,-2,-2,is_sprinting if preview_class<0 else false)
 
 	# Authored Sprung-/Dash-Sprites dürfen die Kosmetik nicht mehr verschlucken.
-	var golden_jump:=in_world and preview_class<0 and class_id==0 and hero_race==0 and hero_gender==0 and warrior_jump_timer>0.0
+	var golden_jump:=in_world and preview_class<0 and class_id==0 and hero_race==0 and warrior_jump_timer>0.0
 	var early_visual_return:=in_world and (death_timer>0.0 or (dash_timer>0.0 and class_id!=1))
 	if golden_jump or early_visual_return:
 		if preview_class<0:
@@ -9813,6 +9815,9 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 	var side := weapon_look.rotated(PI * 0.5)
 	var arm_color: Color = [Color('6d8292'), Color('695b91'), Color('65775b')][clampi(visual_class, 0, 2)]
 	var cuff_color: Color = [Color('c0c8c4'), Color('d4c1e8'), Color('ae9b70')][clampi(visual_class, 0, 2)]
+	if ReferenceScenery.Hero.uses_knight(visual_class, use_race):
+		# Goldener Ritter: Silberarm mit Goldmanschette passend zur Rüstung.
+		arm_color = Color('b9b3a6');cuff_color = Color('d9a640')
 	draw_line(arm_start, grip, Color('493d45'), 10.0 * scale_factor)
 	draw_line(arm_start, grip, arm_color, 7.0 * scale_factor)
 	draw_circle(arm_start, 5.5 * scale_factor, Color('493d45'))
@@ -14756,7 +14761,7 @@ func on_golem_defeated(enemy: Dictionary) -> void:
 	var result: String = golem_world.on_defeated(self, enemy)
 	for i in range(before, enemies.size()): golem_register_enemy(enemies[i])
 	if result == "split":
-		if not dedicated_server_mode: message("Der Dunkle Golem zerbricht – zwei halbe Golems kämpfen weiter!")
+		if not dedicated_server_mode: message("Der Dunkle Golem zerbricht – zwei Dunkle kleine Golems kämpfen weiter!")
 	elif result == "victory":
 		golem_victory(Vector2(enemy["pos"]))
 
