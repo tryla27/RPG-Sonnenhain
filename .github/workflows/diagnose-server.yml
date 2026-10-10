@@ -51,6 +51,7 @@ jobs:
           echo "heartbeats=$(printf '%s\n' "$all" | grep -c 'SERVER_HEARTBEAT')"
           printf '%s\n' "$all" | grep 'SERVER_HEARTBEAT' | tail -4 | cut -c1-230 | sed 's/^/HB /'
           printf '%s\n' "$all" | grep 'BOSS_' | tail -5 | cut -c1-160 | sed 's/^/BOSS /'
+          printf '%s\n' "$all" | grep 'CLIENT_3D' | tail -4 | cut -c1-400 | sed 's/^/HB /'
           uptime -p 2>/dev/null | sed 's/^/UPTIME /'
           pgrep -af "[s]onnenhain-server.x86_64" | sed 's/^/PROC /' | cut -c1-120
           ps -o etime= -p "$(pgrep -f '[s]onnenhain-server.x86_64 --headless' | head -1)" 2>/dev/null | sed 's/^/PROC_AGE /'

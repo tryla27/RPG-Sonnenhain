@@ -23,6 +23,11 @@ func run()->void:
 	check(not World.replaces_static(3) and not World.replaces_static(12),"Rückfall: 2D-Landschaft")
 	check(not World.replaces_wall(Vector2(11000,0),Vector2(11000,1920)),"Rückfall: 2D-Mauern")
 	World.active=true
+	var report:Dictionary=World.new().probe_report(0)
+	for key in ["pixels","rows","size","adapter","vendor","api","agent","brave","os"]:
+		check(report.has(key),"Bericht enthält %s" % key)
+	check(not report.has("name") and not report.has("player"),"Bericht ohne Spielernamen")
+	World.active=true
 	if failures>0:
 		push_error("OBSTACLES_FALLBACK_FAILED %d" % failures);quit(1);return
 	print("OBSTACLES_FALLBACK_OK")

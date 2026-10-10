@@ -6,6 +6,8 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- 3D-Landschaft: `WorldObstacles3D.probe_report` → `report_3d_probe` →
+  `rpc_client_3d_report` (Server-Log `CLIENT_3D`, in der Server-Diagnose sichtbar).
 - Essensanzeige: `HudLayout.draw_effect_chips` (92×28-Kacheln, 4 pro Reihe,
   Details beim Darüberfahren) statt 348×58-Leiste. Test
   `tests/ui/check_effect_chips.gd`, Bild `tools/capture_food_chips.gd`.
