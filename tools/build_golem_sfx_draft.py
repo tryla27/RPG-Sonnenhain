@@ -279,6 +279,205 @@ def zerfall_c(rng):
     return fin(b.mix((breaks, 1.0), (crush, 0.7), (rubble(rng, d, 20, 0.3, 1.1), 0.35)))
 
 
+
+# ================================================================== Runde 2
+# Angelos Rückmeldung (10.10.2026, Klangprobe Runde 1):
+#  Wurf: „viel krasser, als würde ein Meteorit geworfen und dann einschlagen“
+#  Steinhagel: „so lang wie der Hagel (~8 s), Regen aus großen Felsbrocken,
+#    die sehr oft einschlagen“
+#  Zerfall: „wie jetzt, aber weniger synthetisch, brechender, verzerrter“
+#  Schild: „wie B, aber so lang wie der Schild (8 s)“
+
+def fracture(rng, d, low=300, high=6000, drive=2.0):
+    """Echter wirkender Bruch: mehrere gestapelte Rauschrisse statt reiner
+    Sinus-Schläge, leicht verzerrt."""
+    out = np.zeros(int(SR * d))
+    t0 = 0.0
+    for k in range(int(rng.integers(3, 6))):
+        length = rng.uniform(0.02, 0.07)
+        band = b.bp(b.noise(length, rng), rng.uniform(low, low * 2), rng.uniform(high * 0.6, high))
+        piece = band * b.env(length, 0.0003, length * 0.35, 4)
+        i0 = int(t0 * SR)
+        seg = piece[: max(0, len(out) - i0)]
+        out[i0:i0 + len(seg)] += seg * rng.uniform(0.6, 1.0)
+        t0 += rng.uniform(0.006, 0.03)
+    return sat(out * 1.5, drive)
+
+
+def boulder_hit(rng, size=1.0, bright=1.0):
+    """Ein großer Felsbrocken schlägt ein (für den Hagel-Regen)."""
+    d = 0.5 + 0.3 * size
+    body = sub(rng.uniform(55, 90) / (0.7 + 0.3 * size), 26, d, 0.15 + 0.15 * size)
+    br = fracture(rng, 0.25, 600 * bright, 6500 * bright, 1.8)
+    return b.mix((body, 1.0), (b.at(br, 0, d), 0.7 * bright), (rubble(rng, d, 5, 0.05, 0.3), 0.25))
+
+
+def scatter(rng, total, rate, maker, start=0.0, fade_in=0.4, fade_out=0.8):
+    """Viele Einschläge über `total` Sekunden verteilt (Poisson)."""
+    out = np.zeros(int(SR * total))
+    t = start
+    while t < total - 0.3:
+        x = maker(rng)
+        i0 = int(t * SR)
+        seg = x[: max(0, len(out) - i0)]
+        g = min(1.0, (t + 0.05) / fade_in) * min(1.0, (total - t) / fade_out)
+        pan_gain = rng.uniform(0.45, 1.0)
+        out[i0:i0 + len(seg)] += seg * g * pan_gain
+        t += rng.exponential(1.0 / rate)
+    return out
+
+
+# ------------------------------------------------------------ Wurf (Meteor)
+
+def wurf2_a(rng):
+    """Meteor A: Felsen reißt heraus, dann heulender, steigender Flug."""
+    d = 1.4
+    t = b.t_axis(d)
+    rip = b.at(fracture(rng, 0.2, 400, 6000, 2.2), 0, d)
+    heave = sub(95, 38, 0.6, 0.25)
+    roar = b.sweep_bp(b.noise(d, rng), b.glide(180, 1400, d, 0.7), q=1.1) * np.minimum(t / 0.15, 1) * b.env(d, 0.15, 1.1, 1.4)
+    rumble = b.lp(b.noise(d, rng, "brown"), 120) * np.minimum(t / 0.1, 1) * b.env(d, 0.1, 1.2, 1.4)
+    return fin(b.mix((rip, 0.8), (heave, 1.0), (roar, 0.9), (rumble, 0.9)))
+
+
+def wurf2_b(rng):
+    """Meteor B: tiefer Ruck, dann brennender Felsbrocken mit Knistern und Dröhnen."""
+    d = 1.5
+    t = b.t_axis(d)
+    heave = sat(sub(80, 30, 0.7, 0.3) * 1.5, 2.5)
+    roar = b.lp(b.sweep_bp(b.noise(d, rng), b.glide(120, 900, d, 0.8), q=0.9), 2500) * np.minimum(t / 0.1, 1) * b.env(d, 0.1, 1.3, 1.3)
+    crackle = splinters(rng, d, 60, 0.1, 1.2, 1500, 7000) * np.minimum(t / 0.3, 1)
+    drone = b.lp(b.osc(b.glide(55, 40, d), d, "saw"), 300) * b.env(d, 0.1, 1.3, 1.3)
+    return fin(b.mix((heave, 1.0), (roar, 1.0), (crackle, 0.45), (drone, 0.5)))
+
+
+def wurf2_c(rng):
+    """Meteor C: maximal verzerrt, Doppelschlag beim Abwurf, gepresstes Heulen."""
+    d = 1.4
+    t = b.t_axis(d)
+    slams = sat((b.at(sub(110, 40, 0.4, 0.15), 0, d) + b.at(sub(90, 35, 0.5, 0.2), 0.09, d)) * 2.0, 3.5)
+    howl = sat(b.sweep_bp(b.noise(d, rng), b.glide(250, 1800, d, 0.6), q=1.4) * np.minimum(t / 0.1, 1) * b.env(d, 0.1, 1.1, 1.3) * 2.0, 3.0)
+    return fin(b.mix((slams, 1.0), (howl, 0.8), (b.at(fracture(rng, 0.2, 500, 6000, 3.0), 0, d), 0.6)))
+
+
+# ------------------------------------------------------------ Steinhagel (lang)
+HAIL_SECONDS = 12.0  # so lange dauert das Steinhagel-Feld im Spiel
+
+def hagel2_a(rng):
+    """Felsregen A: dichte, harte Einschläge, klar voneinander zu hören."""
+    d = HAIL_SECONDS
+    hits = scatter(rng, d, 6.0, lambda r: boulder_hit(r, r.uniform(0.6, 1.2), 1.0))
+    bed = b.lp(b.noise(d, rng, "brown"), 100) * 0.25
+    return fin(b.mix((hits, 1.0), (bed, 0.5)))
+
+
+def hagel2_b(rng):
+    """Felsregen B: schwere, tiefe Brocken, Boden bebt durchgehend."""
+    d = HAIL_SECONDS
+    hits = scatter(rng, d, 4.5, lambda r: boulder_hit(r, r.uniform(1.0, 1.6), 0.7))
+    t = b.t_axis(d)
+    quake = b.lp(b.noise(d, rng, "brown"), 70) * (0.6 + 0.4 * np.sin(2 * np.pi * 0.7 * t) ** 2) * np.minimum(t / 0.6, 1) * np.minimum((d - t) / 1.0, 1)
+    return fin(b.mix((hits, 1.0), (quake, 0.7), (rubble(rng, d, 120, 0.3, d - 1.0), 0.2)), echo_wet=0.12, echo_delay=0.13)
+
+
+def hagel2_c(rng):
+    """Felsregen C: sehr dicht und verzerrt, wie ein Bombardement."""
+    d = HAIL_SECONDS
+    hits = scatter(rng, d, 8.0, lambda r: sat(boulder_hit(r, r.uniform(0.7, 1.3), 1.0) * 1.8, 2.8))
+    bed = sat(b.lp(b.noise(d, rng, "brown"), 120) * 0.6, 2.0)
+    return fin(b.mix((hits, 1.0), (bed, 0.4)))
+
+
+# ------------------------------------------------------------ Zerfall (brechender)
+
+def _zerfall_base(rng, d, offs, drive, layers):
+    parts = np.zeros(int(SR * d))
+    for off in offs:
+        size = rng.uniform(0.8, 1.4)
+        hit = b.mix((sub(rng.uniform(50, 85), 25, 0.6, 0.22 * size), 0.8), (fracture(rng, 0.3, 300, 6500, drive), 1.0))
+        parts += b.at(hit, off, d)[: len(parts)]
+    return parts
+
+
+def zerfall2_a(rng):
+    """Zerfall A: wie jetzt, aber jeder Schlag ist ein echter Bruch."""
+    d = 1.7
+    breaks = _zerfall_base(rng, d, (0.0, 0.18, 0.4, 0.68, 0.95), 2.0, 1)
+    grind_ = grind(rng, d, 200, 2800, 0.84) * b.env(d, 0.01, 1.3, 1.6)
+    return fin(b.mix((breaks, 1.0), (grind_, 0.6), (rubble(rng, d, 30, 0.3, 1.3), 0.4)), echo_wet=0.18, echo_delay=0.14)
+
+
+def zerfall2_b(rng):
+    """Zerfall B: lauter, verzerrter, mehr Splitter dazwischen."""
+    d = 1.7
+    breaks = _zerfall_base(rng, d, (0.0, 0.15, 0.33, 0.55, 0.8, 1.05), 3.0, 1)
+    shards = splinters(rng, d, 60, 0.0, 1.4, 1500, 8000)
+    return fin(sat(b.mix((breaks, 1.0), (shards, 0.5), (rubble(rng, d, 40, 0.3, 1.3), 0.4)) * 1.6, 2.2))
+
+
+def zerfall2_c(rng):
+    """Zerfall C: tiefer Kern bricht zuerst, dann reißt alles nacheinander."""
+    d = 1.8
+    core = sat(sub(48, 22, 1.0, 0.45) * 1.8, 2.5)
+    breaks = _zerfall_base(rng, d, (0.12, 0.3, 0.52, 0.78, 1.05), 2.6, 1)
+    quake = b.lp(b.noise(d, rng, "brown"), 80) * b.env(d, 0.01, 1.5, 1.5)
+    return fin(b.mix((core, 1.0), (breaks, 0.9), (quake, 0.6), (rubble(rng, d, 40, 0.4, 1.3), 0.4)), echo_wet=0.15)
+
+
+# ------------------------------------------------------------ Schild (8 s)
+SHIELD_SECONDS = 8.0
+
+def schild2(rng, variant):
+    d = SHIELD_SECONDS
+    t = b.t_axis(d)
+    close = b.at(sub(70, 30, 1.0, 0.45), 0.05, d)
+    hold = np.minimum(t / 0.5, 1) * np.minimum((d - t) / 0.6, 1)
+    grindin = grind(rng, d, 150, 900, 0.9) * hold
+    drone = b.lp(b.osc(41, d, "saw") + b.osc(61.5, d), 220) * hold
+    open_ = b.at(sub(85, 35, 0.6, 0.25), d - 0.55, d)
+    if variant == "a":   # gleichmäßig: Mahlen und Dröhnen tragen durch
+        mix = b.mix((close, 1.0), (grindin, 0.5), (drone, 0.5), (open_, 0.7))
+    elif variant == "b":  # pulsierend: der Stein arbeitet in Wellen
+        pulse = 0.55 + 0.45 * np.sin(2 * np.pi * 0.9 * t) ** 2
+        mix = b.mix((close, 1.0), (grindin * pulse, 0.65), (drone * (0.7 + 0.3 * pulse), 0.5), (open_, 0.7))
+    else:                 # knackend: unter Druck reißen immer wieder Risse
+        cracks = scatter(rng, d, 1.6, lambda r: fracture(r, 0.25, 500, 6000, 2.0), start=0.5, fade_in=0.2, fade_out=0.8)
+        mix = b.mix((close, 1.0), (grindin, 0.5), (drone, 0.45), (cracks, 0.5), (open_, 0.7))
+    return fin(mix, echo_wet=0.12, echo_delay=0.15)
+
+
+ROUND2 = {
+    "golem_wurf": (wurf2_a, wurf2_b, wurf2_c),
+    "steinhagel": (hagel2_a, hagel2_b, hagel2_c),
+    "golem_zerfall": (zerfall2_a, zerfall2_b, zerfall2_c),
+    "golem_schild": (lambda r: schild2(r, "a"), lambda r: schild2(r, "b"), lambda r: schild2(r, "c")),
+}
+
+
+def build_round2(target: Path) -> list:
+    files = []
+    for name, recipes in ROUND2.items():
+        for tag, recipe in zip("abc", recipes):
+            rng = np.random.default_rng(zlib.crc32(f"{name}:r2:{tag}".encode()))
+            x = recipe(rng)
+            assert np.all(np.isfinite(x)), (name, tag)
+            path = target / f"r2_{name}_{tag}.wav"
+            b.write_wav(path, x)
+            files.append(path)
+    # Wurf zusammen mit dem gewählten Einschlag (Brocken landet B) als Ablauf.
+    land = landen_b(np.random.default_rng(zlib.crc32(b"brocken_landen:draft:b")))
+    for tag, recipe in zip("abc", ROUND2["golem_wurf"]):
+        throw = recipe(np.random.default_rng(zlib.crc32(f"golem_wurf:r2:{tag}".encode())))
+        gap = int(0.8 * SR)
+        seq = np.zeros(max(len(throw), gap + len(land)))
+        seq[: len(throw)] += throw
+        seq[gap:gap + len(land)] += land
+        seq = seq / (np.max(np.abs(seq)) + 1e-9) * 10 ** (-3 / 20)
+        path = target / f"r2_golem_wurf_{tag}_mit_einschlag.wav"
+        b.write_wav(path, seq)
+        files.append(path)
+    return files
+
 ACTIONS = {
     "golem_schritt": (schritt_a, schritt_b, schritt_c),
     "golem_schild": (schild_a, schild_b, schild_c),
@@ -313,5 +512,5 @@ def build(target: Path) -> list:
 
 if __name__ == "__main__":
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "build/golem_sfx_draft")
-    written = build(out)
+    written = build_round2(out) if "--runde2" in sys.argv else build(out)
     print(f"{len(written)} Dateien in {out}")
