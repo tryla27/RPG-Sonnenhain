@@ -51,6 +51,8 @@ jobs:
           echo "heartbeats=$(printf '%s\n' "$all" | grep -c 'SERVER_HEARTBEAT')"
           printf '%s\n' "$all" | grep 'SERVER_HEARTBEAT' | tail -4 | cut -c1-230 | sed 's/^/HB /'
           printf '%s\n' "$all" | grep 'BOSS_' | tail -5 | cut -c1-160 | sed 's/^/BOSS /'
+          printf '%s\n' "$all" | grep -E 'GOLEM_' | tail -5 | cut -c1-160 | sed 's/^/GOLEM /'
+          tail -n 400 "$HOME/sonnenhain-server/server.log" 2>/dev/null | grep -B2 -A3 'SCRIPT ERROR' | tail -40 | cut -c1-200 | sed 's/^/ERRCTX /'
           uptime -p 2>/dev/null | sed 's/^/UPTIME /'
           pgrep -af "[s]onnenhain-server.x86_64" | sed 's/^/PROC /' | cut -c1-120
           ps -o etime= -p "$(pgrep -f '[s]onnenhain-server.x86_64 --headless' | head -1)" 2>/dev/null | sed 's/^/PROC_AGE /'
@@ -59,4 +61,4 @@ jobs:
           while IFS= read -r line; do
             safe=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
             echo "::notice title=Server-Diagnose::$safe"
-          done < <(grep -E "^(HB|BOSS) " diag.txt | tail -6; grep -vE "^(HB|BOSS|ERR|PROC|UPTIME) " diag.txt | head -6)
+          done < <(grep -E "^(HB|BOSS) " diag.txt | tail -6; grep -vE "^(HB|BOSS|ERR|PROC|UPTIME|ERRCTX|GOLEM) " diag.txt | head -6; grep -E "^(ERR|GOLEM) " diag.txt | head -16; grep -E "^ERRCTX " diag.txt | tail -20)
