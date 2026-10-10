@@ -143,6 +143,10 @@ static func paint(c:CanvasItem,p:Vector2,t:int,level:int,look:Vector2,base:Color
 	if t==0:
 		paint_waldschleim(c,p,look,base,phase,attack,scale_factor,stretch)
 		return
+	if t==25:
+		# Himmelsfalter: eigener Schwebeflug mit Flügelschlag (himmelsfalter_art.gd).
+		preload("res://components/himmelsfalter_art.gd").paint(c,p,look,phase,attack,scale_factor*stretch.x,Color.WHITE,visual)
+		return
 	var canvas_origin:=p
 	var canvas_scale:=stretch*scale_factor
 	c.draw_set_transform(canvas_origin,0,canvas_scale)
