@@ -61,4 +61,7 @@ jobs:
           while IFS= read -r line; do
             safe=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
             echo "::notice title=Server-Diagnose::$safe"
-          done < <(grep -E "^(HB|BOSS) " diag.txt | tail -6; grep -vE "^(HB|BOSS|ERR|PROC|UPTIME|ERRCTX|GOLEM) " diag.txt | head -6; grep -E "^(ERR|GOLEM) " diag.txt | head -16; grep -E "^ERRCTX " diag.txt | tail -20)
+          done < <(grep -E "^(ERR|GOLEM) " diag.txt | head -4; grep -E "^HB " diag.txt | tail -2)
+          # Fehlerumfeld als ein einziger Hinweis (GitHub zeigt nur 10 Hinweise je Schritt).
+          ctx=$(grep -E "^ERRCTX " diag.txt | tail -24 | cut -c8- | tr -d '\r' | sed 's/%/%25/g' | paste -sd '|' -)
+          [ -n "$ctx" ] && echo "::notice title=Fehlerumfeld::$ctx"
