@@ -5318,6 +5318,10 @@ func interact() -> void:
 				var needed_boss:=region_required_boss(int(portal[2]))
 				message("Weg versiegelt! Besiege zuerst %s." % boss_gate_name(needed_boss))
 				return
+			# Rückweg ebenso: aus der Nebelheide nicht in versiegelte Ascheberge.
+			if near_new and not region_available(region_at(portal[0])):
+				message("Weg versiegelt! Besiege zuerst %s." % boss_gate_name(region_required_boss(region_at(portal[0]))))
+				return
 			var desired: Vector2 = portal[1]+Vector2(0,110) if near_old else portal[0]+Vector2(0,110)
 			var expected_region := int(portal[2]) if near_old else region_at(portal[0])
 			player_pos = safe_world_teleport_destination(desired,expected_region)
@@ -7746,7 +7750,8 @@ func _draw() -> void:
 			if visible_world(chest_position(i), 80): draw_chest(chest_position(i), not chest_ready(i))
 		for portal in PORTALS:
 			if visible_world(portal[0], 100): draw_portal(portal[0], int(portal[2]))
-			if visible_world(portal[1], 100): draw_portal(portal[1], int(portal[2]))
+			# Rückseite: zeigt, wohin sie zurückführt (nicht das Gebiet, in dem sie steht).
+			if visible_world(portal[1], 100): draw_portal(portal[1], region_at(portal[0]))
 	for projectile in projectiles:
 		if visible_world(projectile["pos"], 40):
 			var p: Vector2 = projectile["pos"]
@@ -10176,7 +10181,8 @@ func draw_hud() -> void:
 			break
 	for portal in PORTALS:
 		if player_pos.distance_to(portal[0]) < 112 or player_pos.distance_to(portal[1]) < 112:
-			nearest = "E  ·  Torbogen nach %s (LV %d)" % [region_name(int(portal[2])), region_level(int(portal[2]))]
+			var portal_target: int = int(portal[2]) if player_pos.distance_to(portal[0]) < 112 else region_at(portal[0])
+			nearest = "E  ·  Torbogen nach %s (LV %d)" % [region_name(portal_target), region_level(portal_target)]
 			break
 	for i in LANDMARKS.size():
 		if player_pos.distance_to(chest_position(i)) < 125:

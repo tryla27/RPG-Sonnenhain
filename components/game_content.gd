@@ -13,7 +13,9 @@ const PORTALS := [
 	[Vector2(7590, 2590), Vector2(11850, 2810), 9],
 	[Vector2(7610, 6830), Vector2(11850, 4720), 10],
 	[Vector2(10100, 2750), Vector2(11850, 6630), 11],
-	[Vector2(9820, 6750), Vector2(11850, 8500), 12]
+	[Vector2(9820, 6750), Vector2(11850, 8500), 12],
+	# Angelo 10.10.2026: zweiter Weg in die Nebelheide, oben rechts in den Aschebergen.
+	[Vector2(10550, 600), Vector2(12300, 520), 8]
 ]
 const ENEMY_TYPES := [
 	{"name":"Waldschleim", "region":1, "hp":42, "damage":8, "speed":78, "xp":12, "color":Color("73cb88")},

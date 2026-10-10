@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- `GameContent.PORTALS`: sechster Torbogen Ascheberge (10550, 600) ↔
+  Nebelheide (12300, 520). Rückseite eines Torbogens zeigt Ziel und Siegel des
+  Ausgangsgebiets; Rückweg in versiegelte Gebiete gesperrt. `check_content.py`
+  prüft jetzt „jedes Ostgebiet erreichbar“. Test `check_ascheberge_portal.gd`,
+  Vorschau `tools/capture_portal_ascheberge.gd`.
 - Waldschleim: `components/forest_slime_motion.gd` (Körper/Blatt aus
   `tools/build_slime_parts.py`, stufenloser Hüpfbogen, verzögertes Blatt) in
   `WoodlandArt.paint` für Laufen/Stehen; Angriff/Treffer/Tod weiter Bilder.
