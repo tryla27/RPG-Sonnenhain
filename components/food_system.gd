@@ -68,23 +68,74 @@ const REGIONAL_HERBS=[
 var harvested:Dictionary={}
 var plants:Array=[]
 var plant_foods:Dictionary={}
+## Nahrungsbüsche (Wunsch 10.10.2026): 8–12 Fruchtbüsche und 3 Kräuter je
+## Gebiet, über die ganze Map verteilt (vorher 3 Büsche + 1 Kraut in der Mitte).
+## Gleiche Welt → gleiche Plätze auf jedem Gerät (keine Zufallszahlen).
+const FRUIT_MIN:=8
+const FRUIT_MAX:=12
+const HERBS_PER_REGION:=3
+const GRID_STEP:=230.0
+const GolemBoss=preload("res://components/golem_boss.gd")
+
 func configure(g)->void:
  if not plants.is_empty():return
  for region in range(1,13):
-  var bounds:Rect2=g.region_rect(region).intersection(Rect2(Vector2.ZERO,g.WORLD))
-  for offset in [Vector2(-160,-140),Vector2(160,-140),Vector2(0,180)]:
-   var desired:Vector2=bounds.get_center()+offset
-   var p:Vector2=g.safe_world_teleport_destination(desired,region)
-   if g.region_at(p) != region:
-    p=bounds.get_center()
-   plants.append({"point":p,"food":REGION_FOOD[region],"tree":false,"region":region,"kind":"fruit"})
-   plant_foods[key(p)]=REGION_FOOD[region]
-  var herb_desired:Vector2=bounds.get_center()+Vector2(265,175)
-  var herb_point:Vector2=g.safe_world_teleport_destination(herb_desired,region)
-  if g.region_at(herb_point)!=region:
-   herb_point=g.safe_world_teleport_destination(bounds.get_center()+Vector2(-260,175),region)
-  var herb_info:Dictionary=herb_for_region(region)
-  plants.append({"point":herb_point,"region":region,"kind":"herb","name":herb_info["name"],"color":herb_info["color"]})
+  var fruit_count:int=FRUIT_MIN+posmod(region*7+3,FRUIT_MAX-FRUIT_MIN+1)
+  var points:Array=spread_points(g,region,fruit_count+HERBS_PER_REGION)
+  for i in points.size():
+   var p:Vector2=points[i]
+   if i<fruit_count:
+    plants.append({"point":p,"food":REGION_FOOD[region],"tree":false,"region":region,"kind":"fruit"})
+    plant_foods[key(p)]=REGION_FOOD[region]
+   else:
+    var herb_info:Dictionary=herb_for_region(region)
+    plants.append({"point":p,"region":region,"kind":"herb","name":herb_info["name"],"color":herb_info["color"]})
+
+## Freie Stelle für einen Busch: im Gebiet, nicht auf Wegen, Felsen, Mauern,
+## Wegsteinen, Toren, Bossfeldern, NPCs oder dem Golem-Altar.
+static func bush_spot_ok(g,p:Vector2,region:int)->bool:
+ if g.region_at(p)!=region or g.region_at(p+Vector2(0,30))!=region:return false
+ if g.terrain_blocked(p,44.0) or g.blocked_by_region_wall(p):return false
+ if g.distance_to_trail(p)<75.0:return false
+ for stone in g.WAYSTONES:
+  if p.distance_to(stone)<240.0:return false
+ for landmark in g.LANDMARKS:
+  if p.distance_to(landmark["pos"])<200.0:return false
+ for portal in g.PORTALS:
+  if p.distance_to(portal[0])<200.0 or p.distance_to(portal[1])<200.0:return false
+ for npc in g.NPCS:
+  if p.distance_to(npc["pos"])<150.0:return false
+ if g.class_boss_arena_index_at(p,120.0)>=0:return false
+ if GolemBoss.in_arena(p,150.0):return false
+ return true
+
+## Gleichmäßig verteilte Plätze: Raster mit festem Versatz, dann immer die
+## Stelle nehmen, die am weitesten von den schon gewählten entfernt ist.
+static func spread_points(g,region:int,count:int)->Array:
+ var rect:Rect2=g.region_rect(region).intersection(Rect2(Vector2.ZERO,g.WORLD)).grow(-230)
+ var candidates:Array=[]
+ var y:=rect.position.y
+ while y<rect.end.y:
+  var x:=rect.position.x
+  while x<rect.end.x:
+   var h:=absi(hash(Vector3i(int(x),int(y),region)))
+   var p:=Vector2(x+float(h%161)-80.0,y+float((h/161)%161)-80.0)
+   if bush_spot_ok(g,p,region):candidates.append(p)
+   x+=GRID_STEP
+  y+=GRID_STEP
+ var chosen:Array=[]
+ if candidates.is_empty():return chosen
+ chosen.append(candidates[absi(hash(region))%candidates.size()])
+ while chosen.size()<count and chosen.size()<candidates.size():
+  var best:Vector2=candidates[0];var best_d:=-1.0
+  for c in candidates:
+   var d:=INF
+   for q in chosen:d=minf(d,c.distance_to(q))
+   if d>best_d:best_d=d;best=c
+  if best_d<=0.0:break
+  chosen.append(best)
+ return chosen
+
 var regen_rate:=0.0
 var regen_until:=0.0
 var active_food_name:=""

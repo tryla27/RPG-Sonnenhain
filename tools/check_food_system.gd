@@ -17,7 +17,7 @@ func run():
  for q in g.QUESTS:g.quests.append({"state":0,"progress":0})
  for e in g.WORLD_EVENTS:g.event_states.append(0);g.event_progress.append(0)
  g.food_system.configure(g)
- assert(g.food_system.plants.size()==48)
+ assert(g.food_system.plants.size()>=12*11 and g.food_system.plants.size()<=12*15)
  var region_kinds={}
  for plant in g.food_system.plants:
   var region:int=g.region_at(plant["point"])
@@ -57,7 +57,7 @@ func run():
   var gained:int=1 if str(plant.get("kind","fruit"))=="herb" else 3
   assert(after_count==before_count+gained)
  for region in range(1,13):
-  assert(int(expected_regions[region])==4)
+  assert(int(expected_regions[region])>=11 and int(expected_regions[region])<=15)
  # Reset after the all-map interaction pass for cooldown/save tests.
  g.inventory.clear()
  g.food_system.harvested={}
@@ -124,5 +124,5 @@ func run():
  data["food_state"]["regen_rate"]=999
  assert(not store.valid_data(data,g.player_uuid))
  assert(not store.valid_food_state({"plants":[]}))
- print("FOOD_SYSTEM_OK 44 foods incl. 13 Alma recipes, 48 plants, visible ripe fruit bodies, exact five-minute regrow, buffs and instant cakes")
+ print("FOOD_SYSTEM_OK 44 foods incl. 13 Alma recipes, 8-12 fruit bushes + 3 herbs per region, visible ripe fruit bodies, exact five-minute regrow, buffs and instant cakes")
  quit()
