@@ -122,6 +122,10 @@ if (isset($_SERVER['HTTP_RANGE'])) {
 }
 header('Content-Length: ' . max(0, $end - $start + 1));
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'HEAD' || $size === 0) exit;
+// Große Dateien (Android-App ≈ 120 MB) dürfen nicht am PHP-Zeitlimit abbrechen,
+// sonst kommt auf langsamen Handyverbindungen nur ein Teil an.
+if ($size > 8388608) { @set_time_limit(0); }
+while (ob_get_level() > 0) { ob_end_flush(); }
 $stream = fopen($file, 'rb'); fseek($stream, $start); $remaining = $end - $start + 1;
-while ($remaining > 0 && !feof($stream) && !connection_aborted()) { $data = fread($stream, min(1048576, $remaining)); if ($data === false || $data === '') break; echo $data; $remaining -= strlen($data); }
+while ($remaining > 0 && !feof($stream) && !connection_aborted()) { $data = fread($stream, min(1048576, $remaining)); if ($data === false || $data === '') break; echo $data; flush(); $remaining -= strlen($data); }
 fclose($stream);
