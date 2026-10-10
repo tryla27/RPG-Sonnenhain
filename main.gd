@@ -9001,6 +9001,18 @@ func region_rect(id: int) -> Rect2:
 	return WorldGeometry.region_rect(id)
 
 func draw_region_gates() -> void:
+	if not WorldObstacles3D.active:
+		# 2D-Rückfall: die alten Ostmauern (sonst zeichnet sie die 3D-Landschaft).
+		draw_line(Vector2(11070, 0), Vector2(11070, 9600), Color("536c70"), 145)
+		draw_line(Vector2(11070, 0), Vector2(11070, 9600), Color("8da8a2"), 13)
+		for border in [1920, 3840, 5760, 7680]:
+			for segment in 25:
+				var x := 11000.0 + segment * 200.0
+				var next_x := x + 200.0
+				var y: float = float(border) + sin(x / 350.0) * 21.0 + sin(x / 97.0) * 8.0
+				var next_y: float = float(border) + sin(next_x / 350.0) * 21.0 + sin(next_x / 97.0) * 8.0
+				draw_line(Vector2(x, y), Vector2(next_x, next_y), Color("52616e"), 111)
+				draw_line(Vector2(x, y - 20.0), Vector2(next_x, next_y - 20.0), Color("a6b6ac", 0.6), 9)
 	draw_gate_wall(Vector2(1780, 0), Vector2(1780, 2600), Vector2(1780, 1120), 1)
 	draw_gate_wall(Vector2(1780, 2600), Vector2(1780, 8500), Vector2(1780, 6200), 8)
 	draw_gate_wall(Vector2(0, 2600), Vector2(1780, 2600), Vector2(875, 2600), 5)

@@ -23,8 +23,17 @@ var columns:=1
 var grid_rows:=1
 var collection_clock:=0.0
 
+## Rückfall (10.10.2026): Rendert der 3D-Viewport im Browser nichts (z. B. bei
+## manchen Grafiktreibern), zeichnet das Spiel wieder die 2D-Landschaft. Einmal
+## nach dem ersten Bild wird geprüft, ob im 3D-Bild überhaupt Pixel stehen.
+static var active:=true
+var probe_clock:=-1.0
+var probe_done:=false
+const PROBE_DELAY:=0.8
+const PROBE_MIN_PIXELS:=40
+
 static func replaces_static(zone:int)->bool:
-	return zone>=1 and zone<=12
+	return active and zone>=1 and zone<=12
 
 static func paint_ground(g,zone:int,key:int,point:Vector2,wet:bool)->void:
 	# Kleine Bodenflecken und Wasserwellen gehören zum Gelände, nicht zu den Körpern.
@@ -52,7 +61,33 @@ static func model_id(zone:int,motif:int)->String:
 
 static func replaces_wall(start:Vector2,finish:Vector2)->bool:
 	# Die beiden Dorfgrenzen gehören vollständig zur unveränderten Map 0.
-	return not ((start.x==1780 and start.y==0) or (start.y==2600 and start.x==0))
+	return active and not ((start.x==1780 and start.y==0) or (start.y==2600 and start.x==0))
+
+## Zählt sichtbare Pixel im 3D-Bild (jedes 4. Pixel). 0 = nichts gerendert.
+static func visible_pixels(image:Image)->int:
+	if image==null or image.is_empty():return 0
+	var count:=0
+	for y in range(0,image.get_height(),4):
+		for x in range(0,image.get_width(),4):
+			if image.get_pixel(x,y).a>0.5:count+=1
+	return count
+
+## Nach dem ersten Bild einmal prüfen; leer → 2D-Landschaft zurück.
+func probe(g,delta:float)->void:
+	if probe_done or rows.is_empty() or not is_instance_valid(viewport):return
+	if probe_clock<0.0:probe_clock=PROBE_DELAY
+	probe_clock-=delta
+	if probe_clock>0.0:return
+	probe_done=true
+	var tex:=viewport.get_texture()
+	if tex==null:return
+	var pixels:=visible_pixels(tex.get_image())
+	if pixels>=PROBE_MIN_PIXELS:return
+	active=false
+	rows.clear();signature=""
+	viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;world.process_mode=Node.PROCESS_MODE_DISABLED
+	printerr("OBSTACLES_3D_FALLBACK pixels=%d – 3D-Landschaft bleibt leer, zeige 2D" % pixels)
+	if g.has_method("invalidate_static_cache"):g.invalidate_static_cache()
 
 func ensure(g:Node)->void:
 	if is_instance_valid(viewport):return
@@ -79,6 +114,8 @@ func enabled(g)->bool:
 	return not g.dedicated_server_mode and DisplayServer.get_name()!="headless" and g.arena_mode=="" and g.interior_id<0 and g.dungeon_id<0 and not g.konflux.active and g.character_created and g.panel not in ["start","account_gate","account_login","account_register","account_migrate","creation","creation_review"]
 
 func update(g,delta:float)->void:
+	if not active:return
+	probe(g,delta)
 	if not enabled(g):
 		rows.clear();signature=""
 		if is_instance_valid(viewport):viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;world.process_mode=Node.PROCESS_MODE_DISABLED
