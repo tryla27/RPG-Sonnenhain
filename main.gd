@@ -4116,6 +4116,13 @@ func update_projectiles(delta: float) -> void:
 			if collision["hit"]:
 				p["pos"]=collision["pos"]
 				if not uses_server_world():projectile_break(p["pos"],p["dir"],int(p.get("kind",2)),str(p.get("element","")))
+				elif not p.has("remote_owner"):
+					# Eigener Schuss online: sofort zerschellen lassen (Bild + Klang),
+					# die spätere Server-Meldung an derselben Stelle wird übersprungen.
+					local_projectile_breaks.append({"pos":p["pos"],"ms":Time.get_ticks_msec()})
+					while local_projectile_breaks.size()>12:local_projectile_breaks.pop_front()
+					combat_feedback.burst(p["pos"],p["dir"],int(p.get("kind",2)),str(p.get("element","")))
+					play_break_sound(p["pos"],int(p.get("kind",2)),p["dir"])
 			# Kein Gegner getroffen: Die Fusion zündet am Hindernis oder am Reichweitenende.
 			if p.has("fusion") and not bool(p.get("fusion_fired",false)) and not bool(p.get("network_visual",false)):
 				p["fusion_fired"]=true
@@ -14178,7 +14185,8 @@ func projectile_collision(a:Vector2,b:Vector2,server:bool,context:String="",room
 	var previous:=a
 	for n in range(1,count+1):
 		var point:Vector2=a.lerp(b,float(n)/count)
-		var blocked:bool=projectile_world_blocked(point) if server else is_blocked(point,previous)
+		var overworld:bool=arena_mode=="" and dungeon_id<0 and interior_id<0 and not konflux.active
+		var blocked:bool=projectile_world_blocked(point) if (server or overworld) else is_blocked(point,previous)
 		if context=="konflux":blocked=(KonfluxMap.safe(point,room) or KonfluxMap.solid(point,4) or KonfluxMap.height_at(point)>height+20 or not Rect2(Vector2.ZERO,KonfluxMap.SIZE).has_point(point)) if room<0 else KonfluxMap.blocked(point,previous,room,4)
 		if blocked:return {"hit":true,"pos":previous}
 		previous=point
@@ -14189,7 +14197,7 @@ func projectile_break(pos:Vector2,dir:Vector2,kind:int,element:String,player_sho
 	var room:String=("world" if dedicated_server_mode else multiplayer_instance_id()) if instance=="" else instance
 	if not dedicated_server_mode:
 		combat_feedback.burst(pos,dir,kind,element)
-		if pos.distance_to(player_pos)<850:play_sound("arrow_break" if kind==3 else "magic_break")
+		play_break_sound(pos,kind,dir)
 	if network_mode=="host":
 		var payload:Dictionary={"pos":[pos.x,pos.y],"dir":[dir.x,dir.y],"kind":kind,"element":element,"context":where,"instance_id":room}
 		for peer in multiplayer.get_peers():
@@ -14205,8 +14213,24 @@ func rpc_projectile_break(payload:Dictionary)->void:
 	if raw.size()!=2 or facing_data.size()!=2:return
 	var pos:=Vector2(float(raw[0]),float(raw[1]))
 	if not pos.is_finite() or pos.distance_to(player_pos)>900:return
+	var now:=Time.get_ticks_msec()
+	for local in local_projectile_breaks:
+		if now-int(local["ms"])<900 and Vector2(local["pos"]).distance_to(pos)<180.0:return
 	combat_feedback.burst(pos,Vector2(float(facing_data[0]),float(facing_data[1])),int(payload.get("kind",2)),str(payload.get("element","")))
-	play_sound("arrow_break" if int(payload.get("kind",2))==3 else "magic_break")
+	play_break_sound(pos,int(payload.get("kind",2)),Vector2(float(facing_data[0]),float(facing_data[1])))
+
+## Zerschellen: Bruchklang des Geschosses plus Aufprall je Material.
+func play_break_sound(pos:Vector2,kind:int,dir:Vector2=Vector2.ZERO)->void:
+	if dedicated_server_mode or pos.distance_to(player_pos)>=850:return
+	play_sound("arrow_break" if kind==3 else "magic_break")
+	# Das Geschoss stoppt kurz vor dem Hindernis: Material etwas weiter vorn prüfen.
+	var material:=""
+	for reach in [6.0,12.0,20.0]:
+		material=projectile_material(pos+dir.normalized()*reach)
+		if material!="":break
+	match material:
+		"stein":play_world_sound("treffer_stein",pos)
+		"metall":play_world_sound("treffer_metall",pos)
 
 func projectile_world_blocked(point:Vector2)->bool:
 	if point.x<26 or point.y<26 or point.x>WORLD.x-26 or point.y>WORLD.y-26:return true
@@ -14225,7 +14249,30 @@ func projectile_world_blocked(point:Vector2)->bool:
 				if SpawnStoneBody.blocks(point-stone,0):return true
 				continue
 			if WaystoneShrine.OBELISK_SOLID.has_point(point-stone):return true
+		if projectile_material(point)!="":return true
+	else:
+		for stone in WAYSTONES:
+			if stone!=WAYSTONES[0] and WaystoneShrine.OBELISK_SOLID.has_point(point-stone):return true
 	return false
+
+## Woran ein Geschoss im Dorf zerschellt (Laternen, Zäune, Brunnen, Bäume …):
+## "metall", "holz", "stein" oder "" für frei. Client und Server nutzen dieselbe
+## Regel, damit Pfeile an denselben Stellen zerschellen.
+func projectile_material(point:Vector2)->String:
+	if region_at(point)!=0:
+		return "stein" if terrain_blocked(point) or blocked_by_region_wall(point) else ""
+	for lamp in VillageFixtures.LAMPS:
+		if Rect2(lamp+Vector2(-10,-30),Vector2(20,40)).has_point(point):return "metall"
+	for origin in VillageLayout.FENCES:
+		if Rect2(origin+Vector2(-6,-4),Vector2(112,12)).has_point(point):return "holz"
+	if Rect2(VillageLayout.BOARD+Vector2(-34,-2),Vector2(74,22)).has_point(point):return "holz"
+	for tree in REFERENCE_TREES:
+		if point.distance_to(tree)<16.0:return "holz"
+	if point.distance_to(BORIN_MAGIC_TREE_POS)<38.0:return "holz"
+	if Rect2(REFERENCE_WELL+Vector2(-44,-22),Vector2(88,54)).has_point(point):return "stein"
+	if preload("res://components/village_forecourts.gd").blocked(point,0.0):return "holz"
+	if SpawnStoneBody.blocks(point-WAYSTONES[0],0):return "stein"
+	return "stein" if blocked_by_region_wall(point) else ""
 
 func mark_network_teleport()->void:
 	teleport_serial+=1
@@ -14493,6 +14540,8 @@ func set_local_canvas_transform(origin:Vector2,rotation:float=0.0)->void:
 
 # --- Dunkler Golem: Verdrahtung (Regeln in components/golem_boss.gd) -----------
 var golem_push_velocity := Vector2.ZERO
+## Eigene Pfeile, die online schon sichtbar zerschellt sind: {pos, ms}.
+var local_projectile_breaks: Array = []
 var golem_prev_states: Dictionary = {}
 var golem_step_timer := 0.0
 
