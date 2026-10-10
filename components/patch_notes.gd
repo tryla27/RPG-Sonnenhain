@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Krieger · Wieder sichtbar", "Menschliche Krieger waren im Stehen und beim Sprung unsichtbar; zu sehen waren nur Schwert und Umhang. Das Sprungbild wurde doppelt verschoben und landete außerhalb des Bildschirms. Jetzt ist der Sprung wieder zu sehen, und im Stehen zeigt der Krieger denselben Körper wie beim Gehen statt des kleinen, unscharfen Standbilds."],
+["Dunkler Golem · Neuer Name", "Die beiden Hälften nach dem Zerfall heißen jetzt „Dunkler kleiner Golem“."],
 ["Dunkler Golem · Unsichtbar nach links behoben", "Lief der Golem nach links, war nur sein Schatten zu sehen. Er hat jetzt ein eigenes Bild für diese Richtung und ist immer sichtbar."],
 ["Dunkler Golem · Neues Aussehen", "Der Golem ist jetzt ein fein gezeichnetes Pixelbild mit 128×128 Punkten statt großer Blöcke: kantige Basaltplatten mit Licht und Schatten, gezackte lila Risse, deutlich stämmigere Beine mit Kniesteinen, Ansichten von vorn, von der Seite und von hinten, eigene Bilder für Gehen, Schild, Schaben, Stampfen, Schrei und Aufstehen. Geworfene Brocken, Hagelsteine und Trümmer sehen aus wie echte Steine mit Kanten, Ecken und Dellen."],
 ["Rüstungen · Neue Inventarbilder", "Die sieben legendären Rüstungen haben neue Inventarbilder, aus 3D-Modellen gerendert, mit Licht und Tiefe. Die Golem-Rüstung zeigt im Inventar jetzt ihr eigenes Bild und am Charakter kantige Basaltplatten, gezackte lila Risse, Schulterbrocken und zwei schwebende Steine."],

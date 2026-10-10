@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Krieger: `rpg_hero.gd` zeichnete die goldenen Sprites (Stehen, Sprung) an
+  `p+offset` unter der bereits gesetzten Welt-Verschiebung → doppelt verschoben,
+  unsichtbar. Jetzt `draw_set_transform(Vector2.ZERO)` davor. Standbild
+  (`GOLDEN_IDLE_ENABLED=false`) abgeschaltet. Vorschau
+  `tools/capture_warrior_ingame.gd`. Typ 28 heißt „Dunkler kleiner Golem“.
 - Golem-Sprite: Zeile 3 im Blatt = Seite nach links (gespiegelt erzeugt);
   `draw_texture_rect_region` mit negativer Breite zeichnete nichts.
   Vorschau im echten Spielbild `tools/capture_golem_ingame.gd`.

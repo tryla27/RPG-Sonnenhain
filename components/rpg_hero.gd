@@ -3,6 +3,7 @@ extends RefCounted
 const H = preload("res://components/reference_house.gd")
 const GoldenSprites = preload("res://components/golden_sprite_runtime.gd")
 const GOLDEN_HUMAN_WARRIOR_IDLE := "res://art/sprites/characters/golden_human_warrior/idle_8dir.png"
+const GOLDEN_IDLE_ENABLED := false
 const GOLDEN_HUMAN_WARRIOR_JUMP := [
 	"res://art/sprites/characters/golden_human_warrior/jump/jump-south-8f-v1.png",
 	"res://art/sprites/characters/golden_human_warrior/jump/jump-south-west-8f-v1.png",
@@ -39,18 +40,30 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	if role==0 and race==0 and gender==0 and jump_progress>=0.0 and death<0.0:
 		var frame:=clampi(floori(clampf(jump_progress,0.0,0.9999)*8.0),0,7)
 		var tint:=Color("fff3de").lerp(Color.WHITE,1.0-clampf(hurt,0.0,1.0)*0.45)
+		# Wie der gezeichnete Körper in Bildschirmkoordinaten (p+offset), nicht
+		# zusätzlich über die Welt-Verschiebung des Aufrufers (sonst doppelt
+		# verschoben und unsichtbar, nur Umhang und Waffe blieben, 10.10.2026).
+		c.draw_set_transform(Vector2.ZERO)
 		if GoldenSprites.draw_animation_strip(c,GOLDEN_HUMAN_WARRIOR_JUMP[heading],p+offset,frame,8,Vector2(96,96),75.0,s,tint):
 			preload("res://components/arcane_necklaces.gd").paint_actor(c,p+offset+(Vector2(0,-sin(jump_progress*PI)*20)*s if jump_progress>=0 else Vector2.ZERO),look,necklace,s,phase)
 			hurt_flash=0.0
+			c.draw_set_transform(offset)
 			return
+		c.draw_set_transform(offset)
 	# Golden pilot: authored idle strip for the base human warrior. Incomplete
 	# animation/equipment states deliberately fall back to the proven renderer.
-	if role==0 and race==0 and gender==0 and phase==0.0 and not running and roll<0.0 and death<0.0 and armor<0 and head<0:
+	# Abgeschaltet (Angelo 10.10.2026, „Krieger optisch reparieren“): das
+	# 24-px-Standbild passte nicht zum gezeichneten Krieger (anderer Stil, doppeltes
+	# Schwert). Stehen und Gehen nutzen wieder denselben Körper.
+	if GOLDEN_IDLE_ENABLED and role==0 and race==0 and gender==0 and phase==0.0 and not running and roll<0.0 and death<0.0 and armor<0 and head<0:
 		var tint:=Color("fff3de").lerp(Color.WHITE,1.0-clampf(hurt,0.0,1.0)*0.45)
+		c.draw_set_transform(Vector2.ZERO)
 		if GoldenSprites.draw_direction_strip(c,GOLDEN_HUMAN_WARRIOR_IDLE,p+offset,heading,Vector2(24,24),20.0,s*4.0,tint):
 			preload("res://components/arcane_necklaces.gd").paint_actor(c,p+offset+(Vector2(0,-sin(jump_progress*PI)*20)*s if jump_progress>=0 else Vector2.ZERO),look,necklace,s,phase)
 			hurt_flash=0.0
+			c.draw_set_transform(offset)
 			return
+		c.draw_set_transform(offset)
 	look=Vector2(sin(heading*PI/4.0),cos(heading*PI/4.0))
 	var back := heading==4
 	var diagonal := heading in [1,3,5,7]
