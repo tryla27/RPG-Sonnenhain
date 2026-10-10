@@ -69,6 +69,20 @@ func run()->void:
 	g.reset_touch_joystick();g.reset_touch_aim()
 	check(g.touch_move_base==AppTouch.MOVE_REST,"App: Stick in Ruhelage")
 
+	# Fester Stick links: Basis bleibt stehen, auch wenn der Daumen weit zieht.
+	g.panel="";g.character_created=true;g.death_timer=0.0
+	touch(g,AppTouch.MOVE_REST+Vector2(40,-20),true,5)
+	check(g.touch_move_id==5 and g.touch_move_base==AppTouch.MOVE_REST,"Stick greift an fester Stelle")
+	var drag:=InputEventScreenDrag.new();drag.index=5;drag.position=AppTouch.MOVE_REST+Vector2(300,0)
+	g._unhandled_input(drag)
+	check(g.touch_move_base==AppTouch.MOVE_REST and g.touch_move_vector.x>0.99,"Stick wandert nicht mit, volle Kraft")
+	touch(g,drag.position,false,5)
+	check(g.touch_move_id==-1 and g.touch_move_base==AppTouch.MOVE_REST,"Stick zurück in Ruhelage")
+	touch(g,Vector2(450,300),true,6)
+	check(g.touch_move_id==-1,"weit weg vom Stick: keine Bewegung")
+	touch(g,Vector2(450,300),false,6)
+	await create_timer(0.4).timeout
+
 	# Anmelden: Felder, verworfene Zeichen, Enter springt weiter.
 	g.panel="account_login";g.account_name="";g.account_password="";g.account_focus=0
 	check(g.app_text_target()=="account_0","Ziel Accountname")

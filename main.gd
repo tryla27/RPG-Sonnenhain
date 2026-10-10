@@ -2932,9 +2932,9 @@ func update_touch_joystick(pos: Vector2) -> void:
 	const DEADZONE := 14.0
 	var delta := pos - touch_move_base
 	var distance := delta.length()
-	if distance > MAX_RADIUS:
+	if distance > MAX_RADIUS and not app_mode:
 		# Follow-Joystick: die Basis wandert mit, damit der Daumen nicht an einer
-		# festen Bildschirmposition "hängen bleibt".
+		# festen Bildschirmposition "hängen bleibt". In der App bleibt er fest.
 		touch_move_base += delta.normalized() * (distance - MAX_RADIUS)
 		delta = pos - touch_move_base
 		distance = delta.length()

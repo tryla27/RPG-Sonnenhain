@@ -6,6 +6,8 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- App: Bewegungsstick fest bei `AppTouch.MOVE_REST`, greifbar im Umkreis
+  `MOVE_GRAB` (150), kein Mitwandern (`update_touch_joystick` bei `app_mode`).
 - `build_android_apk.sh`: Versionscode = Minuten seit 01.01.2026 UTC statt
   Laufnummer (neuer Workflow begann bei 1 < 478, Android verweigerte das Update);
   Versionsname = Build-Datum.
