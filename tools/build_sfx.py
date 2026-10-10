@@ -853,11 +853,13 @@ def r_spawn_brummen(rng, v):
     # Schlichtes Brummen am Spawn-Stein (Angelo 10.10.2026): nur ein tiefer Ton,
     # der unregelmäßig (alle 4–9 s) sanft einen Ganzton höher gleitet und zurück.
     # v=0 weicher (Grundton + zwei leise Obertöne), v=1 etwas brummiger
-    # (mehr Obertöne, leicht angezerrt). Nahtlose Schleife ≈ 40 s: Frequenzweg
+    # (mehr Obertöne, leicht angezerrt), v=2/3 wie B, aber sanft (Angelo:
+    # „B aber viel sanfter und angenehmer für die Ohren“): kaum Verzerrung,
+    # weiche Obertöne, langsameres Gleiten; v=3 noch etwas dunkler. Nahtlose Schleife ≈ 40 s: Frequenzweg
     # beginnt und endet auf dem Grundton, die Gesamtphase ist ein ganzzahliges
     # Vielfaches, alle Obertöne schließen also ohne Knacks an.
     low, high = 55.0, 55.0 * 2 ** (2 / 12)
-    glide = 1.4
+    glide = 1.4 if v < 2 else 2.4
     plan = []  # (dauer, ziel)
     total = 0.0
     up = False
@@ -893,14 +895,20 @@ def r_spawn_brummen(rng, v):
     if v == 0:
         x = np.sin(phase) + 0.42 * np.sin(2 * phase) + 0.16 * np.sin(3 * phase)
         x = lp(x * breath, 420, 2)
-    else:
+    elif v == 1:
         x = (np.sin(phase) + 0.55 * np.sin(2 * phase) + 0.32 * np.sin(3 * phase)
              + 0.18 * np.sin(4 * phase) + 0.1 * np.sin(5 * phase))
         x = np.tanh(1.6 * x * breath) / np.tanh(1.6)
         x = lp(x, 650, 2)
+    else:
+        soft = 1.0 if v == 2 else 0.7
+        x = (np.sin(phase) + 0.5 * np.sin(2 * phase) + 0.24 * soft * np.sin(3 * phase)
+             + 0.09 * soft * np.sin(4 * phase) + 0.03 * soft * np.sin(5 * phase))
+        x = np.tanh(0.7 * x * breath) / np.tanh(0.7)
+        x = lp(x, 420 if v == 2 else 320, 2)
     # Filter einschwingen lassen: drei Durchläufe, der mittlere wird genommen.
     x3 = np.tile(x, 3)
-    x3 = lp(x3, 900 if v else 600, 2)
+    x3 = lp(x3, 900 if v == 1 else 600, 2)
     x = x3[len(x):2 * len(x)]
     return x / (np.max(np.abs(x)) + 1e-9) * 10 ** (-6 / 20)
 
