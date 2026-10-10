@@ -736,4 +736,8 @@ func load_state(raw:Variant)->void:
 	var t:Variant=raw.get("trees",{})
 	knocked_trees=t.duplicate() if t is Dictionary else {}
 	cooldown_until=float(raw.get("cooldown_until",0.0))
+	# Nach einem Neustart lebt kein Golem mehr (Gegner werden nicht gespeichert):
+	# liegengebliebene Brocken zerbröseln wie nach jedem Kampf.
+	fight_active=false
+	crumble=CRUMBLE_TIME if not boulders.is_empty() else 0.0
 	version+=1
