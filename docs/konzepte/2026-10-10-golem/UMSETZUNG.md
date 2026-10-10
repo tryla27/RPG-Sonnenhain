@@ -23,8 +23,9 @@ Vorschau: `golem.png` (erzeugt mit `tools/capture_dark_golem.gd`).
 
 ## Werte (Balance, zum Nachjustieren)
 
-- Leben: 6000 × Stufenfaktor (Stufe 40 → ×5,6 ≈ 33.600), je weiterem Spieler +70 %. Hälften je die Hälfte.
-- Schaden: Grundschaden `enemy_damage(27)` ≈ 233; Stampfer ×1,3, Brocken ×1,0, Hagel ×0,3; Hälften ×0,5.
+- Leben: 7200 × Stufenfaktor (Stufe 40 → ×5,6 ≈ 40.300), je weiterem Spieler +70 %. Hälften je die Hälfte (≈ 20.200). Zu zweit zusammen ≈ 137.000.
+- Schaden: Grundschaden `enemy_damage(27)` ≈ 233; Stampfer ×0,85 (0,6 s Ansage mit Ring, 4 s Abklingzeit, ausweichbar), Brocken ×1,0, Hagel ×0,3; Hälften ×0,5.
+- Himmelsfalter: alle 8 s bis zu 3, höchstens 10 (bewusst schwer, Angelo 10.10.).
 - Alles in `components/golem_boss.gd` oben als Konstanten.
 
 ## Technik

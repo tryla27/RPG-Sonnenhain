@@ -40,7 +40,7 @@ static func crack(c:CanvasItem,points:Array,u:float,glow:float)->void:
 	c.draw_polyline(line,Color(CRACK_GLOW,0.25*glow),u*2.2)
 	c.draw_polyline(line,Color(CRACK,0.55+0.45*glow),maxf(1.0,u*0.8))
 
-## Der Golem. state: walk, shield, scrape, scream_pause, rise.
+## Der Golem. state: walk, shield, scrape, stomp, scream_pause, rise.
 static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:Vector2,time:float,flash:float)->void:
 	var u:=GolemBoss.visual_scale(type)
 	var state:=str(info.get("state","walk"))
@@ -67,6 +67,10 @@ static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:
 		arm_r=Vector2(40+aim.x*16*mirror,-6+aim.y*10)
 	elif state=="scream_pause":
 		arm_l=Vector2(-48,-44);arm_r=Vector2(48,-44)
+	elif state=="stomp":
+		# Faust hoch über den Kopf, gleich kracht sie herunter.
+		var lift:=1.0-clampf(float(info.get("timer",0.0))/GolemBoss.STOMP_WINDUP,0.0,1.0)
+		arm_r=Vector2(30,-60-lift*26)
 	var P:=func(v:Vector2)->Vector2:return o+Vector2(v.x*mirror,v.y+crouch+bob/u)*u
 	# Beine (kurz, stämmig)
 	for side:int in [-1,1]:
@@ -162,6 +166,26 @@ static func draw_boulder(c:CanvasItem,p:Vector2)->void:
 	c.draw_colored_polygon(_ellipse(p+Vector2(0,10),GolemBoss.BOULDER_RADIUS,GolemBoss.BOULDER_RADIUS*0.32),Color(0,0,0,0.3))
 	block(c,p+Vector2(0,-14),Vector2(22,20),4.0,BASALT_LIGHT)
 	crack(c,[p+Vector2(-18,-24),p+Vector2(-2,-14),p+Vector2(12,-22)],2.0,0.4)
+
+## Vorwarnung beim Stampfen: Ring am Boden, der sich bis zum Einschlag füllt.
+## ring_only: nur die Linie, über allem gezeichnet, damit der Ring auch hinter
+## dem Golem sichtbar bleibt.
+static func draw_stomp_warning(c:CanvasItem,info:Dictionary,type:int,ring_only:bool=false)->void:
+	if str(info.get("state",""))!="stomp":return
+	var at:Array=info.get("stomp_at",[0,0])
+	var spot:=Vector2(float(at[0]),float(at[1]))
+	var radius:=GolemBoss.STOMP_RADIUS*GolemBoss.visual_scale(type)/4.0
+	var t:=1.0-clampf(float(info.get("timer",0.0))/GolemBoss.STOMP_WINDUP,0.0,1.0)
+	if ring_only:
+		var line:=_ellipse(spot,radius,radius*0.5)
+		line.append(line[0])
+		c.draw_polyline(line,Color(CRACK_GLOW,0.35+0.3*t),2.0)
+		return
+	c.draw_colored_polygon(_ellipse(spot,radius,radius*0.5),Color(CRACK,0.10+0.12*t))
+	c.draw_colored_polygon(_ellipse(spot,maxf(1.0,radius*t),maxf(0.5,radius*0.5*t)),Color(CRACK,0.28))
+	var ring:=_ellipse(spot,radius,radius*0.5)
+	ring.append(ring[0])
+	c.draw_polyline(ring,Color(CRACK_GLOW,0.55+0.4*t),3.0)
 
 ## Vorwarnung beim Schaben: Linie in Wurfrichtung.
 static func draw_scrape_warning(c:CanvasItem,pos:Vector2,info:Dictionary)->void:

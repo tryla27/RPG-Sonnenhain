@@ -9408,6 +9408,7 @@ func mob_attack_target_position(enemy:Dictionary)->Vector2:
 func draw_enemy(enemy: Dictionary) -> void:
 	if GolemBoss.is_golem(enemy):
 		GolemDesign.draw_scrape_warning(self,Vector2(enemy["pos"]),enemy.get("golem",{}))
+		GolemDesign.draw_stomp_warning(self,enemy.get("golem",{}),int(enemy["type"]))
 		GolemDesign.draw_golem(self,Vector2(enemy["pos"]),int(enemy["type"]),enemy.get("golem",{}),Vector2(enemy.get("facing",Vector2.DOWN)),world_time,float(enemy.get("flash",0.0)))
 		return
 	var p: Vector2 = enemy["pos"]
@@ -14663,7 +14664,9 @@ func golem_snapshot_sounds(old: Dictionary, copy: Dictionary) -> void:
 			"shield": play_world_sound("golem_schild", p)
 			"scrape": play_world_sound("golem_schaben", p)
 			"scream_pause": play_world_sound("golem_schrei", p)
-			"walk": if before == "scrape": play_world_sound("golem_wurf", p)
+			"walk":
+				if before == "scrape": play_world_sound("golem_wurf", p)
+				elif before == "stomp": play_world_sound("brocken_landen", p)
 	if bool(copy.get("walking", false)) and now == "walk":
 		golem_step_timer -= 0.1
 		if golem_step_timer <= 0.0:
@@ -14689,4 +14692,6 @@ func draw_golem_world_fx() -> void:
 func draw_golem_overlay() -> void:
 	if arena_mode != "" or dungeon_id >= 0 or interior_id >= 0: return
 	GolemDesign.draw_debris(self, golem_debris)
+	for enemy in enemies:
+		if GolemBoss.is_golem(enemy): GolemDesign.draw_stomp_warning(self, enemy.get("golem",{}), int(enemy["type"]), true)
 	if golem_world.scream_at >= 0.0: GolemDesign.draw_scream(self, golem_world.scream_pos, world_time - golem_world.scream_at)

@@ -59,11 +59,15 @@ const MINION_INTERVAL:=8.0
 const MINION_MAX:=10
 const TREE_REGROW_SECONDS:=600.0
 
-## Nahkampf: Stampfer vor dem Golem.
-const MELEE_DAMAGE:=1.3
-const MELEE_COOLDOWN:=2.4
+## Nahkampf: Stampfer vor dem Golem. Erst hebt er 0,6 s die Faust, ein Ring am
+## Boden zeigt die Trefferfläche; wer rechtzeitig herausgeht, nimmt nichts
+## (Angelo 10.10.: Anzeige ja, 4 s Abklingzeit).
+const MELEE_DAMAGE:=0.85
+const MELEE_COOLDOWN:=4.0
 const MELEE_RANGE:=150.0
 const MELEE_PUSH:=120.0
+const STOMP_WINDUP:=0.6
+const STOMP_RADIUS:=110.0
 
 const XP_BIG:=1500
 const XP_HALF:=300
@@ -188,6 +192,15 @@ func update_golem(g,enemy:Dictionary,targets:Array,delta:float)->void:
 				info["state"]="walk"
 		"shield":
 			if float(info["timer"])<=0.0:info["state"]="walk"
+		"stomp":
+			if float(info["timer"])<=0.0:
+				var at:Array=info.get("stomp_at",[pos.x,pos.y])
+				var spot:=Vector2(float(at[0]),float(at[1]))
+				var u:=visual_scale(type)/4.0
+				g.golem_hit_players(spot,STOMP_RADIUS*u,roundi(base_damage(g)*MELEE_DAMAGE*damage_mult(type)),(spot-pos).normalized(),MELEE_PUSH)
+				g.play_world_sound("brocken_landen",spot)
+				info["state"]="walk"
+				version+=1
 		"scrape":
 			if float(info["timer"])<=0.0:
 				var dir:Vector2=Vector2(info.get("aim",[0,1])[0],info.get("aim",[0,1])[1]).normalized()
@@ -213,9 +226,8 @@ func update_golem(g,enemy:Dictionary,targets:Array,delta:float)->void:
 				info["melee_cd"]=MELEE_COOLDOWN
 				var face:=(target-pos).normalized()
 				enemy["facing"]=face
-				var u:=visual_scale(type)/4.0
-				g.golem_hit_players(pos+face*60.0*u,110.0*u,roundi(base_damage(g)*MELEE_DAMAGE*damage_mult(type)),face,MELEE_PUSH)
-				g.play_world_sound("brocken_landen",pos+face*60.0*u)
+				var spot:=pos+face*60.0*visual_scale(type)/4.0
+				info["state"]="stomp";info["timer"]=STOMP_WINDUP;info["stomp_at"]=[spot.x,spot.y]
 			elif target!=Vector2.ZERO and best>110.0*visual_scale(type)/4.0:
 				var speed:=(SPEED if type==TYPE_BIG else HALF_SPEED)
 				var slow:=float(enemy.get("slow",0.0))>0.0

@@ -112,6 +112,25 @@ func run()->void:
 	check(dist>GolemBoss.THROW_FLIGHT-40.0 and dist<=GolemBoss.THROW_FLIGHT+GolemBoss.THROW_ROLL+20.0,"15 m Flug + Rollen (%s)" % dist)
 	check(g.is_blocked(Vector2(b[0],b[1]),Vector2(b[0],b[1])+Vector2(0,120)),"Brocken blockiert den Weg")
 
+	# Stampfer: 0,6 s Ansage mit Ring, wer herausgeht, nimmt nichts; 4 s Abklingzeit.
+	g.golem_world.boulders.clear();g.golem_world.throws.clear();g.golem_world.fields.clear();g.golem_world.hail.clear()
+	golem["golem"]["state"]="walk";golem["golem"]["throw_cd"]=99.0;golem["golem"]["shield_cd"]=99.0;golem["golem"]["melee_cd"]=0.0
+	g.player_pos=Vector2(golem["pos"])+Vector2(0,100)
+	g.hp=g.max_hp();g.invulnerable=0.0;g.golem_push_velocity=Vector2.ZERO
+	g.golem_world.update_golem(g,golem,g.golem_targets(),0.05)
+	check(str(golem["golem"]["state"])=="stomp","Stampfer wird angesagt")
+	check(g.hp==g.max_hp(),"Ansage macht noch keinen Schaden")
+	check(is_equal_approx(float(golem["golem"]["melee_cd"]),GolemBoss.MELEE_COOLDOWN) and GolemBoss.MELEE_COOLDOWN==4.0,"4 s Abklingzeit")
+	g.player_pos=Vector2(golem["pos"])+Vector2(0,-260)
+	for i in 8:g.golem_world.update_golem(g,golem,g.golem_targets(),0.1)
+	check(str(golem["golem"]["state"])!="stomp" and g.hp==g.max_hp(),"ausgewichen: kein Schaden")
+	golem["golem"]["state"]="walk";golem["golem"]["melee_cd"]=0.0
+	g.player_pos=Vector2(golem["pos"])+Vector2(0,100)
+	g.golem_world.update_golem(g,golem,g.golem_targets(),0.05)
+	for i in 8:g.golem_world.update_golem(g,golem,g.golem_targets(),0.1)
+	var stomp_raw:=roundi(GolemBoss.base_damage(g)*GolemBoss.MELEE_DAMAGE)
+	check(g.hp<g.max_hp() and g.max_hp()-g.hp<=stomp_raw,"stehengeblieben: Treffer (%s von %s)" % [g.max_hp()-g.hp,stomp_raw])
+
 	# Bäume: umgeworfen, nach 10 Minuten wieder da.
 	g.golem_world.knocked_trees["5:5"]=Time.get_unix_time_from_system()+GolemBoss.TREE_REGROW_SECONDS
 	check(g.golem_world.tree_knocked(Vector2i(5,5)),"Baum liegt")
