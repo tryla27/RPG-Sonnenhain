@@ -25,9 +25,10 @@ const ACTION_R:=29.0
 const HEAL_RECT:=Rect2(746,598,62,40)
 const RESOURCE_RECT:=Rect2(814,598,62,40)
 const MENU_BUTTONS:=[["chat","CHAT",Rect2(764,14,64,42)],["inventory","TASCHE",Rect2(834,14,64,42)],["app_menu","MENÜ",Rect2(904,14,64,42)]]
-## Bewegung: linke Bildhälfte unterhalb der Statusanzeigen.
-const MOVE_ZONE:=Rect2(0,150,600,498)
+## Bewegung: fester Stick links (Angelo 10.10.2026: „links fixiert, nicht
+## beweglich“). Greifen im Umkreis MOVE_GRAB, die Basis wandert nie mit.
 const MOVE_REST:=Vector2(150,500)
+const MOVE_GRAB:=150.0
 ## Automatisches Zielen: Reichweite in Weltpixeln.
 const AIM_RANGE:=520.0
 ## Zeitfenster, in dem derselbe Tap nicht noch einmal auslöst.
@@ -67,7 +68,7 @@ static func button_at(pos:Vector2)->String:
 	return ""
 
 static func in_move_zone(pos:Vector2,blocked:Array)->bool:
-	if not MOVE_ZONE.has_point(pos):return false
+	if pos.distance_to(MOVE_REST)>MOVE_GRAB:return false
 	for r in blocked:
 		if (r as Rect2).has_point(pos):return false
 	return true
@@ -165,7 +166,7 @@ static func handle(g,event:InputEvent)->bool:
 			return true
 		if g.touch_move_id==-1 and in_move_zone(pos,[g.quest_hud_rect()]):
 			g.touch_move_id=t.index
-			g.touch_move_base=Vector2(clampf(pos.x,90.0,480.0),clampf(pos.y,240.0,560.0))
+			g.touch_move_base=MOVE_REST
 			g.touch_move_knob=g.touch_move_base
 			g.touch_move_vector=Vector2.ZERO
 			g.update_touch_joystick(pos)
