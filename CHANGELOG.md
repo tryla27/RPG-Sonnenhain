@@ -157,3 +157,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 ## Archiv
 
 Siehe `docs/archive/releases/`.
+
+## 10.10.2026 – Echte 3D-Körper für Außenkarten
+
+- 72 Landschaftsmotive für Maps 1–12 und sechs gemeinsame Mauermodule als echte ArrayMesh-Körper mit 64×64-Materialtexturen, 58 gelegentliche kurze Animationen.
+- Gemeinsamer transparenter 3D-Viewport mit individuell animierten Instanzen; laufende Mesh-Projektionen werden mit Figuren und Wegsteinen nach Fußpunkt sortiert. Keine vorgerenderten Sprite-Dateien.
+- Bestehende feste Kollisionspunkte und Kampfregeln bleiben zuständig; zusätzliche Pflanzen haben keine Collider. Map 0 inklusive ihrer Dorfgrenzen bleibt unverändert.
+- Server und Innenräume erzeugen keine 3D-Viewports. Geometrie wird pro Motiv einmal erstellt und wiederverwendet; nur sichtbare Instanzen bleiben aktiv.
+- Vorschauen und Architektur: docs/design/obstacles-live-3d/README.md. Nutzer hat diese Veröffentlichung ausdrücklich freigegeben.

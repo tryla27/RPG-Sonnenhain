@@ -7,6 +7,9 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 
 ## Entscheidungen
 
+- 10.10.2026: Echte 3D-Modelle mit Höhe und Tiefe für alle Außenmaps 1–12, sechs Motive je Karte und sechs Mauermodule. Map 0 bleibt unverändert. Live-Schaltung mit „Ok kannst live gehen“ ausdrücklich freigegeben; aktive Mesh-Instanzen werden in der bisherigen Spielperspektive mit Figuren sortiert.
+
+
 - 9.10.2026: Nutzer bestätigt mit „jetzt“ die Veröffentlichung von Meistergaben-Reparatur, Anhänger-Halsketten, Dunklem Arkanhüter in Kristallmoor, Kartenreisen und breiterem Elara-Durchgang. Umsetzung und Regressionstests im Freigabepaket.
 
 - 9.10.2026: PR-Aufräumen. Geschlossen: #11, #12, #13, #16 (schon in `main`),
