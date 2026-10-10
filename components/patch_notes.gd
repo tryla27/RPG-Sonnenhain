@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Android · Download repariert", "Der Download der Android-App konnte auf langsameren Handyverbindungen vorzeitig abbrechen; die unvollständige Datei ließ sich dann nicht installieren. Große Dateien werden jetzt ohne Zeitlimit vollständig übertragen."],
 ["Android · App zum Testen", "Sonnenhain gibt es jetzt als Android-App (Testversion) auf der Website unter „Android-App laden“. Sie spielt auf demselben Live-Server wie die Browser-Version und nutzt die Touch-Steuerung."],
 ["Welt · Torbogen zur Nebelheide", "Oben rechts in den Aschebergen steht ein neuer Torbogen. Er führt direkt in die Nebelheide und wieder zurück. Torbögen zeigen auf der Rückseite jetzt das Gebiet, in das sie zurückführen."],
 ["Gegner · Geschmeidiger Waldschleim", "Der Waldschleim hüpft jetzt richtig: Er drückt sich zusammen, streckt sich, fliegt kurz, landet breit und federt zweimal nach. Sein Blatt schwingt verzögert mit, im Stand atmet er ruhig und das Blatt wiegt sich. Vorher wechselten seine Laufbilder ruckartig."],

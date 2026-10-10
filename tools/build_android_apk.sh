@@ -48,5 +48,8 @@ sed -i "s/^version\/code=.*/version\/code=$code/; s/^version\/name=.*/version\/n
 test -s "$out"
 ls -la "$out"
 tools_dir="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-"$tools_dir/aapt2" dump badging "$out" | grep -E "^package|sdkVersion|uses-permission|application-label" || true
-"$tools_dir/apksigner" verify --print-certs "$out" | head -3 || true
+# Kurzbericht als Hinweis im Lauf (auch ohne Zugriff auf das Protokoll lesbar).
+badge="$("$tools_dir/aapt2" dump badging "$out" 2>&1 | grep -E "^package|sdkVersion|targetSdkVersion|native-code" | tr '\n' ' ' | cut -c1-400)"
+sign="$("$tools_dir/apksigner" verify --verbose "$out" 2>&1 | grep -E "Verifies|Verified using|ERROR|WARNING" | head -6 | tr '\n' ' ' | cut -c1-400)"
+echo "::notice title=APK::$(stat -c %s "$out") Bytes · $badge"
+echo "::notice title=Signatur::$sign"
