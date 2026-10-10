@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- `build_android_apk.sh`: Versionscode = Minuten seit 01.01.2026 UTC statt
+  Laufnummer (neuer Workflow begann bei 1 < 478, Android verweigerte das Update);
+  Versionsname = Build-Datum.
 - Android-App getrennt von Website und Server: neuer Workflow
   `deploy-android.yml` (nur von Hand, eigene Bestätigung) baut die APK und legt
   nur `/download/sonnenhain-rpg.apk` ab (Upload als `.neu`, Größe prüfen,
