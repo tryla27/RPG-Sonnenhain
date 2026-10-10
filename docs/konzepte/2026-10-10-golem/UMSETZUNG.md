@@ -9,7 +9,7 @@ Vorschau: `golem.png` (erzeugt mit `tools/capture_dark_golem.gd`).
 |---|---|
 | Name, Größe | „Dunkler Golem“ (Typ 27), gezeichnet 4× Mob-Maßstab ≈ 5× Spieler, ≈ 430 px breit |
 | Aussehen | schwarzer Basalt, lila Elixier-Risse, gesprungene Gesichtsplatte mit zwei Spalten, schwebende Steine über den Schultern (eigener Entwurf, keine Kopie) |
-| Beschwörung | Altar im Himmelsgarten (14900, 8650), E mit 30 Steinbeeren + 1 Rotkuchen + 1 Blaukuchen; online prüft der Server Abstand und ob schon ein Golem lebt |
+| Beschwörung | Altar im Himmelsgarten (14900, 8650), E genügt; online prüft der Server Abstand und ob schon ein Golem lebt. **Opfergaben vorerst aus** (Angelo 10.10., zum Testen): geplant 30 Steinbeeren + 1 Rotkuchen + 1 Blaukuchen, einschalten mit `SUMMON_COST = PLANNED_SUMMON_COST` in `golem_boss.gd` |
 | Musik | Thema `boss_golem`: `music/boss_golem.ogg`, bis Angelos Lied da ist die Bossmusik |
 | Bewegung | langsam (40), Schritt- und Schabgeräusche |
 | Schild | stoppt, krümmt sich, −99 % Schaden für 8 s, Abklingzeit 30 s |
@@ -19,7 +19,7 @@ Vorschau: `golem.png` (erzeugt mit `tools/capture_dark_golem.gd`).
 | Schrei | einmal unter 40 %: Pause, dann trifft eine Welle jeden Spieler im Himmelsgarten (25 % Leben) |
 | Tod | zerfällt sichtbar in Einzelteile und in zwei halbe Golems (Typ 28, halbe Größe, halbes Leben, halber Schaden) |
 | Begleiter | alle 8 s bis zu 3 Himmelsfalter (Fernkampf), höchstens 10 gleichzeitig |
-| Beute | jeder Beteiligte bekommt die Golem-Rüstung (100 Schutz) ins Inventar (online) bzw. als Beute (allein) |
+| Beute | jeder Beteiligte bekommt die Golem-Rüstung (100 Schutz) ins Inventar (online) bzw. als Beute (allein); nirgends zu kaufen |
 
 ## Werte (Balance, zum Nachjustieren)
 

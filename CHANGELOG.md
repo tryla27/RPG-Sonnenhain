@@ -22,6 +22,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 - Golem-Balance (Angelo 10.10.): Stampfer mit 0,6 s Ansage (Ring am Boden),
   4 s Abklingzeit, Schaden ×0,85 statt ×1,3; Leben +20 % (7200/3600);
   Himmelsfalter bleiben bei höchstens 10.
+- Golem vorerst ohne Opfergaben beschwörbar (`GolemBoss.SUMMON_COST` leer,
+  geplante Kosten in `PLANNED_SUMMON_COST`). Test: Golem-Rüstung in keiner
+  Laden-Rotation.
 - Legendäre Rüstungen: `components/master_armor.gd` (Daten, Wirkungen),
   Aussehen 6–12 in `rpg_hero.gd`, Torvald ab Stufe 40, Drops (Klassenbosse 10 %,
   Elite ab Stufe 33 2 %), Dornen/Lebensraub auf dem Server. Test
