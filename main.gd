@@ -159,7 +159,8 @@ const PORTALS := GameContent.PORTALS
 const SFX_NAMES := ["step", "swing", "hit", "dodge", "pickup", "level", "menu", "skill_0", "skill_1", "skill_2", "skill_3", "skill_4", "skill_5", "skill_6", "skill_7", "skill_8", "skill_12", "skill_13", "skill_14", "skill_15", "skill_16", "skill_17", "skill_18", "skill_19", "skill_20", "skill_21", "skill_22", "skill_23", "skill_24", "skill_25", "skill_26", "skill_27", "skill_28", "skill_29", "skill_30", "skill_31", "skill_32", "skill_33"]
 const MUSIC_THEMES := ["dorf", "blumen", "pilzwald", "ruinen", "kristall", "asche", "kueste", "sternen", "nebel", "bernstein", "quelle", "daemmer", "himmel"]
 const CUSTOM_MUSIC_THEMES := ["dorf", "blumen", "kueste", "pilzwald", "ruinen", "kristall", "asche", "sternen", "taverne"]
-const MUSIC_FADE_SECONDS := 1.35
+const MusicPlayback = preload("res://components/music_playback.gd")
+const MUSIC_FADE_SECONDS := MusicPlayback.DEFAULT_FADE_SECONDS
 const ENEMY_TYPES := GameContent.ENEMY_TYPES
 const VillageBuildings=preload("res://components/village_buildings.gd")
 const VillageElevation=preload("res://components/village_elevation.gd")
@@ -424,6 +425,7 @@ var music_incoming: AudioStreamPlayer
 var music_theme := ""
 var music_fading := false
 var music_fade_elapsed := 0.0
+var music_fade_duration := MUSIC_FADE_SECONDS
 var music_enabled := true
 var music_volume := 0.90
 var effects_volume := 0.75
@@ -1610,51 +1612,7 @@ func desired_music_theme() -> String:
 	return boss_theme if boss_theme!="" else MUSIC_THEMES[region]
 
 func update_music(delta: float = 0.0) -> void:
-	if music_player == null or music_incoming == null: return
-	if not music_enabled:
-		music_player.stop()
-		music_incoming.stop()
-		music_fading = false
-		music_theme = ""
-		return
-	var desired:String=desired_music_theme()
-	if desired != music_theme:
-		# Bei schnellem Hin- und Herreisen bleibt der gerade lautere Track erhalten.
-		if music_fading:
-			if music_fade_elapsed > MUSIC_FADE_SECONDS * 0.5:
-				music_player.stop()
-				var previous: AudioStreamPlayer = music_player
-				music_player = music_incoming
-				music_incoming = previous
-			else:
-				music_incoming.stop()
-			music_fading = false
-		var path:String=music_path_for_theme(desired)
-		var stream: AudioStream = load(path)
-		if stream == null: return
-		if stream is AudioStreamOggVorbis: stream.loop = true
-		if stream is AudioStreamWAV: stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		music_theme = desired
-		music_incoming.stop()
-		music_incoming.stream = stream
-		music_incoming.volume_db = -80.0
-		music_incoming.play()
-		music_fade_elapsed = 0.0
-		music_fading = true
-	var base_volume: float = -80.0 if music_volume <= 0.0 else ((-15.0 if panel == "pause" else -4.5) + linear_to_db(music_volume))
-	if music_fading:
-		music_fade_elapsed = minf(MUSIC_FADE_SECONDS, music_fade_elapsed + delta)
-		var blend: float = music_fade_elapsed / MUSIC_FADE_SECONDS
-		music_player.volume_db = base_volume + linear_to_db(maxf(0.001, cos(blend * PI * 0.5)))
-		music_incoming.volume_db = base_volume + linear_to_db(maxf(0.001, sin(blend * PI * 0.5)))
-		if blend >= 1.0:
-			music_player.stop()
-			var previous: AudioStreamPlayer = music_player
-			music_player = music_incoming
-			music_incoming = previous
-			music_fading = false
-	else:
-		music_player.volume_db = move_toward(music_player.volume_db, base_volume, delta * 22.0)
+	MusicPlayback.update(self, delta)
 
 func max_hp() -> float:
 	return 100.0 + float(level - 1) * 8.0 + float(skill_levels[10]) * 25.0 + equipment_power(equipped_ring_uid) + equipment_power(equipped_necklace_uid) + (equipment_power(equipped_ring2_uid) if class_id == 1 and equipped_ring2_uid != equipped_ring_uid else 0) + item_attribute("str") * (2 if class_id == 0 else 1)
@@ -2670,7 +2628,8 @@ func active_class_boss_music_theme()->String:
 	return ""
 
 func music_path_for_theme(theme:String)->String:
-	if theme in CLASS_BOSS_MUSIC_THEMES or theme=="boss_golem":
+	if theme == "boss_golem": return MusicPlayback.GOLEM_PATH
+	if theme in CLASS_BOSS_MUSIC_THEMES:
 		var custom:="res://music/%s.ogg" % theme
 		if ResourceLoader.exists(custom):return custom
 		return "res://audio/boss.wav"

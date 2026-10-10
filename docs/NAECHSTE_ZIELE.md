@@ -7,6 +7,8 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 
 ## Entscheidungen
 
+- 10.10.2026: Golem-Musik bestätigt: ausschließlich erste 24 Sekunden der letzten Probe fünfmal als 120-Sekunden-Loop. Beim Spawn langsam über sechs Sekunden einblenden; Bass und Snare ab Sekunde 12 jeder Wiederholung, keine zusätzliche Melodie ab Sekunde 24.
+
 - 10.10.2026: Echte 3D-Modelle mit Höhe und Tiefe für alle Außenmaps 1–12, sechs Motive je Karte und sechs Mauermodule. Map 0 bleibt unverändert. Live-Schaltung mit „Ok kannst live gehen“ ausdrücklich freigegeben; aktive Mesh-Instanzen werden in der bisherigen Spielperspektive mit Figuren sortiert.
 
 

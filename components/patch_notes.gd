@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Musik · Dunkler Golem", "Beim Erscheinen des Dunklen Golems blendet seine neue Hardtekk-Bossmelodie über sechs Sekunden ein. Der zweiminütige Loop begleitet auch den Kampf gegen seine beiden Hälften."],
 ["Dunkler Golem · Unsichtbar nach links behoben", "Lief der Golem nach links, war nur sein Schatten zu sehen. Er hat jetzt ein eigenes Bild für diese Richtung und ist immer sichtbar."],
 ["Dunkler Golem · Neues Aussehen", "Der Golem ist jetzt ein fein gezeichnetes Pixelbild mit 128×128 Punkten statt großer Blöcke: kantige Basaltplatten mit Licht und Schatten, gezackte lila Risse, deutlich stämmigere Beine mit Kniesteinen, Ansichten von vorn, von der Seite und von hinten, eigene Bilder für Gehen, Schild, Schaben, Stampfen, Schrei und Aufstehen. Geworfene Brocken, Hagelsteine und Trümmer sehen aus wie echte Steine mit Kanten, Ecken und Dellen."],
 ["Rüstungen · Neue Inventarbilder", "Die sieben legendären Rüstungen haben neue Inventarbilder, aus 3D-Modellen gerendert, mit Licht und Tiefe. Die Golem-Rüstung zeigt im Inventar jetzt ihr eigenes Bild und am Charakter kantige Basaltplatten, gezackte lila Risse, Schulterbrocken und zwei schwebende Steine."],

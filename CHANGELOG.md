@@ -6,6 +6,8 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Bestätigten Golem-Hardtekk-Loop (120 s, erste 24 s fünfmal) unter `music/boss_golem.wav` eingebunden; Spawn und Hälften nutzen die bestehende Boss-Erkennung. Musikübergänge in `MusicPlayback` ausgelagert, Golem blendet über 6 s ein, andere Themen weiterhin über 1,35 s. Bearbeitbare Quelle und Loop-Prüfung unter `music/source/golem/`.
+
 - Golem-Sprite: Zeile 3 im Blatt = Seite nach links (gespiegelt erzeugt);
   `draw_texture_rect_region` mit negativer Breite zeichnete nichts.
   Vorschau im echten Spielbild `tools/capture_golem_ingame.gd`.
