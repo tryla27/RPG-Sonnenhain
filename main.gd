@@ -5857,6 +5857,10 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	var stored_shop: Variant = data.get("shop_stock", {})
 	if stored_shop is Dictionary and stored_shop.has("smith"):
 		shop_stock = stored_shop.duplicate(true)
+		for stock in shop_stock.values():
+			if stock is Array:
+				for offer in stock:
+					if offer is Dictionary:FoodSystem.normalize_item(offer)
 		for role in shop_stock:shop_stock[role]=shop_stock[role].slice(maxi(0,shop_stock[role].size()-30))
 	for offers in shop_stock.values():
 		for item in offers:ArcaneNecklaces.normalize(item)
@@ -9295,7 +9299,7 @@ func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(side * 13, -23), p + Vector2(side * 27, -43), p + Vector2(side * 29, -17)]), c.darkened(0.18))
 				PixelStyle32.rect(self,Rect2(p + Vector2(side * 9 - 2, -12), Vector2(5, 5)), Color('fff2a5'))
 			PixelStyle32.rect(self,Rect2(p + Vector2(-10, 1), Vector2(20, 11)), Color('c1bbaa'))
-		4: # Steingolem als klarer Ruinenwächter.
+		4: # Steinwächter (früher Steingolem) als klarer Ruinenwächter.
 			PixelStyle32.rect(self,Rect2(p + Vector2(-20, 17 + stride * 0.25), Vector2(14, 18)), c.darkened(0.33))
 			PixelStyle32.rect(self,Rect2(p + Vector2(7, 17 - stride * 0.25), Vector2(14, 18)), c.darkened(0.33))
 			PixelStyle32.rect(self,Rect2(p + Vector2(-24, -26), Vector2(48, 50)), c.darkened(0.16))
@@ -9320,7 +9324,7 @@ func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 			PixelStyle32.arc(self,p + Vector2(0, 4), 17, 0.3, PI - 0.3, 12, Color('e9d4a8'), 3)
 		6: # Krabbe mit kristallisiertem Panzer und Scheren.
 			draw_crab_model(p, c, stride, true)
-		7: # Kristallgolem: massiver Körper mit facettierten Schultern und Kern.
+		7: # Kristallwächter (früher Kristallgolem): massiver Körper mit facettierten Schultern und Kern.
 			for side in [-1.0, 1.0]:
 				PixelStyle32.rect(self,Rect2(p + Vector2(side * 27 - 9, -8 + stride * side * 0.2), Vector2(18, 39)), c.darkened(0.28))
 				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(side * 22, -20), p + Vector2(side * 39, -39), p + Vector2(side * 43, -8), p + Vector2(side * 25, 5)]), Color('d9faff'))
@@ -9337,7 +9341,7 @@ func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 			PixelStyle32.rect(self,Rect2(p + Vector2(-8, -18), Vector2(5, 6)), Color('ffe388'))
 			PixelStyle32.rect(self,Rect2(p + Vector2(5, -18), Vector2(5, 6)), Color('ffe388'))
 			PixelStyle32.line(self,p + Vector2(-22, 15), p + Vector2(-35, 25 + stride), Color('f7ab6a'), 5)
-		9: # Lavagolem: weiterentwickelter Glutgolem mit schwerem Basaltkörper und Lavarissen.
+		9: # Lavawächter (früher Lavagolem): weiterentwickelter Glutwächter mit schwerem Basaltkörper und Lavarissen.
 			PixelStyle32.rect(self,Rect2(p + Vector2(-31, -31), Vector2(62, 58)), Color('4f3f44'))
 			PixelStyle32.rect(self,Rect2(p + Vector2(-24, -45), Vector2(48, 25)), c)
 			for side in [-1.0, 1.0]:
@@ -13187,7 +13191,9 @@ func validate_equipment_slots() -> void:
 		BossRelics.normalize(item);ArcaneNecklaces.normalize(item)
 		if equipped_necklace_uid<0 and item.get("icon","")=="necklace" and int(item.get("uid",-1)) in [equipped_ring_uid,equipped_ring2_uid]:equipped_necklace_uid=int(item["uid"])
 	if equipped_necklace_uid>=0 and necklace_visual()<0:equipped_necklace_uid=-1
-	for item in inventory:preload("res://components/headgear_rules.gd").normalize(item)
+	for item in inventory:
+		preload("res://components/headgear_rules.gd").normalize(item)
+		FoodSystem.normalize_item(item)
 	if not equipped_head_allowed():equipped_head_uid=-1
 	var weapon_icon := item_icon_for_uid(equipped_uid)
 	if equipped_uid >= 0 and (weapon_icon == "" or weapon_icon != class_weapon_icon()):

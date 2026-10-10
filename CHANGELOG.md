@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Umbenannt: Stein-/Kristall-/Lavagolem → -wächter; Roter Sonnenkuchen →
+  Rotkuchen, Blauer Mondkuchen → Blaukuchen (`FoodSystem.RENAMED`,
+  `normalize_item` für Inventar und Shopbestand beim Laden). Test
+  `tests/gameplay/check_renamed_items.gd`.
 - Spell-Grenze 4 (`components/spell_return.gd`, `buy_skill`, Skill-Gegenstände)
   und Abgabe bei Borin (Panel `spell_return`, `give_back_spell`, 10 Sprüche).
   Abgegebene Fusionen werden auch aus `fusion_history` entfernt, weil die
