@@ -3,6 +3,8 @@
 # Release marker: [deploy] class bosses, shared loot, boss arenas/houses, harvest visuals/timers, HUD separation and audiovisual combat.
 # Release marker: production rollout for class bosses, HUD separation, Borin route, harvest timers and boss audiovisual combat.
 extends Node2D
+const WorldObstacles3D=preload("res://components/world_obstacles_3d.gd")
+var world_obstacles_3d:=WorldObstacles3D.new()
 const PatchNotice = preload("res://components/patch_notice.gd")
 const PatchNotes = preload("res://components/patch_notes.gd")
 const MenuFeedback = preload("res://components/menu_feedback.gd")
@@ -1509,6 +1511,7 @@ func foliage_at(pos: Vector2) -> bool:
 	for plant in food_system.plants:
 		var kind := str(plant.get("kind",""))
 		if (kind == "herb" or kind == "fruit" and not bool(plant.get("tree",false))) and pos.distance_to(plant["point"]) < 28.0: return true
+	if WorldObstacles3D.replaces_static(region_at(pos)):return world_obstacles_3d.foliage_near(self,pos)
 	var cx := int(pos.x / 250.0)
 	var cy := int(pos.y / 250.0)
 	for dx in range(-1, 2):
@@ -1525,6 +1528,7 @@ func foliage_at(pos: Vector2) -> bool:
 
 ## Streubüsche auf dem Boden: dieselbe Auswahl wie beim Zeichnen der Bodenkacheln.
 func scatter_bush_near(pos: Vector2) -> bool:
+	if WorldObstacles3D.replaces_static(region_at(pos)):return world_obstacles_3d.foliage_near(self,pos)
 	var tx0 := int(floor(pos.x / 64.0))
 	var ty0 := int(floor(pos.y / 64.0))
 	for tx in range(tx0 - 1, tx0 + 2):
@@ -1763,6 +1767,7 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 	return ExperienceRules.reward(base_xp, recipient_level, enemy_level(type))
 
 func _process(delta: float) -> void:
+	if not world_obstacles_3d.enabled(self):world_obstacles_3d.update(self,delta)
 	combat_feedback.step(delta)
 	if not dedicated_server_mode:
 		sound_bank.tick(delta)
@@ -1936,6 +1941,7 @@ func _process(delta: float) -> void:
 		camera_smooth = camera_smooth.lerp(target_camera,1.0-exp(-14.0*delta))
 	camera_pos = camera_smooth.round()
 	performance_last_frame_ms = delta*1000.0
+	world_obstacles_3d.update(self,delta)
 	update_static_cache()
 	update_foreground_cache()
 	save_timer += delta
@@ -8625,6 +8631,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 			if zone == 0:
 				if key % 6 == 0: draw_flower(p, key)
 				elif key % 10 == 0: draw_grass(p)
+			elif WorldObstacles3D.replaces_static(zone):WorldObstacles3D.paint_ground(self,zone,key,p,wet)
 			elif zone == 1:
 				if key % 8 == 0: draw_tree(p, zone)
 				elif key % 4 == 0: draw_bush_cluster(p, zone, key)
@@ -8920,6 +8927,7 @@ func draw_trails() -> void:
 				if visible_world(other_shoulder, 100.0) and (trail_index + i) % 3 == 0: draw_flower(other_shoulder, trail_index * 31 + i)
 
 func draw_obstacle(obstacle: Dictionary) -> void:
+	if WorldObstacles3D.replaces_static(int(obstacle.get("zone",0))):return
 	var p: Vector2 = obstacle["pos"]
 	var r: float = obstacle["radius"]
 	var zone: int = obstacle["zone"]
@@ -8993,16 +9001,6 @@ func region_rect(id: int) -> Rect2:
 	return WorldGeometry.region_rect(id)
 
 func draw_region_gates() -> void:
-	draw_line(Vector2(11070, 0), Vector2(11070, 9600), Color("536c70"), 145)
-	draw_line(Vector2(11070, 0), Vector2(11070, 9600), Color("8da8a2"), 13)
-	for border in [1920, 3840, 5760, 7680]:
-		for segment in 25:
-			var x := 11000.0 + segment * 200.0
-			var next_x := x + 200.0
-			var y: float = float(border) + sin(x / 350.0) * 21.0 + sin(x / 97.0) * 8.0
-			var next_y: float = float(border) + sin(next_x / 350.0) * 21.0 + sin(next_x / 97.0) * 8.0
-			draw_line(Vector2(x, y), Vector2(next_x, next_y), Color("52616e"), 111)
-			draw_line(Vector2(x, y - 20.0), Vector2(next_x, next_y - 20.0), Color("a6b6ac", 0.6), 9)
 	draw_gate_wall(Vector2(1780, 0), Vector2(1780, 2600), Vector2(1780, 1120), 1)
 	draw_gate_wall(Vector2(1780, 2600), Vector2(1780, 8500), Vector2(1780, 6200), 8)
 	draw_gate_wall(Vector2(0, 2600), Vector2(1780, 2600), Vector2(875, 2600), 5)
@@ -9026,62 +9024,64 @@ func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_lev
 	var moss := Color("5f8f69")
 	var thickness := 92.0
 
-	for part_value in [Vector2(first,gap-GATE_HALF_WIDTH),Vector2(gap+GATE_HALF_WIDTH,last)]:
-		var part: Vector2 = part_value
-		var length := part.y-part.x
-		if length <= 0.0: continue
-		var face := Rect2(start.x-thickness*0.5,part.x,thickness,length) if vertical else Rect2(part.x,start.y-thickness*0.5,length,thickness)
-		if not face.grow(120).intersects(current_static_bounds()): continue
+	if not WorldObstacles3D.replaces_wall(start,finish):
+		for part_value in [Vector2(first,gap-GATE_HALF_WIDTH),Vector2(gap+GATE_HALF_WIDTH,last)]:
+			var part: Vector2 = part_value
+			var length := part.y-part.x
+			if length <= 0.0: continue
+			var face := Rect2(start.x-thickness*0.5,part.x,thickness,length) if vertical else Rect2(part.x,start.y-thickness*0.5,length,thickness)
+			if not face.grow(120).intersects(current_static_bounds()): continue
 
-		# Solider, texturunabhängiger Mauerkörper.
-		draw_rect(face,dark)
-		var inset := Rect2(face.position+(Vector2(8,0) if vertical else Vector2(0,8)),face.size-(Vector2(16,0) if vertical else Vector2(0,16)))
-		draw_rect(inset,mid)
-		# Helle Mauerkrone auf der dem Dorf zugewandten Seite.
-		var crown := Rect2(face.position+(Vector2(7,0) if vertical else Vector2(0,7)),Vector2(face.size.x-14,15) if vertical else Vector2(15,face.size.y-14))
-		draw_rect(crown,light)
+			# Solider, texturunabhängiger Mauerkörper.
+			draw_rect(face,dark)
+			var inset := Rect2(face.position+(Vector2(8,0) if vertical else Vector2(0,8)),face.size-(Vector2(16,0) if vertical else Vector2(0,16)))
+			draw_rect(inset,mid)
+			# Helle Mauerkrone auf der dem Dorf zugewandten Seite.
+			var crown := Rect2(face.position+(Vector2(7,0) if vertical else Vector2(0,7)),Vector2(face.size.x-14,15) if vertical else Vector2(15,face.size.y-14))
+			draw_rect(crown,light)
 
-		# Versetzte Steinblöcke, vollständig prozedural.
-		var stone_len := 44.0
-		var rows := 3
-		var count := ceili(length/stone_len)+1
-		for row in rows:
-			for stone in count:
-				var stagger := stone_len*0.5 if row%2==1 else 0.0
-				var axis := part.x+stone*stone_len-stagger
-				if axis >= part.y: continue
-				var axis_end := minf(axis+stone_len-3.0,part.y)
-				if axis_end <= part.x: continue
-				if vertical:
-					var band_x := start.x-thickness*0.5+10.0+row*24.0
-					draw_rect(Rect2(Vector2(band_x,maxf(axis,part.x)+2),Vector2(20,axis_end-maxf(axis,part.x)-3)),mid.lightened(0.04 if (stone+row)%2==0 else -0.02))
-					draw_line(Vector2(band_x,maxf(axis,part.x)),Vector2(band_x+20,maxf(axis,part.x)),mortar,2)
-				else:
-					var band_y := start.y-thickness*0.5+10.0+row*24.0
-					draw_rect(Rect2(Vector2(maxf(axis,part.x)+2,band_y),Vector2(axis_end-maxf(axis,part.x)-3,20)),mid.lightened(0.04 if (stone+row)%2==0 else -0.02))
-					draw_line(Vector2(maxf(axis,part.x),band_y),Vector2(maxf(axis,part.x),band_y+20),mortar,2)
+			# Versetzte Steinblöcke, vollständig prozedural.
+			var stone_len := 44.0
+			var rows := 3
+			var count := ceili(length/stone_len)+1
+			for row in rows:
+				for stone in count:
+					var stagger := stone_len*0.5 if row%2==1 else 0.0
+					var axis := part.x+stone*stone_len-stagger
+					if axis >= part.y: continue
+					var axis_end := minf(axis+stone_len-3.0,part.y)
+					if axis_end <= part.x: continue
+					if vertical:
+						var band_x := start.x-thickness*0.5+10.0+row*24.0
+						draw_rect(Rect2(Vector2(band_x,maxf(axis,part.x)+2),Vector2(20,axis_end-maxf(axis,part.x)-3)),mid.lightened(0.04 if (stone+row)%2==0 else -0.02))
+						draw_line(Vector2(band_x,maxf(axis,part.x)),Vector2(band_x+20,maxf(axis,part.x)),mortar,2)
+					else:
+						var band_y := start.y-thickness*0.5+10.0+row*24.0
+						draw_rect(Rect2(Vector2(maxf(axis,part.x)+2,band_y),Vector2(axis_end-maxf(axis,part.x)-3,20)),mid.lightened(0.04 if (stone+row)%2==0 else -0.02))
+						draw_line(Vector2(maxf(axis,part.x),band_y),Vector2(maxf(axis,part.x),band_y+20),mortar,2)
 
-		# Moos und kleine Schäden, damit die Mauer wieder lesbar und lebendig wirkt.
-		var marks := ceili(length/72.0)
-		for mark in marks:
-			var axis := part.x+20.0+mark*72.0
-			if axis >= part.y-8.0: continue
-			if mark%3==0:
-				var mp := Vector2(start.x+thickness*0.22,axis) if vertical else Vector2(axis,start.y+thickness*0.22)
-				draw_rect(Rect2(mp-Vector2(7,3),Vector2(14,6)),moss)
-			if mark%4==1:
-				if vertical:
-					draw_line(Vector2(start.x-17,axis),Vector2(start.x+9,axis+14),Color("2f3b3c"),2)
-				else:
-					draw_line(Vector2(axis,start.y-17),Vector2(axis+14,start.y+9),Color("2f3b3c"),2)
+			# Moos und kleine Schäden, damit die Mauer wieder lesbar und lebendig wirkt.
+			var marks := ceili(length/72.0)
+			for mark in marks:
+				var axis := part.x+20.0+mark*72.0
+				if axis >= part.y-8.0: continue
+				if mark%3==0:
+					var mp := Vector2(start.x+thickness*0.22,axis) if vertical else Vector2(axis,start.y+thickness*0.22)
+					draw_rect(Rect2(mp-Vector2(7,3),Vector2(14,6)),moss)
+				if mark%4==1:
+					if vertical:
+						draw_line(Vector2(start.x-17,axis),Vector2(start.x+9,axis+14),Color("2f3b3c"),2)
+					else:
+						draw_line(Vector2(axis,start.y-17),Vector2(axis+14,start.y+9),Color("2f3b3c"),2)
 
 	# Massive Torpfeiler sind immer sichtbar, unabhängig vom Torzustand.
-	for side in [-1.0,1.0]:
-		var post := gate+(Vector2(0,side*GATE_HALF_WIDTH) if vertical else Vector2(side*GATE_HALF_WIDTH,0))
-		draw_rect(Rect2(post-Vector2(43,43),Vector2(86,86)),dark)
-		draw_rect(Rect2(post-Vector2(34,34),Vector2(68,68)),mid)
-		draw_rect(Rect2(post-Vector2(38,39),Vector2(76,15)),light)
-		draw_rect(Rect2(post+Vector2(-11,7),Vector2(22,16)),Color("d8bb74"))
+	if not WorldObstacles3D.replaces_wall(start,finish):
+		for side in [-1.0,1.0]:
+			var post := gate+(Vector2(0,side*GATE_HALF_WIDTH) if vertical else Vector2(side*GATE_HALF_WIDTH,0))
+			draw_rect(Rect2(post-Vector2(43,43),Vector2(86,86)),dark)
+			draw_rect(Rect2(post-Vector2(34,34),Vector2(68,68)),mid)
+			draw_rect(Rect2(post-Vector2(38,39),Vector2(76,15)),light)
+			draw_rect(Rect2(post+Vector2(-11,7),Vector2(22,16)),Color("d8bb74"))
 
 	var village_gate := gate in VILLAGE_GATES
 	var gate_open := village_gate and opened_village_gates.has(gate)
@@ -12317,6 +12317,7 @@ func draw_cached_prop(prop: Dictionary) -> void:
 func draw_sorted_world_objects() -> void:
 	var entries: Array = []
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0:
+		world_obstacles_3d.append_entries(entries)
 		for prop in village_props():
 			if prop_bounds(prop).intersects(current_static_bounds()): entries.append({"kind":"prop","depth":prop["depth"],"data":prop})
 		# Die gezeichneten Fruchtpflanzen SIND die interaktiven FoodSystem-Punkte.
@@ -12344,6 +12345,7 @@ func draw_sorted_world_objects() -> void:
 	entries.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return float(a["depth"])<float(b["depth"]))
 	for entry in entries:
 		match entry["kind"]:
+			"obstacle_3d":world_obstacles_3d.paint(self,entry)
 			"prop": draw_cached_prop(entry["data"])
 			"food_plant":
 				var food_point: Vector2 = entry["data"]["point"]
