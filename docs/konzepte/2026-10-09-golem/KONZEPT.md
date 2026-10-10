@@ -1,7 +1,7 @@
 # Golem-Konzept: Endgegner des Himmelsgartens
 
 Stand: 10.10.2026, 02:30. Angelos Vorgaben vom 10.10. sind eingearbeitet; sie
-ersetzen den ersten Entwurf (Kern-Phase, Golemiten) dort, wo sie sich
+ersetzen den ersten Entwurf (Kern-Phase, kleine Golemiten) dort, wo sie sich
 widersprechen.
 
 ## Wünsche
@@ -41,6 +41,17 @@ Vorbild ist der Golem aus Clash Royale.
 - **Brocken** bleiben liegen, bis der nächste Golem erscheint.
 - **Größe:** wirklich sehr groß, **5× so groß wie ein Spieler** und dazu sehr
   breit.
+
+**10.10.2026, 02:44 (Antworten):**
+- **Name:** Dunkler Golem.
+- **Steinhagel-Feld:** bleibt 12 s.
+- **Bäume:** stehen nach 10 Minuten wieder.
+- **Musik:** Angelo bringt den Hardtekk-Track selbst mit.
+- **Beute:** eine Golem-Rüstung mit **100 Verteidigung**.
+- **Zerfall:** Beim Tod zerfällt er in **2 Golems, halb so groß und halb so
+  stark**, die weiterkämpfen. Erst wenn beide fallen, ist der Kampf gewonnen.
+- **Begleitende Spawns:** Während des ganzen Kampfs erscheinen **sehr viele
+  Fernkampf-Mobs dieser Map**. Im Himmelsgarten ist das der **Himmelsfalter**.
 
 **10.10.2026, 02:32 (Stil):** Angelo hat Bilder als Stilrichtung geschickt (ein
 bekannter Spiel-Golem aus einem Handyspiel). Rahmen und Farben aus diesem
@@ -138,18 +149,24 @@ Bewusst **anders** als die Vorlage:
   - Hagelbrocken: 45 je Treffer
   - Brockenwurf: 110 plus Mitreißen
   - Schrei: 25 % des maximalen Lebens plus 1 s Taumeln
-- **Feld:** bleibt 12 s, also bis kurz nach dem Ende des Schilds. → Frage 3.
+- **Feld:** bleibt 12 s, also bis kurz nach dem Ende des Schilds (Angelo).
 - **Liegender Brocken:** bleibt liegen, bis der nächste Golem erscheint (Angelo).
   Er ist ein festes Hindernis und wird auf dem Server gespeichert, damit er
   einen Neustart übersteht.
-- **Bäume** werden nicht gelöscht, nur für 5 Minuten umgeworfen. → Frage 4.
+- **Bäume** werden nicht gelöscht, sie stehen nach 10 Minuten wieder (Angelo).
+- **Zerfall:** Bei 0 Leben zerfällt er in 2 halbe Golems: halbe Größe (2,5×
+  Spieler, etwa 160 px), halbes Leben (je 3000 bei einem Spieler), halber
+  Schaden. Sie haben dieselben Fähigkeiten, etwas schneller (Tempo 52). Der
+  Schrei kommt nur vom großen Golem.
+- **Begleit-Spawns:** Himmelsfalter (Fernkampf) erscheinen in Wellen am Rand des
+  Kampfplatzes, etwa alle 8 s 2–3 Stück, höchstens 10 gleichzeitig, mit
+  Spieleranzahl skaliert. Nach dem Sieg hören die Wellen auf.
 
 ## Klang und Musik
 
-- **Bossmusik Heavy Metal/Hardtekk:** Ich baue sie wie die übrige Musik per
-  Skript (`tools/build_music.py`): verzerrte Gitarren-Synths, Doublebass,
-  Hardtekk-Kick ab etwa 170 BPM. Wenn du lieber einen eigenen oder gekauften
-  Track nutzt, binde ich den ein. → Frage 5.
+- **Bossmusik Heavy Metal/Hardtekk:** Angelo liefert den Track. Ich binde ihn
+  als Boss-Thema ein: Start beim Erscheinen, nahtlose Schleife, Ausblenden
+  nach dem Sieg über beide halben Golems.
 - **Schleppen:** tiefes Knirschen und Bersten von Stein, bei jedem Schritt
   leichtes Bildwackeln.
 - **Einschilden:** dumpfes Zusammenschieben, danach gedämpfte Treffer
@@ -191,8 +208,15 @@ Bewusst **anders** als die Vorlage:
    Wellenanimation läuft bei allen im Bild.
 10. **Ragdoll nur im Bild:** Der Server meldet nur „tot“, jeder Spieler sieht
     den Zusammenbruch selbst.
-11. **Beute und Sieg-Markierung im Spielstand** (siehe Frage 6).
-12. **Tests und Vorschaubilder:**
+11. **Golem-Rüstung:** neue Rüstung mit 100 Verteidigung, eigenes Aussehen am
+    Charakter (schwarze Basaltplatten mit lila Rissen), Beute für jeden
+    Beteiligten. Dazu eine Sieg-Markierung im Spielstand. Das passt zum
+    LV-40-Rüstungskonzept.
+12. **Zerfall in 2 halbe Golems:** zwei weitere Figuren in halber Größe mit
+    eigener Lebensleiste, Sieg erst nach beiden.
+13. **Himmelsfalter-Wellen:** Server-Spawner, der während des Kampfs
+    Fernkampf-Mobs der Map nachschiebt, mit Obergrenze.
+14. **Tests und Vorschaubilder:**
     - Tests: Schild-Zeitfenster, Feldradius und Tempo-Bonus, Wurfweite und
       Liegenbleiben, Schrei-Schwelle, nur ein Golem.
     - Bilder: Golem stehend, eingeschildet mit Feld, beim Wurf und beim
@@ -211,15 +235,5 @@ Groß (XL), weil das 3D-Figurensystem dazugehört. Vorschlag:
 
 ## Fragen an dich
 
-Beantwortet: Größe (5×, sehr breit), Kuchen (umbenannt), Brocken (liegen bis
-zum nächsten Golem). Noch offen:
-
-3. **Feld:** Wie lange soll das Steinhagel-Feld bleiben? Vorschlag 12 s.
-4. **Bäume:** Sollen umgeworfene Bäume nach einiger Zeit wieder stehen
-   (Vorschlag 5 Minuten) oder dauerhaft weg sein?
-5. **Musik:** Soll ich den Hardtekk-Track selbst bauen, oder hast du einen?
-6. **Beute:** Was gibt er? Zur Auswahl: eigene Halskette, LV-40-Rüstungsteil
-   (passt zum neuen Rüstungskonzept), Material.
-7. **Name:** „Himmelsfels, der Sternkoloss“, oder einen eigenen?
-8. **Golemiten:** Der erste Entwurf hatte zwei kleine Golemiten beim Tod. Weg
-   damit, weil jetzt der Ragdoll-Tod das Finale ist?
+Alle Fragen sind beantwortet (10.10.2026, 02:44). Offen ist nur noch dein
+Hardtekk-Track. Sobald du ihn schickst, binde ich ihn ein.
