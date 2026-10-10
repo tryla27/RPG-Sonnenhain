@@ -1470,7 +1470,8 @@ func typing_feedback(before: int, after: int) -> void:
 func play_sound(name: String) -> void:
 	if SoundBank.is_ui(name): ui_sound_count += 1
 	if sound_bank.has(name):
-		sound_bank.play(name, ui_volume if SoundBank.is_ui(name) else effects_volume)
+		# Oberflächenklänge folgen seit 10.10.2026 dem Regler „Effekte“ (eigener Regler entfernt).
+		sound_bank.play(name, effects_volume)
 		return
 	if sound_players.is_empty() or not sound_streams.has(name): return
 	var player: AudioStreamPlayer = sound_players[next_sound_player]
@@ -6298,13 +6299,6 @@ func panel_click(mouse: Vector2) -> void:
 		elif Rect2(300, 432, 550, 42).has_point(mouse):
 			play_sound("ui_klick")
 			toggle_creative_mode()
-		elif not creative_mode and Rect2(300,480,260,38).has_point(mouse):
-			export_save_backup()
-		elif not creative_mode and Rect2(590,480,260,38).has_point(mouse):
-			import_save_backup()
-		elif Rect2(300, 563, 550, 35).has_point(mouse):
-			menu_feedback.ask_exit("settings")
-			return
 		elif creative_mode:
 			if Rect2(300,510,280,38).has_point(mouse):
 				panel="repair";queue_redraw();return
@@ -6379,9 +6373,6 @@ func set_volume_from_mouse(mouse: Vector2) -> bool:
 		return true
 	if Rect2(300, 375, 550, 21).has_point(mouse):
 		effects_volume = clampf((mouse.x - 315.0) / 520.0, 0.0, 1.0)
-		return true
-	if Rect2(300, 411, 550, 21).has_point(mouse):
-		ui_volume = clampf((mouse.x - 315.0) / 520.0, 0.0, 1.0)
 		return true
 	return false
 
@@ -11167,19 +11158,14 @@ func draw_game_menu() -> void:
 func draw_pause_panel() -> void:
 	ui_button(Rect2(860,319,130,42), "CONTROLLER")
 	ui_button(DisplayMode.BUTTON_RECT, "FENSTER" if DisplayMode.is_fullscreen() else "VOLLBILD")
-	ui_button(Rect2(300, 135, 550, 42), "PAUSE", true, true)
-	text_at(Vector2(302, 205), "Level %d · %s · %d Gold" % [level, "Konflux" if konflux.active else region_name(region_at(player_pos)), gold], 17, Color("e6f0dc"))
+	text_at(Vector2(302, 190), "Level %d · %s · %d Gold" % [level, "Konflux" if konflux.active else region_name(region_at(player_pos)), gold], 17, Color("e6f0dc"))
 	ui_button(Rect2(300, 221, 550, 42), "FORTSETZEN")
 	ui_button(Rect2(860, 221, 130, 42), "TOUCH" if touch_enabled else "TASTEN")
 	ui_button(Rect2(860, 270, 130, 42), "MECHANIK")
 	ui_button(Rect2(300, 270, 550, 42), "TESTSTAND SPEICHERN" if creative_mode else "SPIEL SPEICHERN")
 	draw_volume_slider(Vector2(300, 328), "MUSIK", music_volume, Color("d9b67b"))
 	draw_volume_slider(Vector2(300, 364), "EFFEKTE", effects_volume, Color("9bcfd0"))
-	draw_volume_slider(Vector2(300, 400), "OBERFLÄCHE", ui_volume, Color("c7b3e2"))
 	ui_button(Rect2(300, 432, 550, 42), "TESTMODUS VERLASSEN" if creative_mode else "TESTMODUS STARTEN")
-	if not creative_mode:
-		ui_button(Rect2(300, 480, 260, 38), "BACKUP EXPORT")
-		ui_button(Rect2(590, 480, 260, 38), "BACKUP IMPORT")
 	if creative_mode:
 		text_at(Vector2(302, 500), "TESTMODUS · Reparatur, Reisen und World Builder sind getrennte Werkzeuge.", 12, Color("fff0bd"))
 		ui_button(Rect2(300,510,280,38),"SPIELSTAND REPARIEREN")
@@ -11187,8 +11173,7 @@ func draw_pause_panel() -> void:
 		ui_button(Rect2(770,510,180,38),"WORLD BUILDER")
 	elif test_level_lock>0:
 		text_at(Vector2(302,504),"ALTER LEVEL-LOCK AKTIV · wird beim nächsten XP-Gewinn aufgehoben.",13,Color("ffd98a"))
-	text_at(Vector2(302, 538 if not creative_mode else 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
-	ui_button(Rect2(300, 563, 550, 35), "SPEICHERN & ZUR STARTSEITE" if is_web_platform() else "SPEICHERN & ZUM HAUPTMENÜ")
+	text_at(Vector2(302, 500 if not creative_mode else 488), pause_status, 13, Color("ffe5ab"), HORIZONTAL_ALIGNMENT_LEFT, 630)
 
 func draw_controls_panel() -> void:
 	if touch_enabled:

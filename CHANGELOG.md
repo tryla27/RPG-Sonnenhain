@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Einstellungen (`draw_pause_panel`): Pause-Titel, Backup Export/Import,
+  „Speichern & zur Startseite“ und Oberflächen-Regler entfernt; UI-Klänge nutzen
+  `effects_volume` (`ui_volume` bleibt im Speicherstand). Vorschau
+  `tools/capture_settings_panel.gd`.
 - 3D-Landschaft: `WorldObstacles3D.probe_report` → `report_3d_probe` →
   `rpc_client_3d_report` (Server-Log `CLIENT_3D`, in der Server-Diagnose sichtbar).
 - Essensanzeige: `HudLayout.draw_effect_chips` (92×28-Kacheln, 4 pro Reihe,
