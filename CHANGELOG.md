@@ -9,6 +9,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 - Bosshüte sichtbar: `head_visual()` liefert 3–5 für Bosshüte,
   `RpgHero.paint_boss_hat`, Netzwerk-Grenze für `head` auf 5. Vorschau
   `tools/capture_boss_hats.gd`, Test `tests/gameplay/check_boss_hat_visual.gd`.
+- Umbenannt: Stein-/Kristall-/Lavagolem → -wächter; Roter Sonnenkuchen →
+  Rotkuchen, Blauer Mondkuchen → Blaukuchen (`FoodSystem.RENAMED`,
+  `normalize_item` für Inventar und Shopbestand beim Laden). Test
+  `tests/gameplay/check_renamed_items.gd`.
 - Spell-Grenze 4 (`components/spell_return.gd`, `buy_skill`, Skill-Gegenstände)
   und Abgabe bei Borin (Panel `spell_return`, `give_back_spell`, 10 Sprüche).
   Abgegebene Fusionen werden auch aus `fusion_history` entfernt, weil die

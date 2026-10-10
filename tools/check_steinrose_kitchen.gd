@@ -104,9 +104,9 @@ func run() -> void:
 		var info:Dictionary=Food.by_name(str(recipe["name"]))
 		g.hp=maxf(1.0,g.max_hp()-50.0);g.energy=0
 		assert(g.food_system.eat(g,output_index))
-		if str(recipe["name"])=="Blauer Mondkuchen":
+		if str(recipe["name"])=="Blaukuchen":
 			assert(g.energy==g.max_energy())
-		elif str(recipe["name"])=="Roter Sonnenkuchen":
+		elif str(recipe["name"])=="Rotkuchen":
 			assert(g.hp==g.max_hp())
 		else:
 			assert(bool(info.get("meal",false)))
@@ -131,9 +131,9 @@ func run() -> void:
 	g.food_system.clear_meal()
 	g.inventory.clear();add_food(g,"Nebelpflaumen-Tee",1);assert(g.food_system.eat(g,0))
 	var active_before:String=str(g.food_system.active_food_name)
-	g.inventory.clear();add_food(g,"Blauer Mondkuchen",1);g.energy=1;assert(g.food_system.eat(g,0))
+	g.inventory.clear();add_food(g,"Blaukuchen",1);g.energy=1;assert(g.food_system.eat(g,0))
 	assert(g.energy==g.max_energy() and g.food_system.active_food_name==active_before)
-	g.inventory.clear();add_food(g,"Roter Sonnenkuchen",1);g.hp=1;assert(g.food_system.eat(g,0))
+	g.inventory.clear();add_food(g,"Rotkuchen",1);g.hp=1;assert(g.food_system.eat(g,0))
 	assert(g.hp==g.max_hp() and g.food_system.active_food_name==active_before)
 
 	# Recipe progress and absolute expiry survive reconnect/save; time keeps running offline.
