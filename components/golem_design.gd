@@ -109,7 +109,8 @@ static func crack(c:CanvasItem,points:Array,u:float,glow:float)->void:
 	c.draw_polyline(line,Color(CRACK,0.55+0.45*glow),maxf(1.0,u*0.8))
 
 ## Pixel-Sprite (tools/build_golem_art.py): 128×128 je Bild, Füße bei y=124.
-## Zeilen: vorn, Seite (nach rechts), hinten. Spalten: FRAMES.
+## Zeilen: vorn, Seite (nach rechts), hinten, Seite (nach links, gespiegelt
+## im Blatt). Spalten: FRAMES.
 const SHEET:=preload("res://art/monsters/golem/golem_sheet.png")
 const GLOW:=preload("res://art/monsters/golem/golem_glow.png")
 const FRAME:=128.0
@@ -131,11 +132,13 @@ static func frame_index(state:String,walking:bool,time:float)->int:
 	if walking:return FRAMES.find("walk0")+int(floor(time*4.0))%4
 	return FRAMES.find("idle0")+int(floor(time*1.5))%2
 
-## Zeile und Spiegelung aus der Blickrichtung.
-static func view_row(facing:Vector2)->Array:
-	if facing.y<-0.6 and absf(facing.x)<0.6:return [2,false]
-	if absf(facing.x)>=0.6:return [1,facing.x<0.0]
-	return [0,false]
+## Zeile im Blatt aus der Blickrichtung (3 = Seite nach links).
+## Früher: Spiegeln mit negativer Breite – das zeichnet Godot bei Ausschnitten
+## gar nicht, der Golem war nach links laufend unsichtbar (10.10.2026).
+static func view_row(facing:Vector2)->int:
+	if facing.y<-0.6 and absf(facing.x)<0.6:return 2
+	if absf(facing.x)>=0.6:return 3 if facing.x<0.0 else 1
+	return 0
 
 ## Der Golem. state: walk, shield, scrape, stomp, scream_pause, rise.
 static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:Vector2,time:float,flash:float,walking:bool=false)->void:
@@ -151,9 +154,7 @@ static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:
 	var shadow_w:=52.0*u
 	c.draw_colored_polygon(_ellipse(pos+Vector2(0,u*2),shadow_w,shadow_w*0.28),Color(0,0,0,0.30))
 	var col:=frame_index(state,walking,time)
-	var rv:Array=view_row(facing)
-	var row:int=rv[0]
-	var mirror:bool=rv[1]
+	var row:=view_row(facing)
 	var region:=Rect2(col*FRAME,row*FRAME,FRAME,FRAME)
 	var size:=Vector2(FRAME,FRAME)*s
 	var top_left:=pos-Vector2(FRAME*0.5,FEET_Y)*s
@@ -164,7 +165,6 @@ static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:
 		size.y-=hidden*s
 		top_left.y+=hidden*s
 	var dest:=Rect2(top_left,size)
-	if mirror:dest=Rect2(top_left+Vector2(size.x,0),Vector2(-size.x,size.y))
 	c.draw_texture_rect_region(SHEET,dest,region,Color(1,1,1,0.35+0.65*rise))
 	c.draw_texture_rect_region(GLOW,dest,region,Color(1,1,1,(0.45+0.55*glow)*rise))
 	if state=="shield":

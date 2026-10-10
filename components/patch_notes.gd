@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Dunkler Golem · Unsichtbar nach links behoben", "Lief der Golem nach links, war nur sein Schatten zu sehen. Er hat jetzt ein eigenes Bild für diese Richtung und ist immer sichtbar."],
 ["Dunkler Golem · Neues Aussehen", "Der Golem ist jetzt ein fein gezeichnetes Pixelbild mit 128×128 Punkten statt großer Blöcke: kantige Basaltplatten mit Licht und Schatten, gezackte lila Risse, deutlich stämmigere Beine mit Kniesteinen, Ansichten von vorn, von der Seite und von hinten, eigene Bilder für Gehen, Schild, Schaben, Stampfen, Schrei und Aufstehen. Geworfene Brocken, Hagelsteine und Trümmer sehen aus wie echte Steine mit Kanten, Ecken und Dellen."],
 ["Rüstungen · Neue Inventarbilder", "Die sieben legendären Rüstungen haben neue Inventarbilder, aus 3D-Modellen gerendert, mit Licht und Tiefe. Die Golem-Rüstung zeigt im Inventar jetzt ihr eigenes Bild und am Charakter kantige Basaltplatten, gezackte lila Risse, Schulterbrocken und zwei schwebende Steine."],
 ["Dunkler Golem · Stärker und gefährlicher", "Der Golem hat 20 % mehr Leben. Stampfer, Brocken, Steinhagel und Schrei treffen jetzt mit einem festen Anteil deiner maximalen Lebenspunkte, Rüstung hilft dabei nicht: Stampfer 45 %, Brocken 55 %, Hagelstein 8 %, Schrei 34 % (bei den halben Golems etwa die Hälfte). Ausweichen ist der Schutz. Das Steinhagel-Feld ist 22 % größer, der Brockenwurf fliegt 22 % weiter."],

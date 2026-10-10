@@ -8,7 +8,9 @@ tief sitzendem Kopf mit zwei glühenden Spalten und schwebenden Steinen.
 Ausgabe (je Bild 128×128 px, Füße bei y=124, Mitte x=64):
   art/monsters/golem/golem_sheet.png  – Körper
   art/monsters/golem/golem_glow.png   – nur Risse/Augen (im Spiel pulsierend)
-  Zeilen: 0 vorn, 1 Seite (nach rechts), 2 hinten
+  Zeilen: 0 vorn, 1 Seite (nach rechts), 2 hinten, 3 Seite (nach links,
+  gespiegelt; im Spiel wird nicht mit negativer Breite gespiegelt, das zeichnet
+  Godot bei Ausschnitten nicht)
   Spalten: FRAMES (siehe unten)
 Mit --preview <datei.png> zusätzlich ein beschriftetes Vorschaublatt (3×).
 
@@ -350,13 +352,17 @@ def render(view, frame):
 
 
 def build():
-    sheet = Image.new("RGBA", (SIZE * len(FRAMES), SIZE * len(VIEWS)), (0, 0, 0, 0))
+    sheet = Image.new("RGBA", (SIZE * len(FRAMES), SIZE * (len(VIEWS) + 1)), (0, 0, 0, 0))
     glow = Image.new("RGBA", sheet.size, (0, 0, 0, 0))
     for r, view in enumerate(VIEWS):
         for col, frame in enumerate(FRAMES):
             b, g = render(view, frame)
             sheet.paste(b, (col * SIZE, r * SIZE))
             glow.paste(g, (col * SIZE, r * SIZE))
+            if view == "side":
+                row = len(VIEWS)
+                sheet.paste(b.transpose(Image.FLIP_LEFT_RIGHT), (col * SIZE, row * SIZE))
+                glow.paste(g.transpose(Image.FLIP_LEFT_RIGHT), (col * SIZE, row * SIZE))
     return sheet, glow
 
 
