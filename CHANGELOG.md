@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Essensanzeige: `HudLayout.draw_effect_chips` (92×28-Kacheln, 4 pro Reihe,
+  Details beim Darüberfahren) statt 348×58-Leiste. Test
+  `tests/ui/check_effect_chips.gd`, Bild `tools/capture_food_chips.gd`.
 - Geschosse: `projectile_world_blocked` (Server) kennt jetzt Laternen, Zäune,
   Brett, Brunnen, Dorfbäume, Vorplätze und Wegstein-Obelisken; Clients nutzen in
   der Oberwelt dieselbe Regel. Eigene Online-Schüsse zerschellen lokal sofort
