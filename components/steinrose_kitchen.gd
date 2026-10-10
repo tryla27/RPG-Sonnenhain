@@ -20,8 +20,8 @@ const RECIPES := [
 	{"name":"Bernstein-Marmelade","ingredients":{"Bernsteinfrucht":2,"Himbeeren":2,"Bernsteinblatt":1},"learn_cost":11,"desc":"Zaeh und schuetzend wie Harz.","effect":"+2 HP/s · +5% Resistenz · 6:00"},
 	{"name":"Heidelbeer-Pfannkuchen","ingredients":{"Heidelbeeren":3,"Aprikose":1,"Quellminze":1},"learn_cost":12,"desc":"Ein ruhiges Sammlerfruehstueck.","effect":"+3 HP/s · +4% Sammelchance · 6:00"},
 	{"name":"Schimmerbeeren-Suppe","ingredients":{"Kristallbeeren":2,"Heidelbeeren":2,"Daemmerkraut":1},"learn_cost":14,"desc":"Blaue Suppe fuer reine Mana-Erholung.","effect":"+4 Mana/s · nur Mana · 6:00"},
-	{"name":"Blauer Mondkuchen","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"Himmelsfrucht":1,"Himmelslavendel":1},"learn_cost":18,"desc":"Almas seltene Notration fuer Magier.","effect":"Mana sofort vollstaendig wiederherstellen"},
-	{"name":"Roter Sonnenkuchen","ingredients":{"Himbeeren":2,"Daemmerbeeren":1,"Sonnenkraut":1},"learn_cost":18,"desc":"Almas rote Notration fuer gefaehrliche Reisen.","effect":"HP sofort vollstaendig wiederherstellen"}
+	{"name":"Blaukuchen","ingredients":{"Kristallbeeren":2,"Quellbeeren":2,"Himmelsfrucht":1,"Himmelslavendel":1},"learn_cost":18,"desc":"Almas seltene Notration fuer Magier.","effect":"Mana sofort vollstaendig wiederherstellen"},
+	{"name":"Rotkuchen","ingredients":{"Himbeeren":2,"Daemmerbeeren":1,"Sonnenkraut":1},"learn_cost":18,"desc":"Almas rote Notration fuer gefaehrliche Reisen.","effect":"HP sofort vollstaendig wiederherstellen"}
 ]
 
 var selected := 0
@@ -214,15 +214,15 @@ func draw_recipe_detail(g, allow_cook:bool=false) -> void:
 		y+=24
 	g.text_at(Vector2(745,414),"WIRKUNG",12,Color("e9cc90"))
 	g.text_at(Vector2(745,437),str(detail["effect"]),10,Color("d8e6dc"),HORIZONTAL_ALIGNMENT_LEFT,220)
-	if str(detail["name"]) in ["Blauer Mondkuchen","Roter Sonnenkuchen"]:
+	if str(detail["name"]) in ["Blaukuchen","Rotkuchen"]:
 		g.text_at(Vector2(745,467),"WIRKUNG  SOFORT",11,Color("ffe1a0"))
 	else:
 		g.text_at(Vector2(745,467),"DAUER  06:00",11,Color("ffe1a0"))
 	if str(detail["name"])=="Schimmerbeeren-Suppe":
 		g.text_at(Vector2(745,490),"Nur Mana-Regeneration, kein HP-Bonus.",9,Color("8fc4ff"),HORIZONTAL_ALIGNMENT_LEFT,220)
-	elif str(detail["name"])=="Blauer Mondkuchen":
+	elif str(detail["name"])=="Blaukuchen":
 		g.text_at(Vector2(745,490),"Sofort 100% Mana · bestehender Buff bleibt.",9,Color("8fc4ff"),HORIZONTAL_ALIGNMENT_LEFT,220)
-	elif str(detail["name"])=="Roter Sonnenkuchen":
+	elif str(detail["name"])=="Rotkuchen":
 		g.text_at(Vector2(745,490),"Sofort 100% HP · bestehender Buff bleibt.",9,Color("ffb0ad"),HORIZONTAL_ALIGNMENT_LEFT,220)
 	elif allow_cook:
 		g.text_at(Vector2(745,490),"Deine Zutaten bestimmen den Preis.",9,Color("aebfb9"),HORIZONTAL_ALIGNMENT_LEFT,220)
