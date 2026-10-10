@@ -14,14 +14,17 @@ class Sheet extends Node2D:
 	func label(p:Vector2,text:String)->void:
 		draw_string(font,p,text,HORIZONTAL_ALIGNMENT_CENTER,260,15,Color("fff3cf"))
 	func _draw()->void:
-		draw_rect(Rect2(0,0,2000,1050),Color("8fae7a"))
-		draw_rect(Rect2(0,540,2000,510),Color("7f9f6c"))
+		draw_rect(Rect2(0,0,2400,1050),Color("8fae7a"))
+		draw_rect(Rect2(0,540,2400,510),Color("7f9f6c"))
 		# Reihe 1: Golem neben Spieler in vier Zuständen.
-		var states:=[{"state":"walk"},{"state":"shield"},{"state":"scrape","aim":[1,0],"timer":0.4},{"state":"scream_pause"}]
-		var names:=["Gehen (5× Spieler)","Schild: −99 % · 8 s","Schaben vor dem Wurf","Schrei unter 40 %"]
-		for i in 4:
-			var p:=Vector2(260+i*490,460)
+		var states:=[{"state":"walk"},{"state":"shield"},{"state":"scrape","aim":[1,0],"timer":0.4},{"state":"stomp","timer":0.25,"stomp_at":[0,0]},{"state":"scream_pause"}]
+		var names:=["Gehen (5× Spieler)","Schild: −99 % · 8 s","Schaben vor dem Wurf","Stampfer: Ring = Warnung","Schrei unter 40 %"]
+		for i in 5:
+			var p:=Vector2(260+i*470,460)
 			if i==2:GolemDesign.draw_scrape_warning(self,p,states[i])
+			if i==3:
+				states[i]["stomp_at"]=[p.x,p.y+60]
+				GolemDesign.draw_stomp_warning(self,states[i],GolemBoss.TYPE_BIG)
 			GolemDesign.draw_golem(self,p,GolemBoss.TYPE_BIG,states[i],Vector2.DOWN if i!=2 else Vector2.RIGHT,0.6+i*0.4,0.0)
 			Hero.paint(self,p+Vector2(140,-10),0,0,0,Vector2.LEFT,0.0,1.0,Vector2.ZERO,-1.0,Vector2.LEFT,0)
 			label(p+Vector2(-130,40),names[i])
@@ -40,7 +43,7 @@ func _initialize()->void:call_deferred("capture")
 
 func capture()->void:
 	var out:String=OS.get_cmdline_user_args()[0]
-	var vp:=SubViewport.new();vp.size=Vector2i(2000,1050);vp.render_target_update_mode=SubViewport.UPDATE_ALWAYS;root.add_child(vp)
+	var vp:=SubViewport.new();vp.size=Vector2i(2400,1050);vp.render_target_update_mode=SubViewport.UPDATE_ALWAYS;root.add_child(vp)
 	var sheet:=Sheet.new();sheet.font=ThemeDB.fallback_font
 	seed(7)
 	sheet.world.fields.append({"pos":[340,800],"life":8.0,"next":0.2,"mult":1.0})
