@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Golem-Sprite: Zeile 3 im Blatt = Seite nach links (gespiegelt erzeugt);
+  `draw_texture_rect_region` mit negativer Breite zeichnete nichts.
+  Vorschau im echten Spielbild `tools/capture_golem_ingame.gd`.
 - `GolemBoss.load_state`: liegengebliebene Brocken zerbröseln nach Neustart
   (`crumble`), Kampf gilt als beendet.
 - Golem v2 Teil 2 (Optik): `tools/build_golem_art.py` erzeugt

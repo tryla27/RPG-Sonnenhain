@@ -17,7 +17,7 @@ func check(ok:bool,label:String)->void:
 
 func _initialize()->void:
 	var sheet:Texture2D=GolemDesign.SHEET
-	check(sheet.get_width()==128*GolemDesign.FRAMES.size() and sheet.get_height()==128*3,"Sprite-Blatt 11 × 3 Bilder à 128 px (%dx%d)" % [sheet.get_width(),sheet.get_height()])
+	check(sheet.get_width()==128*GolemDesign.FRAMES.size() and sheet.get_height()==128*4,"Sprite-Blatt 11 × 4 Bilder à 128 px (%dx%d)" % [sheet.get_width(),sheet.get_height()])
 	check(GolemDesign.GLOW.get_size()==sheet.get_size(),"Leucht-Ebene gleich groß")
 	check(is_equal_approx(GolemDesign.sprite_scale(GolemBoss.TYPE_BIG)*128.0,320.0),"großer Golem ≈ 320 px")
 	check(is_equal_approx(GolemDesign.sprite_scale(GolemBoss.TYPE_HALF)*128.0,160.0),"halber Golem ≈ 160 px")
@@ -26,8 +26,11 @@ func _initialize()->void:
 	var walk:={}
 	for i in 16:walk[GolemDesign.frame_index("walk",true,i*0.25)]=true
 	check(walk.size()==4,"vier Gehbilder")
-	check(GolemDesign.view_row(Vector2.DOWN)==[0,false] and GolemDesign.view_row(Vector2.UP)==[2,false],"vorn und hinten")
-	check(GolemDesign.view_row(Vector2.LEFT)==[1,true] and GolemDesign.view_row(Vector2.RIGHT)==[1,false],"Seite, links gespiegelt")
+	check(GolemDesign.view_row(Vector2.DOWN)==0 and GolemDesign.view_row(Vector2.UP)==2,"vorn und hinten")
+	check(GolemDesign.view_row(Vector2.LEFT)==3 and GolemDesign.view_row(Vector2.RIGHT)==1,"Seite: eigene Zeile nach links (kein Spiegeln mit negativer Breite)")
+	# Linke Zeile ist das Spiegelbild der rechten.
+	var sheet_img:Image=sheet.get_image()
+	check(sheet_img.get_pixel(40,128+100)==sheet_img.get_pixel(127-40,384+100),"Zeile 3 gespiegelt")
 	# Beine etwa ein Drittel der Höhe: unterstes Drittel des Stehbilds gut gefüllt.
 	var img:Image=sheet.get_image()
 	var legs:=0
