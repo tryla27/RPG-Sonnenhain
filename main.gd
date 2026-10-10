@@ -2976,7 +2976,7 @@ func begin_touch_aim(index: int, pos: Vector2) -> void:
 	touch_aim_vector = facing.normalized() if facing.length_squared() > 0.01 else Vector2.RIGHT
 	touch_aim_manual = false
 	touch_attack_ids[index] = "attack"
-	if app_mode: app_auto_aim()
+	if app_mode: app_auto_aim(true)
 
 func reset_touch_aim(index: int = -1) -> void:
 	if index >= 0:
