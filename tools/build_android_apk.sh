@@ -47,4 +47,6 @@ sed -i "s/^version\/code=.*/version\/code=$code/; s/^version\/name=.*/version\/n
 "$GODOT_BIN" --headless --path . --export-release "Android" "$out" 2>&1 | tee /tmp/android-export.log
 test -s "$out"
 ls -la "$out"
-"$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$out" | head -5 || true
+tools_dir="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+"$tools_dir/aapt2" dump badging "$out" | grep -E "^package|sdkVersion|uses-permission|application-label" || true
+"$tools_dir/apksigner" verify --print-certs "$out" | head -3 || true
