@@ -36,6 +36,9 @@ const SHIELD_COOLDOWN:=30.0
 const SHIELD_DAMAGE_MULT:=0.01
 const FIELD_RADIUS:=320.0
 const FIELD_TIME:=12.0
+## Felsregen: ein langer Klang für das ganze Feld statt eines Klangs pro Stein
+## (Angelo, Klangprobe 10.10.). Leer = bisherige Einzelklänge.
+const HAIL_RAIN_SOUND:=""
 const HAIL_INTERVAL:=0.22
 const HAIL_DELAY:=1.2
 const HAIL_RADIUS:=46.0
@@ -220,6 +223,7 @@ func update_golem(g,enemy:Dictionary,targets:Array,delta:float)->void:
 				info["state"]="shield";info["timer"]=SHIELD_TIME;info["shield_cd"]=SHIELD_COOLDOWN
 				fields.append({"pos":[pos.x,pos.y],"life":FIELD_TIME,"next":0.3,"mult":damage_mult(type)})
 				g.play_world_sound("golem_schild",pos)
+				if HAIL_RAIN_SOUND!="":g.play_world_sound(HAIL_RAIN_SOUND,pos)
 				version+=1
 			elif float(info["throw_cd"])<=0.0 and best<900.0 and target!=Vector2.ZERO:
 				var aim:=(target-pos).normalized()
@@ -247,8 +251,12 @@ func update_golem(g,enemy:Dictionary,targets:Array,delta:float)->void:
 					info["step"]=float(info.get("step",0.0))+delta
 					if float(info["step"])>=0.9:
 						info["step"]=0.0
-						g.play_world_sound("golem_schritt",next)
+						g.play_world_sound(step_sound(type),next)
 	enemy["golem"]=info
+
+## Großer Golem: schwerer Schritt; halbe Golems: eigener Stampfer.
+static func step_sound(type:int)->String:
+	return "golem_schritt" if type==TYPE_BIG else "golem_schritt_klein"
 
 func boulder_at(p:Vector2,margin:float=0.0)->bool:
 	for b in boulders:
@@ -275,7 +283,7 @@ func update_world(g,delta:float,authority:bool)->void:
 		if h["delay"]>0.0:continue
 		var p:=Vector2(h["pos"][0],h["pos"][1])
 		if authority:g.golem_hit_players(p,HAIL_RADIUS,int(h["damage"]),Vector2.ZERO,0.0)
-		g.play_world_sound("steinhagel",p)
+		if HAIL_RAIN_SOUND=="":g.play_world_sound("steinhagel",p)
 		hail.remove_at(i)
 	for i in range(throws.size()-1,-1,-1):
 		var t:Dictionary=throws[i]

@@ -14683,7 +14683,9 @@ func golem_snapshot_sounds(old: Dictionary, copy: Dictionary) -> void:
 	var p := Vector2(copy.get("net_target_pos", copy.get("pos", Vector2.ZERO)))
 	if before != now:
 		match now:
-			"shield": play_world_sound("golem_schild", p)
+			"shield":
+				play_world_sound("golem_schild", p)
+				if GolemBoss.HAIL_RAIN_SOUND != "": play_world_sound(GolemBoss.HAIL_RAIN_SOUND, p)
 			"scrape": play_world_sound("golem_schaben", p)
 			"scream_pause": play_world_sound("golem_schrei", p)
 			"walk":
@@ -14693,7 +14695,7 @@ func golem_snapshot_sounds(old: Dictionary, copy: Dictionary) -> void:
 		golem_step_timer -= 0.1
 		if golem_step_timer <= 0.0:
 			golem_step_timer = 0.9
-			play_world_sound("golem_schritt", p)
+			play_world_sound(GolemBoss.step_sound(int(copy.get("type", GolemBoss.TYPE_BIG))), p)
 
 func save_golem_world() -> void:
 	if not dedicated_server_mode or golem_world_path == "": return
