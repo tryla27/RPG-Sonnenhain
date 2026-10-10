@@ -44,8 +44,8 @@ const ENEMY_TYPES := [
 	{"name":"Himmelsfalter", "region":12, "hp":390, "damage":60, "speed":148, "xp":145, "color":Color("d9c6e8")},
 	{"name":"Sternenwächterin", "region":12, "hp":560, "damage":69, "speed":85, "xp":180, "color":Color("e4d4b5")},
 	# 27/28: Dunkler Golem und seine Hälften (components/golem_boss.gd); nur beschworen.
-	{"name":"Dunkler Golem", "region":12, "hp":7200, "damage":70, "speed":40, "xp":1500, "color":Color("2a2730")},
-	{"name":"Halber Golem", "region":12, "hp":3600, "damage":35, "speed":52, "xp":300, "color":Color("3d3945")}
+	{"name":"Dunkler Golem", "region":12, "hp":8640, "damage":95, "speed":40, "xp":1500, "color":Color("2a2730")},
+	{"name":"Halber Golem", "region":12, "hp":4320, "damage":47, "speed":52, "xp":300, "color":Color("3d3945")}
 ]
 const BASE_ABILITIES := [
 	{"name":"Wirbelhieb", "desc":"Kreisender Nahkampfschlag", "cost":28, "cd":6.0, "req":3, "kind":0},

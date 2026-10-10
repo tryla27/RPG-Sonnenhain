@@ -6,6 +6,17 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Golem v2 Teil 1 (`components/golem_boss.gd`): Prozent-Schaden ohne Rüstung
+  (`golem_hit_players(..., fraction)`, `rpc_golem_damage`, `apply_golem_damage`
+  mit `damage_ignores_armor`), Trefferzonen `shot_zone`/`zone_mult` (Geschosse
+  über `shot_hit_zone` in main.gd), A*-Wegsuche auf 64-px-Raster mit Budget,
+  Sichtlinie gecacht, Ausweichen/Durchbrechen, `end_fight` mit Zerbröseln und
+  `cooldown_until` (golem_world.json), Rücksetzen nach 5 min ohne Spieler,
+  `lite_snapshot` außerhalb des Himmelsgartens, `net_info` ohne Wegdaten,
+  `golem_trees_changed(key)` → `invalidate_static_area`, Server-Log
+  `GOLEM_PERF` jede Minute. HP 8640/4320, Schaden 95/47. F3-Anzeige
+  `components/perf_overlay.gd`. Tests `check_golem_v2.gd`, `check_perf_overlay.gd`,
+  Netztest erweitert; Vorschau `tools/capture_golem_v2_combat.gd`.
 - 3D-Landschaft: `WorldObstacles3D.probe_report` → `report_3d_probe` →
   `rpc_client_3d_report` (Server-Log `CLIENT_3D`, in der Server-Diagnose sichtbar).
 - Essensanzeige: `HudLayout.draw_effect_chips` (92×28-Kacheln, 4 pro Reihe,
