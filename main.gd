@@ -11,6 +11,18 @@ const MenuFeedback = preload("res://components/menu_feedback.gd")
 var menu_feedback = MenuFeedback.new()
 ## Zählt abgespielte Oberflächenklänge, damit Menüklicks nicht doppelt klingen.
 var ui_sound_count := 0
+## Legendäre Rüstungen (components/master_armor.gd).
+var arkan_shield_cooldown := 0.0
+var golem_guard_timer := 0.0
+var golem_guard_cooldown := 0.0
+var seconds_since_hit := 99.0
+## Dunkler Golem (components/golem_boss.gd): Kampfzustand und Zerfallsteile.
+var golem_world = GolemBoss.new()
+var golem_debris: Array = []
+var golem_world_path := ""
+var golem_save_timer := 0.0
+var golem_saved_version := -1
+var golem_summon_pending := false
 ## Borin: Spells abgeben (components/spell_return.gd).
 var spell_return_selected := -1
 var spell_return_confirm := false
@@ -131,6 +143,10 @@ const WorldGeometry=preload("res://components/world_geometry.gd")
 const ItemRules=preload("res://components/item_rules.gd")
 const SoundBank=preload("res://components/sound_bank.gd")
 const TypingSound=preload("res://components/typing_sound.gd")
+const MasterArmor=preload("res://components/master_armor.gd")
+const GolemBoss=preload("res://components/golem_boss.gd")
+const GolemDesign=preload("res://components/golem_design.gd")
+const ShopTrade=preload("res://components/shop_trade.gd")
 const SpellReturn=preload("res://components/spell_return.gd")
 const WorldSnapshot=preload("res://components/world_snapshot.gd")
 const HeadgearRules=preload("res://components/headgear_rules.gd")
@@ -370,6 +386,9 @@ var controls_return_panel := "pause"
 var sell_all_confirm := false
 var pending_purchase := -1
 var pending_purchase_item: Dictionary = {}
+## Verkaufen mit Mengenauswahl (components/shop_trade.gd).
+var pending_sale := -1
+var trade_quantity := 1
 var merchant_kind := ""
 var menu_scroll := 0
 var patch_view: Dictionary = PatchNotes.new_view()
@@ -919,6 +938,8 @@ func start_websocket_server() -> void:
 	var save_dir := command_arg_value("--save-dir=",home_dir.path_join("sonnenhain-server/data/player-saves") if home_dir != "" else "user://server-player-saves")
 	if server_save_store.configure(save_dir) != OK:
 		push_error("Server-Speicherverzeichnis konnte nicht geöffnet werden")
+	golem_world_path = save_dir.get_base_dir().path_join("golem_world.json")
+	load_golem_world()
 	var account_dir:=save_dir.get_base_dir().path_join("accounts")
 	if account_store.configure(account_dir)!=OK:
 		push_error("Server-Accountverzeichnis konnte nicht geöffnet werden")
@@ -1016,7 +1037,7 @@ func server_action_allowed(peer_id: int, action_key: String, cooldown_ms: int) -
 	if peer_id <= 0: return false
 	var now := Time.get_ticks_msec()
 	var key := "%d:%s" % [peer_id, action_key]
-	var previous := int(server_action_times.get(key, 0))
+	var previous := int(server_action_times.get(key, now - cooldown_ms))
 	if now - previous < cooldown_ms: return false
 	server_action_times[key] = now
 	return true
@@ -1159,7 +1180,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
 		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
-		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
+		"head":clampi(int(state.get("head",-1)),-1,5),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
 		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2,
@@ -1203,7 +1224,7 @@ func push_world_snapshot() -> void:
 		var state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
 		if state.has("dir"):state["dir"]=[state["dir"].x,state["dir"].y]
 		var face:Vector2=enemy.get("facing",Vector2.DOWN)
-		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0),"boss_spawn_timer":enemy.get("boss_spawn_timer",0.0)})
+		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0),"boss_spawn_timer":enemy.get("boss_spawn_timer",0.0),"golem":enemy.get("golem",{})})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
 		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0),"kind":shot.get("kind","projectile"),"ability_id":shot.get("ability_id","basic"),"radius":shot.get("radius",0.0),"age":shot.get("age",0.0),"duration":shot.get("duration",0.0)})
@@ -1212,7 +1233,7 @@ func push_world_snapshot() -> void:
 		if not drop.has("drop_uid") or not drop.has("item"):continue
 		var dp:Vector2=drop["pos"]
 		drop_rows.append({"drop_uid":int(drop["drop_uid"]),"pos":[dp.x,dp.y],"item":drop["item"],"life":float(drop.get("life",0.0)),"reserved_class":int(drop.get("reserved_class",-1)),"reserve_ms":maxi(0,int(drop.get("reserve_until_ms",0))-Time.get_ticks_msec())})
-	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows,"drops":drop_rows}
+	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows,"drops":drop_rows,"golem":golem_world.snapshot(world_time)}
 	for peer_id in multiplayer.get_peers():
 		var state: Dictionary = remote_players.get(int(peer_id),{})
 		if str(state.get("context","world")) == "world":
@@ -1224,6 +1245,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 	if int(snapshot.get("protocol",-1)) != NETWORK_PROTOCOL_VERSION: return
 	if str(snapshot.get("context","world")) != "world": return
 	server_last_reply_ms = Time.get_ticks_msec()
+	if golem_world.apply_snapshot(snapshot.get("golem",{}),world_time): golem_trees_changed("")
 	var previous_by_uid: Dictionary = {}
 	for existing in enemies:
 		previous_by_uid[int(existing.get("uid",-1))] = existing
@@ -1248,6 +1270,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 			copy["gait_phase"]=old.get("gait_phase",fposmod(float(copy.get("seed",0.0))*.73,TAU))
 			copy["flash"]=maxf(float(copy.get("flash",0)),float(old.get("flash",0)))
 			if float(copy.get("hp",1))<float(old.get("hp",1)):copy["flash"]=.18
+			if GolemBoss.is_golem(copy):golem_snapshot_sounds(old,copy)
 			if int(copy.get("type",-1)) in [12,13,14]:
 				var old_attack:Dictionary=old.get("attack_state",{})
 				var new_attack:Dictionary=copy.get("attack_state",{})
@@ -1259,6 +1282,9 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 					play_boss_spell_sound(str(ability.get("id","basic")))
 		else:
 			copy["pos"] = target
+			if int(copy.get("type",-1))==GolemBoss.TYPE_BIG and str(copy.get("golem",{}).get("state",""))=="rise" and not boss_spawn_sound_seen.has(uid):
+				boss_spawn_sound_seen[uid]=true
+				play_sound("boss_erscheint")
 			if int(copy.get("type",-1)) in [12,13,14] and float(copy.get("boss_spawn_timer",0.0))>0.0 and not boss_spawn_sound_seen.has(uid):
 				boss_spawn_sound_seen[uid]=true
 				play_sound("boss_erscheint")
@@ -1741,6 +1767,7 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 	return ExperienceRules.reward(base_xp, recipient_level, enemy_level(type))
 
 func _process(delta: float) -> void:
+	if not world_obstacles_3d.enabled(self):world_obstacles_3d.update(self,delta)
 	combat_feedback.step(delta)
 	if not dedicated_server_mode:
 		sound_bank.tick(delta)
@@ -1843,6 +1870,8 @@ func _process(delta: float) -> void:
 		boss_cooldowns[i] = maxf(0.0, float(boss_cooldowns[i]) - delta)
 	if panel == "":
 		update_rune_effects(delta)
+		update_master_armor(delta)
+		update_golem_client(delta)
 		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * food_system.energy_regen_mult() * essence.energy_mult() * delta)
 		update_elara_healing_field(delta)
 		update_player(delta)
@@ -1965,7 +1994,7 @@ func server_spawn_enemy_for_region(target_region: int, peers: Array) -> bool:
 	if target_region == 0 or peers.is_empty() or normal_mob_count() >= SERVER_WORLD_MOB_CAP: return false
 	var candidates: Array = []
 	for i in ENEMY_TYPES.size():
-		if i not in [12,13,14] and int(ENEMY_TYPES[i]["region"]) == target_region:
+		if i not in [12,13,14,27,28] and int(ENEMY_TYPES[i]["region"]) == target_region:
 			candidates.append(i)
 	if candidates.is_empty(): return false
 	var peer_id := int(peers[randi() % peers.size()])
@@ -2012,7 +2041,7 @@ func server_cleanup_orphan_mobs() -> void:
 	for i in range(enemies.size()-1,-1,-1):
 		var enemy: Dictionary = enemies[i]
 		var type := int(enemy.get("type",-1))
-		if type in [12,13,14] or bool(enemy.get("small_guardian",false)) or bool(enemy.get("invasion",false)): continue
+		if type in [12,13,14,27,28] or bool(enemy.get("small_guardian",false)) or bool(enemy.get("invasion",false)) or bool(enemy.get("golem_minion",false)): continue
 		var region := region_at(Vector2(enemy["pos"]))
 		# Alte/falsch platzierte Weltmobs aus frueheren Builds duerfen keinen
 		# Regionsbestand und keinen globalen Spawnplatz blockieren.
@@ -2203,8 +2232,10 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 				enemy["walking"]=true
 		elif server:
 			rpc_server_damage.rpc_id(int(event["target"]),int(event["damage"]))
+			apply_master_thorns(enemy,int(event["damage"]),master_armor_of(int(event["target"])),int(event["target"]))
 		elif invulnerable<=0:
 			apply_player_damage(int(event["damage"]))
+			apply_master_thorns(enemy,int(event["damage"]),master_armor_id())
 	if int(enemy["type"]) in [0,1,2,3]:
 		enemy["walking"]=moved
 		if moved and str(previous_attack_state.get("ability",{}).get("shape",""))!="leap":
@@ -2220,8 +2251,16 @@ func update_dedicated_enemies(delta:float)->void:
 		if float(enemy.get("hp",0))<=0:
 			MobCombat.cancel(enemy)
 			defeat_enemy(i,int(enemy.get("last_hit_peer",0)));continue
-		if advance_mob(enemy,delta,true):server_moving_mobs+=1
+		if GolemBoss.is_golem(enemy):golem_world.update_golem(self,enemy,golem_targets(),delta)
+		elif advance_mob(enemy,delta,true):server_moving_mobs+=1
 		if float(enemy.get("hp",0))<=0:defeat_enemy(i,int(enemy.get("last_hit_peer",0)))
+	golem_world.update_world(self,delta,true)
+	# Brocken und Bäume sichern, sobald sich etwas ändert (höchstens alle 2 s).
+	golem_save_timer+=delta
+	if golem_save_timer>=2.0 and golem_world.version!=golem_saved_version:
+		golem_save_timer=0.0
+		golem_saved_version=golem_world.version
+		save_golem_world()
 
 
 func mob_shot_cancelled(shot:Dictionary)->bool:
@@ -2399,7 +2438,7 @@ func update_player(delta: float) -> void:
 		walk_phase += delta*anim_rate
 	var run_mult:=lerpf(1.0,sprint_speed_mult(),sprint_speed_curve(sprint_blend))
 	var ultimate_move_mult := ranger_ultimate_speed_mult if class_id == 2 and ranger_ultimate_speed_timer > 0.0 else 1.0
-	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult() * ultimate_move_mult * essence.movement_mult())*delta
+	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult() * ultimate_move_mult * essence.movement_mult() * MasterArmor.move_mult(master_armor_id()))*delta
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
@@ -2488,6 +2527,8 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 			if SpawnStoneBody.blocks(pos-stone,0,hero_collision_radius()):return true
 			continue
 		if WaystoneShrine.blocks(pos-stone,from_pos-stone): return true
+	# Liegende Golem-Brocken blockieren; wer schon drinsteckt, kommt heraus.
+	if region_at(pos) == 12 and golem_world.boulder_at(pos, hero_collision_radius()) and not golem_world.boulder_at(from_pos, hero_collision_radius() - 4.0): return true
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
 	if preload("res://components/village_forecourts.gd").blocked(pos,hero_collision_radius()):return true
@@ -2596,6 +2637,7 @@ func active_class_boss_music_theme()->String:
 	if boss_music_hold_timer>0.0 and boss_music_hold_theme!="":return boss_music_hold_theme
 	for enemy in enemies:
 		var type:=int(enemy.get("type",-1))
+		if GolemBoss.is_golem(enemy) and float(enemy.get("hp",0.0))>0.0 and player_pos.distance_to(Vector2(enemy["pos"]))<1400.0:return "boss_golem"
 		if type not in [12,13,14] or float(enemy.get("hp",0.0))<=0.0:continue
 		if region_at(player_pos)!=region_at(Vector2(enemy["pos"])):continue
 		if player_pos.distance_to(Vector2(enemy["pos"]))>1200.0:continue
@@ -2605,7 +2647,7 @@ func active_class_boss_music_theme()->String:
 	return ""
 
 func music_path_for_theme(theme:String)->String:
-	if theme in CLASS_BOSS_MUSIC_THEMES:
+	if theme in CLASS_BOSS_MUSIC_THEMES or theme=="boss_golem":
 		var custom:="res://music/%s.ogg" % theme
 		if ResourceLoader.exists(custom):return custom
 		return "res://audio/boss.wav"
@@ -2635,6 +2677,7 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	for stone in WAYSTONES:
 		if p.distance_to(stone) < radius + 110.0: return {}
 	if near_waystone_shrine(p, radius + 24.0): return {}
+	if GolemBoss.in_arena(p, radius - 150.0): return {}
 	for portal in PORTALS:
 		if p.distance_to(portal[0]) < radius + 150.0 or p.distance_to(portal[1]) < radius + 150.0: return {}
 	return {"pos":p, "radius":radius, "zone":zone, "key":key}
@@ -2659,6 +2702,7 @@ func make_decorative_tree(tx:int,ty:int) -> Dictionary:
 	if not region_rect(zone).grow(-45).encloses(Rect2(point-Vector2(100,160),Vector2(200,210))): return {}
 	if distance_to_trail(point)<120.0:return {}
 	if near_waystone_shrine(point+Vector2(24,42), 56.0):return {}
+	if golem_world.tree_knocked(Vector2i(tx,ty)) or (point+Vector2(24,42)).distance_to(GolemBoss.ALTAR)<260.0:return {}
 	var tree := false
 	match zone:
 		1: tree = key%8==0
@@ -3193,6 +3237,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		typing_feedback(code_before, join_code.length())
 		queue_redraw()
 		return
+	# Shop: Maus auf ein Angebot + Enter kauft sofort; im Fenster bestätigt Enter.
+	if panel == "shop" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+		if shop_quick_buy(get_viewport().get_mouse_position()):
+			get_viewport().set_input_as_handled()
+			return
 	# Texteingabe für einmalige Charaktererstellung.
 	if panel == "creation" and event is InputEventKey and event.pressed and not event.echo:
 		var name_before := creation_name.length()
@@ -3588,6 +3637,7 @@ func normal_attack() -> void:
 	var variant := equipped_weapon_variant()
 	attack_timer = 0.62 if variant == "axe" else (0.78 if variant == "crossbow" else (0.45 if class_id == 0 else (0.62 if class_id == 1 else 0.52)))
 	if class_id == 2 and ranger_hunt_buff > 0.0: attack_timer /= 1.25
+	attack_timer /= MasterArmor.attack_speed_mult(master_armor_id())
 	if class_id == 2 and ranger_ultimate_speed_timer > 0.0: attack_timer /= ranger_ultimate_speed_mult
 	if robotics_overclock_timer > 0.0: attack_timer /= 1.18
 	if class_mastery_unlocked and class_id == 0: warrior_rage = minf(100.0, warrior_rage + 8.0)
@@ -3657,7 +3707,9 @@ func hit_arc(origin: Vector2, direction: Vector2, reach: float, threshold: float
 		if i>=enemies.size():continue
 		var enemy: Dictionary = enemies[i]
 		var offset: Vector2 = enemy["pos"] - origin
-		if offset.length() <= reach and (offset.length() < 25 or direction.dot(offset.normalized()) > threshold):
+		# Große Golems: Nahkampf trifft schon an ihrer Außenkante.
+		var body := mob_hit_radius(enemy) - 28.0 if GolemBoss.is_golem(enemy) else 0.0
+		if offset.length() <= reach + body and (offset.length() < 25 + body or direction.dot(offset.normalized()) > threshold):
 			damage_enemy(i, damage, direction, stun, element, source_peer)
 
 func move_enemy_with_collision(enemy: Dictionary, displacement: Vector2) -> void:
@@ -3735,18 +3787,23 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 		var reference:=normal_attack_power() if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("normal_power",1)),1,140+attacker_level*30)
 		amount=necklaces.direct_hit(neck,source_peer,enemy,reference,amount,Time.get_ticks_msec())
 		if source_peer>0:sync_necklace_progress(source_peer)
+	if GolemBoss.is_golem(enemy):
+		amount = maxi(1, roundi(amount * GolemBoss.incoming_mult(enemy)))
+		if source_peer > 0: golem_world.participants[source_peer] = true
 	enemy["hp"] = float(enemy["hp"]) - amount
 	enemy["flash"] = 0.16
 	if source_peer > 0 and network_mode == "host":
 		server_broadcast_hit_confirm(source_peer,enemy,amount)
-	move_enemy_with_collision(enemy,push*18.0)
-	if stun: enemy["stun"] = 1.2
+	# Der Golem lässt sich weder wegstoßen noch betäuben.
+	if not GolemBoss.is_golem(enemy):
+		move_enemy_with_collision(enemy,push*18.0)
+		if stun: enemy["stun"] = 1.2
 	if apply_runes and rune_rank(3,4,source_peer)==4 and rune_hit_from_behind(enemy,source_peer):
 		enemy["stun"]=maxf(float(enemy.get("stun",0)),0.35)
 	effect(enemy["pos"] + Vector2(0, -25), str(amount), Color("fff1a1"), 0.75)
 	if apply_runes and source_peer<=0 and drain_timer>0:heal_player(minf(8.0,amount*.2))
 	if apply_runes:
-		var stolen:float=minf(float(amount),maxf(0.0,float(enemy["hp"])+amount))*.02*rune_rank(0,1,source_peer)
+		var stolen:float=minf(float(amount),maxf(0.0,float(enemy["hp"])+amount))*(.02*rune_rank(0,1,source_peer)+MasterArmor.lifesteal(master_armor_of(source_peer),int(enemy.get("elite",0))>0 or int(enemy["type"]) in [12,13,14]))
 		if source_peer>0:
 			if stolen>0.0 or (element!="" and rune_rank(2,4,source_peer)>0):rpc_rune_hit_reward.rpc_id(source_peer,stolen,element!="")
 		else:rune_hit_reward(stolen,element!="")
@@ -3846,19 +3903,20 @@ func use_ability(slot: int) -> void:
 	if id < 0 or id >= ABILITIES.size() or not learned[id]: return
 	var ability: Dictionary = ABILITIES[id]
 	if float(ability["cd"]) <= 0.0: return
-	if float(cooldowns[id]) > 0 or energy < float(ability["cost"]): return
+	var ability_cost := float(ability["cost"]) * MasterArmor.ability_cost_mult(master_armor_id())
+	if float(cooldowns[id]) > 0 or energy < ability_cost: return
 	if konflux.active:
 		if KonfluxMap.safe(player_pos,konflux.room):
 			message("Keine Angriffe im geschützten Spawnkreis.")
 			return
-		energy -= float(ability["cost"])
+		energy -= ability_cost
 		cooldowns[id] = float(ability["cd"])*essence.cooldown_mult()
 		konflux.attack(self,id)
 		return
 	if waystone_safe_at(player_pos):
 		message("Wegstein-Schutz: Hier sind Fähigkeiten deaktiviert.")
 		return
-	energy -= float(ability["cost"])
+	energy -= ability_cost
 	var rank: int = int(skill_levels[id])
 	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1)) * essence.cooldown_mult()
 	var power := maxi(1,roundi(float(ability_cast_power(id,rank))*essence.ability_power_mult()))
@@ -4473,6 +4531,7 @@ func open_elara_alchemy() -> void:
 	menu_scroll=0
 	sell_all_confirm=false
 	pending_purchase=-1
+	pending_sale = -1
 	pending_purchase_item={}
 
 func open_pip_arcane_shop() -> void:
@@ -4486,6 +4545,7 @@ func open_pip_arcane_shop() -> void:
 	menu_scroll=0
 	sell_all_confirm=false
 	pending_purchase=-1
+	pending_sale = -1
 	pending_purchase_item={}
 
 func interior_actors() -> Array:
@@ -4668,7 +4728,7 @@ func spawn_enemy() -> void:
 	var target_region: int = region
 	var candidates: Array = []
 	for i in ENEMY_TYPES.size():
-		if i not in [12, 13, 14] and int(ENEMY_TYPES[i]["region"]) == target_region: candidates.append(i)
+		if i not in [12, 13, 14, 27, 28] and int(ENEMY_TYPES[i]["region"]) == target_region: candidates.append(i)
 	if candidates.is_empty(): return
 	var type: int = int(candidates.pick_random())
 	var p: Vector2 = Vector2.ZERO
@@ -4806,10 +4866,11 @@ func update_enemies(delta:float)->void:
 		var enemy:Dictionary=enemies[i]
 		if float(enemy.get("hp",0))<=0:
 			MobCombat.cancel(enemy);defeat_enemy(i);continue
-		var despawn_range:=3600.0 if int(enemy.get("type",-1)) in [12,13,14] else 1250.0
+		var despawn_range:=3600.0 if int(enemy.get("type",-1)) in [12,13,14,27,28] else 1250.0
 		if enemy["pos"].distance_to(player_pos)>despawn_range and arena_mode=="" and int(enemy.get("target_peer",-1))<0:
 			enemies.remove_at(i);continue
-		advance_mob(enemy,delta,false)
+		if GolemBoss.is_golem(enemy):golem_world.update_golem(self,enemy,golem_targets(),delta)
+		else:advance_mob(enemy,delta,false)
 		if panel=="arena_reward":return
 		if float(enemy.get("hp",0))<=0 and i<enemies.size():defeat_enemy(i)
 
@@ -4821,7 +4882,23 @@ func apply_player_damage(raw: int) -> void:
 		effect(player_pos,"BLOCK",Color("b5e6fb"),0.6)
 		return
 	update_rune_effects(0.0)
-	var dealt := maxi(1, int((raw - equipment_power(equipped_armor_uid)) * food_system.damage_taken_mult()))
+	var master := master_armor_id()
+	seconds_since_hit = 0.0
+	if randf() < MasterArmor.block_chance(master):
+		effect(player_pos,"BLOCK",Color("e0b85a"),0.6)
+		return
+	var armor_value := equipment_power(equipped_armor_uid) + MasterArmor.bonus_armor(master, hp/maxf(1.0,max_hp()))
+	if master == MasterArmor.ARKAN and arkan_shield_cooldown <= 0.0:
+		raw = maxi(0, raw - MasterArmor.ARKAN_SHIELD)
+		arkan_shield_cooldown = MasterArmor.ARKAN_SHIELD_COOLDOWN
+		effect(player_pos,"ARKANSCHILD",Color("8fe6ff"),0.6)
+	var dealt := maxi(1, int((raw - armor_value) * food_system.damage_taken_mult()))
+	if master == MasterArmor.GOLEM:
+		if golem_guard_timer <= 0.0 and golem_guard_cooldown <= 0.0 and (hp-dealt)/maxf(1.0,max_hp()) < MasterArmor.GOLEM_GUARD_THRESHOLD:
+			golem_guard_timer = MasterArmor.GOLEM_GUARD_TIME
+			golem_guard_cooldown = MasterArmor.GOLEM_GUARD_COOLDOWN
+			effect(player_pos,"STEINHAUT",Color("b45cff"),0.9)
+		if golem_guard_timer > 0.0: dealt = maxi(1, int(dealt*0.5))
 	if rune_emergency_timer>0.0:dealt=maxi(1,roundi(dealt*(1.0-.10*essence.rank(1,2))))
 	if shield_timer > 0: dealt = maxi(1, int(dealt * 0.35))
 	if class_id == 0 and standing_in_battle_zone(): dealt = maxi(1, int(dealt * 0.78))
@@ -4965,6 +5042,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var pos: Vector2 = enemy["pos"]
 	play_world_sound(SoundBank.death_sound_for(type), pos)
 	enemies.remove_at(index)
+	if GolemBoss.is_golem(enemy): on_golem_defeated(enemy)
 	if type==12:
 		for j in range(enemies.size()-1,-1,-1):
 			if int(enemies[j].get("guardian_of",-1))==int(enemy["uid"]):enemies.remove_at(j)
@@ -4992,6 +5070,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)),"item":relic,"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		drops.append({"pos":safe_drop_position(pos,Vector2(-25,8)),"item":class_boss_hat_item(type-12),"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		if type==14:drops.append({"pos":safe_drop_position(pos,Vector2(0,34)),"item":ranger_falcon_rune_item(),"life":180.0,"reserved_class":2,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
+		if randf()<MasterArmor.CLASS_BOSS_CHANCE:drops.append({"pos":safe_drop_position(pos,Vector2(-40,30)),"item":master_armor_item(MasterArmor.CLASS_BOSS_ARMOR[type-12]),"life":180.0})
 		message("%s besiegt! %s und sein Klassenhut liegen als Beute am Boden." % [ENEMY_TYPES[type]["name"],CLASS_RELIC_NAMES[type-12]])
 		if bosses_defeated.count(true) == bosses_defeated.size() and not final_completed and final_countdown < 0.0:
 			final_countdown = 8.0
@@ -5170,6 +5249,8 @@ func collect_drops() -> void:
 		save_game()
 
 func interact() -> void:
+	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and player_pos.distance_to(GolemBoss.ALTAR) < GolemBoss.ALTAR_USE_RANGE:
+		try_golem_summon();return
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and player_pos.distance_to(BORIN_CRYSTAL_POS) < 95.0:
 		panel="fusion";play_sound("ui_dialog");return
 	if konflux.active:
@@ -5308,6 +5389,7 @@ func interact() -> void:
 		menu_scroll = 0
 		sell_all_confirm = false
 		pending_purchase = -1
+		pending_sale = -1
 		pending_purchase_item = {}
 
 func interact_world_event(index: int) -> void:
@@ -5658,6 +5740,7 @@ func capture_save_data() -> Dictionary:
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
+	data["golem_world"] = golem_world.save_state()
 	data["essence_state"] = essence.snapshot()
 	data["book_state"] = book_system.snapshot()
 	data["world_fog"] = world_fog.legacy_snapshot()
@@ -5762,6 +5845,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if not from_server and not creative_mode: server_save.restore(data)
 	food_system.restore(data.get("food_state",{}))
 	steinrose.restore(data.get("steinrose_state",{}))
+	if not uses_server_world(): golem_world.load_state(data.get("golem_world",{}))
 	world_fog.restore(data.get("world_fog",[]),WORLD,data.get("world_fog_fine",""))
 	var stored_recent: Variant = data.get("recent_players",[])
 	recent_players = stored_recent if stored_recent is Array else []
@@ -5862,6 +5946,10 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	var stored_shop: Variant = data.get("shop_stock", {})
 	if stored_shop is Dictionary and stored_shop.has("smith"):
 		shop_stock = stored_shop.duplicate(true)
+		for stock in shop_stock.values():
+			if stock is Array:
+				for offer in stock:
+					if offer is Dictionary:FoodSystem.normalize_item(offer)
 		for role in shop_stock:shop_stock[role]=shop_stock[role].slice(maxi(0,shop_stock[role].size()-30))
 	for offers in shop_stock.values():
 		for item in offers:ArcaneNecklaces.normalize(item)
@@ -6254,6 +6342,7 @@ func panel_click(mouse: Vector2) -> void:
 		panel = controls_return_panel if panel == "controls" else (quest_guide.return_panel if panel == "quest_details" else "")
 		sell_all_confirm = false
 		pending_purchase = -1
+		pending_sale = -1
 		return
 	match panel:
 		"essence": click_essence(mouse)
@@ -6391,6 +6480,8 @@ func reset_character_state() -> void:
 	party_state = {}
 	food_system.restore({})
 	steinrose.restore({})
+	golem_world = GolemBoss.new()
+	golem_debris.clear()
 	pip_loan_level = 0
 	pip_return_dialogue_index = 0
 	processed_server_transactions.clear()
@@ -7213,13 +7304,28 @@ func click_inventory(mouse: Vector2) -> void:
 
 func click_shop(mouse: Vector2) -> void:
 	if pending_purchase >= 0:
-		if Rect2(352, 391, 204, 45).has_point(mouse):
-			buy_item(pending_purchase_item)
+		var maximum := ShopTrade.max_buy(int(pending_purchase_item.get("price",0)), gold)
+		var changed := ShopTrade.click_quantity(mouse, trade_quantity, maximum)
+		if changed >= 0:
+			trade_quantity = changed
+			play_sound("ui_klick")
+		elif ShopTrade.CONFIRM.has_point(mouse):
+			confirm_shop_dialog()
+		elif ShopTrade.CANCEL.has_point(mouse) or not ShopTrade.DIALOG.has_point(mouse):
 			pending_purchase = -1
+			pending_sale = -1
 			pending_purchase_item = {}
-		elif Rect2(578, 391, 204, 45).has_point(mouse) or not Rect2(315, 210, 522, 247).has_point(mouse):
-			pending_purchase = -1
-			pending_purchase_item = {}
+		return
+	if pending_sale >= 0:
+		var stack := int(inventory[pending_sale].get("count",1)) if pending_sale < inventory.size() else 1
+		var changed_sale := ShopTrade.click_quantity(mouse, trade_quantity, stack)
+		if changed_sale >= 0:
+			trade_quantity = changed_sale
+			play_sound("ui_klick")
+		elif ShopTrade.CONFIRM.has_point(mouse):
+			confirm_shop_dialog()
+		elif ShopTrade.CANCEL.has_point(mouse) or not ShopTrade.DIALOG.has_point(mouse):
+			pending_sale = -1
 		return
 	if merchant_kind=="alchemy" and Rect2(600,145,150,40).has_point(mouse):
 		visit_healer()
@@ -7236,6 +7342,7 @@ func click_shop(mouse: Vector2) -> void:
 			sell_all_confirm = false
 			pending_purchase = i
 			pending_purchase_item = stock[i].duplicate(true)
+			trade_quantity = 1
 			return
 	for i in inventory.size():
 		var col := i % 11
@@ -7249,11 +7356,47 @@ func click_shop(mouse: Vector2) -> void:
 			sell_all_unequipped()
 		else:
 			sell_all_confirm = true
-			message("Alle nicht ausgerüsteten Items verkaufen? Erneut klicken.")
+			var preview := sell_all_preview()
+			message("Alle nicht ausgerüsteten Items verkaufen? %d Items · +%d Gold. Erneut klicken." % [preview[0], preview[1]])
 		return
-	if Rect2(786, 562, 183, 39).has_point(mouse) and selected_item >= 0:
+	if Rect2(786, 562, 183, 39).has_point(mouse) and selected_item >= 0 and selected_item < inventory.size():
 		sell_all_confirm = false
-		sell_item(selected_item)
+		pending_sale = selected_item
+		trade_quantity = 1
+
+## Bestätigt das offene Kauf- oder Verkaufsfenster (Knopf oder Enter).
+func confirm_shop_dialog() -> void:
+	if pending_purchase >= 0:
+		buy_items(pending_purchase_item, trade_quantity)
+		pending_purchase = -1
+		pending_purchase_item = {}
+	elif pending_sale >= 0:
+		sell_items(pending_sale, trade_quantity)
+		pending_sale = -1
+	trade_quantity = 1
+	queue_redraw()
+
+## Maus auf einem Angebot + Enter: sofort 1 Stück kaufen.
+func shop_quick_buy(mouse: Vector2) -> bool:
+	if pending_purchase >= 0 or pending_sale >= 0:
+		confirm_shop_dialog()
+		return true
+	var stock: Array = shop_stock[merchant_kind].slice(shop_page*3,shop_page*3+3)
+	var hovered := ShopTrade.offer_at(mouse, stock.size())
+	if hovered < 0: return false
+	buy_items(stock[hovered].duplicate(true), 1)
+	queue_redraw()
+	return true
+
+## [Anzahl, Gold] für „Alles verkaufen“ (ohne Ausrüstung und Gesperrtes).
+func sell_all_preview() -> Array:
+	var total := 0
+	var count := 0
+	for item in inventory:
+		if int(item["uid"]) in equipped_item_uids() or bool(item.get("locked",false)): continue
+		total += item_sale_value(item)
+		count += int(item.get("count", 1))
+	return [count, total]
 
 func sell_all_unequipped() -> void:
 	var total := 0
@@ -7341,7 +7484,7 @@ func use_item(index: int) -> void:
 	if item["icon"] == "potion":
 		play_sound("spieler_trank")
 		if name in ["Energietrank", "Manatrank"]: energy = minf(max_energy(), energy + 65)
-		else: heal_player(max_hp() * (0.8 if name == "Großer Heiltrank" else 0.5))
+		else: heal_player(max_hp() * (0.8 if name == "Großer Heiltrank" else 0.5) * MasterArmor.potion_mult(master_armor_id()))
 		if int(item.get("count", 1)) > 1:
 			item["count"] = int(item["count"]) - 1
 			item["stack_value"] = maxi(0, item_sale_value(item) - int(item.get("value", 0)))
@@ -7368,6 +7511,7 @@ func refresh_shop_stock() -> void:
 	var suffix:String=theme["suffix"]
 	shop_page=0
 	pending_purchase=-1
+	pending_sale = -1
 	pending_purchase_item={}
 	var rarity := 1 if tier < 12 else (2 if tier < 30 else 3)
 	var shop_element:String=theme["element"]
@@ -7408,6 +7552,15 @@ func refresh_shop_stock() -> void:
 		var batch:Array=[]
 		for offset in 3:batch.append(pool[(shop_rotation*3+offset)%pool.size()])
 		shop_stock[role]=preload("res://components/shop_rotation.gd").append_offers(previous_stock.get(role,[]),batch)
+	# Ab Stufe 40 hat Torvald je Rotation eine legendäre Rüstung.
+	var master_offer := MasterArmor.smith_offer(level, shop_rotation)
+	if not master_offer.is_empty() and shop_stock.has("smith"):
+		var known := false
+		for offer in shop_stock["smith"]:
+			if int(offer.get("master_armor",-1)) == int(master_offer["master_armor"]): known = true
+		if not known:
+			shop_stock["smith"].append(master_offer)
+			while shop_stock["smith"].size() > 30: shop_stock["smith"].pop_front()
 
 func append_food_stock() -> void:
 	if not shop_stock.has("merchant"): shop_stock["merchant"]=[]
@@ -7435,36 +7588,69 @@ func append_new_equipment() -> void:
 			if old["name"] == offer["name"]: exists = true
 		if not exists: shop_stock["merchant"].append(offer)
 
-func buy_item(stock_item: Dictionary) -> void:
+func buy_item(stock_item: Dictionary, announce: bool = true) -> bool:
 	ArcaneNecklaces.normalize(stock_item)
 	var price := maxi(0,int(stock_item.get("price",0)))
 	if gold < price:
 		message_error("Dafür fehlen dir %d Gold." % (price-gold))
-		return
+		return false
 	var icon := str(stock_item.get("icon","gem"))
 	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food","head","necklace"]:
 		message("Dieses Angebot ist ungültig.")
-		return
+		return false
 	var purchased := make_item(String(stock_item.get("name","Fundstück")), icon, clampi(int(stock_item.get("rarity",1)),0,4), maxi(0,int(stock_item.get("power",0))), int(price/2.0), String(stock_item.get("element","")), maxi(1,int(stock_item.get("level",level))))
 	if icon=="head":
 		purchased["head_class"]=clampi(int(stock_item.get("head_class",1 if merchant_kind=="arcane" else class_id)),0,2)
 		purchased["design"]=purchased["head_class"]
+	if stock_item.has("master_armor") and int(stock_item["master_armor"]) in MasterArmor.SHOP_IDS:
+		if level < MasterArmor.LEVEL:
+			message_error("Diese Rüstung kannst du ab Stufe %d tragen und kaufen." % MasterArmor.LEVEL)
+			return false
+		MasterArmor.apply(purchased,int(stock_item["master_armor"]))
 	if int(stock_item.get("skill_unlock",-1))>=0:
 		purchased["skill_unlock"]=int(stock_item["skill_unlock"])
 		purchased["tooltip"]="Lernen: %s" % ABILITIES[int(stock_item["skill_unlock"])]["name"]
 	if not can_add_item(purchased):
 		message_error("Dein Inventar ist voll.")
-		return
+		return false
 	var gold_before := gold
 	gold -= price
 	if not add_item(purchased):
 		gold = gold_before
 		message("Kauf abgebrochen · Inventar konnte nicht aktualisiert werden.")
-		return
+		return false
 	validate_equipment_slots()
-	play_sound("kaufen")
-	message("Gekauft: %s" % stock_item.get("name","Fundstück"))
-	save_game()
+	if announce:
+		play_sound("kaufen")
+		message("Gekauft: %s" % stock_item.get("name","Fundstück"))
+		save_game()
+	return true
+
+## Mehrere Stück kaufen; stoppt bei fehlendem Gold oder vollem Inventar.
+func buy_items(stock_item: Dictionary, amount: int) -> int:
+	var bought := 0
+	for i in clampi(amount,1,ShopTrade.MAX_BUY):
+		if not buy_item(stock_item.duplicate(true), false): break
+		bought += 1
+	if bought > 0:
+		play_sound("kaufen")
+		message("Gekauft: %d× %s für %d Gold" % [bought, stock_item.get("name","Fundstück"), bought*maxi(0,int(stock_item.get("price",0)))])
+		save_game()
+	return bought
+
+## Mehrere Stück eines Stapels verkaufen (wie mehrmals VERKAUFEN).
+func sell_items(index: int, amount: int) -> int:
+	if index < 0 or index >= inventory.size(): return 0
+	var uid := int(inventory[index].get("uid",-1))
+	var sold := 0
+	for i in clampi(amount,1,maxi(1,int(inventory[index].get("count",1)))):
+		if index >= inventory.size() or int(inventory[index].get("uid",-1)) != uid: break
+		var before := inventory.size()
+		var count_before := int(inventory[index].get("count",1))
+		sell_item(index)
+		if inventory.size() == before and index < inventory.size() and int(inventory[index].get("count",1)) == count_before: break
+		sold += 1
+	return sold
 
 func sell_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
@@ -7532,7 +7718,9 @@ func _draw() -> void:
 					var label:="E · %s" % item["name"]
 					if class_relic_locked_for_player(drop,class_id):label="🔒 %s · für %s reserviert" % [item["name"],CLASS_NAMES[reserved]]
 					text_at(p+Vector2(-105,-34),label,11,Color("fff1bd"),HORIZONTAL_ALIGNMENT_CENTER,210)
+	draw_golem_world_fx()
 	draw_sorted_world_objects()
+	draw_golem_overlay()
 	for cloud in poison_clouds:
 		if visible_world(cloud["pos"], 110):
 			var center: Vector2 = cloud["pos"]
@@ -8005,9 +8193,48 @@ func cardinal_direction_index(dir: Vector2) -> int:
 	if absf(dir.x) > absf(dir.y): return 2 if dir.x > 0.0 else 1
 	return 0 if dir.y > 0.0 else 3
 
+## Getragene legendäre Rüstung (0–6) oder -1.
+func master_armor_item(id: int) -> Dictionary:
+	var item := make_item(str(MasterArmor.ARMORS[id]["name"]), "armor", 4, int(MasterArmor.ARMORS[id]["power"]), 0, "", MasterArmor.LEVEL)
+	MasterArmor.apply(item, id)
+	item["value"] = maxi(400, int(MasterArmor.ARMORS[id]["price"]) / 4) if id != MasterArmor.GOLEM else 5000
+	return item
+
+func master_armor_id() -> int:
+	if equipped_armor_uid < 0: return -1
+	for item in inventory:
+		if int(item.get("uid",-1)) == equipped_armor_uid: return MasterArmor.index(item)
+	return -1
+
+## Legendäre Rüstung eines Spielers (lokal oder über den Server-Zustand).
+func master_armor_of(peer: int) -> int:
+	if peer <= 0: return master_armor_id()
+	return MasterArmor.id_from_design(int(remote_players.get(peer,{}).get("armor",-1)))
+
+## Pro Bild: Abklingzeiten, Golem-Steinhaut, Sternenquell-Erholung.
+func update_master_armor(delta: float) -> void:
+	arkan_shield_cooldown = maxf(0.0, arkan_shield_cooldown-delta)
+	golem_guard_timer = maxf(0.0, golem_guard_timer-delta)
+	golem_guard_cooldown = maxf(0.0, golem_guard_cooldown-delta)
+	seconds_since_hit += delta
+	var regen := MasterArmor.regen(master_armor_id(), seconds_since_hit)
+	if regen > 0.0 and hp > 0.0 and hp < max_hp(): heal_player(regen*delta)
+
+## Dornenpanzer: Angreifer bekommt einen Teil des Nahkampfschadens zurück.
+func apply_master_thorns(enemy: Dictionary, raw: int, armor_id: int, peer: int = 0) -> void:
+	var back := MasterArmor.thorns_damage(armor_id, raw)
+	if back <= 0 or float(enemy.get("hp",0)) <= 0: return
+	enemy["hp"] = float(enemy["hp"]) - back
+	enemy["flash"] = 0.16
+	if peer > 0: enemy["last_hit_peer"] = peer
+	if randf() < MasterArmor.THORN_ROOT_CHANCE: enemy["stun"] = maxf(float(enemy.get("stun",0.0)), 1.0)
+	effect(enemy["pos"] + Vector2(0, -30), "DORNEN %d" % back, Color("a8c36a"), 0.6)
+
 func armor_visual() -> int:
 	for item in inventory:
 		if int(item.get("uid",-1)) == equipped_armor_uid:
+			var master := MasterArmor.index(item)
+			if master >= 0: return MasterArmor.design(master)
 			var title := str(item.get("name","")).to_lower()
 			for key in ["reis", "wacht", "arkan", "wald", "sonnen", "kristall"]:
 				if key in title: return ["reis", "wacht", "arkan", "wald", "sonnen", "kristall"].find(key)
@@ -8400,10 +8627,11 @@ func draw_static_overworld(bounds: Rect2) -> void:
 			if class_boss_arena_index_at(p,55.0)>=0 or point_near_class_boss_house(p,85.0):continue
 			if not region_rect(zone).grow(-45).encloses(Rect2(p-Vector2(100,160),Vector2(200,210))): continue
 			if distance_to_trail(p) < 120.0: continue
+			if zone == 12 and (golem_world.tree_knocked(Vector2i(tx,ty)) or p.distance_to(GolemBoss.ALTAR) < 260.0): continue
 			if zone == 0:
 				if key % 6 == 0: draw_flower(p, key)
 				elif key % 10 == 0: draw_grass(p)
-			elif WorldObstacles3D.replaces_static(zone):continue
+			elif WorldObstacles3D.replaces_static(zone):WorldObstacles3D.paint_ground(self,zone,key,p,wet)
 			elif zone == 1:
 				if key % 8 == 0: draw_tree(p, zone)
 				elif key % 4 == 0: draw_bush_cluster(p, zone, key)
@@ -9178,6 +9406,10 @@ func mob_attack_target_position(enemy:Dictionary)->Vector2:
 	return Vector2(enemy["pos"])+Vector2(enemy.get("facing",Vector2.DOWN))*165.0
 
 func draw_enemy(enemy: Dictionary) -> void:
+	if GolemBoss.is_golem(enemy):
+		GolemDesign.draw_scrape_warning(self,Vector2(enemy["pos"]),enemy.get("golem",{}))
+		GolemDesign.draw_golem(self,Vector2(enemy["pos"]),int(enemy["type"]),enemy.get("golem",{}),Vector2(enemy.get("facing",Vector2.DOWN)),world_time,float(enemy.get("flash",0.0)))
+		return
 	var p: Vector2 = enemy["pos"]
 	var type: int = int(enemy["type"])
 	var elite_kind: int = int(enemy.get("elite", 0))
@@ -9294,7 +9526,7 @@ func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(side * 13, -23), p + Vector2(side * 27, -43), p + Vector2(side * 29, -17)]), c.darkened(0.18))
 				PixelStyle32.rect(self,Rect2(p + Vector2(side * 9 - 2, -12), Vector2(5, 5)), Color('fff2a5'))
 			PixelStyle32.rect(self,Rect2(p + Vector2(-10, 1), Vector2(20, 11)), Color('c1bbaa'))
-		4: # Steingolem als klarer Ruinenwächter.
+		4: # Steinwächter (früher Steingolem) als klarer Ruinenwächter.
 			PixelStyle32.rect(self,Rect2(p + Vector2(-20, 17 + stride * 0.25), Vector2(14, 18)), c.darkened(0.33))
 			PixelStyle32.rect(self,Rect2(p + Vector2(7, 17 - stride * 0.25), Vector2(14, 18)), c.darkened(0.33))
 			PixelStyle32.rect(self,Rect2(p + Vector2(-24, -26), Vector2(48, 50)), c.darkened(0.16))
@@ -9319,7 +9551,7 @@ func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 			PixelStyle32.arc(self,p + Vector2(0, 4), 17, 0.3, PI - 0.3, 12, Color('e9d4a8'), 3)
 		6: # Krabbe mit kristallisiertem Panzer und Scheren.
 			draw_crab_model(p, c, stride, true)
-		7: # Kristallgolem: massiver Körper mit facettierten Schultern und Kern.
+		7: # Kristallwächter (früher Kristallgolem): massiver Körper mit facettierten Schultern und Kern.
 			for side in [-1.0, 1.0]:
 				PixelStyle32.rect(self,Rect2(p + Vector2(side * 27 - 9, -8 + stride * side * 0.2), Vector2(18, 39)), c.darkened(0.28))
 				PixelStyle32.polygon(self,PackedVector2Array([p + Vector2(side * 22, -20), p + Vector2(side * 39, -39), p + Vector2(side * 43, -8), p + Vector2(side * 25, 5)]), Color('d9faff'))
@@ -9336,7 +9568,7 @@ func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 			PixelStyle32.rect(self,Rect2(p + Vector2(-8, -18), Vector2(5, 6)), Color('ffe388'))
 			PixelStyle32.rect(self,Rect2(p + Vector2(5, -18), Vector2(5, 6)), Color('ffe388'))
 			PixelStyle32.line(self,p + Vector2(-22, 15), p + Vector2(-35, 25 + stride), Color('f7ab6a'), 5)
-		9: # Lavagolem: weiterentwickelter Glutgolem mit schwerem Basaltkörper und Lavarissen.
+		9: # Lavawächter (früher Lavagolem): weiterentwickelter Glutwächter mit schwerem Basaltkörper und Lavarissen.
 			PixelStyle32.rect(self,Rect2(p + Vector2(-31, -31), Vector2(62, 58)), Color('4f3f44'))
 			PixelStyle32.rect(self,Rect2(p + Vector2(-24, -45), Vector2(48, 25)), c)
 			for side in [-1.0, 1.0]:
@@ -9901,7 +10133,7 @@ func draw_hud() -> void:
 		text_at(Vector2(23,food_y+20),"SNACK · +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],10,Color("aed48c"))
 		status_bottom=food_y+34
 	for enemy in enemies:
-		if int(enemy["type"]) in [12, 13, 14] and enemy["pos"].distance_to(player_pos) < 620:
+		if int(enemy["type"]) in [12, 13, 14, 27, 28] and enemy["pos"].distance_to(player_pos) < (1100 if GolemBoss.is_golem(enemy) else 620):
 			ui_box(Rect2(430, 10, 480, 64), Color("5b4547"))
 			text_at(Vector2(446, 37), "BOSS · %s" % ENEMY_TYPES[int(enemy["type"])]["name"], 19, Color("ffe5b5"))
 			bar(Rect2(446, 43, 447, 19), float(enemy["hp"]), float(enemy["max_hp"]), Color("eb866f"), "%d / %d" % [ceili(float(enemy["hp"])), ceili(float(enemy["max_hp"]))])
@@ -10337,7 +10569,7 @@ func draw_mechanics_panel() -> void:
 			var y: float = 242.0 + row*42.0
 			var mob_text: String = ""
 			for e in ENEMY_TYPES.size():
-				if int(ENEMY_TYPES[e]["region"]) == i and e not in [12,13,14]:
+				if int(ENEMY_TYPES[e]["region"]) == i and e not in [12,13,14,27,28]:
 					if mob_text != "": mob_text += ", "
 					mob_text += str(ENEMY_TYPES[e]["name"])
 			var status: String = "OFFEN" if region_available(i) else "GESPERRT"
@@ -11411,7 +11643,9 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var attribute_diff := int(item.get(primary_key, 0)) - int(worn.get(primary_key, 0))
 		var arrow := "▲ +" if attribute_diff > 0 else ("▼ " if attribute_diff < 0 else "= ")
 		text_at(pos + Vector2(14, 145), "%s für %s: %s%d" % [primary_key.to_upper(), CLASS_NAMES[class_id], arrow, attribute_diff], 13, Color("83e4a0") if attribute_diff > 0 else (Color("ee8a86") if attribute_diff < 0 else Color("dfdcc3")))
-	if HeadgearRules.grants_eternal_arrows(item):
+	if MasterArmor.index(item) >= 0:
+		text_at(pos+Vector2(14,168),str(MasterArmor.ARMORS[MasterArmor.index(item)]["effect"]),10,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	elif HeadgearRules.grants_eternal_arrows(item):
 		text_at(pos+Vector2(14,168),HeadgearRules.ETERNAL_ARROWS_TEXT,11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
 	elif bool(item.get("boss_relic",false)) or str(item.get("rune_id",""))!="":
 		text_at(pos+Vector2(14,168),str(item.get("tooltip","Spezialgegenstand")),11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
@@ -11469,7 +11703,7 @@ func draw_shop_panel() -> void:
 	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else ("PIP (ARKANHANDEL)" if merchant_kind == "arcane" else "HÄNDLER"))
 	text_at(Vector2(165, 125), shop_name, 25, Color("ffeda9"))
 	text_at(Vector2(804, 126), "%d GOLD" % gold, 17, Color("f9dba0"))
-	text_at(Vector2(169, 174), "%d/30 Angebote · 3 neu in %d:%02d" % [shop_stock[merchant_kind].size(),int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 16, Color("e8f2de"))
+	text_at(Vector2(169, 174), "%d/30 Angebote · 3 neu in %d:%02d · Maus + ENTER kauft sofort" % [shop_stock[merchant_kind].size(),int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 16, Color("e8f2de"), HORIZONTAL_ALIGNMENT_LEFT, 420)
 	ui_button(Rect2(760,145,80,40),"<",shop_page>0)
 	ui_button(Rect2(850,145,100,40),str(shop_page+1)+" / "+str(int((shop_stock[merchant_kind].size()+2)/3)),(shop_page+1)*3 < shop_stock[merchant_kind].size())
 	if merchant_kind=="alchemy": ui_button(Rect2(600,145,150,40),"VOLLHEILUNG")
@@ -11498,8 +11732,13 @@ func draw_shop_panel() -> void:
 			text_at(pos + Vector2(17, 35), "×%d" % int(inventory[i]["count"]), 11, Color("fff1c8"))
 	if selected_item >= 0 and selected_item < inventory.size():
 		var chosen: Dictionary = inventory[selected_item]
-		text_at(Vector2(171, 592), "%s · %d Gold pro Stück" % [chosen["name"], int(chosen["value"])], 16, RARITY_COLORS[int(chosen["rarity"])])
-	ui_button(Rect2(564, 562, 210, 39), "BESTÄTIGEN?" if sell_all_confirm else "ALLES VERKAUFEN")
+		var stack_count := int(chosen.get("count",1))
+		var worth := "%s · %d Gold" % [chosen["name"], ShopTrade.stack_sale_total(item_sale_value(chosen), stack_count, 1)]
+		if stack_count > 1: worth += " pro Stück · alle %d: %d Gold" % [stack_count, item_sale_value(chosen)]
+		text_at(Vector2(171, 592), worth, 15, RARITY_COLORS[int(chosen["rarity"])], HORIZONTAL_ALIGNMENT_LEFT, 385)
+	var sell_all_label := "ALLES VERKAUFEN"
+	if sell_all_confirm: sell_all_label = "OK? +%d GOLD" % int(sell_all_preview()[1])
+	ui_button(Rect2(564, 562, 210, 39), sell_all_label)
 	ui_button(Rect2(786, 562, 183, 39), "VERKAUFEN", selected_item >= 0)
 	var mouse := get_viewport().get_mouse_position()
 	for i in stock.size():
@@ -11513,10 +11752,25 @@ func draw_shop_panel() -> void:
 		var pending: Dictionary = shop_preview_item(pending_purchase_item)
 		draw_item_icon(Vector2(346, 270), String(pending["icon"]), RARITY_COLORS[int(pending["rarity"])], 1.6, weapon_visual_stage(pending), item_design(pending))
 		text_at(Vector2(413, 298), String(pending["name"]), 19, RARITY_COLORS[int(pending["rarity"])])
-		text_at(Vector2(413, 326), "Preis: %d Gold   ·   Dein Gold: %d" % [int(pending_purchase_item["price"]), gold], 16, Color("f6dca1"))
-		text_at(Vector2(345, 365), "Diesen Gegenstand wirklich kaufen?", 16, Color("f1ead6"))
-		ui_button(Rect2(352, 391, 204, 45), "KAUFEN")
-		ui_button(Rect2(578, 391, 204, 45), "ABBRECHEN")
+		var unit := int(pending_purchase_item["price"])
+		text_at(Vector2(413, 326), "Preis: %d Gold   ·   Dein Gold: %d" % [unit, gold], 16, Color("f6dca1"))
+		var maximum := ShopTrade.max_buy(unit, gold)
+		ShopTrade.draw_quantity(self, trade_quantity, maximum, "Gesamt: %d Gold" % (unit*trade_quantity))
+		ui_button(ShopTrade.CONFIRM, "KAUFEN · ENTER", gold >= unit)
+		ui_button(ShopTrade.CANCEL, "ABBRECHEN")
+	if pending_sale >= 0 and pending_sale < inventory.size():
+		var selling: Dictionary = inventory[pending_sale]
+		var stack := int(selling.get("count",1))
+		draw_rect(Rect2(135, 79, 882, 530), Color(0.07, 0.10, 0.13, 0.66))
+		ui_box(ShopTrade.DIALOG, Color("35454c"))
+		text_at(Vector2(344, 250), "VERKAUF BESTÄTIGEN", 24, Color("ffe0a1"))
+		draw_item_icon(Vector2(346, 270), String(selling["icon"]), RARITY_COLORS[int(selling["rarity"])], 1.6, weapon_visual_stage(selling), item_design(selling))
+		text_at(Vector2(413, 298), String(selling["name"]), 19, RARITY_COLORS[int(selling["rarity"])])
+		text_at(Vector2(413, 326), "Im Stapel: %d   ·   Wert aller: %d Gold" % [stack, item_sale_value(selling)], 16, Color("f6dca1"))
+		var total := ShopTrade.stack_sale_total(item_sale_value(selling), stack, trade_quantity)
+		ShopTrade.draw_quantity(self, trade_quantity, stack, "Gesamt: +%d Gold" % total)
+		ui_button(ShopTrade.CONFIRM, "VERKAUFEN · ENTER")
+		ui_button(ShopTrade.CANCEL, "ABBRECHEN")
 
 func shop_preview_item(stock_item: Dictionary) -> Dictionary:
 	var preview: Dictionary = stock_item.duplicate(true)
@@ -12077,8 +12331,10 @@ func draw_sorted_world_objects() -> void:
 		if rescue_state >= 2:
 			var p := RESCUE_POS+Vector2(0,120)
 			if visible_world(p,130): entries.append({"kind":"npc","depth":p.y+24,"data":{"name":"Nela","role":"Bewohnerin","pos":p,"color":Color("bd8774"),"kind":"rescued"}})
+	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and visible_world(GolemBoss.ALTAR,200):
+		entries.append({"kind":"golem_altar","depth":GolemBoss.ALTAR.y+10})
 	for enemy in enemies:
-		if visible_world(enemy["pos"],100): entries.append({"kind":"enemy","depth":enemy["pos"].y+24,"data":enemy})
+		if visible_world(enemy["pos"],420 if GolemBoss.is_golem(enemy) else 100): entries.append({"kind":"enemy","depth":enemy["pos"].y+24,"data":enemy})
 	for peer_id in remote_players:
 		var state: Dictionary = remote_players[peer_id]
 		if not state_matches_local_context(state): continue
@@ -12117,6 +12373,11 @@ func draw_sorted_world_objects() -> void:
 			"npc": draw_npc(entry["data"])
 			"stone": draw_waystone(entry["point"])
 			"enemy": draw_enemy(entry["data"])
+			"golem_altar":
+				GolemDesign.draw_altar(self,GolemBoss.ALTAR,golem_world.fight_active,world_time)
+				if player_pos.distance_to(GolemBoss.ALTAR) < GolemBoss.ALTAR_USE_RANGE and not golem_world.fight_active:
+					text_at(GolemBoss.ALTAR+Vector2(-150,46),"E · Dunklen Golem beschwören",13,Color("e3b8ff"),HORIZONTAL_ALIGNMENT_CENTER,300)
+					text_at(GolemBoss.ALTAR+Vector2(-150,64),"30 Steinbeeren · 1 Rotkuchen · 1 Blaukuchen",11,Color("cfc4dc"),HORIZONTAL_ALIGNMENT_CENTER,300)
 			"remote": draw_spawn_elevated_actor(int(entry["peer"]))
 			"player": draw_spawn_elevated_actor(-1)
 
@@ -12185,7 +12446,7 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
 		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
-		"head":clampi(int(state.get("head",-1)),-1,2),"rings":clampi(int(state.get("rings",0)),0,3),
+		"head":clampi(int(state.get("head",-1)),-1,5),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
 		"stealth":bool(state.get("stealth",false)) and clampi(int(state.get("class",0)),0,2)==2
@@ -13188,7 +13449,11 @@ func validate_equipment_slots() -> void:
 		BossRelics.normalize(item);ArcaneNecklaces.normalize(item)
 		if equipped_necklace_uid<0 and item.get("icon","")=="necklace" and int(item.get("uid",-1)) in [equipped_ring_uid,equipped_ring2_uid]:equipped_necklace_uid=int(item["uid"])
 	if equipped_necklace_uid>=0 and necklace_visual()<0:equipped_necklace_uid=-1
-	for item in inventory:preload("res://components/headgear_rules.gd").normalize(item)
+	for item in inventory:
+		preload("res://components/headgear_rules.gd").normalize(item)
+		FoodSystem.normalize_item(item)
+		var master_id := MasterArmor.index(item)
+		if master_id >= 0: MasterArmor.apply(item, master_id)
 	if not equipped_head_allowed():equipped_head_uid=-1
 	var weapon_icon := item_icon_for_uid(equipped_uid)
 	if equipped_uid >= 0 and (weapon_icon == "" or weapon_icon != class_weapon_icon()):
@@ -13206,9 +13471,12 @@ func is_equipped_uid(uid: int) -> bool:
 func eternal_arrows_active() -> bool:
 	return HeadgearRules.eternal_arrows(inventory, equipped_head_uid, class_id)
 
+## 0–2 Klassenhut (nur an der eigenen Klasse sichtbar), 3–5 Bosshut (immer).
 func head_visual() -> int:
 	for item in inventory:
 		if int(item.get("uid",-1))==equipped_head_uid and str(item.get("icon",""))=="head":
+			var boss:=HeadgearRules.boss_index(item)
+			if boss>=0:return 3+boss
 			return int(item.get("head_class",-1))
 	return -1
 
@@ -13341,6 +13609,8 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 		item["boss_hat"]=true
 		item["head_class"]=clampi(int(item.get("head_class",-1)),0,2)
 		item["design"]=int(item["head_class"])
+	var master_id := MasterArmor.index(item)
+	if master_id >= 0: MasterArmor.apply(item, master_id)
 	return item
 
 func apply_rescue_progress(amount: int, shared: bool = false) -> void:
@@ -13719,8 +13989,11 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 		server_spawn_world_drop(class_relic_item(type-12),Vector2(enemy["pos"])+Vector2(25,0),type-12,180.0)
 		server_spawn_world_drop(class_boss_hat_item(type-12),Vector2(enemy["pos"])+Vector2(-25,8),type-12,180.0)
 		if type==14:server_spawn_world_drop(ranger_falcon_rune_item(),Vector2(enemy["pos"])+Vector2(0,34),2,180.0)
+		if randf()<MasterArmor.CLASS_BOSS_CHANCE:server_spawn_world_drop(master_armor_item(MasterArmor.CLASS_BOSS_ARMOR[type-12]),Vector2(enemy["pos"])+Vector2(-40,30),-1,180.0)
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
 		server_spawn_world_drop(random_loot(type,reward_class),Vector2(enemy["pos"]),-1,90.0)
+	if elite_kind > 0 and not is_boss and region_level(int(ENEMY_TYPES[type]["region"])) >= MasterArmor.ELITE_MIN_REGION_LEVEL and randf() < MasterArmor.ELITE_CHANCE:
+		server_spawn_world_drop(master_armor_item(MasterArmor.SHOP_IDS.pick_random()),Vector2(enemy["pos"])+Vector2(18,-10),-1,120.0)
 	if randf() < 0.03:
 		server_spawn_world_drop(make_item("Heiltrank","potion",1,0,18),Vector2(enemy["pos"])+Vector2(20,0),-1,90.0)
 	var mob_uid := int(enemy.get("uid",-1))
@@ -13865,6 +14138,7 @@ func rpc_zz_save_reply(response: Dictionary) -> void:
 func mob_visual_scale(enemy:Dictionary)->float:
 	var type:int=int(enemy["type"])
 	if bool(enemy.get("small_guardian",false)):return .48
+	if GolemBoss.is_golem(enemy):return GolemBoss.visual_scale(type)
 	var factor:float=1.3 if type==12 else (.48 if type in [0,1,18,25] else (.6 if type in [2,6,10] else .8))
 	if type in [13,14]:factor=1.0
 	return factor*(1.42 if int(enemy.get("elite",0))==2 else (1.22 if int(enemy.get("elite",0))==1 else 1.0))
@@ -14047,6 +14321,11 @@ func receive_mob_death(payload:Dictionary)->void:
 	var uid:int=int(payload.get("uid",-1))
 	if dead_mob_uids.has(uid):return
 	dead_mob_uids[uid]=combat_feedback.clock
+	if int(payload.get("type",-1)) in GolemBoss.TYPES:
+		var raw_pos:Array=payload.get("pos",[0,0])
+		golem_debris.append_array(GolemDesign.make_debris(Vector2(float(raw_pos[0]),float(raw_pos[1])),int(payload["type"])))
+		play_sound("golem_zerfall")
+		return
 	var row:Dictionary=payload.duplicate()
 	row["at"]=combat_feedback.clock
 	var death_type:int=int(row.get("type",-1))
@@ -14104,7 +14383,7 @@ func draw_mob_deaths()->void:
 func normal_mob_count()->int:
 	var count:=0
 	for enemy in enemies:
-		if int(enemy["type"]) not in [12,13,14] and not bool(enemy.get("small_guardian",false)):count+=1
+		if int(enemy["type"]) not in [12,13,14,27,28] and not bool(enemy.get("small_guardian",false)) and not bool(enemy.get("golem_minion",false)):count+=1
 	return count
 
 func ring_visual()->int:
@@ -14188,3 +14467,226 @@ func restore_canvas_transform()->void:
 func set_local_canvas_transform(origin:Vector2,rotation:float=0.0)->void:
 	var z:=effective_camera_zoom() if drawing_ui else 1.0
 	draw_set_transform(origin/z,rotation,Vector2.ONE/z)
+
+# --- Dunkler Golem: Verdrahtung (Regeln in components/golem_boss.gd) -----------
+var golem_push_velocity := Vector2.ZERO
+var golem_prev_states: Dictionary = {}
+var golem_step_timer := 0.0
+
+## Spieler, die der Golem angreifen kann: [{id, pos, max_hp}] (id 0 = allein).
+func golem_targets() -> Array:
+	var result: Array = []
+	if dedicated_server_mode or network_mode == "host":
+		for peer in remote_players:
+			var state: Dictionary = remote_players[peer]
+			if str(state.get("context","world")) != "world" or float(state.get("hp",1.0)) <= 0.0: continue
+			var pos := network_player_position(int(peer))
+			if region_at(pos) != 12 or waystone_safe_at(pos): continue
+			result.append({"id":int(peer),"pos":pos,"max_hp":float(state.get("max_hp",100.0))})
+	if not dedicated_server_mode and hp > 0 and death_timer <= 0.0 and arena_mode == "" and dungeon_id < 0 and interior_id < 0:
+		if region_at(player_pos) == 12 and not waystone_safe_at(player_pos):
+			result.append({"id":0,"pos":player_pos,"max_hp":max_hp()})
+	return result
+
+func golem_hit_players(center: Vector2, radius: float, damage: int, dir: Vector2, push: float, hits: Array = []) -> void:
+	for target in golem_targets():
+		var id := int(target["id"])
+		if id in hits or Vector2(target["pos"]).distance_to(center) > radius + 18.0: continue
+		hits.append(id)
+		var shove: Vector2 = dir.normalized() * push * 3.2 if push > 0.0 else Vector2.ZERO
+		if id > 0:
+			rpc_server_damage.rpc_id(id, damage)
+			if shove != Vector2.ZERO: rpc_golem_push.rpc_id(id, shove.x, shove.y)
+		elif invulnerable <= 0.0:
+			apply_player_damage(damage)
+			golem_push_velocity += shove
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_golem_push(x: float, y: float) -> void:
+	if network_mode != "client": return
+	golem_push_velocity += Vector2(clampf(x,-900,900), clampf(y,-900,900))
+
+## Schrei unter 40 %: trifft jeden Spieler im Himmelsgarten.
+func golem_scream(_pos: Vector2) -> void:
+	for target in golem_targets():
+		var damage := maxi(1, roundi(float(target["max_hp"]) * GolemBoss.SCREAM_DAMAGE_FRACTION))
+		if int(target["id"]) > 0: rpc_server_damage.rpc_id(int(target["id"]), damage)
+		elif invulnerable <= 0.0: apply_player_damage(damage)
+	if not dedicated_server_mode: message("Der Dunkle Golem schreit – die Erde bebt im ganzen Himmelsgarten!")
+
+## Brocken reißen Gegner mit.
+func golem_push_mobs(center: Vector2, radius: float, dir: Vector2, amount: float) -> void:
+	for enemy in enemies:
+		if GolemBoss.is_golem(enemy): continue
+		var p: Vector2 = enemy["pos"]
+		if p.distance_to(center) > radius + mob_hit_radius(enemy): continue
+		var next := p + dir.normalized() * amount
+		if region_at(next) == region_at(p) and not terrain_blocked(next, mob_hit_radius(enemy)): enemy["pos"] = next
+
+func golem_minion_spawn(type: int, maximum: int) -> void:
+	var count := 0
+	for enemy in enemies:
+		if bool(enemy.get("golem_minion", false)): count += 1
+	for n in mini(3, maximum - count):
+		for attempt in 12:
+			var p: Vector2 = GolemBoss.ALTAR + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(380.0, 620.0)
+			if region_at(p) != 12 or terrain_blocked(p, 30.0) or golem_world.boulder_at(p, 30.0): continue
+			var mob := make_enemy(type, p)
+			mob["golem_minion"] = true
+			if dedicated_server_mode:
+				mob["uid"] = server_next_mob_uid
+				server_next_mob_uid += 1
+				mob["context"] = "world"
+				mob["instance_id"] = "world"
+				mob["spawned_at_ms"] = Time.get_ticks_msec()
+			enemies.append(mob)
+			break
+
+## Umgeworfene Bäume neu zeichnen und Kollision neu rechnen.
+func golem_trees_changed(_key: String) -> void:
+	decorative_tree_cache.clear()
+	if not dedicated_server_mode: invalidate_static_cache()
+
+func golem_register_enemy(enemy: Dictionary) -> void:
+	if not dedicated_server_mode: return
+	enemy["uid"] = server_next_mob_uid
+	server_next_mob_uid += 1
+	enemy["spawned_at_ms"] = Time.get_ticks_msec()
+
+func on_golem_defeated(enemy: Dictionary) -> void:
+	var before := enemies.size()
+	var result: String = golem_world.on_defeated(self, enemy)
+	for i in range(before, enemies.size()): golem_register_enemy(enemies[i])
+	if result == "split":
+		if not dedicated_server_mode: message("Der Dunkle Golem zerbricht – zwei halbe Golems kämpfen weiter!")
+	elif result == "victory":
+		golem_victory(Vector2(enemy["pos"]))
+
+## Sieg: Jeder Beteiligte bekommt die Golem-Rüstung (100 DEF).
+func golem_victory(pos: Vector2) -> void:
+	save_golem_world()
+	if dedicated_server_mode:
+		var fight := int(golem_world.version)
+		for raw_peer in golem_world.participants.keys():
+			var peer := int(raw_peer)
+			if peer <= 0 or not remote_players.has(peer): continue
+			var uuid := str(remote_players[peer].get("uuid","peer%d" % peer))
+			var tx := "golem:%d:%d:%s" % [fight, Time.get_unix_time_from_system(), uuid]
+			server_register_transaction(peer, tx)
+			rpc_server_combat_reward.rpc_id(peer, tx, GolemBoss.TYPE_HALF, 0, 500, [network_reward_payload(master_armor_item(6))])
+		return
+	if arena_mode != "": return
+	drops.append({"pos":safe_drop_position(pos,Vector2(0,20)),"item":master_armor_item(6),"life":600.0})
+	drops.append({"pos":safe_drop_position(pos,Vector2(30,0)),"gold":500,"life":120.0})
+	message("Der Dunkle Golem ist besiegt! Die Golem-Rüstung liegt am Boden.")
+	play_sound("quest_bereit")
+	save_game()
+
+## Altar: Opfergaben prüfen, dann beschwören (online fragt der Server).
+func try_golem_summon() -> void:
+	if not golem_world.alive_golems(enemies).is_empty():
+		message("Der Dunkle Golem ist bereits erwacht!")
+		return
+	var counts := {}
+	for item_name in GolemBoss.SUMMON_COST: counts[item_name] = steinrose.inventory_count(self, item_name)
+	var missing := GolemBoss.missing_offerings(counts)
+	if missing != "":
+		message("Der Altar verlangt noch: %s." % missing)
+		return
+	if uses_server_world():
+		if golem_summon_pending: return
+		golem_summon_pending = true
+		rpc_request_golem_summon.rpc_id(1)
+		message("Der Altar bebt …")
+		return
+	golem_consume_offerings()
+	var golem: Dictionary = golem_world.summon(self, 1)
+	enemies.append(golem)
+	golem_trees_changed("")
+	message("Der Dunkle Golem erhebt sich aus dem Altar!")
+	play_sound("boss_erscheint")
+
+func golem_consume_offerings() -> void:
+	for item_name in GolemBoss.SUMMON_COST: steinrose.remove_item_count(self, item_name, int(GolemBoss.SUMMON_COST[item_name]))
+	save_game()
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_golem_summon() -> void:
+	if not dedicated_server_mode or network_mode != "host": return
+	var peer := multiplayer.get_remote_sender_id()
+	if peer <= 0 or not remote_players.has(peer) or not server_action_allowed(peer, "golem_summon", 2500): return
+	if network_player_position(peer).distance_to(GolemBoss.ALTAR) > GolemBoss.ALTAR_USE_RANGE + 120.0:
+		rpc_golem_summon_result.rpc_id(peer, false, "Du stehst zu weit vom Altar entfernt.")
+		return
+	if not golem_world.alive_golems(enemies).is_empty():
+		rpc_golem_summon_result.rpc_id(peer, false, "Der Dunkle Golem ist bereits erwacht!")
+		return
+	var players := 0
+	for target in golem_targets():
+		if Vector2(target["pos"]).distance_to(GolemBoss.ALTAR) < 1600.0: players += 1
+	var golem: Dictionary = golem_world.summon(self, maxi(1, players))
+	golem_register_enemy(golem)
+	enemies.append(golem)
+	save_golem_world()
+	printerr("GOLEM_SUMMON players=%d hp=%d" % [maxi(1, players), int(golem["hp"])])
+	rpc_golem_summon_result.rpc_id(peer, true, "Der Dunkle Golem erhebt sich aus dem Altar!")
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_golem_summon_result(ok: bool, text: String) -> void:
+	if network_mode != "client": return
+	golem_summon_pending = false
+	if ok: golem_consume_offerings()
+	message(text.substr(0, 120))
+
+## Jeder Frame: Stoß, Zerfallsteile, auf Clients Geräusche aus dem Zustand.
+func update_golem_client(delta: float) -> void:
+	GolemDesign.update_debris(golem_debris, delta)
+	if golem_push_velocity.length() > 4.0:
+		var next := player_pos + golem_push_velocity * delta
+		if not is_blocked(next, player_pos): player_pos = next
+		golem_push_velocity = golem_push_velocity.move_toward(Vector2.ZERO, 900.0 * delta)
+	else:
+		golem_push_velocity = Vector2.ZERO
+	if uses_server_world():
+		golem_world.update_world(self, delta, false)
+	elif network_mode == "offline" or network_mode == "host":
+		if golem_world.fight_active and golem_world.alive_golems(enemies).is_empty(): golem_world.fight_active = false
+		golem_world.update_world(self, delta, true)
+
+## Online: Golemgeräusche aus Zustandswechseln im Weltpaket.
+func golem_snapshot_sounds(old: Dictionary, copy: Dictionary) -> void:
+	var before := str(old.get("golem",{}).get("state",""))
+	var now := str(copy.get("golem",{}).get("state",""))
+	var p := Vector2(copy.get("net_target_pos", copy.get("pos", Vector2.ZERO)))
+	if before != now:
+		match now:
+			"shield": play_world_sound("golem_schild", p)
+			"scrape": play_world_sound("golem_schaben", p)
+			"scream_pause": play_world_sound("golem_schrei", p)
+			"walk": if before == "scrape": play_world_sound("golem_wurf", p)
+	if bool(copy.get("walking", false)) and now == "walk":
+		golem_step_timer -= 0.1
+		if golem_step_timer <= 0.0:
+			golem_step_timer = 0.9
+			play_world_sound("golem_schritt", p)
+
+func save_golem_world() -> void:
+	if not dedicated_server_mode or golem_world_path == "": return
+	var file := FileAccess.open(golem_world_path, FileAccess.WRITE)
+	if file == null: return
+	file.store_string(JSON.stringify(golem_world.save_state()))
+
+func load_golem_world() -> void:
+	if golem_world_path == "" or not FileAccess.file_exists(golem_world_path): return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(golem_world_path))
+	golem_world.load_state(parsed)
+
+func draw_golem_world_fx() -> void:
+	if arena_mode != "" or dungeon_id >= 0 or interior_id >= 0: return
+	if not visible_world(GolemBoss.ALTAR, 1400.0) and golem_world.boulders.is_empty() and golem_world.fields.is_empty(): return
+	GolemDesign.draw_world_fx(self, golem_world, world_time)
+
+func draw_golem_overlay() -> void:
+	if arena_mode != "" or dungeon_id >= 0 or interior_id >= 0: return
+	GolemDesign.draw_debris(self, golem_debris)
+	if golem_world.scream_at >= 0.0: GolemDesign.draw_scream(self, golem_world.scream_pos, world_time - golem_world.scream_at)

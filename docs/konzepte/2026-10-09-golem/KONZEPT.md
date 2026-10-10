@@ -1,157 +1,239 @@
 # Golem-Konzept: Endgegner des Himmelsgartens
 
-Stand: 9.10.2026, Entwurf zur Abstimmung mit Angelo.
+Stand: 10.10.2026, 02:30. Angelos Vorgaben vom 10.10. sind eingearbeitet; sie
+ersetzen den ersten Entwurf (Kern-Phase, kleine Golemiten) dort, wo sie sich
+widersprechen.
 
-## Wunsch (Angelo, 9.10.2026, 23:24)
+## Wünsche
 
-> Golem Endgegner für die letzte Map: ein riesiger magischer Steinhaufen-Golem,
-> der Steinhagel in einem großen Umkreis verursacht (Vorbild: Golem aus Clash
-> Royale). Dazu arbeiten wir ein Golem-Konzept aus.
+**9.10.2026, 23:24:** Golem-Endgegner für die letzte Map. Ein riesiger
+magischer Steinhaufen-Golem, der in einem großen Umkreis Steinhagel verursacht.
+Vorbild ist der Golem aus Clash Royale.
+
+**10.10.2026, 02:18 (Vorgaben):**
+- **Musik:** Beim Erscheinen läuft Endboss-Musik im Stil Heavy Metal/Hardtekk.
+- **Beschwörung:** Er wird mit 30 Steinbeeren, 1 Rotkuchen und 1 Blaukuchen
+  beschworen.
+- **Aussehen:**
+  - steinig-schwarz mit lila Elixier-Rissen
+  - 64 px groß, als 3D-Modell
+  - beim Tod Ragdoll an Armen und Körper
+- **Gefühl:** sehr massiv und langsam. Beim Vorwärtsschleppen macht er
+  imposante, schwer brechende Geräusche.
+- **Einschilden:** Er bleibt stehen, beugt sich zusammen und bekommt 8 s lang
+  −99 % Schaden. Abklingzeit 30 s.
+- **Steinhagel-Feld:** Direkt nach dem Einschilden erscheint ein rundes Feld mit
+  20 m Durchmesser. Darin fallen große Steinbrocken von oben und machen
+  Schaden. Im Feld hat der Golem +30 % Tempo, und Verlangsamung wirkt auf ihn
+  50 % schwächer.
+- **Brockenwurf:** Alle 10 s schabt er mit einem Arm im Boden und wirft einen
+  Riesenbrocken geradeaus. Der Brocken reißt Mobs, Spieler und Bäume mit. Er
+  fliegt 15 m, rollt dann etwas weiter und bleibt liegen.
+- **Schrei:** Fällt er unter 40 % Leben, hält er kurz inne und schreit. Der
+  Schrei trifft alles auf der Map und hat eine wellenförmige Animation.
+
+**10.10.2026, 02:29 (Antworten):**
+- Die bisherigen Golem-Mobs heißen jetzt **Wächter** (Steinwächter,
+  Kristallwächter, Lavawächter, PR #97). Der neue Endgegner ist der einzige
+  Golem.
+- **Rotkuchen und Blaukuchen** gibt es schon: Roter Sonnenkuchen und Blauer
+  Mondkuchen von Alma heißen jetzt so (PR #97).
+- **Brocken** bleiben liegen, bis der nächste Golem erscheint.
+- **Größe:** wirklich sehr groß, **5× so groß wie ein Spieler** und dazu sehr
+  breit.
+
+**10.10.2026, 02:44 (Antworten):**
+- **Name:** Dunkler Golem.
+- **Steinhagel-Feld:** bleibt 12 s.
+- **Bäume:** stehen nach 10 Minuten wieder.
+- **Musik:** Angelo bringt den Hardtekk-Track selbst mit.
+- **Beute:** eine Golem-Rüstung mit **100 Verteidigung**.
+- **Zerfall:** Beim Tod zerfällt er in **2 Golems, halb so groß und halb so
+  stark**, die weiterkämpfen. Erst wenn beide fallen, ist der Kampf gewonnen.
+- **Begleitende Spawns:** Während des ganzen Kampfs erscheinen **sehr viele
+  Fernkampf-Mobs dieser Map**. Im Himmelsgarten ist das der **Himmelsfalter**.
+
+**10.10.2026, 02:32 (Stil):** Angelo hat Bilder als Stilrichtung geschickt (ein
+bekannter Spiel-Golem aus einem Handyspiel). Rahmen und Farben aus diesem
+Konzept gelten weiter. Siehe „Stilrichtung“ unten.
 
 ## Einordnung
 
-- **Letzte Map** ist der Himmelsgarten (Gebiet 12, empfohlen Stufe 40, Portal
-  aus dem Sternenbruch). Dort gibt es bisher nur Himmelsfalter und
-  Sternenwächterin, aber keinen Gebietsboss.
-- Der Golem wird der **Gebiets-Endgegner** dort. Die drei Klassenbosse und die
-  Arena der letzten Wache bleiben, wie sie sind.
-- Die normalen Steingolems (Alte Ruinen), Kristallgolems und Lavagolems bleiben
-  kleine Gegner. Der Endgegner muss sich davon klar abheben: Größe, Leuchten,
-  eigene Bühne.
+- Die letzte Map ist der Himmelsgarten (Gebiet 12, empfohlen ab Stufe 40). Dort
+  gibt es bisher keinen Gebietsboss.
+- Der Golem ist dort ein **beschworener** Endgegner. Er steht nicht dauerhaft
+  in der Welt, sondern erscheint, wenn jemand die Opfergaben an einem Altar
+  ablegt.
+- Klassenbosse und die Arena der letzten Wache bleiben, wie sie sind.
 
-## Name (Vorschlag)
+## Maße
 
-**Himmelsfels, der Sternkoloss**. Kurz im Spiel: „Sternkoloss“.
-Alternativen: „Der Steinerne Himmel“, „Urgolem Basalthorn“.
+Ein Meter sind 32 px. Der Held ist etwa 64 px hoch.
+- **Golem: 5× Spielergröße**, also etwa 320 px hoch. Sehr breit, etwa 380 px
+  von Faust zu Faust, wie ein gebückter Felsberg. Treffer- und
+  Kollisionsfläche dazu: Körper etwa 220 × 140 px am Boden.
+- Steinhagel-Feld: 20 m Durchmesser = 640 px, also Radius 320 px.
+- Brockenwurf: 15 m Flug = 480 px, danach rollt der Brocken etwa 3 m (≈ 96 px)
+  aus.
+- Figur: im 64-px-Raster gebaut (gröbere Pixel als die Welt), damit er trotz
+  der Größe zum Pixelstil passt.
 
-## Aussehen
+## Beschwörung
 
-- **Riesig:** etwa viermal so hoch wie der Held (rund 260 px). Er ist ein Haufen
-  großer, grob behauener Felsbrocken, den Magie zusammenhält. Zwischen den Brocken
-  sind sichtbare Lücken, in denen blaues Sternenlicht pulsiert.
-- **Kern:** In der Brust liegt ein leuchtender Kristallkern als Schwachpunkt. Er
-  wird in Phase 2 freigelegt.
-- **Schwebende Steine:** Drei bis fünf kleine Brocken kreisen um Schultern und
-  Kopf. Sie sind das Zeichen für den Steinhagel: Vor dem Hagel steigen sie auf.
-- **Gang:** Er ist langsam und schwer. Jeder Schritt lässt den Bildschirm leicht
-  wackeln und Staub aufsteigen. Wie beim Clash-Royale-Golem wirkt er
-  unaufhaltsam, aber träge.
-- **Stil:** derselbe 32-px-Pixelstil wie die Welt. Für die Größe wird er aus
-  mehreren Teilen zusammengesetzt (Rumpf, Arme, Kopf, Kern, schwebende Steine),
-  damit Arme und Steine einzeln animiert werden können. Später passt er gut zum
-  D2-Figurensystem (3D-Körper in Pixel-Optik), ist aber nicht davon abhängig.
+- Im Himmelsgarten steht ein **Golem-Altar** (Steinplatte mit lila Rissen).
+- Wer am Altar E drückt und 30 Steinbeeren, 1 Rotkuchen und 1 Blaukuchen
+  dabeihat, legt sie ab. Der Altar bricht auf, der Golem steigt heraus, und die
+  Bossmusik startet.
+- Alle Zutaten gibt es schon: Steinbeeren pflückt man in der Welt, Rotkuchen
+  und Blaukuchen kocht Alma (früher Roter Sonnenkuchen und Blauer Mondkuchen).
+- Es gibt nur einen Golem gleichzeitig pro Welt. Solange einer lebt, ist der
+  Altar gesperrt.
 
-## Bühne
+## Stilrichtung (nach Angelos Bildern)
 
-- Eine **schwebende Felsinsel** im Himmelsgarten, etwa 1400 × 1000 px, mit
-  Sternenstaub am Rand. Mit dem neuen Wegstein-Stil (Höhenunterschied) wirkt sie
-  wie ein Plateau, auf das man hinaufsteigt.
-- Am Eingang steht eine Siegelplatte. Wer sie betritt, weckt den Golem. Er
-  steht nicht einfach herum, damit niemand ihn versehentlich anlockt.
-- Nach dem Sieg bleibt die Insel frei. Der Golem erwacht nach einer Wartezeit
-  (Vorschlag: 15 Minuten, wie bei den Klassenbossen) wieder.
+Ein **eigener** Golem, kein Nachbau der Vorlage. Übernommen wird nur die
+allgemeine Wirkung:
+- **Silhouette:** gebückt, massiger Rumpf, riesige Schultern und Fäuste, kurze
+  stämmige Beine. Der Kopf sitzt tief zwischen den Schultern. Er wirkt breiter
+  als hoch.
+- **Formen:** große, kantig behauene Felsblöcke mit klaren Flächen statt rundem
+  Geröll. Die Fäuste bestehen aus mehreren Blöcken.
+- **Lesbarkeit:** wenige große Formen und deutliches Licht von oben, damit er
+  auch klein im Bild sofort als Felskoloss erkennbar ist.
+
+Bewusst **anders** als die Vorlage:
+- Farben: steinig-schwarzer Basalt, lila Elixier-Risse
+- Gesicht: zwei schmale, lila glühende Spalten in einer gesprungenen
+  Basaltplatte, kein Gesichtsschild wie bei der Vorlage
+- keine Kristallkrone auf dem Kopf; das Lila sitzt in den Rissen zwischen den
+  Blöcken
+- schwebende Brocken um die Schultern als eigenes Erkennungszeichen
+
+## Aussehen und Animation
+
+- **Körper:** steinig-schwarzer Felshaufen (Basalt). Durch die Fugen laufen
+  **lila Elixier-Risse**, die pulsieren. Bei Treffern leuchten die Risse kurz
+  auf.
+- **3D-Modell in Pixel-Optik:** einfache 3D-Körper (Rumpf, Kopf, zwei Arme aus
+  Gelenkteilen, Beine/Stumpf), in kleiner Auflösung gerendert und als
+  Pixelbild in die 2D-Welt gesetzt. Das ist genau der Weg aus D2 (Prototyp
+  3D-Figuren). Der Golem wird damit die **erste 3D-Figur** im Spiel.
+- **Ragdoll beim Tod:** Arme und Körper werden zu Physik-Teilen und fallen in
+  sich zusammen. Das passiert nur bei jedem Spieler im Bild, nicht auf dem
+  Server.
+- **Animationen:**
+  - Schleppen (schwer, mit Bodenstaub)
+  - Einschilden (zusammenbeugen, Risse dunkel, Steinhülle)
+  - Schaben (Arm gräbt, Brocken bricht heraus)
+  - Wurf
+  - Schrei (Kopf zurück, Risse gleißend)
+  - Tod
 
 ## Kampf
 
-### Phase 1 (100–50 % Leben): der Steinhaufen
-
-| Angriff | Was passiert | Ausweichen |
+| Fähigkeit | Ablauf | Gegenspiel |
 |---|---|---|
-| **Stampfer** | Er hebt den Fuß und stampft. Ein Ring aus Staub läuft nach außen (Radius 220 px). | Rechtzeitig weggehen oder mit Ausweichrolle durch den Ring |
-| **Felswurf** | Er reißt einen Brocken aus der Schulter und wirft ihn auf den Spieler. Der Schatten am Boden wächst, Einschlag nach 1,1 s. | Aus dem Schatten laufen |
-| **Steinhagel** (Kernangriff) | Die schwebenden Steine steigen auf, er hebt beide Arme. In **großem Umkreis (900 px)** erscheinen 18–26 Einschlagschatten, dicht beim Golem und lockerer am Rand. Nach 1,4 s schlagen Steine ein, in drei kurzen Wellen. | Zwischen den Schatten durch. Die Lücken sind immer breit genug für den Helden |
+| **Schleppen** | Er geht sehr langsam auf das Ziel zu, jeder Schritt dröhnt. | Abstand halten |
+| **Einschilden** | Er bleibt stehen und beugt sich zusammen: −99 % Schaden für 8 s, Abklingzeit 30 s. | Pause zum Heilen und Positionieren |
+| **Steinhagel-Feld** | Direkt danach entsteht ein Feld mit 640 px Durchmesser um ihn. Darin fallen Brocken mit Schatten-Vorwarnung. Im Feld: Golem +30 % Tempo, Verlangsamung auf ihn halb so stark. | Raus aus dem Feld oder zwischen den Schatten durch |
+| **Brockenwurf** | Alle 10 s. Er schabt sichtbar (Vorwarnung als Linie am Boden) und wirft geradeaus. Der Brocken fliegt 480 px, nimmt Spieler, Mobs und Bäume mit, rollt aus und bleibt als **Hindernis** liegen. | Seitlich ausweichen; liegende Brocken als Deckung nutzen |
+| **Schrei** (einmal, unter 40 %) | Er hält inne und schreit. Eine Welle läuft über die ganze Map und trifft jeden Spieler im Himmelsgarten. | Nicht ausweichbar, nur aushalten (Heilung bereithalten) |
 
-Steinhagel kommt in Phase 1 etwa alle 14 s, Stampfer und Felswurf dazwischen.
+## Werte (Vorschlag, nach dem ersten Test anpassbar)
 
-### Phase 2 (unter 50 %): der freigelegte Kern
-
-- Brocken brechen ab und bleiben als **Deckung** auf der Insel liegen. Hinter
-  ihnen ist man vor dem Felswurf sicher. Der Steinhagel zerschlägt die Deckung
-  mit der Zeit.
-- Der **Kern** leuchtet offen. Treffer von vorn auf den Kern machen **+50 %
-  Schaden**. Das belohnt gutes Zielen; zusammen mit C2 (Angriffe in
-  Kopfrichtung) und D3 (Trefferzonen) passt das später noch besser.
-- Steinhagel kommt jetzt alle 9 s und hat eine vierte Welle.
-- **Neu: Sternenfall.** Ein großer Stein fällt genau in die Mitte der Insel
-  (Radius 300 px, langer Vorlauf von 2,5 s). Wer dort steht, nimmt schweren
-  Schaden.
-
-### Tod (wie in Clash Royale)
-
-- Der Golem **zerfällt** mit einer Todeswelle. Der Ring ist vorher angezeigt,
-  nach 1,5 s folgt mittlerer Schaden in 260 px.
-- Aus dem Haufen stehen **zwei Golemiten** auf: halb so groß, schneller, mit je
-  12 % seines Lebens. Jeder Golemit wirft kleinen Steinhagel (8 Schatten,
-  400 px) und zerfällt beim Tod mit einer kleinen Todeswelle.
-- Erst wenn beide Golemiten besiegt sind, gilt der Kampf als gewonnen.
-
-## Werte (Vorschlag)
-
-- **Leben:** 6000 bei einem Spieler, für jedes weitere Gruppenmitglied in der
-  Nähe +70 %. Zum Vergleich: Der Jagdmeister hat 2350.
+- **Leben:** 6000 bei einem Spieler, +70 % je weiterem Gruppenmitglied in der
+  Nähe.
+- **Tempo:** 40, im Feld 52. Er ist langsamer als jeder normale Gegner.
 - **Schaden:**
-  - Stampfer 70
-  - Felswurf 85
-  - Hagelstein 45 je Treffer (es treffen selten mehr als zwei)
-  - Sternenfall 160
-  - Todeswelle 90
-- **Geschwindigkeit:** 48. Er ist langsamer als jeder normale Gegner.
-- **Erfahrung:** 1500, dazu 300 je Golemit.
-- **Beute:**
-  - Ein garantiertes Endgegner-Teil, siehe Frage 3.
-  - Viel Gold und eine Sternkoloss-Essenz für Runen oder Fusionen.
+  - Schritt: kein Schaden
+  - Hagelbrocken: 45 je Treffer
+  - Brockenwurf: 110 plus Mitreißen
+  - Schrei: 25 % des maximalen Lebens plus 1 s Taumeln
+- **Feld:** bleibt 12 s, also bis kurz nach dem Ende des Schilds (Angelo).
+- **Liegender Brocken:** bleibt liegen, bis der nächste Golem erscheint (Angelo).
+  Er ist ein festes Hindernis und wird auf dem Server gespeichert, damit er
+  einen Neustart übersteht.
+- **Bäume** werden nicht gelöscht, sie stehen nach 10 Minuten wieder (Angelo).
+- **Zerfall:** Bei 0 Leben zerfällt er in 2 halbe Golems: halbe Größe (2,5×
+  Spieler, etwa 160 px), halbes Leben (je 3000 bei einem Spieler), halber
+  Schaden. Sie haben dieselben Fähigkeiten, etwas schneller (Tempo 52). Der
+  Schrei kommt nur vom großen Golem.
+- **Begleit-Spawns:** Himmelsfalter (Fernkampf) erscheinen in Wellen am Rand des
+  Kampfplatzes, etwa alle 8 s 2–3 Stück, höchstens 10 gleichzeitig, mit
+  Spieleranzahl skaliert. Nach dem Sieg hören die Wellen auf.
 
-## Klang
+## Klang und Musik
 
-- Tiefes Grollen im Leerlauf und bei jedem Schritt. Beim Erwachen ein
-  bergartiges Knirschen.
-- **Steinhagel:** ein aufsteigendes Pfeifen beim Aufsteigen der Steine, dann
-  einzelne dumpfe Einschläge mit Kies-Nachklang. Bei vielen Steinen gleichzeitig
-  greift der Limiter des Effekte-Busses, damit es nicht übersteuert.
-- **Kern:** ein heller, gläserner Ton bei Treffern.
-- Alles wird wie die übrigen Klänge per Skript erzeugt (`tools/build_sfx.py`).
-  Vor dem Einbau bekommst du eine Hörprobe zum Auswählen, wie bei der
-  Schrittprobe.
+- **Bossmusik Heavy Metal/Hardtekk:** Angelo liefert den Track. Ich binde ihn
+  als Boss-Thema ein: Start beim Erscheinen, nahtlose Schleife, Ausblenden
+  nach dem Sieg über beide halben Golems.
+- **Schleppen:** tiefes Knirschen und Bersten von Stein, bei jedem Schritt
+  leichtes Bildwackeln.
+- **Einschilden:** dumpfes Zusammenschieben, danach gedämpfte Treffer
+  („klonk“ statt Treffer).
+- **Hagel:** Pfeifen, dann Einschläge mit Kies-Nachklang. Bei vielen Steinen
+  greift der Limiter des Effekte-Busses.
+- **Schaben und Wurf:** Kratzen im Boden, Abriss, Flug-Rumpeln, Ausrollen.
+- **Schrei:** tiefer Felsenschrei mit Hall, dazu die Welle im Bild.
+- Wie bei den Schritten gibt es vorher eine **Hörprobe** zum Auswählen.
 
-## Technik
+## Was zusätzlich gebaut werden muss
 
-- `components/golem_boss.gd`: Zustände und Angriffe als Daten, also Phasen,
-  Abklingzeiten und Muster des Hagels. Zustandslose Regeln, damit Server und
-  Spiel dasselbe rechnen.
-- `components/golem_design.gd`: Zeichnen aus Teilen (Rumpf, Arme, Kopf, Kern,
-  schwebende Steine) mit Animation.
-- Die Einschläge laufen über die vorhandenen Gegner-Geschosse mit
-  Vorwarnschatten. Der Server entscheidet die Treffer, wie bei den übrigen
-  Bossen.
-- **Tests:**
-  - Der Hagel lässt immer einen Weg frei.
-  - Phasenwechsel bei 50 %.
-  - Golemiten erscheinen beim Tod.
-  - Gruppen-Skalierung.
-  - Eine Spielstand-Markierung für den Sieg.
-- **Vorschaubilder:** Golem im Stand, beim Hagel mit Schatten und in Phase 2.
+1. **3D-Figurensystem (D2):** Die Grundlage für das 64-px-3D-Modell mit
+   Ragdoll muss her:
+   - kleiner 3D-Viewport
+   - Pixel-Shader
+   - Einbettung in die 2D-Welt mit richtiger Tiefe
+   - Ragdoll (Physik-Knochen)
 
-## Umfang
+   Das ist der größte Brocken. Er nützt danach auch dem Krieger und den
+   anderen Figuren.
+2. **Altar und Opfergaben:** Altar im Himmelsgarten, Prüfung der Zutaten im
+   Inventar, Beschwörung über den Server, damit es nur einen Golem gibt.
+3. **Rotkuchen und Blaukuchen:** erledigt, nur umbenannt (PR #97).
+4. **Bossmusik:** neuer Track, Umschalten beim Erscheinen, Ende beim Tod.
+5. **Server-Kampflogik:** Zustände (Schleppen, Schild, Feld, Schaben/Wurf,
+   Schrei, Tod), Abklingzeiten, Treffer, Tempo-Bonus im Feld, alles
+   übertragen an die Spieler.
+6. **Mitreißen:** Spieler und Mobs werden entlang der Flugbahn geschoben. Der
+   Server braucht dafür einen kurzen „Stoß“-Zustand pro Spieler.
+7. **Umwerfbare Bäume:** Bäume sind bisher feste Deko. Gebraucht werden eine
+   Liste umgeworfener Bäume auf dem Server, die im Bild zu sehen ist, und ein
+   Neuzeichnen der Boden-Kacheln.
+8. **Liegende Brocken als Hindernis:** Kollision für Spieler, Mobs und
+   Geschosse, gemeinsam auf dem Server. Sie bleiben liegen, bis der nächste
+   Golem erscheint, und müssen deshalb dauerhaft auf dem Server gespeichert
+   werden.
+9. **Map-weiter Schrei:** trifft alle Spieler im Himmelsgarten. Die
+   Wellenanimation läuft bei allen im Bild.
+10. **Ragdoll nur im Bild:** Der Server meldet nur „tot“, jeder Spieler sieht
+    den Zusammenbruch selbst.
+11. **Golem-Rüstung:** neue Rüstung mit 100 Verteidigung, eigenes Aussehen am
+    Charakter (schwarze Basaltplatten mit lila Rissen), Beute für jeden
+    Beteiligten. Dazu eine Sieg-Markierung im Spielstand. Das passt zum
+    LV-40-Rüstungskonzept.
+12. **Zerfall in 2 halbe Golems:** zwei weitere Figuren in halber Größe mit
+    eigener Lebensleiste, Sieg erst nach beiden.
+13. **Himmelsfalter-Wellen:** Server-Spawner, der während des Kampfs
+    Fernkampf-Mobs der Map nachschiebt, mit Obergrenze.
+14. **Tests und Vorschaubilder:**
+    - Tests: Schild-Zeitfenster, Feldradius und Tempo-Bonus, Wurfweite und
+      Liegenbleiben, Schrei-Schwelle, nur ein Golem.
+    - Bilder: Golem stehend, eingeschildet mit Feld, beim Wurf und beim
+      Schrei.
 
-Groß (L): Design und Zeichnung, Kampflogik mit Server, Klänge, Bühne, Tests.
-Vorschlag in drei Schritten, jeder mit Bildern zur Abnahme:
+## Umfang und Reihenfolge
 
-1. Aussehen und Bühne (nur Bilder, kein Kampf)
-2. Kampf Phase 1 mit Steinhagel
-3. Phase 2, Tod mit Golemiten, Beute und Klänge
+Groß (XL), weil das 3D-Figurensystem dazugehört. Vorschlag:
+1. **3D-Prototyp:** Golem als 3D-Figur, stehend, schleppend, Ragdoll-Tod.
+   Danach kommen Bilder zur Abnahme. Das ist zugleich der D2-Prototyp.
+2. **Beschwörung:** Altar, Opfergaben, Bossmusik (mit Hörprobe).
+3. **Kampf Teil 1:** Schleppen, Schild, Steinhagel-Feld.
+4. **Kampf Teil 2:** Brockenwurf mit Mitreißen, umwerfbare Bäume, liegende
+   Brocken, Schrei.
+5. **Feinschliff:** Klänge, Werte, Beute.
 
 ## Fragen an dich
 
-1. **Name:** „Himmelsfels, der Sternkoloss“, oder ein anderer?
-2. **Erwachen:** Mit Siegelplatte (Vorschlag) oder steht er offen auf der Map
-   und greift an, wer zu nahe kommt?
-3. **Beute:** Was soll er geben? Zur Auswahl:
-   - eine eigene Halskette, zum Beispiel „Golemherz“ mit Steinhaut für 3 s nach
-     schwerem Treffer
-   - ein Rüstungsteil, das später zu D4 (Rüstung pro Körperteil) passt
-   - ein Fusionsstein-Material
-4. **Golemiten beim Tod:** So wie in Clash Royale (zwei kleine, die
-   nachkommen), oder soll der Kampf mit dem großen Golem enden?
-5. **Gehört er zum Endspiel?** Soll man ihn besiegen müssen, bevor die Arena
-   der letzten Wache öffnet (dann vier Siegel statt drei), oder bleibt er ein
-   freiwilliger Endgegner?
+Alle Fragen sind beantwortet (10.10.2026, 02:44). Offen ist nur noch dein
+Hardtekk-Track. Sobald du ihn schickst, binde ich ihn ein.

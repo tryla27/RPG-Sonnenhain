@@ -19,7 +19,7 @@ func run():
 		var boss_hat:Dictionary=g.class_boss_hat_item((cls+1)%3)
 		g.inventory=[boss_hat];g.toggle_equipment_item(0)
 		assert(g.equipped_head_uid==int(boss_hat["uid"]))
-		assert(g.head_visual()==int(boss_hat["head_class"]))
+		assert(g.head_visual()==3+int(boss_hat["head_class"]))
 		g.class_id=(cls+2)%3;g.validate_equipment_slots();assert(g.equipped_head_uid==int(boss_hat["uid"]))
 		g.class_id=cls
 		var found:Dictionary={}

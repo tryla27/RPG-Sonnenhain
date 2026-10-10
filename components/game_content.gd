@@ -20,12 +20,12 @@ const ENEMY_TYPES := [
 	{"name":"Blütenkäfer", "region":1, "hp":32, "damage":6, "speed":113, "xp":11, "color":Color("e998b6")},
 	{"name":"Pilzling", "region":2, "hp":65, "damage":11, "speed":65, "xp":19, "color":Color("e3ad77")},
 	{"name":"Mooswolf", "region":2, "hp":72, "damage":14, "speed":132, "xp":24, "color":Color("789983")},
-	{"name":"Steingolem", "region":3, "hp":118, "damage":19, "speed":72, "xp":36, "color":Color("bea78c")},
+	{"name":"Steinwächter", "region":3, "hp":118, "damage":19, "speed":72, "xp":36, "color":Color("bea78c")},
 	{"name":"Ruinenbeholder", "region":3, "hp":82, "damage":22, "speed":105, "xp":38, "color":Color("a8b9e9")},
 	{"name":"Kristallkrabbe", "region":4, "hp":125, "damage":22, "speed":75, "xp":44, "color":Color("8de0eb")},
-	{"name":"Kristallgolem", "region":4, "hp":165, "damage":29, "speed":66, "xp":58, "color":Color("92ddea")},
+	{"name":"Kristallwächter", "region":4, "hp":165, "damage":29, "speed":66, "xp":58, "color":Color("92ddea")},
 	{"name":"Ascheläufer", "region":5, "hp":145, "damage":29, "speed":138, "xp":57, "color":Color("dc835e")},
-	{"name":"Lavagolem", "region":5, "hp":260, "damage":38, "speed":52, "xp":82, "color":Color("a75c52")},
+	{"name":"Lavawächter", "region":5, "hp":260, "damage":38, "speed":52, "xp":82, "color":Color("a75c52")},
 	{"name":"Strandkrabbe", "region":6, "hp":57, "damage":9, "speed":93, "xp":15, "color":Color("e9a67e")},
 	{"name":"Wassergeist", "region":6, "hp":90, "damage":16, "speed":117, "xp":26, "color":Color("76bfd2")},
 	{"name":"Kriegsherr", "region":6, "hp":1800, "damage":46, "speed":96, "xp":520, "color":Color("c97b5e")},
@@ -42,7 +42,10 @@ const ENEMY_TYPES := [
 	{"name":"Gratgreif", "region":11, "hp":250, "damage":45, "speed":150, "xp":96, "color":Color("a7a0b8")},
 	{"name":"Schattenritter", "region":11, "hp":340, "damage":53, "speed":90, "xp":108, "color":Color("77748f")},
 	{"name":"Himmelsfalter", "region":12, "hp":390, "damage":60, "speed":148, "xp":145, "color":Color("d9c6e8")},
-	{"name":"Sternenwächterin", "region":12, "hp":560, "damage":69, "speed":85, "xp":180, "color":Color("e4d4b5")}
+	{"name":"Sternenwächterin", "region":12, "hp":560, "damage":69, "speed":85, "xp":180, "color":Color("e4d4b5")},
+	# 27/28: Dunkler Golem und seine Hälften (components/golem_boss.gd); nur beschworen.
+	{"name":"Dunkler Golem", "region":12, "hp":6000, "damage":70, "speed":40, "xp":1500, "color":Color("2a2730")},
+	{"name":"Halber Golem", "region":12, "hp":3000, "damage":35, "speed":52, "xp":300, "color":Color("3d3945")}
 ]
 const BASE_ABILITIES := [
 	{"name":"Wirbelhieb", "desc":"Kreisender Nahkampfschlag", "cost":28, "cd":6.0, "req":3, "kind":0},

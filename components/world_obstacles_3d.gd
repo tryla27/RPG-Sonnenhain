@@ -26,6 +26,22 @@ var collection_clock:=0.0
 static func replaces_static(zone:int)->bool:
 	return zone>=1 and zone<=12
 
+static func paint_ground(g,zone:int,key:int,point:Vector2,wet:bool)->void:
+	# Kleine Bodenflecken und Wasserwellen gehören zum Gelände, nicht zu den Körpern.
+	if not replaces_static(zone):return
+	match zone:
+		1:
+			if key%3==0:g.draw_flower(point,key)
+			else:g.draw_grass(point)
+		2,4:g.draw_grass(point)
+		3,5,7:g.draw_pebbles(point)
+		6:
+			if wet:g.draw_wave(point,key)
+			elif key%3==0:g.draw_pebbles(point)
+		_:
+			if key%3==0:g.draw_flower(point,key)
+			else:g.draw_grass(point)
+
 static func primary_motif(zone:int,key:int)->int:
 	if not replaces_static(zone):return 0
 	var choices:Array=PRIMARY[zone]
@@ -119,6 +135,7 @@ func collect(g,bounds:Rect2)->Array:
 			var key:int=g.hash_cell(tx,ty)
 			var zone:int=g.visual_region_at(Vector2(tx*64+32,ty*64+32))
 			if not replaces_static(zone):continue
+			if g.golem_world.tree_knocked(Vector2i(tx,ty)):continue
 			var tree:Dictionary=g.decorative_tree_in_cell(tx,ty)
 			if not tree.is_empty():
 				if not bounds.has_point(tree["point"]):continue
@@ -139,6 +156,7 @@ func collect(g,bounds:Rect2)->Array:
 static func clear_decoration(g,p:Vector2,zone:int)->bool:
 	if not Geometry.region_rect(zone).grow(-100).has_point(p):return false
 	if g.distance_to_trail(p)<145 or g.class_boss_arena_index_at(p,100)>=0 or g.point_near_class_boss_house(p,120) or g.near_waystone_shrine(p,100):return false
+	if zone==12 and p.distance_to(g.GolemBoss.ALTAR)<280:return false
 	if zone==6 and p.y>6850+sin(p.x/220.0)*125:return false
 	for landmark in g.LANDMARKS:
 		if p.distance_to(landmark["pos"])<210:return false
@@ -235,7 +253,23 @@ func paint(g,row:Dictionary)->void:
 	if row.has("crop_side"):
 		source.position.x+=float(row["crop_side"])*CELL*.5;source.size.x*=.5
 		destination.position.x+=float(row["crop_side"])*size*.5;destination.size.x*=.5
-	g.draw_texture_rect_region(texture,destination,source)
+	# Auch die Projektion einer Außenmauer darf nicht in Dorfpixel hineinragen.
+	for part in outside_village(destination):
+		var ratio:=source.size/destination.size
+		var cropped:=Rect2(source.position+(part.position-destination.position)*ratio,part.size*ratio)
+		g.draw_texture_rect_region(texture,part,cropped)
+
+static func outside_village(rect:Rect2)->Array:
+	var village:=Geometry.region_rect(0)
+	if not rect.intersects(village):return [rect]
+	var overlap:=rect.intersection(village)
+	var pieces:Array=[
+		Rect2(rect.position,Vector2(rect.size.x,overlap.position.y-rect.position.y)),
+		Rect2(Vector2(rect.position.x,overlap.end.y),Vector2(rect.size.x,rect.end.y-overlap.end.y)),
+		Rect2(Vector2(rect.position.x,overlap.position.y),Vector2(overlap.position.x-rect.position.x,overlap.size.y)),
+		Rect2(Vector2(overlap.end.x,overlap.position.y),Vector2(rect.end.x-overlap.end.x,overlap.size.y))
+	]
+	return pieces.filter(func(part:Rect2)->bool:return part.has_area())
 
 static func paint_shadow(g,point:Vector2,radius:Vector2)->void:
 	var outline:=PackedVector2Array()

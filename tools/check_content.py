@@ -56,7 +56,7 @@ def entries(name):
 
 levels = [int(x) for x in re.findall(r'\d+', block('REGION_LEVELS'))]
 assert len(levels) == 13 and min(levels) == 1 and max(levels) == 40
-assert len(entries('ENEMY_TYPES')) == 27
+assert len(entries('ENEMY_TYPES')) == 29
 assert len(entries('QUESTS')) == 25
 assert len(entries('LANDMARKS')) == 11
 assert not re.search(r'\[[^\n]*\bfor\b[^\n]*\bin\b', source), 'GDScript does not support list comprehensions'

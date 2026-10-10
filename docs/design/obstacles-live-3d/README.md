@@ -35,3 +35,5 @@ Erstellt mit `tools/capture_obstacles_3d.gd`, derselben Darstellung und denselbe
 Weitere Sichtprüfungen: [freies Tor](mauer-tor.png), [Mauerverbindung](mauer-ecke.png), [70 % Zoom](zoom-70.png), [Figur hinter einem Körper](held-hinter-baum.png), [Figur davor](held-vor-baum.png).
 
 Der lokale Web-Export wurde aus seinem ausgelieferten Ressourcenpaket geprüft. Der Modellkatalog wird ausdrücklich in Web- und Server-Export eingeschlossen.
+
+Veröffentlichungsprüfung: 113 lokale Projektprüfungen bestanden. Die aktuellen Bossmechaniken einschließlich umgeworfener Bäume sind übernommen; die freie Altarmitte bleibt frei. Außenprojektionen werden an Map 0 abgeschnitten, sodass auch Nachbarmauern keine Dorfpixel verändern. Grasflecken, Blumen und Wasserwellen bleiben Teil des Geländes.

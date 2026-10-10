@@ -20,7 +20,7 @@ func run():
 	g.toggle_equipment_item(g.inventory.size()-1)
 	g.add_item(g.class_boss_hat_item(0))
 	g.toggle_equipment_item(g.inventory.size()-1)
-	assert(g.head_visual()==0)
+	assert(g.head_visual()==3)
 	var peer := WebSocketMultiplayerPeer.new()
 	assert(peer.create_client(g.command_arg_value("--save-test-url=","ws://127.0.0.1:31876")) == OK)
 	g.multiplayer.multiplayer_peer = peer
@@ -43,7 +43,7 @@ func run():
 	assert(g.shop_rotation==9)
 	var initial_revision: int = g.server_save.revision
 	# Existing public fixture may predate the head slot: equip after download.
-	if g.head_visual()!=0:
+	if g.head_visual()!=3:
 		g.add_item(g.class_boss_hat_item(0))
 		g.toggle_equipment_item(g.inventory.size()-1)
 	# Every run must also persist a fresh revision, even if a previous test snapshot exists.
@@ -99,7 +99,7 @@ func run():
 	while not g.server_save.ready:
 		if Time.get_ticks_msec() > deadline: quit(5); return
 		await process_frame
-	assert(g.head_visual()==0)
+	assert(g.head_visual()==3)
 	assert(g.gold == 34568 and g.equipped_ring2_uid >= 0 and g.server_save.revision == initial_revision)
 	var found_food:=false
 	for owned in g.inventory:

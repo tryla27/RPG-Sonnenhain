@@ -44,8 +44,8 @@ const FOODS = [
  {"name":"Bernstein-Marmelade","color":"d6a43e","heal":0,"regen":0.0,"duration":0,"price":14,"meal":true,"meal_hp_regen":2.0,"meal_duration":360,"buff":"armor","buff_value":0.05},
  {"name":"Heidelbeer-Pfannkuchen","color":"6c78bc","heal":0,"regen":0.0,"duration":0,"price":14,"meal":true,"meal_hp_regen":3.0,"meal_duration":360,"buff":"gather","buff_value":0.04},
  {"name":"Schimmerbeeren-Suppe","color":"4ba6df","heal":0,"regen":0.0,"duration":0,"price":16,"meal":true,"meal_mana_regen":4.0,"meal_duration":360},
- {"name":"Blauer Mondkuchen","color":"547bd1","heal":0,"regen":0.0,"duration":0,"price":20,"instant_mana_full":true},
- {"name":"Roter Sonnenkuchen","color":"c84f55","heal":0,"regen":0.0,"duration":0,"price":20,"instant_hp_full":true}
+ {"name":"Blaukuchen","color":"547bd1","heal":0,"regen":0.0,"duration":0,"price":20,"instant_mana_full":true},
+ {"name":"Rotkuchen","color":"c84f55","heal":0,"regen":0.0,"duration":0,"price":20,"instant_hp_full":true}
 ]
 const BUSHES=preload("res://components/village_layout.gd").BUSHES
 const TREES=[Vector2(170,510),Vector2(970,440),Vector2(1500,610),Vector2(360,1050),Vector2(150,1040),Vector2(1630,1680)]
@@ -94,11 +94,20 @@ var meal_until:=0.0
 var buff_kind:=""
 var buff_value:=0.0
 var buff_until:=0.0
+## Alte Namen aus früheren Versionen (Spielstände, Shops) → aktueller Name.
+const RENAMED:={"Blauer Mondkuchen":"Blaukuchen","Roter Sonnenkuchen":"Rotkuchen"}
+static func canonical(food_name:String)->String:
+ return str(RENAMED.get(food_name,food_name))
+## Benennt einen Gegenstand mit altem Essensnamen um (vor dem Benutzen/Speichern).
+static func normalize_item(item:Dictionary)->void:
+ if item.get("icon","")=="food" and RENAMED.has(str(item.get("name",""))):item["name"]=canonical(str(item["name"]))
 static func by_name(food_name:String)->Dictionary:
+ food_name=canonical(food_name)
  for entry in FOODS:
   if entry["name"]==food_name:return entry
  return {}
 static func index_for(food_name:String)->int:
+ food_name=canonical(food_name)
  for i in FOODS.size():
   if FOODS[i]["name"]==food_name:return i
  return -1

@@ -24,10 +24,10 @@ func run():
     g.hp=g.max_hp()-1;g.use_item(0)
     assert(g.hp==g.max_hp() and g.inventory.is_empty())
    g.food_system.active_food_name="Testbuff";g.food_system.meal_hp_regen=2
-   g.inventory=[g.make_item("Roter Sonnenkuchen","food",0,0,20)];g.hp=1;g.energy=7
+   g.inventory=[g.make_item("Rotkuchen","food",0,0,20)];g.hp=1;g.energy=7
    g.use_item(0);assert(g.hp==g.max_hp() and g.energy==7 and g.inventory.is_empty())
    assert(g.food_system.active_food_name=="Testbuff" and g.food_system.meal_hp_regen==2)
-   g.inventory=[g.make_item("Blauer Mondkuchen","food",0,0,20)];g.energy=1;g.hp=7
+   g.inventory=[g.make_item("Blaukuchen","food",0,0,20)];g.energy=1;g.hp=7
    g.use_item(0);assert(g.energy==g.max_energy() and g.hp==7 and g.inventory.is_empty())
    assert(g.food_system.active_food_name=="Testbuff")
  print("CONSUMABLE_PERCENT_OK all classes; levels 1/13/40; HP/mana bonuses; proportional healing; caps; stacks; full cakes; buffs preserved")

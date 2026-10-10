@@ -6,6 +6,33 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Dunkler Golem: `components/golem_boss.gd` (Altar, Schild, Steinhagel-Feld,
+  Brockenwurf mit liegenden Brocken und umgeworfenen Bäumen, Schrei, Zerfall in
+  zwei Hälften, Himmelsfalter-Wellen, Netzpaket, Speichern) und
+  `components/golem_design.gd` (Bild). Gegnertypen 27/28, Server rechnet den
+  Kampf, Brocken/Bäume in `golem_world.json` neben den Spielständen. Klänge
+  `audio/sfx/golem/` (`tools/build_sfx.py`), Musikthema `boss_golem`
+  (`music/boss_golem.ogg`, bis dahin Bossmusik). Test
+  `tests/gameplay/check_dark_golem.gd`, Bild `tools/capture_dark_golem.gd`.
+- Golem online geprüft: `tools/check_dark_golem_network.gd` (Server + 3 Spieler
+  über WebSocket: Beschwören, Kampf, Schrei, Zerfall, Rüstung nur für
+  Beteiligte, `golem_world.json`). Golem ohne Rückstoß/Betäubung, Nahkampf
+  rechnet seinen Körperradius ein. `server_action_allowed` blockt die erste
+  Aktion kurz nach Serverstart nicht mehr.
+- Legendäre Rüstungen: `components/master_armor.gd` (Daten, Wirkungen),
+  Aussehen 6–12 in `rpg_hero.gd`, Torvald ab Stufe 40, Drops (Klassenbosse 10 %,
+  Elite ab Stufe 33 2 %), Dornen/Lebensraub auf dem Server. Test
+  `tests/gameplay/check_master_armor.gd`, Bild `tools/capture_master_armor.gd`.
+- Shop: `components/shop_trade.gd` (Menge, Gesamtwerte), `buy_items`,
+  `sell_items`, `shop_quick_buy` (Enter über Angebot), `sell_all_preview`.
+  Test `tests/ui/check_shop_trade.gd`, Bilder `tools/capture_shop_trade.gd`.
+- Bosshüte sichtbar: `head_visual()` liefert 3–5 für Bosshüte,
+  `RpgHero.paint_boss_hat`, Netzwerk-Grenze für `head` auf 5. Vorschau
+  `tools/capture_boss_hats.gd`, Test `tests/gameplay/check_boss_hat_visual.gd`.
+- Umbenannt: Stein-/Kristall-/Lavagolem → -wächter; Roter Sonnenkuchen →
+  Rotkuchen, Blauer Mondkuchen → Blaukuchen (`FoodSystem.RENAMED`,
+  `normalize_item` für Inventar und Shopbestand beim Laden). Test
+  `tests/gameplay/check_renamed_items.gd`.
 - Spell-Grenze 4 (`components/spell_return.gd`, `buy_skill`, Skill-Gegenstände)
   und Abgabe bei Borin (Panel `spell_return`, `give_back_spell`, 10 Sprüche).
   Abgegebene Fusionen werden auch aus `fusion_history` entfernt, weil die
