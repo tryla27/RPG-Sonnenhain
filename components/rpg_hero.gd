@@ -215,7 +215,9 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 				poly(c,Vector2.ZERO,[[16,27],[20,20],[23,29]],Color("efe5bd"))
 				poly(c,Vector2.ZERO,[[34,29],[38,20],[41,27]],Color("efe5bd"))
 				r(c,23,13,10,3,"c7c6a1" if female else "9b563e")
-	if head==role:
+	if head>=3:
+		paint_boss_hat(c,head-3,female)
+	elif head==role:
 		# Class helmets above the race face, with gender-specific crest/hood details.
 		if role == 0:
 			r(c,12,7,32,5,"69828d")
@@ -236,3 +238,38 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	preload("res://components/arcane_necklaces.gd").paint_actor(c,Vector2(28,56),look,necklace,1.0,phase)
 	hurt_flash=0.0
 	c.draw_set_transform(offset)
+
+
+## Bosshüte (head 3–5): eigene Form, unabhängig von der Klasse des Trägers.
+## 3 Helm des Kriegsherrn, 4 Hut des Dunklen Arkanhüters, 5 Hut des Jagdmeisters.
+static func paint_boss_hat(c:CanvasItem,boss:int,female:bool)->void:
+	match boss:
+		0:
+			# Dunkler Eisenhelm mit Hörnern, Goldrand und rotem Kamm.
+			r(c,11,6,34,7,"3d4448")
+			r(c,14,1,28,6,"5a646a")
+			r(c,18,-2,20,4,"6f7a80")
+			r(c,11,12,34,2,"c9a24e")
+			r(c,26,-3,4,16,"c9a24e")
+			poly(c,Vector2.ZERO,[[11,8],[2,-2],[0,-10],[6,-4],[14,5]],Color("e3dccb"))
+			poly(c,Vector2.ZERO,[[45,8],[54,-2],[56,-10],[50,-4],[42,5]],Color("e3dccb"))
+			poly(c,Vector2.ZERO,[[24,-2],[27,-16],[33,-20],[38,-12],[33,-1]],Color("a8322a"))
+			poly(c,Vector2.ZERO,[[28,-6],[31,-15],[34,-12],[32,-3]],Color("d8553f"))
+		1:
+			# Hoher, geknickter Magierhut in Nachtviolett mit leuchtendem Runenband.
+			poly(c,Vector2.ZERO,[[6,12],[17,2],[22,-14],[28,-28],[40,-34],[36,-22],[33,-10],[40,2],[50,12]],Color("1d1733"))
+			poly(c,Vector2.ZERO,[[12,10],[21,1],[25,-12],[30,-24],[36,-28],[32,-18],[30,-6],[36,4],[44,10]],Color("3a2c63"))
+			r(c,4,10,48,5,"241c3f")
+			r(c,9,7,38,3,"5fd6e0")
+			for k in 5:r(c,11+k*8,7,3,3,"dffcff")
+			poly(c,Vector2.ZERO,[[38,-36],[40,-31],[45,-30],[41,-27],[42,-22],[38,-25],[34,-22],[35,-27],[31,-30],[36,-31]],Color("f3e48e"))
+			if female:r(c,46,10,4,10,"8bdfd5")
+		_:
+			# Breitkrempiger Jägerhut aus Leder mit Blattband und langer Feder.
+			poly(c,Vector2.ZERO,[[2,13],[10,9],[46,9],[54,13],[46,16],[10,16]],Color("4e3423"))
+			poly(c,Vector2.ZERO,[[13,10],[15,0],[22,-5],[34,-5],[41,0],[43,10]],Color("7a5232"))
+			r(c,15,5,26,4,"3d6b3a")
+			r(c,18,6,4,2,"8fbf5a")
+			r(c,30,6,4,2,"8fbf5a")
+			poly(c,Vector2.ZERO,[[40,6],[50,-18],[54,-24],[53,-14],[44,8]],Color("e8d39a"))
+			poly(c,Vector2.ZERO,[[45,0],[52,-18],[53,-14],[47,2]],Color("b5462e" if not female else "c76a9a"))

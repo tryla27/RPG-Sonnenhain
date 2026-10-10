@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Bosshüte sichtbar: `head_visual()` liefert 3–5 für Bosshüte,
+  `RpgHero.paint_boss_hat`, Netzwerk-Grenze für `head` auf 5. Vorschau
+  `tools/capture_boss_hats.gd`, Test `tests/gameplay/check_boss_hat_visual.gd`.
 - Umbenannt: Stein-/Kristall-/Lavagolem → -wächter; Roter Sonnenkuchen →
   Rotkuchen, Blauer Mondkuchen → Blaukuchen (`FoodSystem.RENAMED`,
   `normalize_item` für Inventar und Shopbestand beim Laden). Test
