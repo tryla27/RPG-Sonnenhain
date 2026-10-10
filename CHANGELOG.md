@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- `access.php`: große Dateien ohne PHP-Zeitlimit (`set_time_limit(0)`), Ausgabe
+  je MB geleert. `build_android_apk.sh` meldet Manifest und Signatur als
+  Hinweise im Lauf.
 - Android: Export-Preset „Android“ (arm64, ohne Gradle, `de.sonnenhainrpg.game`),
   `tools/build_android_apk.sh`, Workflow `build-android.yml`; `deploy-pages.yml`
   baut die APK mit und legt sie unter `/download/sonnenhain-rpg.apk` ab
