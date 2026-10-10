@@ -129,9 +129,8 @@ assert '\t\t\t\tdraw_arc(point, 18 + echo * 4' in teleport
 assert 'var hue: Color = [Color("a9eafa")' in source
 assert 'func draw_trails() -> void:' in source and 'draw_trail_band(a, b, 116.0, edge_colors[theme])' in source
 assert '"name":"Elara"' in data_source
-assert 'const MUSIC_FADE_SECONDS := 1.35' in source
-assert 'music_incoming.volume_db' in source and 'music_player.volume_db' in source
-assert 'AudioStreamOggVorbis: stream.loop = true' in source
+# Musikübergänge und Loop-Verhalten prüft tests/gameplay/check_golem_music.gd
+# durch Wiedergabeaufrufe statt durch die frühere Textsuche in main.gd.
 assert 'func music_path_for_theme(theme:String)->String:' in source
 assert 'return "res://music/%s.ogg" % theme' in source
 for boss_theme in ['boss_kriegsherr','boss_arkanhueter','boss_jagdmeister']:

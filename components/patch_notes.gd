@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Musik · Dunkler Golem", "Beim Erscheinen des Dunklen Golems blendet seine neue Hardtekk-Bossmelodie über sechs Sekunden ein. Der zweiminütige Loop begleitet auch den Kampf gegen seine beiden Hälften."],
 ["Krieger · Goldener Ritter", "Menschliche Krieger sind jetzt durchgehend der goldene Ritter aus der Sprunganimation: beim Stehen, Gehen, Laufen, Angreifen, bei Treffern, beim Ausweichen und beim Sturz, in allen acht Richtungen. Vorher wechselte der Krieger beim Springen plötzlich in ein anderes Aussehen. Der Sprung wird nicht mehr gestaucht gezeichnet. Waffe, Arm und Umhang liegen wie gewohnt darüber. Orks und Roboter behalten ihr Aussehen."],
 ["Krieger · Wieder sichtbar", "Menschliche Krieger waren im Stehen und beim Sprung unsichtbar; zu sehen waren nur Schwert und Umhang. Das Sprungbild wurde doppelt verschoben und landete außerhalb des Bildschirms. Jetzt ist der Sprung wieder zu sehen, und im Stehen zeigt der Krieger denselben Körper wie beim Gehen statt des kleinen, unscharfen Standbilds."],
 ["Dunkler Golem · Neuer Name", "Die beiden Hälften nach dem Zerfall heißen jetzt „Dunkler kleiner Golem“."],

@@ -1,0 +1,13 @@
+{
+  "seconds": 120,
+  "source_seconds": [
+    0,
+    24
+  ],
+  "repetitions": 5,
+  "boundary_repair_ms": 3,
+  "boundary_step_pcm": 0,
+  "peak": 0.888824462890625,
+  "equal_repetitions": true,
+  "listening_review": false
+}

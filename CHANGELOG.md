@@ -6,6 +6,8 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Bestätigten Golem-Hardtekk-Loop (120 s, erste 24 s fünfmal) unter `music/boss_golem.wav` eingebunden; Spawn und Hälften nutzen die bestehende Boss-Erkennung. Musikübergänge in `MusicPlayback` ausgelagert, Golem blendet über 6 s ein, andere Themen weiterhin über 1,35 s. Bearbeitbare Quelle und Loop-Prüfung unter `music/source/golem/`.
+
 - Goldener Ritter: `tools/build_golden_warrior.py` erzeugt aus dem ersten
   Sprungbild jeder Richtung `knight_8dir.png` (64×80, 8 Richtungen × Stehen 4,
   Gehen 6, Laufen 6, Angriff 4, Treffer 2). `rpg_hero.gd`: `uses_knight`,
