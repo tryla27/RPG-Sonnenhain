@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Krieger · Goldener Ritter", "Menschliche Krieger sind jetzt durchgehend der goldene Ritter aus der Sprunganimation: beim Stehen, Gehen, Laufen, Angreifen, bei Treffern, beim Ausweichen und beim Sturz, in allen acht Richtungen. Vorher wechselte der Krieger beim Springen plötzlich in ein anderes Aussehen. Der Sprung wird nicht mehr gestaucht gezeichnet. Waffe, Arm und Umhang liegen wie gewohnt darüber. Orks und Roboter behalten ihr Aussehen."],
 ["Krieger · Wieder sichtbar", "Menschliche Krieger waren im Stehen und beim Sprung unsichtbar; zu sehen waren nur Schwert und Umhang. Das Sprungbild wurde doppelt verschoben und landete außerhalb des Bildschirms. Jetzt ist der Sprung wieder zu sehen, und im Stehen zeigt der Krieger denselben Körper wie beim Gehen statt des kleinen, unscharfen Standbilds."],
 ["Dunkler Golem · Neuer Name", "Die beiden Hälften nach dem Zerfall heißen jetzt „Dunkler kleiner Golem“."],
 ["Dunkler Golem · Unsichtbar nach links behoben", "Lief der Golem nach links, war nur sein Schatten zu sehen. Er hat jetzt ein eigenes Bild für diese Richtung und ist immer sichtbar."],

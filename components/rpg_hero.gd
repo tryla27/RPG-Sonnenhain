@@ -4,6 +4,56 @@ const H = preload("res://components/reference_house.gd")
 const GoldenSprites = preload("res://components/golden_sprite_runtime.gd")
 const GOLDEN_HUMAN_WARRIOR_IDLE := "res://art/sprites/characters/golden_human_warrior/idle_8dir.png"
 const GOLDEN_IDLE_ENABLED := false
+## Goldener Ritter für alle menschlichen Krieger (Angelo 10.10.2026): ein Blatt
+## mit Stehen, Gehen, Laufen, Angriff und Treffer in 8 Richtungen, erzeugt aus
+## den Sprungbildern (tools/build_golden_warrior.py). Zelle 64×80, Fuß y=76.
+const KNIGHT_SHEET := "res://art/sprites/characters/golden_human_warrior/knight_8dir.png"
+const KNIGHT_CELL := Vector2(64,80)
+const KNIGHT_FOOT_Y := 76.0
+const KNIGHT_ANIMS := {"idle":[0,4],"walk":[4,6],"run":[10,6],"attack":[16,4],"hit":[20,2]}
+## Sprungbilder: Figur im Original ≈ 490 px hoch, im Spiel 70 px wie der Ritter.
+const KNIGHT_JUMP_SCALE := 70.0/490.0
+const KNIGHT_FOOT_OFFSET := 24.0
+const KNIGHT_JUMP_FOOT_Y := 645.0
+## Angriffsfortschritt 0..1 des lokalen Kriegers (main.gd setzt ihn vor dem Zeichnen), sonst -1.
+static var knight_attack := -1.0
+
+## Zeile im Ritter-Blatt und Sprungbild aus der Blickrichtung am Bildschirm
+## (S, SW, W, NW, N, NO, O, SO wie die Dateinamen). direction_index zählt
+## andersherum (S, SO, O, …), deshalb eigene Zuordnung.
+static func knight_row(look:Vector2)->int:
+	if look.length_squared()<0.0001:return 0
+	var screen:=posmod(roundi(atan2(look.y,look.x)/(PI/4.0)),8)
+	return posmod(screen-2,8)
+
+static func uses_knight(role:int,race:int)->bool:
+	return role==0 and race==0
+
+## Spalte im Ritter-Blatt.
+static func knight_frame(phase:float,running:bool,hurt:float,attack:float,time:float)->int:
+	var anim:="idle"
+	var t:=0.0
+	if hurt>0.35:anim="hit";t=1.0-hurt
+	elif attack>=0.0:anim="attack";t=attack
+	elif phase!=0.0:
+		anim="run" if running else "walk"
+		t=fposmod(phase,TAU)/TAU
+	else:
+		t=fposmod(time*0.8,1.0)
+	var info:Array=KNIGHT_ANIMS[anim]
+	return int(info[0])+clampi(int(floor(t*int(info[1]))),0,int(info[1])-1)
+
+## Ritter zeichnen: in Bildschirmkoordinaten (p+offset), mit Drehung um die
+## Körpermitte (Ausweichrolle, Sturz) und Durchsichtigkeit.
+static func paint_knight(c:CanvasItem,foot:Vector2,heading:int,frame:int,s:float,tint:Color,rotation:float=0.0)->bool:
+	var tex:=GoldenSprites.texture(KNIGHT_SHEET)
+	if tex==null:return false
+	var pivot:=foot+Vector2(0,-33)*s
+	c.draw_set_transform(pivot,rotation)
+	var region:=Rect2(Vector2(frame*KNIGHT_CELL.x,posmod(heading,8)*KNIGHT_CELL.y),KNIGHT_CELL)
+	var top_left:=Vector2(-KNIGHT_CELL.x*0.5,-KNIGHT_FOOT_Y+33)*s
+	c.draw_texture_rect_region(tex,Rect2(top_left,KNIGHT_CELL*s),region,tint)
+	return true
 const GOLDEN_HUMAN_WARRIOR_JUMP := [
 	"res://art/sprites/characters/golden_human_warrior/jump/jump-south-8f-v1.png",
 	"res://art/sprites/characters/golden_human_warrior/jump/jump-south-west-8f-v1.png",
@@ -37,15 +87,44 @@ static func paint(c: CanvasItem,p: Vector2,role: int,race: int,gender: int,look:
 	hurt_flash=clampf(hurt,0,1)
 	var female := gender == 1
 	var heading:=direction_index(look)
-	if role==0 and race==0 and gender==0 and jump_progress>=0.0 and death<0.0:
+	if uses_knight(role,race) and jump_progress>=0.0 and death<0.0:
 		var frame:=clampi(floori(clampf(jump_progress,0.0,0.9999)*8.0),0,7)
 		var tint:=Color("fff3de").lerp(Color.WHITE,1.0-clampf(hurt,0.0,1.0)*0.45)
 		# Wie der gezeichnete Körper in Bildschirmkoordinaten (p+offset), nicht
 		# zusätzlich über die Welt-Verschiebung des Aufrufers (sonst doppelt
 		# verschoben und unsichtbar, nur Umhang und Waffe blieben, 10.10.2026).
 		c.draw_set_transform(Vector2.ZERO)
-		if GoldenSprites.draw_animation_strip(c,GOLDEN_HUMAN_WARRIOR_JUMP[heading],p+offset,frame,8,Vector2(96,96),75.0,s,tint):
+		# Seitenverhältnis der hochkanten Sprungbilder (271×724) beibehalten; früher
+		# in 96×96 gestaucht.
+		var jump_tex:=GoldenSprites.texture(GOLDEN_HUMAN_WARRIOR_JUMP[knight_row(look)])
+		var jump_size:=Vector2(jump_tex.get_width()/8.0,jump_tex.get_height())*KNIGHT_JUMP_SCALE if jump_tex!=null else Vector2(96,96)
+		if GoldenSprites.draw_animation_strip(c,GOLDEN_HUMAN_WARRIOR_JUMP[knight_row(look)],p+offset+Vector2(0,KNIGHT_FOOT_OFFSET)*s,frame,8,jump_size,KNIGHT_JUMP_FOOT_Y*KNIGHT_JUMP_SCALE,s,tint):
 			preload("res://components/arcane_necklaces.gd").paint_actor(c,p+offset+(Vector2(0,-sin(jump_progress*PI)*20)*s if jump_progress>=0 else Vector2.ZERO),look,necklace,s,phase)
+			hurt_flash=0.0
+			c.draw_set_transform(offset)
+			return
+		c.draw_set_transform(offset)
+	# Goldener Ritter: Stehen, Gehen, Laufen, Angriff, Treffer, Rolle und Sturz.
+	if uses_knight(role,race):
+		var knight_tint:=Color.WHITE.lerp(Color("ffb0a8"),clampf(hurt,0.0,1.0)*0.6)
+		var knight_rot:=0.0
+		var knight_frame_index:=knight_frame(phase,running,hurt,knight_attack,Time.get_ticks_msec()/1000.0)
+		# Fußpunkt wie beim gezeichneten Körper (dessen Stiefel enden 24 px unter p).
+		var foot:=p+offset+Vector2(0,KNIGHT_FOOT_OFFSET)*s
+		if roll>=0.0:
+			var spin:=1.0 if roll_dir.x>=0.0 else -1.0
+			knight_rot=roll*TAU*spin
+			foot+=Vector2(0,-sin(roll*PI)*6.0)*s
+		if death>=0.0:
+			var side:=1.0 if look.x>=0.0 else -1.0
+			knight_rot=smoothstep(0.0,0.7,death)*PI*0.5*side
+			foot.y+=smoothstep(0.0,0.7,death)*14.0*s
+			knight_tint.a=1.0-0.5*smoothstep(0.6,1.0,death)
+			knight_frame_index=int(KNIGHT_ANIMS["hit"][0])
+		c.draw_set_transform(Vector2.ZERO)
+		if paint_knight(c,foot,knight_row(look),knight_frame_index,s,knight_tint,knight_rot):
+			c.draw_set_transform(Vector2.ZERO)
+			preload("res://components/arcane_necklaces.gd").paint_actor(c,foot,look,necklace,s,phase)
 			hurt_flash=0.0
 			c.draw_set_transform(offset)
 			return
