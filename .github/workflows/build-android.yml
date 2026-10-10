@@ -6,6 +6,8 @@ on:
       - ".github/workflows/build-android.yml"
       - "tools/build_android_apk.sh"
       - "export_presets.cfg"
+      - "components/app_*.gd"
+      - ".github/workflows/deploy-android.yml"
   workflow_dispatch:
 
 permissions:

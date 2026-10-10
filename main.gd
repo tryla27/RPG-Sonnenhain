@@ -149,6 +149,8 @@ const MasterArmor=preload("res://components/master_armor.gd")
 const GolemBoss=preload("res://components/golem_boss.gd")
 const GolemDesign=preload("res://components/golem_design.gd")
 const PerfOverlay=preload("res://components/perf_overlay.gd")
+const AppKeyboard=preload("res://components/app_keyboard.gd")
+const AppTouch=preload("res://components/app_touch.gd")
 const HimmelsfalterArt=preload("res://components/himmelsfalter_art.gd")
 const ShopTrade=preload("res://components/shop_trade.gd")
 var fullscreen_escape = DisplayMode.EscapeCounter.new()
@@ -451,6 +453,12 @@ var touch_aim_id := -1
 var touch_aim_base := Vector2(1032, 526)
 var touch_aim_knob := Vector2(1032, 526)
 var touch_aim_vector := Vector2.RIGHT
+## Android-App: eigene Touch-Steuerung und Bildschirmtastatur (components/app_*.gd).
+var app_mode := false
+var app_keyboard := AppKeyboard.new()
+var app_touch := AppTouch.new()
+var touch_aim_manual := false
+var app_action_hint := false
 var sound_players: Array = []
 var sound_streams: Dictionary = {}
 var next_sound_player := 0
@@ -568,6 +576,8 @@ func _notification(what: int) -> void:
 			for action in controller.ACTIONS:
 				var code: int = int(controller.bindings[action])
 				if controller.code_pressed(code): controller.blocked_codes[code] = true
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST and app_mode:
+		app_go_back()
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if touch_enabled: clear_touch_inputs()
 		if not dedicated_server_mode and character_created and panel not in ["start","creation"]:
@@ -727,6 +737,13 @@ func _ready() -> void:
 	world_fog.configure(WORLD)
 	touch_enabled = detect_touch_capability()
 	mobile_performance_mode = touch_enabled and is_web_platform()
+	app_mode = OS.has_feature("android")
+	if app_mode:
+		touch_enabled = true
+		reset_touch_joystick()
+		reset_touch_aim()
+		# Zurück-Taste schließt Fenster statt die App zu beenden.
+		get_tree().quit_on_go_back = false
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	environment_tiles = load("res://art/sonnenhain_tiles.png")
 	region_tiles = load("res://art/regions_16.png")
@@ -1742,6 +1759,7 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 
 func _process(delta: float) -> void:
 	perf_overlay.tick(delta)
+	if app_mode: app_keyboard_tick()
 	if not world_obstacles_3d.enabled(self):world_obstacles_3d.update(self,delta)
 	combat_feedback.step(delta)
 	if not dedicated_server_mode:
@@ -2434,6 +2452,7 @@ func update_player(delta: float) -> void:
 		if stick_aim.length_squared() > 0.0: facing = stick_aim.normalized()
 		elif move.length_squared() > 0.0: facing = move.normalized()
 	elif touch_enabled:
+		if app_mode and touch_aim_id >= 0 and not touch_aim_manual: app_auto_aim()
 		if touch_aim_id >= 0 and touch_aim_vector.length_squared() > 0.01:
 			facing = facing.slerp(touch_aim_vector.normalized(), minf(1.0, delta * 18.0)).normalized()
 		elif move.length() > 0.15:
@@ -2896,6 +2915,7 @@ func attack_input_active() -> bool:
 	return binding_pressed("attack")
 
 func touch_button_at(pos: Vector2) -> String:
+	if app_mode: return AppTouch.button_at(pos)
 	if pos.distance_to(Vector2(1032, 526)) <= 67.0: return "attack"
 	if pos.distance_to(Vector2(916, 550)) <= 43.0: return "dodge"
 	if pos.distance_to(Vector2(967, 447)) <= 43.0: return "interact"
@@ -2929,7 +2949,7 @@ func update_touch_joystick(pos: Vector2) -> void:
 func reset_touch_joystick() -> void:
 	touch_move_id = -1
 	touch_move_vector = Vector2.ZERO
-	touch_move_base = Vector2(118, 526)
+	touch_move_base = AppTouch.MOVE_REST if app_mode else Vector2(118, 526)
 	touch_move_knob = touch_move_base
 
 func update_touch_aim(pos: Vector2) -> void:
@@ -2944,15 +2964,19 @@ func update_touch_aim(pos: Vector2) -> void:
 	if distance <= DEADZONE:
 		touch_aim_knob = touch_aim_base
 		return
+	touch_aim_manual = true
 	touch_aim_vector = delta.normalized()
 	touch_aim_knob = touch_aim_base + touch_aim_vector * minf(distance, 58.0)
 
 func begin_touch_aim(index: int, pos: Vector2) -> void:
 	touch_aim_id = index
 	touch_aim_base = Vector2(clampf(pos.x, 850.0, 1080.0), clampf(pos.y, 390.0, 555.0))
+	if app_mode: touch_aim_base = AppTouch.ATTACK + (pos - AppTouch.ATTACK).limit_length(18.0)
 	touch_aim_knob = touch_aim_base
 	touch_aim_vector = facing.normalized() if facing.length_squared() > 0.01 else Vector2.RIGHT
+	touch_aim_manual = false
 	touch_attack_ids[index] = "attack"
+	if app_mode: app_auto_aim()
 
 func reset_touch_aim(index: int = -1) -> void:
 	if index >= 0:
@@ -2962,11 +2986,13 @@ func reset_touch_aim(index: int = -1) -> void:
 			if touch_attack_ids[key] == "attack":
 				touch_attack_ids.erase(key)
 	touch_aim_id = -1
-	touch_aim_base = Vector2(1032, 526)
+	touch_aim_manual = false
+	touch_aim_base = AppTouch.ATTACK if app_mode else Vector2(1032, 526)
 	touch_aim_knob = touch_aim_base
 
 func handle_touch_event(event: InputEvent) -> bool:
 	if not touch_enabled: return false
+	if app_mode: return AppTouch.handle(self, event)
 	if event is InputEventScreenTouch:
 		last_touch_msec = Time.get_ticks_msec()
 		var touch_event: InputEventScreenTouch = event as InputEventScreenTouch
@@ -3090,8 +3116,114 @@ func open_mobile_chat() -> void:
 			send_chat_message(entered)
 	else:
 		chat_open = true
-		DisplayServer.virtual_keyboard_show(chat_input)
+		if app_mode: app_keyboard.open("chat", chat_input)
+		else: DisplayServer.virtual_keyboard_show(chat_input)
 	queue_redraw()
+
+## Android-App: welches Schreibfeld gerade beschrieben wird (siehe AppKeyboard).
+func app_text_target() -> String:
+	if chat_open: return "chat"
+	if panel in ["account_login","account_register"]: return "account_%d" % account_focus
+	if panel == "creation": return "creation"
+	return ""
+
+func app_text_value(target: String) -> String:
+	match target:
+		"chat": return chat_input
+		"account_0": return account_name
+		"account_1": return account_password
+		"account_2": return account_password_confirm
+		"creation": return creation_name
+	return ""
+
+func app_keyboard_open() -> void:
+	var target := app_text_target()
+	app_keyboard.open(target, app_text_value(target))
+
+## Für Vorschaubilder: Eingabeleiste ohne echtes Gerät zeigen.
+func app_keyboard_preview(target: String) -> void:
+	app_keyboard.target = target
+	app_keyboard.preview = true
+	queue_redraw()
+
+func app_keyboard_tick() -> void:
+	var target := app_text_target()
+	app_keyboard.sync(target, app_text_value(target))
+	# Tastatur selbst geschlossen: leeren Chat wieder zu, sonst bleibt der Text stehen.
+	if app_keyboard.dismissed() and chat_open and chat_input.strip_edges() == "":
+		chat_open = false
+		chat_input = ""
+	if app_keyboard.visible(): queue_redraw()
+
+func app_draw_keyboard_bar() -> void:
+	if not app_mode or not app_keyboard.visible(): return
+	AppKeyboard.draw_bar(self, font, app_keyboard.target, app_text_value(app_keyboard.target), world_time)
+
+## Android-Zurück-Taste: wie ESC (Fenster schließen, Spielmenü öffnen).
+func app_go_back() -> void:
+	if chat_open:
+		chat_open = false
+		chat_input = ""
+		app_keyboard.close()
+		queue_redraw()
+		return
+	if online_list_open:
+		online_list_open = false
+		queue_redraw()
+		return
+	for pressed in [true, false]:
+		var esc := InputEventKey.new()
+		esc.keycode = KEY_ESCAPE
+		esc.physical_keycode = KEY_ESCAPE
+		esc.pressed = pressed
+		Input.parse_input_event(esc)
+
+## Angriff und Fähigkeiten ohne Ziehen: auf den nächsten Gegner zielen.
+func app_auto_aim(snap: bool = false) -> void:
+	var target := AppTouch.nearest_target(player_pos, enemies)
+	if target == Vector2.INF: return
+	var dir := target - player_pos
+	if dir.length_squared() < 1.0: return
+	touch_aim_vector = dir.normalized()
+	if snap: facing = touch_aim_vector
+
+## AKTION-Knopf: spricht an, betritt, öffnet; am Wegstein die Weltkarte.
+func app_interact() -> void:
+	if interaction_prompt(food_system.nearest(self)).begins_with("F"): use_waystone()
+	else: interact()
+
+func app_menu_click(mouse: Vector2) -> void:
+	var action := AppTouch.menu_action_at(mouse)
+	if action == "": return
+	match action:
+		"close": panel = ""
+		"online":
+			panel = ""
+			online_list_open = true
+		"pause":
+			panel = "pause"
+			pause_status = "Konflux läuft online weiter." if konflux.active else "Das Spiel ist angehalten."
+		"mechanics": panel = "mechanics"
+		_:
+			panel = ""
+			toggle_panel(action)
+	play_sound("ui_klick")
+	queue_redraw()
+
+func app_draw_touch_controls() -> void:
+	var skill_state: Array = []
+	for slot in 4:
+		var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
+		skill_state.append({"id": id, "cooldown": float(cooldowns[id]) if id >= 0 else 0.0})
+	AppTouch.draw(self, {
+		"move_base": touch_move_base, "move_knob": touch_move_knob, "moving": touch_move_id >= 0,
+		"aiming": touch_aim_id >= 0, "aim_base": touch_aim_base, "aim_knob": touch_aim_knob,
+		"aim_vector": touch_aim_vector, "auto_aim": not touch_aim_manual,
+		"skills": skill_state, "dodge_ready": dash_cooldown <= 0.0,
+		"dodge_label": "SCHRITT" if class_id == 1 else "ROLLE",
+		"action_hint": app_action_hint, "clock": world_time,
+		"resource_label": "MANA" if class_id == 1 else "ENERGIE",
+		"chat_unread": chat_fade > 0.0 and not chat_open})
 
 func _input(event:InputEvent)->void:
 	if PerfOverlay.is_toggle_key(event):
@@ -3102,7 +3234,7 @@ func _input(event:InputEvent)->void:
 		DisplayMode.toggle()
 		get_viewport().set_input_as_handled()
 		return
-	if DisplayMode.is_escape(event) and DisplayMode.is_fullscreen() and fullscreen_escape.press(Time.get_ticks_msec()):
+	if not app_mode and DisplayMode.is_escape(event) and DisplayMode.is_fullscreen() and fullscreen_escape.press(Time.get_ticks_msec()):
 		message("Drücke F11 zum Beenden des Vollbildmodus.")
 	if panel not in ["account_login","account_register"]:
 		account_shift_tap_pending=false
@@ -3136,7 +3268,9 @@ func handle_account_key(event:InputEventKey)->void:
 		elif account_focus==1 and account_password.length()>0:account_password=account_password.left(account_password.length()-1)
 		elif registering and account_focus==2 and account_password_confirm.length()>0:account_password_confirm=account_password_confirm.left(account_password_confirm.length()-1)
 	elif key==KEY_ENTER:
-		if account_form_valid(registering):request_account(registering)
+		# App: Enter auf der Bildschirmtastatur springt ins nächste Feld.
+		if app_mode and account_focus<focus_count-1:account_focus+=1
+		elif account_form_valid(registering):request_account(registering)
 	elif event.unicode>=32:
 		var typed:=String.chr(event.unicode)
 		if account_focus==0 and account_name.length()<24 and "abcdefghijklmnopqrstuvwxyzäöüß0123456789_-".contains(typed.to_lower()):account_name+=typed
@@ -3147,6 +3281,7 @@ func handle_account_key(event:InputEventKey)->void:
 	elif account_status=="Die Passwörter stimmen nicht überein.":
 		account_status=""
 	if panel!="account_gate":typing_feedback(typed_before,account_name.length()+account_password.length()+account_password_confirm.length())
+	if app_mode:app_keyboard.typed(event,app_text_value(app_keyboard.target))
 	queue_redraw()
 	return
 
@@ -3184,6 +3319,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		online_list_open = event.pressed
 		queue_redraw()
 		return
+	if app_mode and AppTouch.skip_mouse(self, event): return
 	if handle_touch_event(event): return
 	# Mobile Browser senden nach einem Touch oft noch einen künstlichen
 	# Mausklick. Den nur kurz nach echtem Touch unterdrücken, damit Buttons
@@ -3242,6 +3378,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var typed := String.chr(event.unicode)
 			if "abcdefghijklmnopqrstuvwxyzäöüß0123456789 -_".find(typed.to_lower()) >= 0: creation_name += typed
 		typing_feedback(name_before, creation_name.length())
+		if app_mode: app_keyboard.typed(event, creation_name)
 		queue_redraw()
 		return
 	# Chat blockiert die Kampfsteuerung, solange geschrieben wird.
@@ -3259,6 +3396,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.unicode >= 32 and chat_input.length() < 120:
 			chat_input += String.chr(event.unicode)
 		if chat_open: typing_feedback(chat_before, chat_input.length())
+		if app_mode and chat_open: app_keyboard.typed(event, chat_input)
 		queue_redraw()
 		return
 	if panel == "" and event.is_pressed() and not (event is InputEventKey and event.echo) and event_matches_binding(event, "chat"):
@@ -6087,14 +6225,20 @@ func panel_click(mouse: Vector2) -> void:
 	if panel=="account_gate":
 		if Rect2(300,320,550,58).has_point(mouse):
 			account_password="";account_password_confirm="";account_status="";account_focus=0;panel="account_login";join_live_multiplayer()
+			if app_mode:app_keyboard_open()
 		elif Rect2(300,400,550,58).has_point(mouse):
 			account_password="";account_password_confirm="";account_status="";account_focus=0;panel="account_register";join_live_multiplayer()
+			if app_mode:app_keyboard_open()
 		return
 	if panel in ["account_login","account_register"]:
 		var registering:=panel=="account_register"
-		if Rect2(300,255 if registering else 275,550,48).has_point(mouse):account_focus=0
-		elif Rect2(300,345 if registering else 365,550,48).has_point(mouse):account_focus=1
-		elif registering and Rect2(300,435,550,48).has_point(mouse):account_focus=2
+		var tapped_field:=-1
+		if Rect2(300,255 if registering else 275,550,48).has_point(mouse):tapped_field=0
+		elif Rect2(300,345 if registering else 365,550,48).has_point(mouse):tapped_field=1
+		elif registering and Rect2(300,435,550,48).has_point(mouse):tapped_field=2
+		if tapped_field>=0:
+			account_focus=tapped_field
+			if app_mode:app_keyboard_open()
 		elif Rect2(300,545 if registering else 455,550,52).has_point(mouse) and account_form_valid(registering):
 			request_account(registering)
 		elif Rect2(300,615 if registering else 525,180,42).has_point(mouse):
@@ -6184,7 +6328,8 @@ func panel_click(mouse: Vector2) -> void:
 				queue_redraw()
 				return
 		if Rect2(300, 228, 550, 48).has_point(mouse):
-			if touch_enabled: creation_name = mobile_text_prompt("Name deines Helden", creation_name, 16)
+			if app_mode: app_keyboard_open()
+			elif touch_enabled: creation_name = mobile_text_prompt("Name deines Helden", creation_name, 16)
 			queue_redraw()
 			return
 		for i in 2:
@@ -6203,9 +6348,9 @@ func panel_click(mouse: Vector2) -> void:
 	if panel == "multiplayer":
 		if Rect2(205, 282, 340, 52).has_point(mouse):
 			join_live_multiplayer()
-		elif Rect2(605, 282, 340, 52).has_point(mouse) and not is_web_platform():
+		elif Rect2(605, 282, 340, 52).has_point(mouse) and not is_web_platform() and not app_mode:
 			host_multiplayer()
-		elif Rect2(205, 396, 740, 46).has_point(mouse) and not is_web_platform():
+		elif Rect2(205, 396, 740, 46).has_point(mouse) and not is_web_platform() and not app_mode:
 			join_multiplayer_from_code(join_code)
 		elif Rect2(205, 454, 740, 46).has_point(mouse):
 			join_code = ""
@@ -6340,6 +6485,7 @@ func panel_click(mouse: Vector2) -> void:
 		pending_sale = -1
 		return
 	match panel:
+		"app_menu": app_menu_click(mouse)
 		"essence": click_essence(mouse)
 		"spell_return": SpellReturn.click(self,mouse)
 		"skills": click_skills(mouse)
@@ -7676,6 +7822,7 @@ func _draw() -> void:
 			var x:float=i*72
 			draw_line(Vector2(x,0),Vector2(x-240,648),Color("152b3b"),1)
 		draw_panel()
+		app_draw_keyboard_bar()
 		return
 	if dedicated_server_mode or DisplayServer.get_name() == "headless": return
 	if konflux.active:
@@ -7870,6 +8017,7 @@ func _draw() -> void:
 	draw_multiplayer_debug_overlay()
 	if rescue_intro_timer > 0.0 or reward_scene_timer > 0.0: draw_rescue_alert()
 	if panel != "": draw_panel()
+	app_draw_keyboard_bar()
 	performance_draw_us = Time.get_ticks_usec()-draw_started
 	performance_draw_samples.append(performance_draw_us)
 	if performance_draw_samples.size()>180: performance_draw_samples.pop_front()
@@ -7911,7 +8059,7 @@ func draw_online_list() -> void:
 		draw_rect(row, Color("17272e", 0.9) if i % 2 == 0 else Color("203239", 0.9))
 		text_at(Vector2(row.position.x + 12, row.position.y + 21), names[i], 15, Color("fff0ce"))
 		y += row_h
-	text_at(box.position + Vector2(18,height-14), "ONLINE antippen zum Schließen" if touch_enabled else "TAB gedrückt halten", 11, Color("9fb4ac"))
+	text_at(box.position + Vector2(18,height-14), ("Antippen zum Schließen" if app_mode else "ONLINE antippen zum Schließen") if touch_enabled else "TAB gedrückt halten", 11, Color("9fb4ac"))
 
 func draw_chat_overlay() -> void:
 	if not chat_open and (chat_messages.is_empty() or chat_fade <= 0.0): return
@@ -10122,8 +10270,9 @@ func draw_hud() -> void:
 	HudLayout.draw_status(self,"%s · %s · Stufe %d%s" % [hero_name if hero_name != "" else CLASS_NAMES[class_id], RACE_NAMES[hero_race], level, " · TEST" if creative_mode else ""],[Color("d9a06f"), Color("9bbce4"), Color("a7cd91")][class_id],hp,max_hp(),energy,max_energy(),energy_color,stamina,max_stamina(),stamina_color)
 	HudLayout.draw_xp_line(self,float(xp),float(xp_required()),mouse_now,"XP %d / %d" % [xp, xp_required()])
 	if party_reward_notice_timer>0.0 and party_reward_notice!="":
-		draw_ref_panel(Rect2(365,8,410,42))
-		text_at(Vector2(378,35),party_reward_notice,13,Color("bfe8ad"),HORIZONTAL_ALIGNMENT_CENTER,384)
+		var reward_dx := -100.0 if app_mode else 0.0
+		draw_ref_panel(Rect2(365+reward_dx,8,410,42))
+		text_at(Vector2(378+reward_dx,35),party_reward_notice,13,Color("bfe8ad"),HORIZONTAL_ALIGNMENT_CENTER,384)
 	if class_mastery_unlocked and class_id==0: text_at(Vector2(365,30),"WUT %.0f%%" % warrior_rage,12,Color("efaa75"))
 	elif class_mastery_unlocked and class_id==2: text_at(Vector2(365,30),"JAGD %.0f%%%s" % [ranger_hunt_meter," · %.0fs" % ranger_hunt_buff if ranger_hunt_buff>0 else ""],12,Color("f3d68e"))
 	elif class_mastery_unlocked and class_id==1: text_at(Vector2(365,30),"LEERTASTE · ARKANER SCHRITT",12,Color("cdbaff"))
@@ -10145,9 +10294,10 @@ func draw_hud() -> void:
 		status_bottom=HudLayout.draw_effect_chips(self,Vector2(10,food_y),chips,mouse_now)
 	for enemy in enemies:
 		if int(enemy["type"]) in [12, 13, 14, 27, 28] and enemy["pos"].distance_to(player_pos) < (1100 if GolemBoss.is_golem(enemy) else 620):
-			ui_box(Rect2(430, 10, 480, 64), Color("5b4547"))
-			text_at(Vector2(446, 37), "BOSS · %s" % ENEMY_TYPES[int(enemy["type"])]["name"], 19, Color("ffe5b5"))
-			bar(Rect2(446, 43, 447, 19), float(enemy["hp"]), float(enemy["max_hp"]), Color("eb866f"), "%d / %d" % [ceili(float(enemy["hp"])), ceili(float(enemy["max_hp"]))])
+			var boss_dx := -150.0 if app_mode else 0.0
+			ui_box(Rect2(430+boss_dx, 10, 480, 64), Color("5b4547"))
+			text_at(Vector2(446+boss_dx, 37), "BOSS · %s" % ENEMY_TYPES[int(enemy["type"])]["name"], 19, Color("ffe5b5"))
+			bar(Rect2(446+boss_dx, 43, 447, 19), float(enemy["hp"]), float(enemy["max_hp"]), Color("eb866f"), "%d / %d" % [ceili(float(enemy["hp"])), ceili(float(enemy["max_hp"]))])
 			break
 	if arena_mode != "":
 		draw_circle(Vector2(1040, 103), 64, Color("28373f"))
@@ -10165,9 +10315,51 @@ func draw_hud() -> void:
 	if save_notice_timer > 0.0:
 		text_at(Vector2(HudLayout.MAP_LABEL_RECT.position.x, HudLayout.SAVE_NOTICE_Y), save_notice_text, 10, Color("c9f0c4"), HORIZONTAL_ALIGNMENT_CENTER, int(HudLayout.MAP_LABEL_RECT.size.x))
 	if notice_timer > 0:
-		ui_box(HudLayout.NOTICE_RECT, Color("415f59"))
+		# App: Hinweise über der Bildmitte statt unter dem Bewegungsstick.
+		var notice_rect := Rect2(321, 420, 510, 34) if app_mode else HudLayout.NOTICE_RECT
+		ui_box(notice_rect, Color("415f59"))
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
-		text_at(HudLayout.NOTICE_RECT.position+Vector2(11, 23), short_notice, 15, Color("fff3c3"))
+		text_at(notice_rect.position+Vector2(11, 23), short_notice, 15, Color("fff3c3"))
+	var nearest := interaction_prompt(nearby_food)
+	app_action_hint = nearest != ""
+	if nearest != "":
+		if touch_enabled:
+			var mobile_hint := Rect2(386, 474, 380, 38)
+			ui_box(mobile_hint, Color("587767"))
+			var touch_prompt := nearest.replace("E  ·", "AKTION  ·")
+			if app_mode: touch_prompt = touch_prompt.replace("F  ·", "AKTION  ·")
+			text_at(Vector2(398, 500), touch_prompt, 14, Color("fff4ca"), HORIZONTAL_ALIGNMENT_CENTER, 356)
+		else:
+			HudLayout.draw_prompt(self, nearest.replace("E  ·", "%s  ·" % binding_short("interact")))
+	if touch_enabled:
+		draw_touch_controls()
+	else:
+		var hud_labels:Array=[
+			"%s SPELLS" % binding_short("skills"),
+			"%s INVENTAR" % binding_short("inventory"),
+			"%s QUESTS" % binding_short("journal"),
+			"%s KARTE" % binding_short("map"),
+			"%s HILFE" % binding_short("mechanics"),
+			"%s GRUPPE" % binding_short("party"),
+			"%s CHAT" % binding_short("chat")
+		]
+		for i in hud_labels.size():HudLayout.draw_hud_button(self,hud_action_rect(i),str(hud_labels[i]),hud_action_rect(i).has_point(mouse_now))
+		for slot in 4:
+			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
+			var x := 694 + slot * 81
+			HudLayout.draw_skill_slot(self,Rect2(x,593,75,44),binding_short("ability_%d" % (slot + 1)),id >= 0)
+			if id >= 0:
+				draw_skill_icon(Vector2(x + 24, 598), id, 30)
+				if float(cooldowns[id]) > 0:
+					draw_rect(Rect2(x + 3, 596, 68, 38), Color(0.1, 0.16, 0.2, 0.7))
+					text_at(Vector2(x + 23, 620), "%.1f" % float(cooldowns[id]), 15)
+	if not touch_enabled and HudLayout.STATUS_RECT.has_point(mouse_now):
+		HudLayout.draw_status_numbers(self,["Leben  %d / %d" % [ceili(hp), ceili(max_hp())],"%s  %d / %d" % ["Mana" if class_id == 1 else "Energie", ceili(energy), ceili(max_energy())],"Ausdauer  %d / %d%s" % [ceili(stamina),ceili(max_stamina())," · rennt" if is_sprinting else ""],"XP  %d / %d" % [xp, xp_required()],"Gold  %d" % gold])
+	if quest_hovered:
+		quest_guide.draw_hud_hover(self,Vector2(quest_rect.position.x,quest_rect.position.y-186))
+
+## Hinweis zur nächsten Interaktion („E  ·  …“, Wegstein „F  ·  …“), "" = keine.
+func interaction_prompt(nearby_food: Dictionary) -> String:
 	var nearest := ""
 	if not nearby_food.is_empty():
 		# Kräuter haben keinen Eintrag "food" (vorher Skriptfehler in jedem Bild).
@@ -10218,41 +10410,12 @@ func draw_hud() -> void:
 			if player_pos.distance_to(LANDMARKS[int(DUNGEON_ENTRANCES[index])]["pos"] + Vector2(-30, 70)) < 84:
 				nearest = "E  ·  %s betreten" % DUNGEON_NAMES[index]
 				break
-	if nearest != "":
-		if touch_enabled:
-			var mobile_hint := Rect2(386, 474, 380, 38)
-			ui_box(mobile_hint, Color("587767"))
-			text_at(Vector2(398, 500), nearest.replace("E  ·", "AKTION  ·"), 14, Color("fff4ca"), HORIZONTAL_ALIGNMENT_CENTER, 356)
-		else:
-			HudLayout.draw_prompt(self, nearest.replace("E  ·", "%s  ·" % binding_short("interact")))
-	if touch_enabled:
-		draw_touch_controls()
-	else:
-		var hud_labels:Array=[
-			"%s SPELLS" % binding_short("skills"),
-			"%s INVENTAR" % binding_short("inventory"),
-			"%s QUESTS" % binding_short("journal"),
-			"%s KARTE" % binding_short("map"),
-			"%s HILFE" % binding_short("mechanics"),
-			"%s GRUPPE" % binding_short("party"),
-			"%s CHAT" % binding_short("chat")
-		]
-		for i in hud_labels.size():HudLayout.draw_hud_button(self,hud_action_rect(i),str(hud_labels[i]),hud_action_rect(i).has_point(mouse_now))
-		for slot in 4:
-			var id: int = class_ultimate() if slot == 3 and level >= 20 else (int(slots[slot]) if slot < 3 else -1)
-			var x := 694 + slot * 81
-			HudLayout.draw_skill_slot(self,Rect2(x,593,75,44),binding_short("ability_%d" % (slot + 1)),id >= 0)
-			if id >= 0:
-				draw_skill_icon(Vector2(x + 24, 598), id, 30)
-				if float(cooldowns[id]) > 0:
-					draw_rect(Rect2(x + 3, 596, 68, 38), Color(0.1, 0.16, 0.2, 0.7))
-					text_at(Vector2(x + 23, 620), "%.1f" % float(cooldowns[id]), 15)
-	if not touch_enabled and HudLayout.STATUS_RECT.has_point(mouse_now):
-		HudLayout.draw_status_numbers(self,["Leben  %d / %d" % [ceili(hp), ceili(max_hp())],"%s  %d / %d" % ["Mana" if class_id == 1 else "Energie", ceili(energy), ceili(max_energy())],"Ausdauer  %d / %d%s" % [ceili(stamina),ceili(max_stamina())," · rennt" if is_sprinting else ""],"XP  %d / %d" % [xp, xp_required()],"Gold  %d" % gold])
-	if quest_hovered:
-		quest_guide.draw_hud_hover(self,Vector2(quest_rect.position.x,quest_rect.position.y-186))
+	return nearest
 
 func draw_touch_controls() -> void:
+	if app_mode:
+		app_draw_touch_controls()
+		return
 	# Klassisches Mobile-Layout: Bewegung links, Skills unten mittig,
 	# Interaktion/Ausweichen/Angriff rechts.
 	var base := touch_move_base
@@ -10541,6 +10704,7 @@ func draw_panel() -> void:
 		"intro": draw_intro_panel()
 		"patches": PatchNotes.draw(self)
 		"pause": draw_game_menu()
+		"app_menu": AppTouch.draw_menu(self)
 		"settings": draw_pause_panel()
 		"repair": draw_repair_panel()
 		"world_builder": world_builder.draw(self)
@@ -10886,7 +11050,7 @@ func account_form_valid(registering:bool)->bool:
 func draw_account_form(registering:bool)->void:
 	text_at(Vector2(300,145 if registering else 165),"BENUTZER ERSTELLEN" if registering else "ANMELDEN",31,Color("ffe2aa"))
 	text_at(Vector2(300,188 if registering else 208),"Name und Passwort%s." % (" zweimal" if registering else ""),15,Color("d8e6dc"))
-	text_at(Vector2(300,216 if registering else 236),"Tab / Umschalt: Feld wechseln · Umschalt+Tab: zurück",11,Color("9fb4ac"))
+	text_at(Vector2(300,216 if registering else 236),"Feld antippen zum Schreiben · Enter springt ins nächste Feld" if app_mode else "Tab / Umschalt: Feld wechseln · Umschalt+Tab: zurück",11,Color("9fb4ac"))
 	text_at(Vector2(300,240 if registering else 260),"NAME",14,Color("e9cc90"))
 	var nr:=Rect2(300,255 if registering else 275,550,48);draw_rect(nr,Color("22363c"));draw_rect(nr,Color("ffe2aa") if account_focus==0 else Color("8ba49c"),false,2)
 	text_at(nr.position+Vector2(14,31),account_name if account_name!="" else "Name eingeben …",19,Color("fff0cf") if account_name!="" else Color("9fb4ac"))
@@ -11120,7 +11284,7 @@ func draw_multiplayer_panel() -> void:
 	text_at(Vector2(205, 182), "2–4 Spieler · gemeinsamer Live-Server · Gruppenchat", 16, Color('d8e6dc'))
 	text_at(Vector2(205, 215), "Browser und Desktop verbinden sich über den verschlüsselten Sonnenhain-Server.", 13, Color('b9cbc3'))
 	ui_button(Rect2(205, 282, 340, 52), "ONLINE-SERVER")
-	if not is_web_platform():
+	if not is_web_platform() and not app_mode:
 		ui_button(Rect2(605, 282, 340, 52), "DESKTOP-HOST (LEGACY)")
 		text_at(Vector2(205, 365), "LEGACY-EINLADUNGSCODE", 14, Color('e9cc90'))
 		var code_box := Rect2(205, 378, 740, 56)
