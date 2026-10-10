@@ -66,7 +66,7 @@ assert 'circle_center' not in dungeon_minimap and 'circle_radius' not in dungeon
 assert [int(x) for x in re.findall(r'\d+', block('DUNGEON_ENTRANCES'))] == [2, 3, 8]
 assert len(re.findall(r'\"[^\"]+\"', block('DUNGEON_NAMES'))) == 3
 assert re.findall(r'\[(\d+), (\d+)\]', block('DUNGEON_ENEMIES')) == [('4', '5'), ('6', '7'), ('21', '22')]
-assert len(entries('PORTALS')) == 5
+assert len(entries('PORTALS')) == 6
 assert len(re.findall(r'Vector2\(', block('WAYSTONES'))) == 12
 assert len(entries('BASE_ABILITIES')) == 44
 for connection in ['func enter_dungeon', 'func leave_dungeon', 'func dungeon_blocked', 'func draw_dungeon_world', 'func draw_dungeon_atmosphere', 'func draw_overworld_atmosphere', 'func draw_dungeon_minimap', 'func open_dungeon_chest', '"dungeon_chests_opened":dungeon_chests_opened']:
@@ -78,14 +78,20 @@ quest_targets = [int(x) for x in re.findall(r'"target":(\d+)', block('QUESTS'))]
 assert len(quest_targets) == 25 and all(0 <= x < 27 for x in quest_targets)
 quest_npcs = set(re.findall(r'"npc":"([^"]+)"', block('QUESTS')))
 assert quest_npcs == {'Mira'}
-# The five arches lead from existing areas into separate stripes; level values are recommendations, not access locks.
+# Arches lead from existing areas into the eastern stripes (each stripe has at
+# least one; the Nebelheide also from the Ascheberge, 10.10.2026). Level values
+# are recommendations, not access locks.
 portals = entries('PORTALS')
-for index, row in enumerate(portals):
+reached = set()
+for row in portals:
     coords = [(int(x), int(y)) for x, y in re.findall(r'Vector2\((\d+),\s*(\d+)\)', row)]
     assert len(coords) == 2
+    assert coords[0][0] < 11000, 'start lies on the mainland'
     assert 11000 < coords[1][0] < 16000
-    assert index * 1920 < coords[1][1] < (index + 1) * 1920
-    assert int(re.search(r',\s*(\d+)\s*\]', row).group(1)) == index + 8
+    region = int(re.search(r',\s*(\d+)\s*\]', row).group(1))
+    assert coords[1][1] // 1920 + 8 == region, (row, region)
+    reached.add(region)
+assert reached == {8, 9, 10, 11, 12}
 # Contents, navigation, UI and save state must be connected to usable calls.
 for token in [
     'pending_class=cls', 'class_id = pending_class',
