@@ -9,6 +9,11 @@ const MenuFeedback = preload("res://components/menu_feedback.gd")
 var menu_feedback = MenuFeedback.new()
 ## Zählt abgespielte Oberflächenklänge, damit Menüklicks nicht doppelt klingen.
 var ui_sound_count := 0
+## Legendäre Rüstungen (components/master_armor.gd).
+var arkan_shield_cooldown := 0.0
+var golem_guard_timer := 0.0
+var golem_guard_cooldown := 0.0
+var seconds_since_hit := 99.0
 ## Borin: Spells abgeben (components/spell_return.gd).
 var spell_return_selected := -1
 var spell_return_confirm := false
@@ -129,6 +134,7 @@ const WorldGeometry=preload("res://components/world_geometry.gd")
 const ItemRules=preload("res://components/item_rules.gd")
 const SoundBank=preload("res://components/sound_bank.gd")
 const TypingSound=preload("res://components/typing_sound.gd")
+const MasterArmor=preload("res://components/master_armor.gd")
 const ShopTrade=preload("res://components/shop_trade.gd")
 const SpellReturn=preload("res://components/spell_return.gd")
 const WorldSnapshot=preload("res://components/world_snapshot.gd")
@@ -1843,6 +1849,7 @@ func _process(delta: float) -> void:
 		boss_cooldowns[i] = maxf(0.0, float(boss_cooldowns[i]) - delta)
 	if panel == "":
 		update_rune_effects(delta)
+		update_master_armor(delta)
 		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * food_system.energy_regen_mult() * essence.energy_mult() * delta)
 		update_elara_healing_field(delta)
 		update_player(delta)
@@ -2202,8 +2209,10 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 				enemy["walking"]=true
 		elif server:
 			rpc_server_damage.rpc_id(int(event["target"]),int(event["damage"]))
+			apply_master_thorns(enemy,int(event["damage"]),master_armor_of(int(event["target"])),int(event["target"]))
 		elif invulnerable<=0:
 			apply_player_damage(int(event["damage"]))
+			apply_master_thorns(enemy,int(event["damage"]),master_armor_id())
 	if int(enemy["type"]) in [0,1,2,3]:
 		enemy["walking"]=moved
 		if moved and str(previous_attack_state.get("ability",{}).get("shape",""))!="leap":
@@ -2398,7 +2407,7 @@ func update_player(delta: float) -> void:
 		walk_phase += delta*anim_rate
 	var run_mult:=lerpf(1.0,sprint_speed_mult(),sprint_speed_curve(sprint_blend))
 	var ultimate_move_mult := ranger_ultimate_speed_mult if class_id == 2 and ranger_ultimate_speed_timer > 0.0 else 1.0
-	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult() * ultimate_move_mult * essence.movement_mult())*delta
+	var displacement := (dash_dir * (650.0 if class_id == 1 else 580.0) if dash_timer > 0 else move * 205.0 * run_mult * food_system.move_mult() * ultimate_move_mult * essence.movement_mult() * MasterArmor.move_mult(master_armor_id()))*delta
 	if konflux.active and dash_timer<=0 and konflux.slow>0: displacement*=0.55
 	move_with_collision(displacement)
 	if player_pos.distance_to(old_pos) > 1 and step_timer <= 0:
@@ -3592,6 +3601,7 @@ func normal_attack() -> void:
 	var variant := equipped_weapon_variant()
 	attack_timer = 0.62 if variant == "axe" else (0.78 if variant == "crossbow" else (0.45 if class_id == 0 else (0.62 if class_id == 1 else 0.52)))
 	if class_id == 2 and ranger_hunt_buff > 0.0: attack_timer /= 1.25
+	attack_timer /= MasterArmor.attack_speed_mult(master_armor_id())
 	if class_id == 2 and ranger_ultimate_speed_timer > 0.0: attack_timer /= ranger_ultimate_speed_mult
 	if robotics_overclock_timer > 0.0: attack_timer /= 1.18
 	if class_mastery_unlocked and class_id == 0: warrior_rage = minf(100.0, warrior_rage + 8.0)
@@ -3750,7 +3760,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 	effect(enemy["pos"] + Vector2(0, -25), str(amount), Color("fff1a1"), 0.75)
 	if apply_runes and source_peer<=0 and drain_timer>0:heal_player(minf(8.0,amount*.2))
 	if apply_runes:
-		var stolen:float=minf(float(amount),maxf(0.0,float(enemy["hp"])+amount))*.02*rune_rank(0,1,source_peer)
+		var stolen:float=minf(float(amount),maxf(0.0,float(enemy["hp"])+amount))*(.02*rune_rank(0,1,source_peer)+MasterArmor.lifesteal(master_armor_of(source_peer),int(enemy.get("elite",0))>0 or int(enemy["type"]) in [12,13,14]))
 		if source_peer>0:
 			if stolen>0.0 or (element!="" and rune_rank(2,4,source_peer)>0):rpc_rune_hit_reward.rpc_id(source_peer,stolen,element!="")
 		else:rune_hit_reward(stolen,element!="")
@@ -3850,19 +3860,20 @@ func use_ability(slot: int) -> void:
 	if id < 0 or id >= ABILITIES.size() or not learned[id]: return
 	var ability: Dictionary = ABILITIES[id]
 	if float(ability["cd"]) <= 0.0: return
-	if float(cooldowns[id]) > 0 or energy < float(ability["cost"]): return
+	var ability_cost := float(ability["cost"]) * MasterArmor.ability_cost_mult(master_armor_id())
+	if float(cooldowns[id]) > 0 or energy < ability_cost: return
 	if konflux.active:
 		if KonfluxMap.safe(player_pos,konflux.room):
 			message("Keine Angriffe im geschützten Spawnkreis.")
 			return
-		energy -= float(ability["cost"])
+		energy -= ability_cost
 		cooldowns[id] = float(ability["cd"])*essence.cooldown_mult()
 		konflux.attack(self,id)
 		return
 	if waystone_safe_at(player_pos):
 		message("Wegstein-Schutz: Hier sind Fähigkeiten deaktiviert.")
 		return
-	energy -= float(ability["cost"])
+	energy -= ability_cost
 	var rank: int = int(skill_levels[id])
 	cooldowns[id] = float(ability["cd"]) * (1.0 - 0.06 * (rank - 1)) * essence.cooldown_mult()
 	var power := maxi(1,roundi(float(ability_cast_power(id,rank))*essence.ability_power_mult()))
@@ -4827,7 +4838,23 @@ func apply_player_damage(raw: int) -> void:
 		effect(player_pos,"BLOCK",Color("b5e6fb"),0.6)
 		return
 	update_rune_effects(0.0)
-	var dealt := maxi(1, int((raw - equipment_power(equipped_armor_uid)) * food_system.damage_taken_mult()))
+	var master := master_armor_id()
+	seconds_since_hit = 0.0
+	if randf() < MasterArmor.block_chance(master):
+		effect(player_pos,"BLOCK",Color("e0b85a"),0.6)
+		return
+	var armor_value := equipment_power(equipped_armor_uid) + MasterArmor.bonus_armor(master, hp/maxf(1.0,max_hp()))
+	if master == MasterArmor.ARKAN and arkan_shield_cooldown <= 0.0:
+		raw = maxi(0, raw - MasterArmor.ARKAN_SHIELD)
+		arkan_shield_cooldown = MasterArmor.ARKAN_SHIELD_COOLDOWN
+		effect(player_pos,"ARKANSCHILD",Color("8fe6ff"),0.6)
+	var dealt := maxi(1, int((raw - armor_value) * food_system.damage_taken_mult()))
+	if master == MasterArmor.GOLEM:
+		if golem_guard_timer <= 0.0 and golem_guard_cooldown <= 0.0 and (hp-dealt)/maxf(1.0,max_hp()) < MasterArmor.GOLEM_GUARD_THRESHOLD:
+			golem_guard_timer = MasterArmor.GOLEM_GUARD_TIME
+			golem_guard_cooldown = MasterArmor.GOLEM_GUARD_COOLDOWN
+			effect(player_pos,"STEINHAUT",Color("b45cff"),0.9)
+		if golem_guard_timer > 0.0: dealt = maxi(1, int(dealt*0.5))
 	if rune_emergency_timer>0.0:dealt=maxi(1,roundi(dealt*(1.0-.10*essence.rank(1,2))))
 	if shield_timer > 0: dealt = maxi(1, int(dealt * 0.35))
 	if class_id == 0 and standing_in_battle_zone(): dealt = maxi(1, int(dealt * 0.78))
@@ -4998,6 +5025,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 		drops.append({"pos":safe_drop_position(pos,Vector2(25,0)),"item":relic,"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		drops.append({"pos":safe_drop_position(pos,Vector2(-25,8)),"item":class_boss_hat_item(type-12),"life":180.0,"reserved_class":type-12,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
 		if type==14:drops.append({"pos":safe_drop_position(pos,Vector2(0,34)),"item":ranger_falcon_rune_item(),"life":180.0,"reserved_class":2,"reserve_until_ms":Time.get_ticks_msec()+CLASS_RELIC_RESERVE_MS})
+		if randf()<MasterArmor.CLASS_BOSS_CHANCE:drops.append({"pos":safe_drop_position(pos,Vector2(-40,30)),"item":master_armor_item(MasterArmor.CLASS_BOSS_ARMOR[type-12]),"life":180.0})
 		message("%s besiegt! %s und sein Klassenhut liegen als Beute am Boden." % [ENEMY_TYPES[type]["name"],CLASS_RELIC_NAMES[type-12]])
 		if bosses_defeated.count(true) == bosses_defeated.size() and not final_completed and final_countdown < 0.0:
 			final_countdown = 8.0
@@ -7405,7 +7433,7 @@ func use_item(index: int) -> void:
 	if item["icon"] == "potion":
 		play_sound("spieler_trank")
 		if name in ["Energietrank", "Manatrank"]: energy = minf(max_energy(), energy + 65)
-		else: heal_player(max_hp() * (0.8 if name == "Großer Heiltrank" else 0.5))
+		else: heal_player(max_hp() * (0.8 if name == "Großer Heiltrank" else 0.5) * MasterArmor.potion_mult(master_armor_id()))
 		if int(item.get("count", 1)) > 1:
 			item["count"] = int(item["count"]) - 1
 			item["stack_value"] = maxi(0, item_sale_value(item) - int(item.get("value", 0)))
@@ -7473,6 +7501,15 @@ func refresh_shop_stock() -> void:
 		var batch:Array=[]
 		for offset in 3:batch.append(pool[(shop_rotation*3+offset)%pool.size()])
 		shop_stock[role]=preload("res://components/shop_rotation.gd").append_offers(previous_stock.get(role,[]),batch)
+	# Ab Stufe 40 hat Torvald je Rotation eine legendäre Rüstung.
+	var master_offer := MasterArmor.smith_offer(level, shop_rotation)
+	if not master_offer.is_empty() and shop_stock.has("smith"):
+		var known := false
+		for offer in shop_stock["smith"]:
+			if int(offer.get("master_armor",-1)) == int(master_offer["master_armor"]): known = true
+		if not known:
+			shop_stock["smith"].append(master_offer)
+			while shop_stock["smith"].size() > 30: shop_stock["smith"].pop_front()
 
 func append_food_stock() -> void:
 	if not shop_stock.has("merchant"): shop_stock["merchant"]=[]
@@ -7514,6 +7551,11 @@ func buy_item(stock_item: Dictionary, announce: bool = true) -> bool:
 	if icon=="head":
 		purchased["head_class"]=clampi(int(stock_item.get("head_class",1 if merchant_kind=="arcane" else class_id)),0,2)
 		purchased["design"]=purchased["head_class"]
+	if stock_item.has("master_armor") and int(stock_item["master_armor"]) in MasterArmor.SHOP_IDS:
+		if level < MasterArmor.LEVEL:
+			message_error("Diese Rüstung kannst du ab Stufe %d tragen und kaufen." % MasterArmor.LEVEL)
+			return false
+		MasterArmor.apply(purchased,int(stock_item["master_armor"]))
 	if int(stock_item.get("skill_unlock",-1))>=0:
 		purchased["skill_unlock"]=int(stock_item["skill_unlock"])
 		purchased["tooltip"]="Lernen: %s" % ABILITIES[int(stock_item["skill_unlock"])]["name"]
@@ -8098,9 +8140,48 @@ func cardinal_direction_index(dir: Vector2) -> int:
 	if absf(dir.x) > absf(dir.y): return 2 if dir.x > 0.0 else 1
 	return 0 if dir.y > 0.0 else 3
 
+## Getragene legendäre Rüstung (0–6) oder -1.
+func master_armor_item(id: int) -> Dictionary:
+	var item := make_item(str(MasterArmor.ARMORS[id]["name"]), "armor", 4, int(MasterArmor.ARMORS[id]["power"]), 0, "", MasterArmor.LEVEL)
+	MasterArmor.apply(item, id)
+	item["value"] = maxi(400, int(MasterArmor.ARMORS[id]["price"]) / 4) if id != MasterArmor.GOLEM else 5000
+	return item
+
+func master_armor_id() -> int:
+	if equipped_armor_uid < 0: return -1
+	for item in inventory:
+		if int(item.get("uid",-1)) == equipped_armor_uid: return MasterArmor.index(item)
+	return -1
+
+## Legendäre Rüstung eines Spielers (lokal oder über den Server-Zustand).
+func master_armor_of(peer: int) -> int:
+	if peer <= 0: return master_armor_id()
+	return MasterArmor.id_from_design(int(remote_players.get(peer,{}).get("armor",-1)))
+
+## Pro Bild: Abklingzeiten, Golem-Steinhaut, Sternenquell-Erholung.
+func update_master_armor(delta: float) -> void:
+	arkan_shield_cooldown = maxf(0.0, arkan_shield_cooldown-delta)
+	golem_guard_timer = maxf(0.0, golem_guard_timer-delta)
+	golem_guard_cooldown = maxf(0.0, golem_guard_cooldown-delta)
+	seconds_since_hit += delta
+	var regen := MasterArmor.regen(master_armor_id(), seconds_since_hit)
+	if regen > 0.0 and hp > 0.0 and hp < max_hp(): heal_player(regen*delta)
+
+## Dornenpanzer: Angreifer bekommt einen Teil des Nahkampfschadens zurück.
+func apply_master_thorns(enemy: Dictionary, raw: int, armor_id: int, peer: int = 0) -> void:
+	var back := MasterArmor.thorns_damage(armor_id, raw)
+	if back <= 0 or float(enemy.get("hp",0)) <= 0: return
+	enemy["hp"] = float(enemy["hp"]) - back
+	enemy["flash"] = 0.16
+	if peer > 0: enemy["last_hit_peer"] = peer
+	if randf() < MasterArmor.THORN_ROOT_CHANCE: enemy["stun"] = maxf(float(enemy.get("stun",0.0)), 1.0)
+	effect(enemy["pos"] + Vector2(0, -30), "DORNEN %d" % back, Color("a8c36a"), 0.6)
+
 func armor_visual() -> int:
 	for item in inventory:
 		if int(item.get("uid",-1)) == equipped_armor_uid:
+			var master := MasterArmor.index(item)
+			if master >= 0: return MasterArmor.design(master)
 			var title := str(item.get("name","")).to_lower()
 			for key in ["reis", "wacht", "arkan", "wald", "sonnen", "kristall"]:
 				if key in title: return ["reis", "wacht", "arkan", "wald", "sonnen", "kristall"].find(key)
@@ -11510,7 +11591,9 @@ func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1)
 		var attribute_diff := int(item.get(primary_key, 0)) - int(worn.get(primary_key, 0))
 		var arrow := "▲ +" if attribute_diff > 0 else ("▼ " if attribute_diff < 0 else "= ")
 		text_at(pos + Vector2(14, 145), "%s für %s: %s%d" % [primary_key.to_upper(), CLASS_NAMES[class_id], arrow, attribute_diff], 13, Color("83e4a0") if attribute_diff > 0 else (Color("ee8a86") if attribute_diff < 0 else Color("dfdcc3")))
-	if HeadgearRules.grants_eternal_arrows(item):
+	if MasterArmor.index(item) >= 0:
+		text_at(pos+Vector2(14,168),str(MasterArmor.ARMORS[MasterArmor.index(item)]["effect"]),10,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
+	elif HeadgearRules.grants_eternal_arrows(item):
 		text_at(pos+Vector2(14,168),HeadgearRules.ETERNAL_ARROWS_TEXT,11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
 	elif bool(item.get("boss_relic",false)) or str(item.get("rune_id",""))!="":
 		text_at(pos+Vector2(14,168),str(item.get("tooltip","Spezialgegenstand")),11,Color("ffd58b"),HORIZONTAL_ALIGNMENT_LEFT,300)
@@ -13308,6 +13391,8 @@ func validate_equipment_slots() -> void:
 	for item in inventory:
 		preload("res://components/headgear_rules.gd").normalize(item)
 		FoodSystem.normalize_item(item)
+		var master_id := MasterArmor.index(item)
+		if master_id >= 0: MasterArmor.apply(item, master_id)
 	if not equipped_head_allowed():equipped_head_uid=-1
 	var weapon_icon := item_icon_for_uid(equipped_uid)
 	if equipped_uid >= 0 and (weapon_icon == "" or weapon_icon != class_weapon_icon()):
@@ -13463,6 +13548,8 @@ func sanitize_network_reward_item(raw: Dictionary) -> Dictionary:
 		item["boss_hat"]=true
 		item["head_class"]=clampi(int(item.get("head_class",-1)),0,2)
 		item["design"]=int(item["head_class"])
+	var master_id := MasterArmor.index(item)
+	if master_id >= 0: MasterArmor.apply(item, master_id)
 	return item
 
 func apply_rescue_progress(amount: int, shared: bool = false) -> void:
@@ -13841,8 +13928,11 @@ func send_server_enemy_reward(peer_id: int, enemy: Dictionary) -> void:
 		server_spawn_world_drop(class_relic_item(type-12),Vector2(enemy["pos"])+Vector2(25,0),type-12,180.0)
 		server_spawn_world_drop(class_boss_hat_item(type-12),Vector2(enemy["pos"])+Vector2(-25,8),type-12,180.0)
 		if type==14:server_spawn_world_drop(ranger_falcon_rune_item(),Vector2(enemy["pos"])+Vector2(0,34),2,180.0)
+		if randf()<MasterArmor.CLASS_BOSS_CHANCE:server_spawn_world_drop(master_armor_item(MasterArmor.CLASS_BOSS_ARMOR[type-12]),Vector2(enemy["pos"])+Vector2(-40,30),-1,180.0)
 	if randf() < (0.38 if elite_kind == 2 else (0.24 if elite_kind == 1 else 0.14)):
 		server_spawn_world_drop(random_loot(type,reward_class),Vector2(enemy["pos"]),-1,90.0)
+	if elite_kind > 0 and not is_boss and region_level(int(ENEMY_TYPES[type]["region"])) >= MasterArmor.ELITE_MIN_REGION_LEVEL and randf() < MasterArmor.ELITE_CHANCE:
+		server_spawn_world_drop(master_armor_item(MasterArmor.SHOP_IDS.pick_random()),Vector2(enemy["pos"])+Vector2(18,-10),-1,120.0)
 	if randf() < 0.03:
 		server_spawn_world_drop(make_item("Heiltrank","potion",1,0,18),Vector2(enemy["pos"])+Vector2(20,0),-1,90.0)
 	var mob_uid := int(enemy.get("uid",-1))
