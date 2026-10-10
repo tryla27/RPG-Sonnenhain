@@ -14,6 +14,12 @@ var arkan_shield_cooldown := 0.0
 var golem_guard_timer := 0.0
 var golem_guard_cooldown := 0.0
 var seconds_since_hit := 99.0
+## Dunkler Golem (components/golem_boss.gd): Kampfzustand und Zerfallsteile.
+var golem_world = GolemBoss.new()
+var golem_debris: Array = []
+var golem_world_path := ""
+var golem_save_timer := 0.0
+var golem_summon_pending := false
 ## Borin: Spells abgeben (components/spell_return.gd).
 var spell_return_selected := -1
 var spell_return_confirm := false
@@ -135,6 +141,8 @@ const ItemRules=preload("res://components/item_rules.gd")
 const SoundBank=preload("res://components/sound_bank.gd")
 const TypingSound=preload("res://components/typing_sound.gd")
 const MasterArmor=preload("res://components/master_armor.gd")
+const GolemBoss=preload("res://components/golem_boss.gd")
+const GolemDesign=preload("res://components/golem_design.gd")
 const ShopTrade=preload("res://components/shop_trade.gd")
 const SpellReturn=preload("res://components/spell_return.gd")
 const WorldSnapshot=preload("res://components/world_snapshot.gd")
@@ -927,6 +935,8 @@ func start_websocket_server() -> void:
 	var save_dir := command_arg_value("--save-dir=",home_dir.path_join("sonnenhain-server/data/player-saves") if home_dir != "" else "user://server-player-saves")
 	if server_save_store.configure(save_dir) != OK:
 		push_error("Server-Speicherverzeichnis konnte nicht geöffnet werden")
+	golem_world_path = save_dir.get_base_dir().path_join("golem_world.json")
+	load_golem_world()
 	var account_dir:=save_dir.get_base_dir().path_join("accounts")
 	if account_store.configure(account_dir)!=OK:
 		push_error("Server-Accountverzeichnis konnte nicht geöffnet werden")
@@ -1211,7 +1221,7 @@ func push_world_snapshot() -> void:
 		var state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
 		if state.has("dir"):state["dir"]=[state["dir"].x,state["dir"].y]
 		var face:Vector2=enemy.get("facing",Vector2.DOWN)
-		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0),"boss_spawn_timer":enemy.get("boss_spawn_timer",0.0)})
+		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0),"boss_spawn_timer":enemy.get("boss_spawn_timer",0.0),"golem":enemy.get("golem",{})})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
 		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0),"kind":shot.get("kind","projectile"),"ability_id":shot.get("ability_id","basic"),"radius":shot.get("radius",0.0),"age":shot.get("age",0.0),"duration":shot.get("duration",0.0)})
@@ -1220,7 +1230,7 @@ func push_world_snapshot() -> void:
 		if not drop.has("drop_uid") or not drop.has("item"):continue
 		var dp:Vector2=drop["pos"]
 		drop_rows.append({"drop_uid":int(drop["drop_uid"]),"pos":[dp.x,dp.y],"item":drop["item"],"life":float(drop.get("life",0.0)),"reserved_class":int(drop.get("reserved_class",-1)),"reserve_ms":maxi(0,int(drop.get("reserve_until_ms",0))-Time.get_ticks_msec())})
-	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows,"drops":drop_rows}
+	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows,"drops":drop_rows,"golem":golem_world.snapshot(world_time)}
 	for peer_id in multiplayer.get_peers():
 		var state: Dictionary = remote_players.get(int(peer_id),{})
 		if str(state.get("context","world")) == "world":
@@ -1232,6 +1242,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 	if int(snapshot.get("protocol",-1)) != NETWORK_PROTOCOL_VERSION: return
 	if str(snapshot.get("context","world")) != "world": return
 	server_last_reply_ms = Time.get_ticks_msec()
+	if golem_world.apply_snapshot(snapshot.get("golem",{}),world_time): golem_trees_changed("")
 	var previous_by_uid: Dictionary = {}
 	for existing in enemies:
 		previous_by_uid[int(existing.get("uid",-1))] = existing
@@ -1256,6 +1267,7 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 			copy["gait_phase"]=old.get("gait_phase",fposmod(float(copy.get("seed",0.0))*.73,TAU))
 			copy["flash"]=maxf(float(copy.get("flash",0)),float(old.get("flash",0)))
 			if float(copy.get("hp",1))<float(old.get("hp",1)):copy["flash"]=.18
+			if GolemBoss.is_golem(copy):golem_snapshot_sounds(old,copy)
 			if int(copy.get("type",-1)) in [12,13,14]:
 				var old_attack:Dictionary=old.get("attack_state",{})
 				var new_attack:Dictionary=copy.get("attack_state",{})
@@ -1267,6 +1279,9 @@ func rpc_world_snapshot(snapshot: Dictionary) -> void:
 					play_boss_spell_sound(str(ability.get("id","basic")))
 		else:
 			copy["pos"] = target
+			if int(copy.get("type",-1))==GolemBoss.TYPE_BIG and str(copy.get("golem",{}).get("state",""))=="rise" and not boss_spawn_sound_seen.has(uid):
+				boss_spawn_sound_seen[uid]=true
+				play_sound("boss_erscheint")
 			if int(copy.get("type",-1)) in [12,13,14] and float(copy.get("boss_spawn_timer",0.0))>0.0 and not boss_spawn_sound_seen.has(uid):
 				boss_spawn_sound_seen[uid]=true
 				play_sound("boss_erscheint")
@@ -1850,6 +1865,7 @@ func _process(delta: float) -> void:
 	if panel == "":
 		update_rune_effects(delta)
 		update_master_armor(delta)
+		update_golem_client(delta)
 		energy = minf(max_energy(), energy + (4.0 if class_id == 1 else (5.0 if class_id == 0 else 6.0)) * food_system.energy_regen_mult() * essence.energy_mult() * delta)
 		update_elara_healing_field(delta)
 		update_player(delta)
@@ -1971,7 +1987,7 @@ func server_spawn_enemy_for_region(target_region: int, peers: Array) -> bool:
 	if target_region == 0 or peers.is_empty() or normal_mob_count() >= SERVER_WORLD_MOB_CAP: return false
 	var candidates: Array = []
 	for i in ENEMY_TYPES.size():
-		if i not in [12,13,14] and int(ENEMY_TYPES[i]["region"]) == target_region:
+		if i not in [12,13,14,27,28] and int(ENEMY_TYPES[i]["region"]) == target_region:
 			candidates.append(i)
 	if candidates.is_empty(): return false
 	var peer_id := int(peers[randi() % peers.size()])
@@ -2018,7 +2034,7 @@ func server_cleanup_orphan_mobs() -> void:
 	for i in range(enemies.size()-1,-1,-1):
 		var enemy: Dictionary = enemies[i]
 		var type := int(enemy.get("type",-1))
-		if type in [12,13,14] or bool(enemy.get("small_guardian",false)) or bool(enemy.get("invasion",false)): continue
+		if type in [12,13,14,27,28] or bool(enemy.get("small_guardian",false)) or bool(enemy.get("invasion",false)) or bool(enemy.get("golem_minion",false)): continue
 		var region := region_at(Vector2(enemy["pos"]))
 		# Alte/falsch platzierte Weltmobs aus frueheren Builds duerfen keinen
 		# Regionsbestand und keinen globalen Spawnplatz blockieren.
@@ -2228,8 +2244,14 @@ func update_dedicated_enemies(delta:float)->void:
 		if float(enemy.get("hp",0))<=0:
 			MobCombat.cancel(enemy)
 			defeat_enemy(i,int(enemy.get("last_hit_peer",0)));continue
-		if advance_mob(enemy,delta,true):server_moving_mobs+=1
+		if GolemBoss.is_golem(enemy):golem_world.update_golem(self,enemy,golem_targets(),delta)
+		elif advance_mob(enemy,delta,true):server_moving_mobs+=1
 		if float(enemy.get("hp",0))<=0:defeat_enemy(i,int(enemy.get("last_hit_peer",0)))
+	golem_world.update_world(self,delta,true)
+	golem_save_timer+=delta
+	if golem_save_timer>=20.0:
+		golem_save_timer=0.0
+		save_golem_world()
 
 
 func mob_shot_cancelled(shot:Dictionary)->bool:
@@ -2496,6 +2518,8 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 			if SpawnStoneBody.blocks(pos-stone,0,hero_collision_radius()):return true
 			continue
 		if WaystoneShrine.blocks(pos-stone,from_pos-stone): return true
+	# Liegende Golem-Brocken blockieren; wer schon drinsteckt, kommt heraus.
+	if region_at(pos) == 12 and golem_world.boulder_at(pos, hero_collision_radius()) and not golem_world.boulder_at(from_pos, hero_collision_radius() - 4.0): return true
 	if region_at(pos) != 0:
 		return terrain_blocked(pos)
 	if preload("res://components/village_forecourts.gd").blocked(pos,hero_collision_radius()):return true
@@ -2604,6 +2628,7 @@ func active_class_boss_music_theme()->String:
 	if boss_music_hold_timer>0.0 and boss_music_hold_theme!="":return boss_music_hold_theme
 	for enemy in enemies:
 		var type:=int(enemy.get("type",-1))
+		if GolemBoss.is_golem(enemy) and float(enemy.get("hp",0.0))>0.0 and player_pos.distance_to(Vector2(enemy["pos"]))<1400.0:return "boss_golem"
 		if type not in [12,13,14] or float(enemy.get("hp",0.0))<=0.0:continue
 		if region_at(player_pos)!=region_at(Vector2(enemy["pos"])):continue
 		if player_pos.distance_to(Vector2(enemy["pos"]))>1200.0:continue
@@ -2613,7 +2638,7 @@ func active_class_boss_music_theme()->String:
 	return ""
 
 func music_path_for_theme(theme:String)->String:
-	if theme in CLASS_BOSS_MUSIC_THEMES:
+	if theme in CLASS_BOSS_MUSIC_THEMES or theme=="boss_golem":
 		var custom:="res://music/%s.ogg" % theme
 		if ResourceLoader.exists(custom):return custom
 		return "res://audio/boss.wav"
@@ -2643,6 +2668,7 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	for stone in WAYSTONES:
 		if p.distance_to(stone) < radius + 110.0: return {}
 	if near_waystone_shrine(p, radius + 24.0): return {}
+	if GolemBoss.in_arena(p, radius - 150.0): return {}
 	for portal in PORTALS:
 		if p.distance_to(portal[0]) < radius + 150.0 or p.distance_to(portal[1]) < radius + 150.0: return {}
 	return {"pos":p, "radius":radius, "zone":zone, "key":key}
@@ -2667,6 +2693,7 @@ func make_decorative_tree(tx:int,ty:int) -> Dictionary:
 	if not region_rect(zone).grow(-45).encloses(Rect2(point-Vector2(100,160),Vector2(200,210))): return {}
 	if distance_to_trail(point)<120.0:return {}
 	if near_waystone_shrine(point+Vector2(24,42), 56.0):return {}
+	if golem_world.tree_knocked(Vector2i(tx,ty)) or (point+Vector2(24,42)).distance_to(GolemBoss.ALTAR)<260.0:return {}
 	var tree := false
 	match zone:
 		1: tree = key%8==0
@@ -3749,6 +3776,9 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 		var reference:=normal_attack_power() if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("normal_power",1)),1,140+attacker_level*30)
 		amount=necklaces.direct_hit(neck,source_peer,enemy,reference,amount,Time.get_ticks_msec())
 		if source_peer>0:sync_necklace_progress(source_peer)
+	if GolemBoss.is_golem(enemy):
+		amount = maxi(1, roundi(amount * GolemBoss.incoming_mult(enemy)))
+		if source_peer > 0: golem_world.participants[source_peer] = true
 	enemy["hp"] = float(enemy["hp"]) - amount
 	enemy["flash"] = 0.16
 	if source_peer > 0 and network_mode == "host":
@@ -4685,7 +4715,7 @@ func spawn_enemy() -> void:
 	var target_region: int = region
 	var candidates: Array = []
 	for i in ENEMY_TYPES.size():
-		if i not in [12, 13, 14] and int(ENEMY_TYPES[i]["region"]) == target_region: candidates.append(i)
+		if i not in [12, 13, 14, 27, 28] and int(ENEMY_TYPES[i]["region"]) == target_region: candidates.append(i)
 	if candidates.is_empty(): return
 	var type: int = int(candidates.pick_random())
 	var p: Vector2 = Vector2.ZERO
@@ -4823,10 +4853,11 @@ func update_enemies(delta:float)->void:
 		var enemy:Dictionary=enemies[i]
 		if float(enemy.get("hp",0))<=0:
 			MobCombat.cancel(enemy);defeat_enemy(i);continue
-		var despawn_range:=3600.0 if int(enemy.get("type",-1)) in [12,13,14] else 1250.0
+		var despawn_range:=3600.0 if int(enemy.get("type",-1)) in [12,13,14,27,28] else 1250.0
 		if enemy["pos"].distance_to(player_pos)>despawn_range and arena_mode=="" and int(enemy.get("target_peer",-1))<0:
 			enemies.remove_at(i);continue
-		advance_mob(enemy,delta,false)
+		if GolemBoss.is_golem(enemy):golem_world.update_golem(self,enemy,golem_targets(),delta)
+		else:advance_mob(enemy,delta,false)
 		if panel=="arena_reward":return
 		if float(enemy.get("hp",0))<=0 and i<enemies.size():defeat_enemy(i)
 
@@ -4998,6 +5029,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 	var pos: Vector2 = enemy["pos"]
 	play_world_sound(SoundBank.death_sound_for(type), pos)
 	enemies.remove_at(index)
+	if GolemBoss.is_golem(enemy): on_golem_defeated(enemy)
 	if type==12:
 		for j in range(enemies.size()-1,-1,-1):
 			if int(enemies[j].get("guardian_of",-1))==int(enemy["uid"]):enemies.remove_at(j)
@@ -5204,6 +5236,8 @@ func collect_drops() -> void:
 		save_game()
 
 func interact() -> void:
+	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and player_pos.distance_to(GolemBoss.ALTAR) < GolemBoss.ALTAR_USE_RANGE:
+		try_golem_summon();return
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and player_pos.distance_to(BORIN_CRYSTAL_POS) < 95.0:
 		panel="fusion";play_sound("ui_dialog");return
 	if konflux.active:
@@ -5693,6 +5727,7 @@ func capture_save_data() -> Dictionary:
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
+	data["golem_world"] = golem_world.save_state()
 	data["essence_state"] = essence.snapshot()
 	data["book_state"] = book_system.snapshot()
 	data["world_fog"] = world_fog.legacy_snapshot()
@@ -5797,6 +5832,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if not from_server and not creative_mode: server_save.restore(data)
 	food_system.restore(data.get("food_state",{}))
 	steinrose.restore(data.get("steinrose_state",{}))
+	if not uses_server_world(): golem_world.load_state(data.get("golem_world",{}))
 	world_fog.restore(data.get("world_fog",[]),WORLD,data.get("world_fog_fine",""))
 	var stored_recent: Variant = data.get("recent_players",[])
 	recent_players = stored_recent if stored_recent is Array else []
@@ -6431,6 +6467,8 @@ func reset_character_state() -> void:
 	party_state = {}
 	food_system.restore({})
 	steinrose.restore({})
+	golem_world = GolemBoss.new()
+	golem_debris.clear()
 	pip_loan_level = 0
 	pip_return_dialogue_index = 0
 	processed_server_transactions.clear()
@@ -7667,7 +7705,9 @@ func _draw() -> void:
 					var label:="E · %s" % item["name"]
 					if class_relic_locked_for_player(drop,class_id):label="🔒 %s · für %s reserviert" % [item["name"],CLASS_NAMES[reserved]]
 					text_at(p+Vector2(-105,-34),label,11,Color("fff1bd"),HORIZONTAL_ALIGNMENT_CENTER,210)
+	draw_golem_world_fx()
 	draw_sorted_world_objects()
+	draw_golem_overlay()
 	for cloud in poison_clouds:
 		if visible_world(cloud["pos"], 110):
 			var center: Vector2 = cloud["pos"]
@@ -8574,6 +8614,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 			if class_boss_arena_index_at(p,55.0)>=0 or point_near_class_boss_house(p,85.0):continue
 			if not region_rect(zone).grow(-45).encloses(Rect2(p-Vector2(100,160),Vector2(200,210))): continue
 			if distance_to_trail(p) < 120.0: continue
+			if zone == 12 and (golem_world.tree_knocked(Vector2i(tx,ty)) or p.distance_to(GolemBoss.ALTAR) < 260.0): continue
 			if zone == 0:
 				if key % 6 == 0: draw_flower(p, key)
 				elif key % 10 == 0: draw_grass(p)
@@ -9358,6 +9399,10 @@ func mob_attack_target_position(enemy:Dictionary)->Vector2:
 	return Vector2(enemy["pos"])+Vector2(enemy.get("facing",Vector2.DOWN))*165.0
 
 func draw_enemy(enemy: Dictionary) -> void:
+	if GolemBoss.is_golem(enemy):
+		GolemDesign.draw_scrape_warning(self,Vector2(enemy["pos"]),enemy.get("golem",{}))
+		GolemDesign.draw_golem(self,Vector2(enemy["pos"]),int(enemy["type"]),enemy.get("golem",{}),Vector2(enemy.get("facing",Vector2.DOWN)),world_time,float(enemy.get("flash",0.0)))
+		return
 	var p: Vector2 = enemy["pos"]
 	var type: int = int(enemy["type"])
 	var elite_kind: int = int(enemy.get("elite", 0))
@@ -10081,7 +10126,7 @@ func draw_hud() -> void:
 		text_at(Vector2(23,food_y+20),"SNACK · +%.1f HP/s · %ds" % [food_system.regen_rate,ceili(food_system.regen_until-Time.get_unix_time_from_system())],10,Color("aed48c"))
 		status_bottom=food_y+34
 	for enemy in enemies:
-		if int(enemy["type"]) in [12, 13, 14] and enemy["pos"].distance_to(player_pos) < 620:
+		if int(enemy["type"]) in [12, 13, 14, 27, 28] and enemy["pos"].distance_to(player_pos) < (1100 if GolemBoss.is_golem(enemy) else 620):
 			ui_box(Rect2(430, 10, 480, 64), Color("5b4547"))
 			text_at(Vector2(446, 37), "BOSS · %s" % ENEMY_TYPES[int(enemy["type"])]["name"], 19, Color("ffe5b5"))
 			bar(Rect2(446, 43, 447, 19), float(enemy["hp"]), float(enemy["max_hp"]), Color("eb866f"), "%d / %d" % [ceili(float(enemy["hp"])), ceili(float(enemy["max_hp"]))])
@@ -10517,7 +10562,7 @@ func draw_mechanics_panel() -> void:
 			var y: float = 242.0 + row*42.0
 			var mob_text: String = ""
 			for e in ENEMY_TYPES.size():
-				if int(ENEMY_TYPES[e]["region"]) == i and e not in [12,13,14]:
+				if int(ENEMY_TYPES[e]["region"]) == i and e not in [12,13,14,27,28]:
 					if mob_text != "": mob_text += ", "
 					mob_text += str(ENEMY_TYPES[e]["name"])
 			var status: String = "OFFEN" if region_available(i) else "GESPERRT"
@@ -12278,8 +12323,10 @@ func draw_sorted_world_objects() -> void:
 		if rescue_state >= 2:
 			var p := RESCUE_POS+Vector2(0,120)
 			if visible_world(p,130): entries.append({"kind":"npc","depth":p.y+24,"data":{"name":"Nela","role":"Bewohnerin","pos":p,"color":Color("bd8774"),"kind":"rescued"}})
+	if arena_mode == "" and dungeon_id < 0 and interior_id < 0 and visible_world(GolemBoss.ALTAR,200):
+		entries.append({"kind":"golem_altar","depth":GolemBoss.ALTAR.y+10})
 	for enemy in enemies:
-		if visible_world(enemy["pos"],100): entries.append({"kind":"enemy","depth":enemy["pos"].y+24,"data":enemy})
+		if visible_world(enemy["pos"],420 if GolemBoss.is_golem(enemy) else 100): entries.append({"kind":"enemy","depth":enemy["pos"].y+24,"data":enemy})
 	for peer_id in remote_players:
 		var state: Dictionary = remote_players[peer_id]
 		if not state_matches_local_context(state): continue
@@ -12317,6 +12364,11 @@ func draw_sorted_world_objects() -> void:
 			"npc": draw_npc(entry["data"])
 			"stone": draw_waystone(entry["point"])
 			"enemy": draw_enemy(entry["data"])
+			"golem_altar":
+				GolemDesign.draw_altar(self,GolemBoss.ALTAR,golem_world.fight_active,world_time)
+				if player_pos.distance_to(GolemBoss.ALTAR) < GolemBoss.ALTAR_USE_RANGE and not golem_world.fight_active:
+					text_at(GolemBoss.ALTAR+Vector2(-150,46),"E · Dunklen Golem beschwören",13,Color("e3b8ff"),HORIZONTAL_ALIGNMENT_CENTER,300)
+					text_at(GolemBoss.ALTAR+Vector2(-150,64),"30 Steinbeeren · 1 Rotkuchen · 1 Blaukuchen",11,Color("cfc4dc"),HORIZONTAL_ALIGNMENT_CENTER,300)
 			"remote": draw_spawn_elevated_actor(int(entry["peer"]))
 			"player": draw_spawn_elevated_actor(-1)
 
@@ -14077,6 +14129,7 @@ func rpc_zz_save_reply(response: Dictionary) -> void:
 func mob_visual_scale(enemy:Dictionary)->float:
 	var type:int=int(enemy["type"])
 	if bool(enemy.get("small_guardian",false)):return .48
+	if GolemBoss.is_golem(enemy):return GolemBoss.visual_scale(type)
 	var factor:float=1.3 if type==12 else (.48 if type in [0,1,18,25] else (.6 if type in [2,6,10] else .8))
 	if type in [13,14]:factor=1.0
 	return factor*(1.42 if int(enemy.get("elite",0))==2 else (1.22 if int(enemy.get("elite",0))==1 else 1.0))
@@ -14259,6 +14312,11 @@ func receive_mob_death(payload:Dictionary)->void:
 	var uid:int=int(payload.get("uid",-1))
 	if dead_mob_uids.has(uid):return
 	dead_mob_uids[uid]=combat_feedback.clock
+	if int(payload.get("type",-1)) in GolemBoss.TYPES:
+		var raw_pos:Array=payload.get("pos",[0,0])
+		golem_debris.append_array(GolemDesign.make_debris(Vector2(float(raw_pos[0]),float(raw_pos[1])),int(payload["type"])))
+		play_sound("golem_zerfall")
+		return
 	var row:Dictionary=payload.duplicate()
 	row["at"]=combat_feedback.clock
 	var death_type:int=int(row.get("type",-1))
@@ -14316,7 +14374,7 @@ func draw_mob_deaths()->void:
 func normal_mob_count()->int:
 	var count:=0
 	for enemy in enemies:
-		if int(enemy["type"]) not in [12,13,14] and not bool(enemy.get("small_guardian",false)):count+=1
+		if int(enemy["type"]) not in [12,13,14,27,28] and not bool(enemy.get("small_guardian",false)) and not bool(enemy.get("golem_minion",false)):count+=1
 	return count
 
 func ring_visual()->int:
@@ -14400,3 +14458,226 @@ func restore_canvas_transform()->void:
 func set_local_canvas_transform(origin:Vector2,rotation:float=0.0)->void:
 	var z:=effective_camera_zoom() if drawing_ui else 1.0
 	draw_set_transform(origin/z,rotation,Vector2.ONE/z)
+
+# --- Dunkler Golem: Verdrahtung (Regeln in components/golem_boss.gd) -----------
+var golem_push_velocity := Vector2.ZERO
+var golem_prev_states: Dictionary = {}
+var golem_step_timer := 0.0
+
+## Spieler, die der Golem angreifen kann: [{id, pos, max_hp}] (id 0 = allein).
+func golem_targets() -> Array:
+	var result: Array = []
+	if dedicated_server_mode or network_mode == "host":
+		for peer in remote_players:
+			var state: Dictionary = remote_players[peer]
+			if str(state.get("context","world")) != "world" or float(state.get("hp",1.0)) <= 0.0: continue
+			var pos := network_player_position(int(peer))
+			if region_at(pos) != 12 or waystone_safe_at(pos): continue
+			result.append({"id":int(peer),"pos":pos,"max_hp":float(state.get("max_hp",100.0))})
+	if not dedicated_server_mode and hp > 0 and death_timer <= 0.0 and arena_mode == "" and dungeon_id < 0 and interior_id < 0:
+		if region_at(player_pos) == 12 and not waystone_safe_at(player_pos):
+			result.append({"id":0,"pos":player_pos,"max_hp":max_hp()})
+	return result
+
+func golem_hit_players(center: Vector2, radius: float, damage: int, dir: Vector2, push: float, hits: Array = []) -> void:
+	for target in golem_targets():
+		var id := int(target["id"])
+		if id in hits or Vector2(target["pos"]).distance_to(center) > radius + 18.0: continue
+		hits.append(id)
+		var shove: Vector2 = dir.normalized() * push * 3.2 if push > 0.0 else Vector2.ZERO
+		if id > 0:
+			rpc_server_damage.rpc_id(id, damage)
+			if shove != Vector2.ZERO: rpc_golem_push.rpc_id(id, shove.x, shove.y)
+		elif invulnerable <= 0.0:
+			apply_player_damage(damage)
+			golem_push_velocity += shove
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_golem_push(x: float, y: float) -> void:
+	if network_mode != "client": return
+	golem_push_velocity += Vector2(clampf(x,-900,900), clampf(y,-900,900))
+
+## Schrei unter 40 %: trifft jeden Spieler im Himmelsgarten.
+func golem_scream(_pos: Vector2) -> void:
+	for target in golem_targets():
+		var damage := maxi(1, roundi(float(target["max_hp"]) * GolemBoss.SCREAM_DAMAGE_FRACTION))
+		if int(target["id"]) > 0: rpc_server_damage.rpc_id(int(target["id"]), damage)
+		elif invulnerable <= 0.0: apply_player_damage(damage)
+	if not dedicated_server_mode: message("Der Dunkle Golem schreit – die Erde bebt im ganzen Himmelsgarten!")
+
+## Brocken reißen Gegner mit.
+func golem_push_mobs(center: Vector2, radius: float, dir: Vector2, amount: float) -> void:
+	for enemy in enemies:
+		if GolemBoss.is_golem(enemy): continue
+		var p: Vector2 = enemy["pos"]
+		if p.distance_to(center) > radius + mob_hit_radius(enemy): continue
+		var next := p + dir.normalized() * amount
+		if region_at(next) == region_at(p) and not terrain_blocked(next, mob_hit_radius(enemy)): enemy["pos"] = next
+
+func golem_minion_spawn(type: int, maximum: int) -> void:
+	var count := 0
+	for enemy in enemies:
+		if bool(enemy.get("golem_minion", false)): count += 1
+	for n in mini(3, maximum - count):
+		for attempt in 12:
+			var p: Vector2 = GolemBoss.ALTAR + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(380.0, 620.0)
+			if region_at(p) != 12 or terrain_blocked(p, 30.0) or golem_world.boulder_at(p, 30.0): continue
+			var mob := make_enemy(type, p)
+			mob["golem_minion"] = true
+			if dedicated_server_mode:
+				mob["uid"] = server_next_mob_uid
+				server_next_mob_uid += 1
+				mob["context"] = "world"
+				mob["instance_id"] = "world"
+				mob["spawned_at_ms"] = Time.get_ticks_msec()
+			enemies.append(mob)
+			break
+
+## Umgeworfene Bäume neu zeichnen und Kollision neu rechnen.
+func golem_trees_changed(_key: String) -> void:
+	decorative_tree_cache.clear()
+	if not dedicated_server_mode: invalidate_static_cache()
+
+func golem_register_enemy(enemy: Dictionary) -> void:
+	if not dedicated_server_mode: return
+	enemy["uid"] = server_next_mob_uid
+	server_next_mob_uid += 1
+	enemy["spawned_at_ms"] = Time.get_ticks_msec()
+
+func on_golem_defeated(enemy: Dictionary) -> void:
+	var before := enemies.size()
+	var result: String = golem_world.on_defeated(self, enemy)
+	for i in range(before, enemies.size()): golem_register_enemy(enemies[i])
+	if result == "split":
+		if not dedicated_server_mode: message("Der Dunkle Golem zerbricht – zwei halbe Golems kämpfen weiter!")
+	elif result == "victory":
+		golem_victory(Vector2(enemy["pos"]))
+
+## Sieg: Jeder Beteiligte bekommt die Golem-Rüstung (100 DEF).
+func golem_victory(pos: Vector2) -> void:
+	save_golem_world()
+	if dedicated_server_mode:
+		var fight := int(golem_world.version)
+		for raw_peer in golem_world.participants.keys():
+			var peer := int(raw_peer)
+			if peer <= 0 or not remote_players.has(peer): continue
+			var uuid := str(remote_players[peer].get("uuid","peer%d" % peer))
+			var tx := "golem:%d:%d:%s" % [fight, Time.get_unix_time_from_system(), uuid]
+			server_register_transaction(peer, tx)
+			rpc_server_combat_reward.rpc_id(peer, tx, GolemBoss.TYPE_HALF, 0, 500, [network_reward_payload(master_armor_item(6))])
+		return
+	if arena_mode != "": return
+	drops.append({"pos":safe_drop_position(pos,Vector2(0,20)),"item":master_armor_item(6),"life":600.0})
+	drops.append({"pos":safe_drop_position(pos,Vector2(30,0)),"gold":500,"life":120.0})
+	message("Der Dunkle Golem ist besiegt! Die Golem-Rüstung liegt am Boden.")
+	play_sound("quest_bereit")
+	save_game()
+
+## Altar: Opfergaben prüfen, dann beschwören (online fragt der Server).
+func try_golem_summon() -> void:
+	if not golem_world.alive_golems(enemies).is_empty():
+		message("Der Dunkle Golem ist bereits erwacht!")
+		return
+	var counts := {}
+	for item_name in GolemBoss.SUMMON_COST: counts[item_name] = steinrose.inventory_count(self, item_name)
+	var missing := GolemBoss.missing_offerings(counts)
+	if missing != "":
+		message("Der Altar verlangt noch: %s." % missing)
+		return
+	if uses_server_world():
+		if golem_summon_pending: return
+		golem_summon_pending = true
+		rpc_request_golem_summon.rpc_id(1)
+		message("Der Altar bebt …")
+		return
+	golem_consume_offerings()
+	var golem: Dictionary = golem_world.summon(self, 1)
+	enemies.append(golem)
+	golem_trees_changed("")
+	message("Der Dunkle Golem erhebt sich aus dem Altar!")
+	play_sound("boss_erscheint")
+
+func golem_consume_offerings() -> void:
+	for item_name in GolemBoss.SUMMON_COST: steinrose.remove_item_count(self, item_name, int(GolemBoss.SUMMON_COST[item_name]))
+	save_game()
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_request_golem_summon() -> void:
+	if not dedicated_server_mode or network_mode != "host": return
+	var peer := multiplayer.get_remote_sender_id()
+	if peer <= 0 or not remote_players.has(peer) or not server_action_allowed(peer, "golem_summon", 2500): return
+	if network_player_position(peer).distance_to(GolemBoss.ALTAR) > GolemBoss.ALTAR_USE_RANGE + 120.0:
+		rpc_golem_summon_result.rpc_id(peer, false, "Du stehst zu weit vom Altar entfernt.")
+		return
+	if not golem_world.alive_golems(enemies).is_empty():
+		rpc_golem_summon_result.rpc_id(peer, false, "Der Dunkle Golem ist bereits erwacht!")
+		return
+	var players := 0
+	for target in golem_targets():
+		if Vector2(target["pos"]).distance_to(GolemBoss.ALTAR) < 1600.0: players += 1
+	var golem: Dictionary = golem_world.summon(self, maxi(1, players))
+	golem_register_enemy(golem)
+	enemies.append(golem)
+	save_golem_world()
+	printerr("GOLEM_SUMMON players=%d hp=%d" % [maxi(1, players), int(golem["hp"])])
+	rpc_golem_summon_result.rpc_id(peer, true, "Der Dunkle Golem erhebt sich aus dem Altar!")
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_golem_summon_result(ok: bool, text: String) -> void:
+	if network_mode != "client": return
+	golem_summon_pending = false
+	if ok: golem_consume_offerings()
+	message(text.substr(0, 120))
+
+## Jeder Frame: Stoß, Zerfallsteile, auf Clients Geräusche aus dem Zustand.
+func update_golem_client(delta: float) -> void:
+	GolemDesign.update_debris(golem_debris, delta)
+	if golem_push_velocity.length() > 4.0:
+		var next := player_pos + golem_push_velocity * delta
+		if not is_blocked(next, player_pos): player_pos = next
+		golem_push_velocity = golem_push_velocity.move_toward(Vector2.ZERO, 900.0 * delta)
+	else:
+		golem_push_velocity = Vector2.ZERO
+	if uses_server_world():
+		golem_world.update_world(self, delta, false)
+	elif network_mode == "offline" or network_mode == "host":
+		if golem_world.fight_active and golem_world.alive_golems(enemies).is_empty(): golem_world.fight_active = false
+		golem_world.update_world(self, delta, true)
+
+## Online: Golemgeräusche aus Zustandswechseln im Weltpaket.
+func golem_snapshot_sounds(old: Dictionary, copy: Dictionary) -> void:
+	var before := str(old.get("golem",{}).get("state",""))
+	var now := str(copy.get("golem",{}).get("state",""))
+	var p := Vector2(copy.get("net_target_pos", copy.get("pos", Vector2.ZERO)))
+	if before != now:
+		match now:
+			"shield": play_world_sound("golem_schild", p)
+			"scrape": play_world_sound("golem_schaben", p)
+			"scream_pause": play_world_sound("golem_schrei", p)
+			"walk": if before == "scrape": play_world_sound("golem_wurf", p)
+	if bool(copy.get("walking", false)) and now == "walk":
+		golem_step_timer -= 0.1
+		if golem_step_timer <= 0.0:
+			golem_step_timer = 0.9
+			play_world_sound("golem_schritt", p)
+
+func save_golem_world() -> void:
+	if not dedicated_server_mode or golem_world_path == "": return
+	var file := FileAccess.open(golem_world_path, FileAccess.WRITE)
+	if file == null: return
+	file.store_string(JSON.stringify(golem_world.save_state()))
+
+func load_golem_world() -> void:
+	if golem_world_path == "" or not FileAccess.file_exists(golem_world_path): return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(golem_world_path))
+	golem_world.load_state(parsed)
+
+func draw_golem_world_fx() -> void:
+	if arena_mode != "" or dungeon_id >= 0 or interior_id >= 0: return
+	if not visible_world(GolemBoss.ALTAR, 1400.0) and golem_world.boulders.is_empty() and golem_world.fields.is_empty(): return
+	GolemDesign.draw_world_fx(self, golem_world, world_time)
+
+func draw_golem_overlay() -> void:
+	if arena_mode != "" or dungeon_id >= 0 or interior_id >= 0: return
+	GolemDesign.draw_debris(self, golem_debris)
+	if golem_world.scream_at >= 0.0: GolemDesign.draw_scream(self, golem_world.scream_pos, world_time - golem_world.scream_at)

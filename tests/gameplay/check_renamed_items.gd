@@ -15,7 +15,12 @@ func _initialize()->void:call_deferred("run")
 
 func run()->void:
 	var g=load("res://main.gd").new()
-	for e in g.ENEMY_TYPES:
+	for i in g.ENEMY_TYPES.size():
+		var e:Dictionary=g.ENEMY_TYPES[i]
+		# Nur der Endgegner (27) und seine Hälften (28) heißen Golem.
+		if i in [27,28]:
+			check(str(e["name"]).contains("Golem"),"Endgegner heißt Golem: %s" % e["name"])
+			continue
 		check(not str(e["name"]).to_lower().contains("golem"),"kein Mob heißt Golem: %s" % e["name"])
 	var names:=[]
 	for e in g.ENEMY_TYPES:names.append(str(e["name"]))
