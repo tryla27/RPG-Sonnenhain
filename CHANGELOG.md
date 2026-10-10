@@ -6,6 +6,13 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Android: Export-Preset „Android“ (arm64, ohne Gradle, `de.sonnenhainrpg.game`),
+  `tools/build_android_apk.sh`, Workflow `build-android.yml`; `deploy-pages.yml`
+  baut die APK mit und legt sie unter `/download/sonnenhain-rpg.apk` ab
+  (Signatur aus Secrets `ANDROID_KEYSTORE_BASE64`/`ANDROID_KEYSTORE_PASSWORD`/
+  `ANDROID_KEY_ALIAS`, sonst Wegwerf-Signatur). Website: `/mobile/` mit Download
+  und Anleitung, Startseite verlinkt die App. `access.php` liefert `.apk` als
+  Download. `project.godot`: Querformat auf Handys, ETC2/ASTC-Import.
 - `GameContent.PORTALS`: sechster Torbogen Ascheberge (10550, 600) ↔
   Nebelheide (12300, 520). Rückseite eines Torbogens zeigt Ziel und Siegel des
   Ausgangsgebiets; Rückweg in versiegelte Gebiete gesperrt. `check_content.py`

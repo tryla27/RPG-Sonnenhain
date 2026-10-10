@@ -149,6 +149,24 @@ jobs:
             if grep -q "SCRIPT ERROR:" /tmp/sonnenhain-release-check.log; then exit 1; fi
           done
 
+      - name: Java 17 for the Android app
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build Android APK
+        shell: bash
+        env:
+          GODOT_BIN: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          bash tools/build_android_apk.sh build/site/download/sonnenhain-rpg.apk
+          git checkout -- export_presets.cfg
+
       - name: Harden browser game shell
         run: python3 tools/harden_web.py build/site/game/index.html
 
@@ -208,11 +226,12 @@ jobs:
           test -f build/site/game/index.pck
           test -f build/site/game/index.wasm
           test -f build/site/mobile/index.html
-          grep -q "APP IN ENTWICKLUNG" build/site/mobile/index.html
+          grep -q "APK HERUNTERLADEN" build/site/mobile/index.html
+          test -s build/site/download/sonnenhain-rpg.apk
           grep -q "Eine Reise durch" build/site/index.html
           grep -Fq 'href="/game/"' build/site/index.html
           grep -Fq 'href="/mobile/"' build/site/index.html
-          grep -q "Mobile-App kommt bald" build/site/index.html
+          grep -q "ANDROID-APP LADEN" build/site/index.html
           ! grep -q "human-gate" build/site/game/index.html
           grep -q "Cache-Control.*no-store" build/site/.htaccess
           grep -q "RewriteRule" build/site/.htaccess
@@ -279,7 +298,8 @@ jobs:
           fi
           ssh -4 -i "$HOME/.ssh/manitu_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new ssh300011111@ngcobalt378.manitu.net "test -s '$access_file' && chmod 640 '$access_file'"
 
-          timeout 180s rsync -az --delete --omit-dir-times --no-owner --no-group --chmod=D770,F660 \
+          # Größer seit der Android-App (≈ 120 MB): mehr Zeit für den Upload.
+          timeout 600s rsync -az --delete --omit-dir-times --no-owner --no-group --chmod=D770,F660 \
             -e "ssh -4 -i $HOME/.ssh/manitu_deploy -p 22 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12" \
             build/site/ \
             ssh300011111@ngcobalt378.manitu.net:"$target/"
@@ -297,12 +317,15 @@ jobs:
               test -f '$target/game/index.pck'
               test -f '$target/game/index.wasm'
               test -f '$target/mobile/index.html'
+              test -s '$target/download/sonnenhain-rpg.apk'
               test -f '$target/.well-known/security.txt'
               printf 'SONNENHAIN_HEALTH_OK\n' > '$target/sonnenhain-health.txt'
               chmod 770 '$target' '$target/game' '$target/mobile' '$target/.well-known'
               chmod 660 '$target/index.html' '$target/site.css' '$target/.htaccess' '$target/sonnenhain-health.txt'
               chmod 660 '$target/game/index.html' '$target/game/index.js' '$target/game/index.pck' '$target/game/index.wasm'
               chmod 660 '$target/mobile/index.html'
+              chmod 770 '$target/download'
+              chmod 660 '$target/download/sonnenhain-rpg.apk'
               printf 'target: '; ls -ld '$target'
               printf 'index: '; ls -l '$target/index.html'
               printf 'htaccess: '; ls -l '$target/.htaccess'

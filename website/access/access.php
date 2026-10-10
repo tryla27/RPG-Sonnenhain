@@ -108,8 +108,9 @@ if (strpos($route, "\0") !== false || preg_match('~(?:^|/)[.]|[\\\\]~', $route))
 $file = realpath($root . '/' . ltrim($route, '/'));
 if ($file !== false && is_dir($file)) $file = realpath($file . '/index.html');
 if ($file === false || strpos($file, $root . DIRECTORY_SEPARATOR) !== 0 || !is_file($file) || preg_match('/\.(php[0-9]?|phtml|phar|htpasswd)$/i', $file)) { http_response_code(404); exit; }
-$types = ['html'=>'text/html; charset=utf-8','css'=>'text/css; charset=utf-8','js'=>'application/javascript','json'=>'application/json','wasm'=>'application/wasm','png'=>'image/png','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','webp'=>'image/webp','svg'=>'image/svg+xml','ico'=>'image/x-icon','ogg'=>'audio/ogg','mp3'=>'audio/mpeg','wav'=>'audio/wav','woff'=>'font/woff','woff2'=>'font/woff2','txt'=>'text/plain; charset=utf-8'];
+$types = ['html'=>'text/html; charset=utf-8','css'=>'text/css; charset=utf-8','js'=>'application/javascript','json'=>'application/json','wasm'=>'application/wasm','png'=>'image/png','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','webp'=>'image/webp','svg'=>'image/svg+xml','ico'=>'image/x-icon','ogg'=>'audio/ogg','mp3'=>'audio/mpeg','wav'=>'audio/wav','woff'=>'font/woff','woff2'=>'font/woff2','txt'=>'text/plain; charset=utf-8','apk'=>'application/vnd.android.package-archive'];
 header('Content-Type: ' . ($types[strtolower(pathinfo($file, PATHINFO_EXTENSION))] ?? 'application/octet-stream'));
+if (strtolower(pathinfo($file, PATHINFO_EXTENSION)) === 'apk') header('Content-Disposition: attachment; filename="' . basename($file) . '"');
 $size = filesize($file); $start = 0; $end = $size - 1;
 header('Accept-Ranges: bytes');
 if (isset($_SERVER['HTTP_RANGE'])) {
