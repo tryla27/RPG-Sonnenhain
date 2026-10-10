@@ -38,9 +38,13 @@ export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$keystore"
 export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$alias"
 export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$password"
 
-# Versionsnummer je Build (Android verlangt steigende Codes für Updates).
-code="${ANDROID_VERSION_CODE:-${GITHUB_RUN_NUMBER:-1}}"
-name="${ANDROID_VERSION_NAME:-1.0.$code}"
+# Versionsnummer je Build. Android installiert ein Update nur, wenn der Code
+# größer ist als der installierte. Laufnummern beginnen in jedem Workflow neu
+# (deploy-android.yml startete bei 1, die alte Website-APK war schon 478),
+# deshalb zählen wir Minuten seit 01.01.2026 UTC: steigt immer, egal welcher
+# Workflow baut, und liegt weit über allen alten Laufnummern.
+code="${ANDROID_VERSION_CODE:-$(( ($(date -u +%s) - 1767225600) / 60 ))}"
+name="${ANDROID_VERSION_NAME:-$(date -u +%Y.%m.%d.%H%M)}"
 sed -i "s/^version\/code=.*/version\/code=$code/; s/^version\/name=.*/version\/name=\"$name\"/" export_presets.cfg
 
 "$GODOT_BIN" --headless --path . --editor --import --quit >/dev/null 2>&1 || true
