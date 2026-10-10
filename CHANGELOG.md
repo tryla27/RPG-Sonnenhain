@@ -6,6 +6,16 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Golem v2 Teil 2 (Optik): `tools/build_golem_art.py` erzeugt
+  `art/monsters/golem/golem_sheet.png` + `golem_glow.png` (128 px, 3 Ansichten ×
+  11 Bilder); `GolemDesign.draw_golem` zeichnet das Sprite (2,5×/1,25×),
+  Trefferzonen angepasst (`HEAD_CENTER` −58 u). `GolemDesign.draw_stone`
+  (feste Saat, 9–12 Ecken, Flächen, Dellen, Riss) für Brocken, Hagel, Trümmer.
+  `tools/build_armor_icons.gd` rendert `art/items/legendary_armor_64.png`
+  (3D, 7 × 64 px), `ItemStyle32` nutzt sie für Entwurf 6–12;
+  `ItemRules.item_design` liefert für legendäre Rüstungen den Entwurf (vorher
+  auf 11 gekappt, Golem-Rüstung zeigte das Sternenquell-Bild). Neue
+  Golem-Rüstung am Charakter (`rpg_hero.gd`). Test `check_golem_art.gd`.
 - Golem v2 Teil 1 (`components/golem_boss.gd`): Prozent-Schaden ohne Rüstung
   (`golem_hit_players(..., fraction)`, `rpc_golem_damage`, `apply_golem_damage`
   mit `damage_ignores_armor`), Trefferzonen `shot_zone`/`zone_mult` (Geschosse

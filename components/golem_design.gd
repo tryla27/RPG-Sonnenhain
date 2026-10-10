@@ -35,83 +35,144 @@ static func block(c:CanvasItem,center:Vector2,size:Vector2,u:float,shade:Color=B
 	c.draw_colored_polygon(PackedVector2Array([pts[0],pts[1],pts[2],center+Vector2(w,-h*0.35).rotated(rot),center+Vector2(-w,-h*0.35).rotated(rot),pts[7]]),shade.lightened(0.10))
 	c.draw_line(pts[0],pts[1],BASALT_TOP,maxf(1.0,u*0.9))
 
+## Echter Stein (Golem v2): unregelmäßige Form mit 9–12 Ecken, drei
+## Helligkeitsflächen (Licht oben links, Seite, Schatten unten rechts), 2–3
+## Dellen mit hellem Rand und ein feiner Riss. Gleiche Saat = gleiche Form.
+static func stone_shape(seed:int,radius:float)->PackedVector2Array:
+	var rng:=RandomNumberGenerator.new()
+	rng.seed=seed
+	var n:=rng.randi_range(9,12)
+	var pts:=PackedVector2Array()
+	for k in n:
+		var a:=k*TAU/n+rng.randf_range(-0.16,0.16)
+		var r:=radius*rng.randf_range(0.78,1.06)
+		pts.append(Vector2(cos(a)*r,sin(a)*r*0.82))
+	return pts
+
+static func draw_stone(c:CanvasItem,center:Vector2,radius:float,seed:int,rot:float=0.0,fade:float=1.0,glow:float=0.0)->void:
+	if radius<1.0:return
+	var local:=stone_shape(seed,radius)
+	var pts:=PackedVector2Array()
+	for v in local:pts.append(center+v.rotated(rot))
+	var outline:=PackedVector2Array()
+	for v in local:outline.append(center+(v+v.normalized()*maxf(1.5,radius*0.07)).rotated(rot))
+	c.draw_colored_polygon(outline,Color(OUTLINE,fade))
+	c.draw_colored_polygon(pts,Color(BASALT,fade))
+	# Lichtfläche: Ecken oben links, zur Mitte hin versetzt.
+	var light_dir:=Vector2(-0.6,-0.8).rotated(-rot)
+	var lit:=PackedVector2Array()
+	var shade:=PackedVector2Array()
+	for v in local:
+		var d:=v.normalized().dot(light_dir)
+		if d>-0.15:lit.append(center+(v*0.92+light_dir*radius*0.06).rotated(rot))
+		if d<0.2:shade.append(center+(v*0.96).rotated(rot))
+	if lit.size()>=3:
+		lit.append(center+(light_dir*radius*0.05).rotated(rot))
+		c.draw_colored_polygon(lit,Color(BASALT_LIGHT,fade))
+	if shade.size()>=3:
+		shade.append(center+(-light_dir*radius*0.15).rotated(rot))
+		c.draw_colored_polygon(shade,Color(BASALT.darkened(0.28),fade))
+	# Oberkante hell.
+	var rng:=RandomNumberGenerator.new()
+	rng.seed=seed*7+3
+	for k in local.size():
+		var a:Vector2=local[k]
+		var b:Vector2=local[(k+1)%local.size()]
+		if ((a+b)*0.5).normalized().dot(light_dir)>0.45:
+			c.draw_line(center+a.rotated(rot),center+b.rotated(rot),Color(BASALT_TOP.lightened(0.15),fade),maxf(1.0,radius*0.06))
+	# Dellen: unregelmäßige Mulden, heller Rand unten rechts; schräg versetzt,
+	# damit sie nicht wie Augen nebeneinander liegen.
+	var first:=rng.randf()*TAU
+	for k in rng.randi_range(2,3):
+		var ang:=first+k*rng.randf_range(2.0,2.6)
+		var p:=Vector2(cos(ang)*rng.randf_range(0.25,0.5),sin(ang)*rng.randf_range(0.2,0.4))*radius
+		var r:=radius*rng.randf_range(0.09,0.15)
+		var dent:=stone_shape(seed*31+k,r)
+		var rim:=PackedVector2Array()
+		var hole:=PackedVector2Array()
+		for v in dent:
+			rim.append(center+(p+v*1.15+Vector2(r*0.3,r*0.3)).rotated(rot))
+			hole.append(center+(p+v).rotated(rot))
+		c.draw_colored_polygon(rim,Color(BASALT_TOP,0.75*fade))
+		c.draw_colored_polygon(hole,Color(BASALT.darkened(0.45),0.9*fade))
+	# Feiner Riss.
+	var a0:=Vector2(rng.randf_range(-0.5,-0.1),rng.randf_range(-0.5,0.0))*radius
+	var a1:=a0+Vector2(radius*0.3,radius*rng.randf_range(0.1,0.3))
+	var a2:=a1+Vector2(radius*0.25,-radius*rng.randf_range(0.05,0.25))
+	var line:=PackedVector2Array([center+a0.rotated(rot),center+a1.rotated(rot),center+a2.rotated(rot)])
+	c.draw_polyline(line,Color(OUTLINE,0.8*fade),maxf(1.0,radius*0.05))
+	if glow>0.0:c.draw_polyline(line,Color(CRACK,glow*fade),maxf(1.0,radius*0.035))
+
 static func crack(c:CanvasItem,points:Array,u:float,glow:float)->void:
 	var line:=PackedVector2Array(points)
 	c.draw_polyline(line,Color(CRACK_GLOW,0.25*glow),u*2.2)
 	c.draw_polyline(line,Color(CRACK,0.55+0.45*glow),maxf(1.0,u*0.8))
 
+## Pixel-Sprite (tools/build_golem_art.py): 128×128 je Bild, Füße bei y=124.
+## Zeilen: vorn, Seite (nach rechts), hinten. Spalten: FRAMES.
+const SHEET:=preload("res://art/monsters/golem/golem_sheet.png")
+const GLOW:=preload("res://art/monsters/golem/golem_glow.png")
+const FRAME:=128.0
+const FEET_Y:=124.0
+const FRAMES:=["idle0","idle1","walk0","walk1","walk2","walk3","shield","scrape","stomp","scream","rise"]
+
+## Sprite-Maßstab: großer Golem 2,5 (≈ 320 px), halber 1,25.
+static func sprite_scale(type:int)->float:
+	return GolemBoss.visual_scale(type)*0.625
+
+## Spalte im Sprite-Blatt für Zustand und Zeit.
+static func frame_index(state:String,walking:bool,time:float)->int:
+	match state:
+		"shield":return FRAMES.find("shield")
+		"scrape":return FRAMES.find("scrape")
+		"stomp":return FRAMES.find("stomp")
+		"scream_pause":return FRAMES.find("scream")
+		"rise":return FRAMES.find("rise")
+	if walking:return FRAMES.find("walk0")+int(floor(time*4.0))%4
+	return FRAMES.find("idle0")+int(floor(time*1.5))%2
+
+## Zeile und Spiegelung aus der Blickrichtung.
+static func view_row(facing:Vector2)->Array:
+	if facing.y<-0.6 and absf(facing.x)<0.6:return [2,false]
+	if absf(facing.x)>=0.6:return [1,facing.x<0.0]
+	return [0,false]
+
 ## Der Golem. state: walk, shield, scrape, stomp, scream_pause, rise.
-static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:Vector2,time:float,flash:float)->void:
+static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:Vector2,time:float,flash:float,walking:bool=false)->void:
 	var u:=GolemBoss.visual_scale(type)
+	var s:=sprite_scale(type)
 	var state:=str(info.get("state","walk"))
-	var mirror:=-1.0 if facing.x<-0.2 else 1.0
-	var back:=facing.y<-0.6 and absf(facing.x)<0.5
-	var bob:=sin(time*3.2)*u*0.8 if state=="walk" else 0.0
-	var crouch:=10.0 if state=="shield" else 0.0
 	var rise:=1.0
 	if state=="rise":rise=clampf(1.0-float(info.get("timer",0.0))/2.0,0.05,1.0)
 	var glow:=0.5+0.5*sin(time*2.4)
 	if state=="shield":glow=0.15
 	if state=="scream_pause":glow=1.0
-	var o:=pos+Vector2(0,(1.0-rise)*40.0*u)
 	# Schatten
 	var shadow_w:=52.0*u
 	c.draw_colored_polygon(_ellipse(pos+Vector2(0,u*2),shadow_w,shadow_w*0.28),Color(0,0,0,0.30))
-	var swing:=sin(time*3.2)
-	var arm_l:=Vector2(-40,-24+swing*3)
-	var arm_r:=Vector2(40,-24-swing*3)
-	if state=="shield":
-		arm_l=Vector2(-22,-30);arm_r=Vector2(22,-30)
-	elif state=="scrape":
-		var aim:=Vector2(info.get("aim",[0,1])[0],info.get("aim",[0,1])[1])
-		arm_r=Vector2(40+aim.x*16*mirror,-6+aim.y*10)
-	elif state=="scream_pause":
-		arm_l=Vector2(-48,-44);arm_r=Vector2(48,-44)
-	elif state=="stomp":
-		# Faust hoch über den Kopf, gleich kracht sie herunter.
-		var lift:=1.0-clampf(float(info.get("timer",0.0))/GolemBoss.STOMP_WINDUP,0.0,1.0)
-		arm_r=Vector2(30,-60-lift*26)
-	var P:=func(v:Vector2)->Vector2:return o+Vector2(v.x*mirror,v.y+crouch+bob/u)*u
-	# Beine (kurz, stämmig)
-	for side:int in [-1,1]:
-		var step:float=swing*side*3.0 if state=="walk" else 0.0
-		block(c,P.call(Vector2(16*side,-8+step*0.3)),Vector2(18,16),u,BASALT)
-	# Arm hinten (bei Seitenansicht verdeckt)
-	block(c,P.call(Vector2(arm_l.x*0.82,-48)),Vector2(22,26),u,BASALT)
-	block(c,P.call(arm_l),Vector2(30,28),u,BASALT_LIGHT)
-	# Rumpf
-	block(c,P.call(Vector2(0,-44)),Vector2(70,50),u,BASALT if not back else BASALT.darkened(0.1))
-	crack(c,[P.call(Vector2(-20,-60)),P.call(Vector2(-8,-48)),P.call(Vector2(-14,-36)),P.call(Vector2(-2,-24))],u,glow)
-	crack(c,[P.call(Vector2(18,-58)),P.call(Vector2(10,-44)),P.call(Vector2(22,-30))],u,glow)
-	# Schultern
-	for side in [-1,1]:
-		block(c,P.call(Vector2(33*side,-64)),Vector2(30,26),u,BASALT_LIGHT)
-	# Kopf tief zwischen den Schultern
-	if not back:
-		var head_y:=-68.0 if state!="scream_pause" else -74.0
-		block(c,P.call(Vector2(0,head_y)),Vector2(28,20),u,BASALT_LIGHT)
-		# gesprungene Basaltplatte mit zwei glühenden Spalten
-		c.draw_line(P.call(Vector2(-10,head_y-2)),P.call(Vector2(10,head_y-6)),OUTLINE,u*0.8)
-		for side in [-1,1]:
-			var eye:Vector2=P.call(Vector2(6*side,head_y+2))
-			c.draw_rect(Rect2(eye-Vector2(3.5*u,0.9*u),Vector2(7*u,1.8*u)),Color(CRACK_GLOW,0.35+0.4*glow))
-			c.draw_rect(Rect2(eye-Vector2(2.6*u,0.5*u),Vector2(5.2*u,1.0*u)),Color(CRACK,0.7+0.3*glow))
-	# Arm vorn mit Faust
-	block(c,P.call(Vector2(arm_r.x*0.82,-48)),Vector2(22,26),u,BASALT)
-	block(c,P.call(arm_r),Vector2(32,30),u,BASALT_LIGHT)
-	crack(c,[P.call(arm_r+Vector2(-8,-6)),P.call(arm_r+Vector2(2,0)),P.call(arm_r+Vector2(-2,8))],u,glow)
-	# Schwebende Brocken über den Schultern
-	for k in 4:
-		var a:=time*0.9+k*TAU/4.0
-		var stone:Vector2=P.call(Vector2(cos(a)*40,-80+sin(a*1.3)*6))
-		block(c,stone,Vector2(9,8),u,BASALT_LIGHT)
-		c.draw_rect(Rect2(stone-Vector2(u,u)*0.5,Vector2(u,u)),Color(CRACK,0.6*glow))
+	var col:=frame_index(state,walking,time)
+	var rv:Array=view_row(facing)
+	var row:int=rv[0]
+	var mirror:bool=rv[1]
+	var region:=Rect2(col*FRAME,row*FRAME,FRAME,FRAME)
+	var size:=Vector2(FRAME,FRAME)*s
+	var top_left:=pos-Vector2(FRAME*0.5,FEET_Y)*s
+	# Beim Aufstehen steigt er aus dem Boden (unten abgeschnitten, langsam sichtbar).
+	if rise<1.0:
+		var hidden:=(1.0-rise)*FEET_Y*0.6
+		region.size.y-=hidden
+		size.y-=hidden*s
+		top_left.y+=hidden*s
+	var dest:=Rect2(top_left,size)
+	if mirror:dest=Rect2(top_left+Vector2(size.x,0),Vector2(-size.x,size.y))
+	c.draw_texture_rect_region(SHEET,dest,region,Color(1,1,1,0.35+0.65*rise))
+	c.draw_texture_rect_region(GLOW,dest,region,Color(1,1,1,(0.45+0.55*glow)*rise))
 	if state=="shield":
 		# Steinhülle: dunkler Schleier über dem gebeugten Körper
-		c.draw_colored_polygon(_ellipse(P.call(Vector2(0,-42)),46*u,36*u),Color(0.10,0.09,0.13,0.45))
-		c.draw_arc(P.call(Vector2(0,-42)),40*u,PI*1.05,PI*1.95,24,Color(CRACK,0.5),u)
+		c.draw_colored_polygon(_ellipse(pos+Vector2(0,-42*u),40*u,34*u),Color(0.10,0.09,0.13,0.40))
+		c.draw_arc(pos+Vector2(0,-42*u),38*u,PI*1.05,PI*1.95,24,Color(CRACK,0.5),u)
 	if flash>0.0:
-		c.draw_colored_polygon(_ellipse(P.call(Vector2(0,-44)),36*u,30*u),Color(1,1,1,minf(0.35,flash*2.0)))
+		c.draw_texture_rect_region(SHEET,dest,region,Color(2.6,2.6,2.6,minf(0.55,flash*3.0)))
 	if state=="rise":
 		for k in 8:
 			var d:=pos+Vector2.RIGHT.rotated(k*TAU/8.0+time)*(30*u*rise)
@@ -163,7 +224,7 @@ static func draw_world_fx(c:CanvasItem,world,time:float)->void:
 		c.draw_colored_polygon(_ellipse(p,GolemBoss.HAIL_RADIUS*(0.4+0.6*t),GolemBoss.HAIL_RADIUS*0.45*(0.4+0.6*t)),Color(0,0,0,0.18+0.25*t))
 		c.draw_arc(p,GolemBoss.HAIL_RADIUS,0,TAU,24,Color(CRACK,0.35+0.4*t),2.0)
 		var falling:=p+Vector2(-20,-260)*(1.0-t)
-		block(c,falling,Vector2(9,8),2.6,BASALT_LIGHT)
+		draw_stone(c,falling,13.0,int(absf(p.x)*3.0+absf(p.y)),t*5.0)
 	for t in world.throws:
 		var start:=Vector2(t["from"][0],t["from"][1])
 		var dir:=Vector2(t["dir"][0],t["dir"][1])
@@ -171,17 +232,19 @@ static func draw_world_fx(c:CanvasItem,world,time:float)->void:
 		var p:=GolemBoss.throw_position(start,dir,tt)
 		var lift:=GolemBoss.throw_height(tt)
 		c.draw_colored_polygon(_ellipse(p,GolemBoss.BOULDER_RADIUS,GolemBoss.BOULDER_RADIUS*0.35),Color(0,0,0,0.3))
-		block(c,p+Vector2(0,-lift-20),Vector2(22,20),4.0,BASALT_LIGHT,tt*8.0)
+		draw_stone(c,p+Vector2(0,-lift-26),46.0,stone_seed(start),tt*7.0,1.0,0.5)
 	# Zerbröseln nach dem Kampf: Brocken sinken ein und werden blasser.
 	var keep:=clampf(world.crumble/GolemBoss.CRUMBLE_TIME,0.0,1.0) if world.crumble>0.0 else 1.0
 	for b in world.boulders:
 		draw_boulder(c,Vector2(b[0],b[1]),keep)
 
+static func stone_seed(p:Vector2)->int:
+	return int(absf(p.x)*13.0+absf(p.y)*7.0)
+
 static func draw_boulder(c:CanvasItem,p:Vector2,keep:float=1.0)->void:
 	c.draw_colored_polygon(_ellipse(p+Vector2(0,10),GolemBoss.BOULDER_RADIUS*keep,GolemBoss.BOULDER_RADIUS*0.32*keep),Color(0,0,0,0.3*keep))
 	if keep<0.08:return
-	block(c,p+Vector2(0,-14*keep),Vector2(22,20)*keep,4.0,BASALT_LIGHT.lerp(Color("8c7d74"),1.0-keep))
-	if keep>0.6:crack(c,[p+Vector2(-18,-24),p+Vector2(-2,-14),p+Vector2(12,-22)],2.0,0.4)
+	draw_stone(c,p+Vector2(0,-16*keep),46.0*keep,stone_seed(p),0.0,clampf(keep*1.4,0.0,1.0),0.35 if keep>0.6 else 0.0)
 
 ## Vorwarnung beim Stampfen: Ring am Boden, der sich bis zum Einschlag füllt.
 ## ring_only: nur die Linie, über allem gezeichnet, damit der Ring auch hinter
@@ -272,4 +335,5 @@ static func draw_debris(c:CanvasItem,parts:Array)->void:
 		var fade:=clampf(float(d["life"])/1.5,0.0,1.0)
 		var p:Vector2=d["pos"]
 		c.draw_colored_polygon(_ellipse(p,Vector2(d["size"]).x*float(d["u"])*0.4,Vector2(d["size"]).x*float(d["u"])*0.12),Color(0,0,0,0.25*fade))
-		block(c,p+Vector2(0,-float(d["z"])),Vector2(d["size"]),float(d["u"]),BASALT_LIGHT if fade>0.5 else BASALT_LIGHT.darkened(0.3),float(d["rot"]))
+		var size:Vector2=d["size"]
+		draw_stone(c,p+Vector2(0,-float(d["z"])),(size.x+size.y)*0.5*float(d["u"])*0.42,int(d.get("seed",int(size.x*97+size.y*13))),float(d["rot"]),clampf(fade*1.3,0.0,1.0),0.6 if bool(d.get("head",false)) else 0.0)

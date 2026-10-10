@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Dunkler Golem · Neues Aussehen", "Der Golem ist jetzt ein fein gezeichnetes Pixelbild mit 128×128 Punkten statt großer Blöcke: kantige Basaltplatten mit Licht und Schatten, gezackte lila Risse, deutlich stämmigere Beine mit Kniesteinen, Ansichten von vorn, von der Seite und von hinten, eigene Bilder für Gehen, Schild, Schaben, Stampfen, Schrei und Aufstehen. Geworfene Brocken, Hagelsteine und Trümmer sehen aus wie echte Steine mit Kanten, Ecken und Dellen."],
+["Rüstungen · Neue Inventarbilder", "Die sieben legendären Rüstungen haben neue Inventarbilder, aus 3D-Modellen gerendert, mit Licht und Tiefe. Die Golem-Rüstung zeigt im Inventar jetzt ihr eigenes Bild und am Charakter kantige Basaltplatten, gezackte lila Risse, Schulterbrocken und zwei schwebende Steine."],
 ["Dunkler Golem · Stärker und gefährlicher", "Der Golem hat 20 % mehr Leben. Stampfer, Brocken, Steinhagel und Schrei treffen jetzt mit einem festen Anteil deiner maximalen Lebenspunkte, Rüstung hilft dabei nicht: Stampfer 45 %, Brocken 55 %, Hagelstein 8 %, Schrei 34 % (bei den halben Golems etwa die Hälfte). Ausweichen ist der Schutz. Das Steinhagel-Feld ist 22 % größer, der Brockenwurf fliegt 22 % weiter."],
 ["Dunkler Golem · Kopftreffer", "Pfeile und Zauber treffen den Golem dort, wo ihre Flugbahn durch sein Bild läuft: Kopf ×1,6 Schaden mit „KOPF!“, Rumpf normal, Beine ×0,75. Nahkampf zählt als Rumpf. Beim Zerfall fliegt der Kopf am weitesten."],
 ["Dunkler Golem · Klüger und ausdauernd", "Der Golem läuft um Felsen, Brocken und Mauern herum und verfolgt dich durch den ganzen Himmelsgarten. Ist er eingesperrt, weicht er aus und bricht notfalls durch. Ist 5 Minuten niemand im Himmelsgarten, verschwindet er."],

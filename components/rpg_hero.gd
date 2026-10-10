@@ -312,11 +312,29 @@ static func paint_master_armor(c:CanvasItem,id:int,cloth:String,trim:String,back
 			for pt in [[20,40],[34,44],[24,50],[37,37]]:
 				r(c,pt[0],pt[1],2,2,trim);r(c,pt[0]-1,pt[1]+0.5,4,1,trim)
 			r(c,16,51,24,3,"4a86b8")
-		6: # Golem-Rüstung: Basaltblöcke mit lila Elixier-Rissen.
+		6: # Golem-Rüstung (v2): kantige Basaltplatten mit Licht- und Schattenkante,
+			# gezackte lila Risse, Schulterbrocken und zwei schwebende Steine.
 			for side in [-1,1]:
-				r(c,28+side*19-8,26,16,13,"3a3540")
-				r(c,28+side*19-8,26,16,3,"4c4654")
-				r(c,28+side*19-2,30,2,7,trim)
-			r(c,19,37,18,15,"332f39")
-			poly(c,Vector2.ZERO,[[24,38],[27,43],[25,47],[29,51]],Color(trim))
-			r(c,31,40,2,6,trim)
+				var sx:int=28+side*19
+				poly(c,Vector2.ZERO,[[sx-9,30],[sx-6,25],[sx+6,25],[sx+9,30],[sx+8,39],[sx-8,39]],Color("2e2a35"))
+				poly(c,Vector2.ZERO,[[sx-8,29],[sx-5,26],[sx+5,26],[sx+8,29]],Color("57505f"))
+				r(c,sx-8,37,16,2,"1d1a22")
+				poly(c,Vector2.ZERO,[[sx-1,28],[sx+1,31],[sx-1,33],[sx+1,36]],Color(trim))
+				# schwebender Stein über der Schulter
+				poly(c,Vector2.ZERO,[[sx-3,19],[sx,17],[sx+3,19],[sx+2,22],[sx-2,22]],Color("4a4454"))
+				r(c,sx-1,19,2,1,trim)
+			if not back:
+				# Brust: zwei versetzte Platten, Bauchplatte, Steingürtel.
+				poly(c,Vector2.ZERO,[[18,36],[27,34],[28,44],[19,45]],Color("3a3540"))
+				poly(c,Vector2.ZERO,[[29,34],[38,36],[37,45],[29,44]],Color("332f39"))
+				r(c,18,36,9,2,"57505f");r(c,29,34,9,2,"4c4654")
+				poly(c,Vector2.ZERO,[[20,46],[36,46],[35,52],[21,52]],Color("2a2730"))
+				r(c,20,46,16,1,"4c4654")
+				for k in 4:r(c,19+k*5,52,4,3,"3d3945" if k%2==0 else "2e2a35")
+				poly(c,Vector2.ZERO,[[23,37],[25,40],[23,42],[26,46],[25,50]],Color(trim))
+				poly(c,Vector2.ZERO,[[33,37],[31,41],[33,43]],Color(trim))
+			else:
+				poly(c,Vector2.ZERO,[[18,35],[38,35],[37,52],[19,52]],Color("2e2a35"))
+				for k in 3:r(c,26,37+k*5,4,4,"4a4454")
+				poly(c,Vector2.ZERO,[[21,38],[23,43],[21,47]],Color(trim))
+				poly(c,Vector2.ZERO,[[35,40],[33,45],[35,49]],Color(trim))

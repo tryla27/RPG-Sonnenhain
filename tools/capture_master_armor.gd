@@ -1,9 +1,10 @@
 extends SceneTree
-# Vorschau: die 7 legendären Rüstungen an allen drei Klassen (vorn, Seite, hinten).
+# Vorschau: die 7 legendären Rüstungen mit Inventarbild und an allen drei Klassen (vorn, Seite, hinten).
 # Aufruf: xvfb-run -a godot --path . --rendering-driver opengl3 --script tools/capture_master_armor.gd -- <datei.png>
 
 const Hero=preload("res://components/rpg_hero.gd")
 const MasterArmor=preload("res://components/master_armor.gd")
+const ItemStyle=preload("res://components/item_style_32.gd")
 
 class Sheet extends Node2D:
 	var font:Font
@@ -11,8 +12,10 @@ class Sheet extends Node2D:
 		draw_rect(Rect2(0,0,1400,880),Color("6f9a63"))
 		for id in 7:
 			var y:=110+id*112
-			draw_string(font,Vector2(20,y-30),str(MasterArmor.ARMORS[id]["name"]),HORIZONTAL_ALIGNMENT_LEFT,-1,16,Color("fff3cf"))
+			draw_string(font,Vector2(20,y-30),str(MasterArmor.ARMORS[id]["name"]),HORIZONTAL_ALIGNMENT_LEFT,-1,14,Color("fff3cf"))
 			draw_string(font,Vector2(20,y-10),"Schutz %d" % int(MasterArmor.ARMORS[id]["power"]),HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("e8f2de"))
+			# Inventarbild (aus 3D gerendert), doppelt groß.
+			ItemStyle.paint(self,Vector2(150,y-98),"armor",Color.WHITE,1.75,MasterArmor.design(id))
 			for cls in 3:
 				for view in 3:
 					var look:Vector2=[Vector2.DOWN,Vector2.RIGHT,Vector2.UP][view]

@@ -153,3 +153,11 @@ Raster wird nach der Beschwörung verteilt gefüllt (40 Zellen pro Bild),
 Wegdaten gehen nicht ins Weltpaket, Brocken höchstens 24, Falter höchstens 10,
 umgeworfene Bäume zeichnen nur ihre Kacheln neu. Der Server schreibt jede
 Minute `GOLEM_PERF` ins Log (Schnitt und Spitze).
+
+## Umsetzung Teil 2 (Optik)
+
+- Golem als 128-px-Sprite: `golem_128_vorschau.png` (alle Bilder),
+  `golem_im_spiel.png` (im Spielmaßstab neben dem Helden).
+- Steine mit Kanten, Ecken und Dellen für Brocken, Hagel und Trümmer.
+- Rüstungen: `ruestungen.png` (3D-Inventarbilder und Aussehen am Charakter).
+- Offen: Abstimmung mit Angelo zu Farbe, Kopf und Proportionen.

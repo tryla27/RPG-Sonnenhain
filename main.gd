@@ -9449,7 +9449,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 	if GolemBoss.is_golem(enemy):
 		GolemDesign.draw_scrape_warning(self,Vector2(enemy["pos"]),enemy.get("golem",{}))
 		GolemDesign.draw_stomp_warning(self,enemy.get("golem",{}),int(enemy["type"]))
-		GolemDesign.draw_golem(self,Vector2(enemy["pos"]),int(enemy["type"]),enemy.get("golem",{}),Vector2(enemy.get("facing",Vector2.DOWN)),world_time,float(enemy.get("flash",0.0)))
+		GolemDesign.draw_golem(self,Vector2(enemy["pos"]),int(enemy["type"]),enemy.get("golem",{}),Vector2(enemy.get("facing",Vector2.DOWN)),world_time,float(enemy.get("flash",0.0)),bool(enemy.get("walking",false)))
 		return
 	var p: Vector2 = enemy["pos"]
 	var type: int = int(enemy["type"])

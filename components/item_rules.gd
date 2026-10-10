@@ -12,6 +12,7 @@ const GameContent = preload("res://components/game_content.gd")
 const BossRelics=preload("res://components/boss_relics.gd")
 const ArcaneNecklaces = preload("res://components/arcane_necklaces.gd")
 const FoodSystem = preload("res://components/food_system.gd")
+const MasterArmor = preload("res://components/master_armor.gd")
 
 const WEAPON_ICONS := ["sword", "staff", "bow"]
 const LOOT_RANKS := ["Alte", "Feine", "Seltene", "Epische", "Legendäre"]
@@ -115,4 +116,6 @@ static func weapon_visual_stage(item: Dictionary) -> int:
 static func item_design(item: Dictionary) -> int:
 	if item.get("icon")=="necklace":return maxi(0,ArcaneNecklaces.index(item))
 	if item.get("icon")=="food": return maxi(0,FoodSystem.index_for(str(item.get("name",""))))
+	# Legendäre Rüstungen: Entwurf 6–12 (eigenes 3D-Inventarbild, auch die Golem-Rüstung).
+	if item.get("icon")=="armor" and MasterArmor.index(item)>=0: return MasterArmor.design(MasterArmor.index(item))
 	return clampi(int(item.get("design", absi(hash(String(item.get("name", "Ausrüstung")))) % 12)), 0, 11)

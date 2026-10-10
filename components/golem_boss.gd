@@ -101,10 +101,11 @@ const RESET_AFTER_ALONE:=300.0
 ## Trefferzonen in Einheiten u (Füße = 0, nach oben negativ), passend zum Bild.
 ## Geschosse treffen die Zone, durch die ihre Flugbahn läuft (Kopf vor Rumpf
 ## vor Beinen); Nahkampf zählt als Rumpf.
-const HULL:=Rect2(-44,-86,88,96)
-const HEAD_CENTER:=Vector2(0,-70)
-const HEAD_RADIUS:=13.0
-const TORSO:=Rect2(-38,-62,76,38)
+## Golem v2: passend zum 128-px-Sprite (1 Sprite-Pixel = 0,625 u, Füße y=124).
+const HULL:=Rect2(-40,-78,80,86)
+const HEAD_CENTER:=Vector2(0,-58)
+const HEAD_RADIUS:=10.0
+const TORSO:=Rect2(-34,-60,68,34)
 const ZONE_MULT:={"head":1.6,"torso":1.0,"legs":0.75}
 
 ## Wegsuche: Raster 64 px über den Himmelsgarten, Körper 90 px (großer Golem).
