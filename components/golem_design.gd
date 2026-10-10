@@ -137,10 +137,15 @@ static func draw_altar(c:CanvasItem,pos:Vector2,active:bool,time:float)->void:
 		c.draw_rect(Rect2(bowl-Vector2(10,9),Vector2(20,4)),[Color("8a8580"),Color("c84f55"),Color("547bd1")][k])
 
 ## Kartensymbol des Altars: dunkler Stein mit lila Riss, pulsiert im Kampf.
-static func draw_map_marker(c:CanvasItem,point:Vector2,active:bool,time:float)->void:
+## sleeping: 15-Minuten-Pause nach dem Sieg, Symbol grau ohne Leuchten.
+static func draw_map_marker(c:CanvasItem,point:Vector2,active:bool,time:float,sleeping:bool=false)->void:
 	var pulse:=0.5+0.5*sin(time*(6.0 if active else 2.0))
 	c.draw_circle(point,10,OUTLINE)
-	c.draw_colored_polygon(PackedVector2Array([point+Vector2(-7,-4),point+Vector2(-3,-8),point+Vector2(4,-8),point+Vector2(8,-3),point+Vector2(7,5),point+Vector2(-6,6)]),BASALT_LIGHT)
+	c.draw_colored_polygon(PackedVector2Array([point+Vector2(-7,-4),point+Vector2(-3,-8),point+Vector2(4,-8),point+Vector2(8,-3),point+Vector2(7,5),point+Vector2(-6,6)]),Color("5c5a60") if sleeping else BASALT_LIGHT)
+	if sleeping:
+		c.draw_polyline(PackedVector2Array([point+Vector2(-5,-1),point+Vector2(-1,2),point+Vector2(2,-3),point+Vector2(5,1)]),Color("8d8a92"),2.0)
+		c.draw_arc(point,11,0,TAU,20,Color("8d8a92",0.6),2.0)
+		return
 	c.draw_polyline(PackedVector2Array([point+Vector2(-5,-1),point+Vector2(-1,2),point+Vector2(2,-3),point+Vector2(5,1)]),Color(CRACK,0.7+0.3*pulse),2.0)
 	c.draw_arc(point,11+(2.0*pulse if active else 0.0),0,TAU,20,Color(CRACK_GLOW,0.5+0.4*pulse),2.0)
 
@@ -167,13 +172,16 @@ static func draw_world_fx(c:CanvasItem,world,time:float)->void:
 		var lift:=GolemBoss.throw_height(tt)
 		c.draw_colored_polygon(_ellipse(p,GolemBoss.BOULDER_RADIUS,GolemBoss.BOULDER_RADIUS*0.35),Color(0,0,0,0.3))
 		block(c,p+Vector2(0,-lift-20),Vector2(22,20),4.0,BASALT_LIGHT,tt*8.0)
+	# Zerbröseln nach dem Kampf: Brocken sinken ein und werden blasser.
+	var keep:=clampf(world.crumble/GolemBoss.CRUMBLE_TIME,0.0,1.0) if world.crumble>0.0 else 1.0
 	for b in world.boulders:
-		draw_boulder(c,Vector2(b[0],b[1]))
+		draw_boulder(c,Vector2(b[0],b[1]),keep)
 
-static func draw_boulder(c:CanvasItem,p:Vector2)->void:
-	c.draw_colored_polygon(_ellipse(p+Vector2(0,10),GolemBoss.BOULDER_RADIUS,GolemBoss.BOULDER_RADIUS*0.32),Color(0,0,0,0.3))
-	block(c,p+Vector2(0,-14),Vector2(22,20),4.0,BASALT_LIGHT)
-	crack(c,[p+Vector2(-18,-24),p+Vector2(-2,-14),p+Vector2(12,-22)],2.0,0.4)
+static func draw_boulder(c:CanvasItem,p:Vector2,keep:float=1.0)->void:
+	c.draw_colored_polygon(_ellipse(p+Vector2(0,10),GolemBoss.BOULDER_RADIUS*keep,GolemBoss.BOULDER_RADIUS*0.32*keep),Color(0,0,0,0.3*keep))
+	if keep<0.08:return
+	block(c,p+Vector2(0,-14*keep),Vector2(22,20)*keep,4.0,BASALT_LIGHT.lerp(Color("8c7d74"),1.0-keep))
+	if keep>0.6:crack(c,[p+Vector2(-18,-24),p+Vector2(-2,-14),p+Vector2(12,-22)],2.0,0.4)
 
 ## Vorwarnung beim Stampfen: Ring am Boden, der sich bis zum Einschlag füllt.
 ## ring_only: nur die Linie, über allem gezeichnet, damit der Ring auch hinter
@@ -222,10 +230,25 @@ static func make_debris(pos:Vector2,type:int)->Array:
 	var parts:Array=[]
 	var layout:=[[Vector2(0,-44),Vector2(70,50)],[Vector2(-36,-64),Vector2(32,26)],[Vector2(36,-64),Vector2(32,26)],[Vector2(0,-68),Vector2(28,20)],[Vector2(-44,-24),Vector2(30,28)],[Vector2(44,-24),Vector2(32,30)],[Vector2(-16,-8),Vector2(18,16)],[Vector2(16,-8),Vector2(18,16)]]
 	for k in 6:layout.append([Vector2(randf_range(-40,40),randf_range(-80,-20)),Vector2(9,8)])
-	for part in layout:
+	for n in layout.size():
+		var part:Array=layout[n]
 		var local:Vector2=part[0]
 		var out:=Vector2(local.x,0).normalized() if absf(local.x)>1.0 else Vector2.RIGHT.rotated(randf()*TAU)
-		parts.append({"pos":pos+Vector2(local.x*u,0),"z":-local.y*u,"vel":(out*randf_range(40,140)+Vector2(randf_range(-30,30),randf_range(-20,40)))*u/4.0,"vz":randf_range(60,220)*u/4.0,"rot":0.0,"vrot":randf_range(-3,3),"size":part[1],"u":u,"life":7.0})
+		# Der Kopf (Teil 3) platzt am stärksten auseinander (Golem v2).
+		var burst:=1.9 if n==3 else 1.0
+		parts.append({"pos":pos+Vector2(local.x*u,0),"z":-local.y*u,"vel":(out*randf_range(40,140)+Vector2(randf_range(-30,30),randf_range(-20,40)))*u/4.0*burst,"vz":randf_range(60,220)*u/4.0*burst,"rot":0.0,"vrot":randf_range(-3,3)*burst,"size":part[1],"u":u,"life":7.0,"head":n==3})
+	# Kopfsplitter: zusätzliche kleine Teile aus dem Kopf.
+	for k in 6:
+		var spray:=Vector2.RIGHT.rotated(randf()*TAU)
+		parts.append({"pos":pos,"z":68.0*u,"vel":spray*randf_range(120,240)*u/4.0,"vz":randf_range(140,300)*u/4.0,"rot":0.0,"vrot":randf_range(-6,6),"size":Vector2(7,6),"u":u,"life":6.0})
+	return parts
+
+## Zerbröselnder Brocken: kleine Steine springen weg (gleiche Teile wie beim Zerfall).
+static func make_crumble(pos:Vector2)->Array:
+	var parts:Array=[]
+	for k in 7:
+		var out:=Vector2.RIGHT.rotated(randf()*TAU)
+		parts.append({"pos":pos+out*randf_range(4,20),"z":randf_range(6,26),"vel":out*randf_range(30,90),"vz":randf_range(40,120),"rot":0.0,"vrot":randf_range(-4,4),"size":Vector2(randf_range(4,8),randf_range(4,7)),"u":2.4,"life":randf_range(2.0,3.0)})
 	return parts
 
 static func update_debris(parts:Array,delta:float)->void:

@@ -94,9 +94,9 @@ func run()->void:
 	check(absf(moved-GolemBoss.SPEED*1.3*0.5)<1.0,"im Feld +30 Prozent Tempo (%s)" % moved)
 	# Hagel trifft den Spieler.
 	g.hp=g.max_hp();g.invulnerable=0.0
-	g.golem_world.hail.append({"pos":[g.player_pos.x,g.player_pos.y],"delay":0.01,"damage":45})
+	g.golem_world.hail.append({"pos":[g.player_pos.x,g.player_pos.y],"delay":0.01,"fraction":GolemBoss.HAIL_HP_FRACTION})
 	g.golem_world.update_world(g,0.05,true)
-	check(g.hp<g.max_hp(),"Steinhagel macht Schaden")
+	check(absi(roundi(g.max_hp()-g.hp)-roundi(g.max_hp()*0.08))<=1,"Steinhagel: 8 %% der max. HP (%s)" % (g.max_hp()-g.hp))
 
 	# Brockenwurf: Spieler wird mitgerissen, Brocken bleibt liegen.
 	g.golem_world.fields.clear();g.golem_world.hail.clear()
@@ -135,8 +135,22 @@ func run()->void:
 	g.player_pos=Vector2(golem["pos"])+Vector2(0,100)
 	g.golem_world.update_golem(g,golem,g.golem_targets(),0.05)
 	for i in 8:g.golem_world.update_golem(g,golem,g.golem_targets(),0.1)
-	var stomp_raw:=roundi(GolemBoss.base_damage(g)*GolemBoss.MELEE_DAMAGE)
-	check(g.hp<g.max_hp() and g.max_hp()-g.hp<=stomp_raw,"stehengeblieben: Treffer (%s von %s)" % [g.max_hp()-g.hp,stomp_raw])
+	var stomp_expect:=roundi(g.max_hp()*GolemBoss.STOMP_HP_FRACTION)
+	check(absi(roundi(g.max_hp()-g.hp)-stomp_expect)<=1,"stehengeblieben: 45 %% der max. HP (%s von %s)" % [g.max_hp()-g.hp,stomp_expect])
+	# Rüstung hilft nicht: gleiche Rechnung mit 100 Schutz.
+	var plate:Dictionary=g.master_armor_item(MasterArmor.GOLEM)
+	g.inventory.append(plate);g.equipped_armor_uid=int(plate["uid"])
+	golem["golem"]["state"]="walk";golem["golem"]["melee_cd"]=0.0
+	g.player_pos=Vector2(golem["pos"])+Vector2(0,100)
+	g.hp=g.max_hp();g.invulnerable=0.0;g.golem_guard_cooldown=99.0
+	g.golem_world.update_golem(g,golem,g.golem_targets(),0.05)
+	for i in 8:g.golem_world.update_golem(g,golem,g.golem_targets(),0.1)
+	stomp_expect=roundi(g.max_hp()*GolemBoss.STOMP_HP_FRACTION)
+	check(absi(roundi(g.max_hp()-g.hp)-stomp_expect)<=1,"Rüstung hilft nicht (%s von %s)" % [g.max_hp()-g.hp,stomp_expect])
+	g.equipped_armor_uid=-1
+	check(is_equal_approx(GolemBoss.THROW_HP_FRACTION,0.55) and is_equal_approx(GolemBoss.HAIL_HP_FRACTION,0.08) and is_equal_approx(GolemBoss.SCREAM_DAMAGE_FRACTION,0.34),"Brocken 55 %, Hagel 8 %, Schrei 34 %")
+	check(is_equal_approx(GolemBoss.FIELD_RADIUS,390.0) and is_equal_approx(GolemBoss.THROW_FLIGHT,586.0) and is_equal_approx(GolemBoss.THROW_ROLL,117.0),"Feld und Wurf +22 %")
+	check(int(g.ENEMY_TYPES[27]["hp"])==8640 and int(g.ENEMY_TYPES[28]["hp"])==4320,"Leben +20 %")
 
 	# Bäume: umgeworfen, nach 10 Minuten wieder da.
 	g.golem_world.knocked_trees["5:5"]=Time.get_unix_time_from_system()+GolemBoss.TREE_REGROW_SECONDS

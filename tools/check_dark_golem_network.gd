@@ -209,11 +209,44 @@ func run() -> void:
 	for i in 120:
 		tick(server,players,frame,1.0/30.0);frame+=1
 		await process_frame
+	check(server.golem_world.boulders.is_empty() and a.golem_world.boulders.is_empty(),"Brocken nach dem Kampf zerbröselt (Server %d, Spieler %d)" % [server.golem_world.boulders.size(),a.golem_world.boulders.size()])
+	check(a.golem_world.cooldown_left()>800.0,"15 Minuten Pause kommt beim Spieler an (%.0f s)" % a.golem_world.cooldown_left())
+	# C geht weg aus dem Himmelsgarten: bekommt nur noch das schmale Paket.
+	c.player_pos=Vector2(2600,1500)
+	c.golem_world.fields=[{"pos":[0,0],"life":9.0}]
+	for i in 12:
+		tick(server,players,frame,1.0/30.0);frame+=1
+		await process_frame
+	check(c.golem_world.fields.is_empty() and c.golem_world.cooldown_left()>800.0,"außerhalb: schmales Paket mit Pause")
+	# Pause: neuer Golem abgelehnt; im Testmodus erlaubt.
+	a.player_pos=GolemBoss.ALTAR+Vector2(0,80)
+	for i in 6:
+		tick(server,players,frame,1.0/30.0);frame+=1
+		await process_frame
+	a.golem_world.cooldown_until=0.0
+	a.interact()
+	deadline=Time.get_ticks_msec()+10000
+	while a.golem_summon_pending and Time.get_ticks_msec()<deadline:await process_frame
+	check(golem_on(server).is_empty(),"Server lehnt während der Pause ab")
+	# Der Server nimmt höchstens alle 2,5 s eine Anfrage pro Spieler an.
+	await create_timer(2.7).timeout
+	a.golem_summon_pending=false
+	server.remote_players[a.local_peer_id]["test_mode"]=true
+	a.creative_mode=true
+	a.interact()
+	deadline=Time.get_ticks_msec()+10000
+	while a.golem_summon_pending and Time.get_ticks_msec()<deadline:await process_frame
+	check(golem_on(server).size()==1,"Testmodus: Golem trotz Pause")
+	a.creative_mode=false
+	for i in 90:
+		tick(server,players,frame,1.0/30.0);frame+=1
+		await process_frame
 	check(FileAccess.file_exists(server.golem_world_path),"golem_world.json gespeichert")
 	var stored:Variant=JSON.parse_string(FileAccess.get_file_as_string(server.golem_world_path))
 	check(stored is Dictionary and (stored["boulders"] as Array).size()==server.golem_world.boulders.size(),"Brocken in der Datei")
 	var restarted:=GolemBoss.new();restarted.load_state(stored)
 	check(restarted.boulders.size()==server.golem_world.boulders.size(),"Brocken nach Neustart wieder da")
+	check(restarted.cooldown_left()>800.0,"Pause übersteht Neustart")
 
 	host.close();peer_a.close();peer_b.close();peer_c.close()
 	for g in [server,a,b,c]:g.get_parent().queue_free()

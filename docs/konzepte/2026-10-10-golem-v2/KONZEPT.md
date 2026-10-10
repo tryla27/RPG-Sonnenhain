@@ -1,7 +1,8 @@
 # Dunkler Golem v2 und Spawn-Brummen – Konzept (10.10.2026)
 
-Angelos Liste von 15:52 Uhr. Noch nichts davon ist gebaut; offene Fragen stehen
-ganz unten.
+Angelos Liste von 15:52 Uhr, Antworten von 16:55 Uhr (unten). Teil 1 (Kampf,
+Technik, Leistung) ist gebaut, Bild `kampf.png`; Teil 2 (Optik) und das
+Brummen folgen.
 
 ## 1. Spawn-Brummen neu
 
@@ -129,3 +130,26 @@ Zum Nachweis bei Angelo: eine kleine FPS-/Bildzeit-Anzeige (F3) einbauen.
    (dann müsste er durch die Tore passen)?
 4. 15-Minuten-Sperre: Gilt sie auch im Testmodus, oder darf man dort sofort
    wieder beschwören?
+
+## Antworten (16:55) und Umsetzung Teil 1
+
+1. Beute: **immer die Golem-Rüstung** für jeden Beteiligten.
+2. Prozent-Schaden: **ja**, Stampfer 45 %, Brocken 55 %, Hagel 8 %, Schrei 34 %.
+3. Verfolgung: **nur im Himmelsgarten**.
+4. 15-Minuten-Pause: **nicht im Testmodus**.
+5. Neu: Der Golem darf Server und andere Mobs nicht ausbremsen.
+
+Leistung, gemessen im Netztest (3 Spieler, ganzer Kampf):
+
+| Teil | Kosten |
+|---|---|
+| Golem-Logik pro Bild (Schnitt) | ≈ 0,11 ms |
+| Längstes Bild (Wegsuche) | ≈ 2,5–2,9 ms |
+| Wegsuche, Ziel unerreichbar (Budget 600 Zellen) | ≈ 10 ms, höchstens alle 3 s |
+| Weltpaket außerhalb des Himmelsgartens | < 120 Zeichen statt ≈ 2,8 KB |
+
+Schutzmaßnahmen: Wegsuche nur bei versperrter Sichtlinie (Prüfung alle 0,25 s),
+Raster wird nach der Beschwörung verteilt gefüllt (40 Zellen pro Bild),
+Wegdaten gehen nicht ins Weltpaket, Brocken höchstens 24, Falter höchstens 10,
+umgeworfene Bäume zeichnen nur ihre Kacheln neu. Der Server schreibt jede
+Minute `GOLEM_PERF` ins Log (Schnitt und Spitze).
