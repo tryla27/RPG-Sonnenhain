@@ -129,6 +129,7 @@ const WorldGeometry=preload("res://components/world_geometry.gd")
 const ItemRules=preload("res://components/item_rules.gd")
 const SoundBank=preload("res://components/sound_bank.gd")
 const TypingSound=preload("res://components/typing_sound.gd")
+const ShopTrade=preload("res://components/shop_trade.gd")
 const SpellReturn=preload("res://components/spell_return.gd")
 const WorldSnapshot=preload("res://components/world_snapshot.gd")
 const HeadgearRules=preload("res://components/headgear_rules.gd")
@@ -368,6 +369,9 @@ var controls_return_panel := "pause"
 var sell_all_confirm := false
 var pending_purchase := -1
 var pending_purchase_item: Dictionary = {}
+## Verkaufen mit Mengenauswahl (components/shop_trade.gd).
+var pending_sale := -1
+var trade_quantity := 1
 var merchant_kind := ""
 var menu_scroll := 0
 var patch_view: Dictionary = PatchNotes.new_view()
@@ -3188,6 +3192,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		typing_feedback(code_before, join_code.length())
 		queue_redraw()
 		return
+	# Shop: Maus auf ein Angebot + Enter kauft sofort; im Fenster bestätigt Enter.
+	if panel == "shop" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+		if shop_quick_buy(get_viewport().get_mouse_position()):
+			get_viewport().set_input_as_handled()
+			return
 	# Texteingabe für einmalige Charaktererstellung.
 	if panel == "creation" and event is InputEventKey and event.pressed and not event.echo:
 		var name_before := creation_name.length()
@@ -4468,6 +4477,7 @@ func open_elara_alchemy() -> void:
 	menu_scroll=0
 	sell_all_confirm=false
 	pending_purchase=-1
+	pending_sale = -1
 	pending_purchase_item={}
 
 func open_pip_arcane_shop() -> void:
@@ -4481,6 +4491,7 @@ func open_pip_arcane_shop() -> void:
 	menu_scroll=0
 	sell_all_confirm=false
 	pending_purchase=-1
+	pending_sale = -1
 	pending_purchase_item={}
 
 func interior_actors() -> Array:
@@ -5303,6 +5314,7 @@ func interact() -> void:
 		menu_scroll = 0
 		sell_all_confirm = false
 		pending_purchase = -1
+		pending_sale = -1
 		pending_purchase_item = {}
 
 func interact_world_event(index: int) -> void:
@@ -6253,6 +6265,7 @@ func panel_click(mouse: Vector2) -> void:
 		panel = controls_return_panel if panel == "controls" else (quest_guide.return_panel if panel == "quest_details" else "")
 		sell_all_confirm = false
 		pending_purchase = -1
+		pending_sale = -1
 		return
 	match panel:
 		"essence": click_essence(mouse)
@@ -7212,13 +7225,28 @@ func click_inventory(mouse: Vector2) -> void:
 
 func click_shop(mouse: Vector2) -> void:
 	if pending_purchase >= 0:
-		if Rect2(352, 391, 204, 45).has_point(mouse):
-			buy_item(pending_purchase_item)
+		var maximum := ShopTrade.max_buy(int(pending_purchase_item.get("price",0)), gold)
+		var changed := ShopTrade.click_quantity(mouse, trade_quantity, maximum)
+		if changed >= 0:
+			trade_quantity = changed
+			play_sound("ui_klick")
+		elif ShopTrade.CONFIRM.has_point(mouse):
+			confirm_shop_dialog()
+		elif ShopTrade.CANCEL.has_point(mouse) or not ShopTrade.DIALOG.has_point(mouse):
 			pending_purchase = -1
+			pending_sale = -1
 			pending_purchase_item = {}
-		elif Rect2(578, 391, 204, 45).has_point(mouse) or not Rect2(315, 210, 522, 247).has_point(mouse):
-			pending_purchase = -1
-			pending_purchase_item = {}
+		return
+	if pending_sale >= 0:
+		var stack := int(inventory[pending_sale].get("count",1)) if pending_sale < inventory.size() else 1
+		var changed_sale := ShopTrade.click_quantity(mouse, trade_quantity, stack)
+		if changed_sale >= 0:
+			trade_quantity = changed_sale
+			play_sound("ui_klick")
+		elif ShopTrade.CONFIRM.has_point(mouse):
+			confirm_shop_dialog()
+		elif ShopTrade.CANCEL.has_point(mouse) or not ShopTrade.DIALOG.has_point(mouse):
+			pending_sale = -1
 		return
 	if merchant_kind=="alchemy" and Rect2(600,145,150,40).has_point(mouse):
 		visit_healer()
@@ -7235,6 +7263,7 @@ func click_shop(mouse: Vector2) -> void:
 			sell_all_confirm = false
 			pending_purchase = i
 			pending_purchase_item = stock[i].duplicate(true)
+			trade_quantity = 1
 			return
 	for i in inventory.size():
 		var col := i % 11
@@ -7248,11 +7277,47 @@ func click_shop(mouse: Vector2) -> void:
 			sell_all_unequipped()
 		else:
 			sell_all_confirm = true
-			message("Alle nicht ausgerüsteten Items verkaufen? Erneut klicken.")
+			var preview := sell_all_preview()
+			message("Alle nicht ausgerüsteten Items verkaufen? %d Items · +%d Gold. Erneut klicken." % [preview[0], preview[1]])
 		return
-	if Rect2(786, 562, 183, 39).has_point(mouse) and selected_item >= 0:
+	if Rect2(786, 562, 183, 39).has_point(mouse) and selected_item >= 0 and selected_item < inventory.size():
 		sell_all_confirm = false
-		sell_item(selected_item)
+		pending_sale = selected_item
+		trade_quantity = 1
+
+## Bestätigt das offene Kauf- oder Verkaufsfenster (Knopf oder Enter).
+func confirm_shop_dialog() -> void:
+	if pending_purchase >= 0:
+		buy_items(pending_purchase_item, trade_quantity)
+		pending_purchase = -1
+		pending_purchase_item = {}
+	elif pending_sale >= 0:
+		sell_items(pending_sale, trade_quantity)
+		pending_sale = -1
+	trade_quantity = 1
+	queue_redraw()
+
+## Maus auf einem Angebot + Enter: sofort 1 Stück kaufen.
+func shop_quick_buy(mouse: Vector2) -> bool:
+	if pending_purchase >= 0 or pending_sale >= 0:
+		confirm_shop_dialog()
+		return true
+	var stock: Array = shop_stock[merchant_kind].slice(shop_page*3,shop_page*3+3)
+	var hovered := ShopTrade.offer_at(mouse, stock.size())
+	if hovered < 0: return false
+	buy_items(stock[hovered].duplicate(true), 1)
+	queue_redraw()
+	return true
+
+## [Anzahl, Gold] für „Alles verkaufen“ (ohne Ausrüstung und Gesperrtes).
+func sell_all_preview() -> Array:
+	var total := 0
+	var count := 0
+	for item in inventory:
+		if int(item["uid"]) in equipped_item_uids() or bool(item.get("locked",false)): continue
+		total += item_sale_value(item)
+		count += int(item.get("count", 1))
+	return [count, total]
 
 func sell_all_unequipped() -> void:
 	var total := 0
@@ -7367,6 +7432,7 @@ func refresh_shop_stock() -> void:
 	var suffix:String=theme["suffix"]
 	shop_page=0
 	pending_purchase=-1
+	pending_sale = -1
 	pending_purchase_item={}
 	var rarity := 1 if tier < 12 else (2 if tier < 30 else 3)
 	var shop_element:String=theme["element"]
@@ -7434,16 +7500,16 @@ func append_new_equipment() -> void:
 			if old["name"] == offer["name"]: exists = true
 		if not exists: shop_stock["merchant"].append(offer)
 
-func buy_item(stock_item: Dictionary) -> void:
+func buy_item(stock_item: Dictionary, announce: bool = true) -> bool:
 	ArcaneNecklaces.normalize(stock_item)
 	var price := maxi(0,int(stock_item.get("price",0)))
 	if gold < price:
 		message_error("Dafür fehlen dir %d Gold." % (price-gold))
-		return
+		return false
 	var icon := str(stock_item.get("icon","gem"))
 	if icon not in ["sword","staff","bow","armor","ring","potion","gem","herb","essence","food","head","necklace"]:
 		message("Dieses Angebot ist ungültig.")
-		return
+		return false
 	var purchased := make_item(String(stock_item.get("name","Fundstück")), icon, clampi(int(stock_item.get("rarity",1)),0,4), maxi(0,int(stock_item.get("power",0))), int(price/2.0), String(stock_item.get("element","")), maxi(1,int(stock_item.get("level",level))))
 	if icon=="head":
 		purchased["head_class"]=clampi(int(stock_item.get("head_class",1 if merchant_kind=="arcane" else class_id)),0,2)
@@ -7453,17 +7519,45 @@ func buy_item(stock_item: Dictionary) -> void:
 		purchased["tooltip"]="Lernen: %s" % ABILITIES[int(stock_item["skill_unlock"])]["name"]
 	if not can_add_item(purchased):
 		message_error("Dein Inventar ist voll.")
-		return
+		return false
 	var gold_before := gold
 	gold -= price
 	if not add_item(purchased):
 		gold = gold_before
 		message("Kauf abgebrochen · Inventar konnte nicht aktualisiert werden.")
-		return
+		return false
 	validate_equipment_slots()
-	play_sound("kaufen")
-	message("Gekauft: %s" % stock_item.get("name","Fundstück"))
-	save_game()
+	if announce:
+		play_sound("kaufen")
+		message("Gekauft: %s" % stock_item.get("name","Fundstück"))
+		save_game()
+	return true
+
+## Mehrere Stück kaufen; stoppt bei fehlendem Gold oder vollem Inventar.
+func buy_items(stock_item: Dictionary, amount: int) -> int:
+	var bought := 0
+	for i in clampi(amount,1,ShopTrade.MAX_BUY):
+		if not buy_item(stock_item.duplicate(true), false): break
+		bought += 1
+	if bought > 0:
+		play_sound("kaufen")
+		message("Gekauft: %d× %s für %d Gold" % [bought, stock_item.get("name","Fundstück"), bought*maxi(0,int(stock_item.get("price",0)))])
+		save_game()
+	return bought
+
+## Mehrere Stück eines Stapels verkaufen (wie mehrmals VERKAUFEN).
+func sell_items(index: int, amount: int) -> int:
+	if index < 0 or index >= inventory.size(): return 0
+	var uid := int(inventory[index].get("uid",-1))
+	var sold := 0
+	for i in clampi(amount,1,maxi(1,int(inventory[index].get("count",1)))):
+		if index >= inventory.size() or int(inventory[index].get("uid",-1)) != uid: break
+		var before := inventory.size()
+		var count_before := int(inventory[index].get("count",1))
+		sell_item(index)
+		if inventory.size() == before and index < inventory.size() and int(inventory[index].get("count",1)) == count_before: break
+		sold += 1
+	return sold
 
 func sell_item(index: int) -> void:
 	if index < 0 or index >= inventory.size(): return
@@ -11474,7 +11568,7 @@ func draw_shop_panel() -> void:
 	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else ("PIP (ARKANHANDEL)" if merchant_kind == "arcane" else "HÄNDLER"))
 	text_at(Vector2(165, 125), shop_name, 25, Color("ffeda9"))
 	text_at(Vector2(804, 126), "%d GOLD" % gold, 17, Color("f9dba0"))
-	text_at(Vector2(169, 174), "%d/30 Angebote · 3 neu in %d:%02d" % [shop_stock[merchant_kind].size(),int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 16, Color("e8f2de"))
+	text_at(Vector2(169, 174), "%d/30 Angebote · 3 neu in %d:%02d · Maus + ENTER kauft sofort" % [shop_stock[merchant_kind].size(),int((420.0 - shop_timer) / 60.0), int(420.0 - shop_timer) % 60], 16, Color("e8f2de"), HORIZONTAL_ALIGNMENT_LEFT, 420)
 	ui_button(Rect2(760,145,80,40),"<",shop_page>0)
 	ui_button(Rect2(850,145,100,40),str(shop_page+1)+" / "+str(int((shop_stock[merchant_kind].size()+2)/3)),(shop_page+1)*3 < shop_stock[merchant_kind].size())
 	if merchant_kind=="alchemy": ui_button(Rect2(600,145,150,40),"VOLLHEILUNG")
@@ -11503,8 +11597,13 @@ func draw_shop_panel() -> void:
 			text_at(pos + Vector2(17, 35), "×%d" % int(inventory[i]["count"]), 11, Color("fff1c8"))
 	if selected_item >= 0 and selected_item < inventory.size():
 		var chosen: Dictionary = inventory[selected_item]
-		text_at(Vector2(171, 592), "%s · %d Gold pro Stück" % [chosen["name"], int(chosen["value"])], 16, RARITY_COLORS[int(chosen["rarity"])])
-	ui_button(Rect2(564, 562, 210, 39), "BESTÄTIGEN?" if sell_all_confirm else "ALLES VERKAUFEN")
+		var stack_count := int(chosen.get("count",1))
+		var worth := "%s · %d Gold" % [chosen["name"], ShopTrade.stack_sale_total(item_sale_value(chosen), stack_count, 1)]
+		if stack_count > 1: worth += " pro Stück · alle %d: %d Gold" % [stack_count, item_sale_value(chosen)]
+		text_at(Vector2(171, 592), worth, 15, RARITY_COLORS[int(chosen["rarity"])], HORIZONTAL_ALIGNMENT_LEFT, 385)
+	var sell_all_label := "ALLES VERKAUFEN"
+	if sell_all_confirm: sell_all_label = "OK? +%d GOLD" % int(sell_all_preview()[1])
+	ui_button(Rect2(564, 562, 210, 39), sell_all_label)
 	ui_button(Rect2(786, 562, 183, 39), "VERKAUFEN", selected_item >= 0)
 	var mouse := get_viewport().get_mouse_position()
 	for i in stock.size():
@@ -11518,10 +11617,25 @@ func draw_shop_panel() -> void:
 		var pending: Dictionary = shop_preview_item(pending_purchase_item)
 		draw_item_icon(Vector2(346, 270), String(pending["icon"]), RARITY_COLORS[int(pending["rarity"])], 1.6, weapon_visual_stage(pending), item_design(pending))
 		text_at(Vector2(413, 298), String(pending["name"]), 19, RARITY_COLORS[int(pending["rarity"])])
-		text_at(Vector2(413, 326), "Preis: %d Gold   ·   Dein Gold: %d" % [int(pending_purchase_item["price"]), gold], 16, Color("f6dca1"))
-		text_at(Vector2(345, 365), "Diesen Gegenstand wirklich kaufen?", 16, Color("f1ead6"))
-		ui_button(Rect2(352, 391, 204, 45), "KAUFEN")
-		ui_button(Rect2(578, 391, 204, 45), "ABBRECHEN")
+		var unit := int(pending_purchase_item["price"])
+		text_at(Vector2(413, 326), "Preis: %d Gold   ·   Dein Gold: %d" % [unit, gold], 16, Color("f6dca1"))
+		var maximum := ShopTrade.max_buy(unit, gold)
+		ShopTrade.draw_quantity(self, trade_quantity, maximum, "Gesamt: %d Gold" % (unit*trade_quantity))
+		ui_button(ShopTrade.CONFIRM, "KAUFEN · ENTER", gold >= unit)
+		ui_button(ShopTrade.CANCEL, "ABBRECHEN")
+	if pending_sale >= 0 and pending_sale < inventory.size():
+		var selling: Dictionary = inventory[pending_sale]
+		var stack := int(selling.get("count",1))
+		draw_rect(Rect2(135, 79, 882, 530), Color(0.07, 0.10, 0.13, 0.66))
+		ui_box(ShopTrade.DIALOG, Color("35454c"))
+		text_at(Vector2(344, 250), "VERKAUF BESTÄTIGEN", 24, Color("ffe0a1"))
+		draw_item_icon(Vector2(346, 270), String(selling["icon"]), RARITY_COLORS[int(selling["rarity"])], 1.6, weapon_visual_stage(selling), item_design(selling))
+		text_at(Vector2(413, 298), String(selling["name"]), 19, RARITY_COLORS[int(selling["rarity"])])
+		text_at(Vector2(413, 326), "Im Stapel: %d   ·   Wert aller: %d Gold" % [stack, item_sale_value(selling)], 16, Color("f6dca1"))
+		var total := ShopTrade.stack_sale_total(item_sale_value(selling), stack, trade_quantity)
+		ShopTrade.draw_quantity(self, trade_quantity, stack, "Gesamt: +%d Gold" % total)
+		ui_button(ShopTrade.CONFIRM, "VERKAUFEN · ENTER")
+		ui_button(ShopTrade.CANCEL, "ABBRECHEN")
 
 func shop_preview_item(stock_item: Dictionary) -> Dictionary:
 	var preview: Dictionary = stock_item.duplicate(true)

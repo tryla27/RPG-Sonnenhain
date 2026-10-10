@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Shop · Schneller kaufen, Mengen, Gesamtwert", "Maus auf ein Angebot und Enter kauft sofort 1 Stück. Im Kauffenster wählst du mit −, + und MAX die Menge und siehst den Gesamtpreis; Enter bestätigt. Verkaufen öffnet ebenfalls ein Fenster mit Menge und Gesamterlös, und „Alles verkaufen“ zeigt vor dem Bestätigen, wie viel Gold es bringt."],
 ["Optik · Bosshüte am Charakter", "Helm des Kriegsherrn, Hut des Dunklen Arkanhüters und Hut des Jagdmeisters waren am Charakter nicht zu sehen. Jetzt hat jeder eine eigene Form: gehörnter Eisenhelm mit rotem Kamm, hoher Nachthut mit leuchtendem Runenband und Stern, breiter Jägerhut mit Feder. Sie sind an jeder Klasse und auch bei anderen Spielern sichtbar."],
 ["Namen · Wächter und Kuchen", "Steingolem, Kristallgolem und Lavagolem heißen jetzt Steinwächter, Kristallwächter und Lavawächter. Den Namen Golem trägt bald nur noch ein ganz besonderer Gegner. Almas Kuchen heißen jetzt Rotkuchen (vorher Roter Sonnenkuchen) und Blaukuchen (vorher Blauer Mondkuchen); vorhandene Kuchen werden automatisch umbenannt."],
 ["Spells · Höchstens 4, Abgabe bei Borin", "Ein Charakter kennt jetzt höchstens 4 Spells. Wer schon 4 kennt, kann bei Borin unter „Spells abgeben“ einen loswerden, auch eine Fusion. Dort siehst du zu jedem Spell Stufe, Kosten, Abklingzeit, Taste und Herkunft. Borin nimmt ihn mit einem lockeren Spruch, Skillpunkte gibt es dafür nicht zurück. Wer schon mehr als 4 kennt, behält sie, kann aber erst wieder lernen, wenn er unter 4 ist."],
