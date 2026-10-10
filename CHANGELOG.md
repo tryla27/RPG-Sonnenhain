@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Shop: `components/shop_trade.gd` (Menge, Gesamtwerte), `buy_items`,
+  `sell_items`, `shop_quick_buy` (Enter über Angebot), `sell_all_preview`.
+  Test `tests/ui/check_shop_trade.gd`, Bilder `tools/capture_shop_trade.gd`.
 - Bosshüte sichtbar: `head_visual()` liefert 3–5 für Bosshüte,
   `RpgHero.paint_boss_hat`, Netzwerk-Grenze für `head` auf 5. Vorschau
   `tools/capture_boss_hats.gd`, Test `tests/gameplay/check_boss_hat_visual.gd`.
