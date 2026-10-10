@@ -10179,9 +10179,11 @@ func draw_hud() -> void:
 		text_at(HudLayout.NOTICE_RECT.position+Vector2(11, 23), short_notice, 15, Color("fff3c3"))
 	var nearest := ""
 	if not nearby_food.is_empty():
-		var nearby_food_info:Dictionary=FoodSystem.FOODS[int(nearby_food["food"])]
+		# Kräuter haben keinen Eintrag "food" (vorher Skriptfehler in jedem Bild).
+		var herb:=str(nearby_food.get("kind","fruit"))=="herb"
+		var nearby_name:String=str(nearby_food.get("name","Kraut"))+" ernten" if herb else str(FoodSystem.FOODS[int(nearby_food["food"])]["name"])+" pflücken"
 		var nearby_ripe:bool=food_system.ready_at(nearby_food["point"],Time.get_unix_time_from_system())
-		nearest="E  ·  %s" % (nearby_food_info["name"]+" pflücken" if nearby_ripe else "Nachwachsen %02d:%02d" % [food_system.regrow_remaining(nearby_food["point"])/60,food_system.regrow_remaining(nearby_food["point"])%60])
+		nearest="E  ·  %s" % (nearby_name if nearby_ripe else "Nachwachsen %02d:%02d" % [food_system.regrow_remaining(nearby_food["point"])/60,food_system.regrow_remaining(nearby_food["point"])%60])
 	for i in WAYSTONES.size():
 		if player_pos.distance_to(WAYSTONES[i]) < 185:
 			nearest = "F  ·  Wegstein: %s" % ("Weltkarte · Reise wählen" if i==0 or waystone_unlocked[i] else "aktivieren und Weltkarte öffnen")

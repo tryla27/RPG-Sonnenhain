@@ -35,6 +35,13 @@ func run()->void:
 		for a in pts.size():
 			for b in range(a+1,pts.size()):closest=minf(closest,pts[a].distance_to(pts[b]))
 		check(closest>=300.0,"Gebiet %d verteilt (nächster Abstand %d)" % [region,int(closest)])
+	# Am Kraut: Hinweis ohne Skriptfehler.
+	for plant in g.food_system.plants:
+		if str(plant["kind"])=="herb":
+			g.player_pos=Vector2(plant["point"])+Vector2(0,20);g.character_created=true
+			var near:Dictionary=g.food_system.nearest(g)
+			check(str(near.get("kind",""))=="herb" and not near.has("food"),"Kraut ohne food-Eintrag")
+			break
 	g.free()
 	if failures>0:
 		push_error("FOOD_BUSHES_FAILED %d" % failures);quit(1);return

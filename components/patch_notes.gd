@@ -1,7 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
-["Welt · Mehr Nahrungsbüsche", "Statt drei Beerenbüschen in der Mitte wachsen jetzt in jedem Gebiet 8 bis 12 Fruchtbüsche und 3 Kräuter, über die ganze Map verteilt, abseits von Wegen, Wegsteinen und Bossfeldern."],
+["Welt · Mehr Nahrungsbüsche", "Statt drei Beerenbüschen in der Mitte wachsen jetzt in jedem Gebiet 8 bis 12 Fruchtbüsche und 3 Kräuter, über die ganze Map verteilt, abseits von Wegen, Wegsteinen und Bossfeldern. Fehler behoben: Neben einem Kraut fehlte der Hinweis „E · ernten“ und das Spiel meldete in jedem Bild einen Fehler, was ruckeln konnte."],
 ["Fehlerbehebung · Pfeile zerschellen", "Pfeile und Zaubergeschosse, die an Laternen, Zäunen, dem Spawn-Stein, Mauern oder Felsen landen, verschwinden nicht mehr lautlos: Sie zerschellen sichtbar mit Bruchklang, an Stein und Metall mit passendem Aufprall. Online passiert das sofort beim eigenen Schuss, und Server und Spiel halten Geschosse an denselben Stellen auf."],
 ["Klang · Dunkler Golem", "Neue Golem-Klänge nach Klangprobe: Die halben Golems stampfen mit eigenem, tieferem Schritt, einschlagende Brocken krachen schwerer mit Beben und Schutt, und der Schrei wechselt zufällig zwischen zwei Varianten."],
 ["Fehlerbehebung · Landschaft fehlte", "Bei manchen Browsern blieben die neuen 3D-Bäume, -Büsche und -Felsen unsichtbar, nur ihre Schatten waren zu sehen. Das Spiel prüft jetzt nach dem ersten Bild, ob die 3D-Landschaft wirklich erscheint, und zeigt sonst automatisch wieder die bisherige Landschaft."],
