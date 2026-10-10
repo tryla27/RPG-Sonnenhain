@@ -147,6 +147,7 @@ const MasterArmor=preload("res://components/master_armor.gd")
 const GolemBoss=preload("res://components/golem_boss.gd")
 const GolemDesign=preload("res://components/golem_design.gd")
 const ShopTrade=preload("res://components/shop_trade.gd")
+var fullscreen_escape = DisplayMode.EscapeCounter.new()
 const SpellReturn=preload("res://components/spell_return.gd")
 const WorldSnapshot=preload("res://components/world_snapshot.gd")
 const HeadgearRules=preload("res://components/headgear_rules.gd")
@@ -1560,8 +1561,11 @@ func ground_surface_at(pos: Vector2) -> String:
 	if distance_to_trail(pos) < 60.0: return "erde"
 	return str(SoundBank.REGION_SURFACES.get(region_at(pos), "gras"))
 
-## Teleport-Brummen am Spawnstein: nur draußen in der Welt, leiser mit Abstand.
+## Teleport-Brummen am Spawnstein: auf Angelos Wunsch (10.10.2026) entfernt.
+## SPAWN_HUM_ENABLED wieder einschalten, um es zurückzuholen.
+const SPAWN_HUM_ENABLED := false
 func spawn_hum_level() -> float:
+	if not SPAWN_HUM_ENABLED: return 0.0
 	if not character_created or interior_id >= 0 or dungeon_id >= 0 or arena_mode != "" or konflux.active: return 0.0
 	return SoundBank.spawn_hum_gain(player_pos.distance_to(WAYSTONES[0]))
 
@@ -3115,6 +3119,8 @@ func _input(event:InputEvent)->void:
 		DisplayMode.toggle()
 		get_viewport().set_input_as_handled()
 		return
+	if DisplayMode.is_escape(event) and DisplayMode.is_fullscreen() and fullscreen_escape.press(Time.get_ticks_msec()):
+		message("Drücke F11 zum Beenden des Vollbildmodus.")
 	if panel not in ["account_login","account_register"]:
 		account_shift_tap_pending=false
 		return
@@ -11612,6 +11618,10 @@ func draw_inventory_panel() -> void:
 		if index < inventory.size() and Rect2(641 + cell % 5 * 65, 200 + int(cell / 5.0) * 55, 54, 48).has_point(mouse):
 			draw_item_tooltip(inventory[index], Vector2(374, clampf(mouse.y - 35, 170, 374)))
 			break
+	# Getragene Teile am Charakter: Infos auch beim Darüberfahren (Wunsch 10.10.2026).
+	var worn := worn_item_at(mouse)
+	if not worn.is_empty():
+		draw_item_tooltip(worn, Vector2(clampf(mouse.x + 18, 170, 1150 - 252), clampf(mouse.y - 35, 150, 420)))
 
 func draw_item_tooltip(item: Dictionary, pos: Vector2, purchase_price: int = -1) -> void:
 	ui_box(Rect2(pos, Vector2(246, 210)), Color("354a4a"))
@@ -11686,6 +11696,23 @@ func draw_item_signature(p: Vector2, item: Dictionary) -> void:
 			draw_line(center + Vector2(-5,-5), center + Vector2(5,5), tint, 3)
 			draw_line(center + Vector2(-5,5), center + Vector2(5,-5), tint, 3)
 		3: draw_arc(center, 5, 0, TAU, 12, tint, 3)
+
+## Plätze am Charakter im Inventar: [Position, getragene UID].
+func worn_slot_rects() -> Array:
+	var slots: Array = [[Vector2(180,205),equipped_head_uid],[Vector2(180,275),equipped_uid],[Vector2(501,235),equipped_armor_uid],[Vector2(501,325),equipped_necklace_uid],[Vector2(300,440),equipped_ring_uid]]
+	if class_id == 1: slots.append([Vector2(405,440),equipped_ring2_uid])
+	return slots
+
+## Getragenes Teil unter der Maus (leer, wenn der Platz frei ist).
+func worn_item_at(mouse: Vector2) -> Dictionary:
+	for slot in worn_slot_rects():
+		if not Rect2(slot[0], Vector2(98, 77)).has_point(mouse): continue
+		var uid := int(slot[1])
+		if uid < 0: return {}
+		for item in inventory:
+			if int(item.get("uid", -1)) == uid: return item
+		return {}
+	return {}
 
 func draw_equipment_slot(p: Vector2, label: String, uid: int, icon: String) -> void:
 	draw_rect(Rect2(p, Vector2(98, 77)), Color("e9cd90") if uid >= 0 else Color("8e774c"))
@@ -13518,7 +13545,35 @@ func make_class_head(item_level:int) -> Dictionary:
 	item["design"]=class_id
 	return item
 
+## Anlegen aus dem Inventar: Ersetzt das neue Teil ein getragenes, tauschen
+## beide ihre Plätze im Inventar (Wunsch 10.10.2026): Das getragene Teil steht
+## dann dort, wo vorher das alte lag, und das alte dort, wo das neue lag.
 func toggle_equipment_item(index: int) -> bool:
+	if index < 0 or index >= inventory.size(): return false
+	var before: Array = equipped_item_uids().duplicate()
+	var chosen_uid := int(inventory[index].get("uid", -1))
+	var handled := toggle_equipment_item_core(index)
+	if not handled or not chosen_uid in equipped_item_uids() or chosen_uid in before: return handled
+	var now: Array = equipped_item_uids()
+	for raw_old in before:
+		var old_uid := int(raw_old)
+		if old_uid < 0 or old_uid in now: continue
+		var old_index := -1
+		for i in inventory.size():
+			if int(inventory[i].get("uid", -1)) == old_uid: old_index = i
+		var new_index := -1
+		for i in inventory.size():
+			if int(inventory[i].get("uid", -1)) == chosen_uid: new_index = i
+		if old_index >= 0 and new_index >= 0:
+			var swap: Dictionary = inventory[old_index]
+			inventory[old_index] = inventory[new_index]
+			inventory[new_index] = swap
+			if selected_item == new_index: selected_item = old_index
+			save_game()
+		break
+	return handled
+
+func toggle_equipment_item_core(index: int) -> bool:
 	if index < 0 or index >= inventory.size(): return false
 	BossRelics.normalize(inventory[index])
 	ArcaneNecklaces.normalize(inventory[index])
