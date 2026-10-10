@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Oberfläche · Einstellungen aufgeräumt", "Im Einstellungsfenster (Escape) sind die Überschrift „Pause“, Backup Export und Import, „Speichern & zur Startseite“ und der Regler „Oberfläche“ entfernt. Menüklänge folgen jetzt dem Regler „Effekte“. Speichern und Verlassen gibt es weiter im Spielmenü."],
 ["Technik · 3D-Landschaft prüfen", "Das Spiel meldet dem Server jetzt einmal pro Sitzung, ob die 3D-Landschaft bei dir sichtbar ist, zusammen mit Grafikkarte und Browser (ohne Namen). Damit lässt sich herausfinden, warum sie in manchen Browsern leer bleibt."],
 ["Oberfläche · Kleinere Essensanzeige", "Aktive Mahlzeiten und Snacks stehen oben links jetzt als kleine Kacheln nebeneinander (Symbol, Restzeit, Balken) statt als breite Leiste. Name und Wirkung erscheinen, wenn du mit der Maus darüberfährst. So bleibt die linke Bildschirmhälfte frei."],
 ["Welt · Mehr Nahrungsbüsche", "Statt drei Beerenbüschen in der Mitte wachsen jetzt in jedem Gebiet 8 bis 12 Fruchtbüsche und 3 Kräuter, über die ganze Map verteilt, abseits von Wegen, Wegsteinen und Bossfeldern. Fehler behoben: Neben einem Kraut fehlte der Hinweis „E · ernten“ und das Spiel meldete in jedem Bild einen Fehler, was ruckeln konnte."],
