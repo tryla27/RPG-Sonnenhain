@@ -1,0 +1,137 @@
+name: Deliver Android app
+
+# Die Android-App wird getrennt von Website und Spielserver ausgeliefert
+# (Angelo 10.10.2026). Dieser Workflow baut nur die APK und legt nur
+# /download/sonnenhain-rpg.apk auf den Webspace; Website, Browserspiel und
+# Server bleiben unberührt. Umgekehrt fasst deploy-pages.yml /download/ nie an.
+# Start nur von Hand und nur nach Angelos Bestätigung (AGENTS.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Explicitly publish the Android app on sonnenhainrpg.de
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonnenhain-android-release
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    if: inputs.deploy == true
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Stamp app build
+        shell: bash
+        run: |
+          set -euo pipefail
+          short="${GITHUB_SHA:0:7}"
+          cat > components/build_info.gd <<EOF
+          extends RefCounted
+          const COMMIT="${GITHUB_SHA}"
+          const SHORT="${short}"
+          EOF
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Godot 4.7.2 and export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 8 --retry-all-errors -o /tmp/godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+          curl -fL --retry 8 --retry-all-errors -o /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          cp -R /tmp/templates/templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
+
+      - name: Build APK
+        shell: bash
+        env:
+          GODOT_BIN: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 fehlt: ohne festen Schlüssel ließe sich die App nicht aktualisieren."
+            exit 1
+          fi
+          bash tools/build_android_apk.sh build/android/sonnenhain-rpg.apk
+          test -s build/android/sonnenhain-rpg.apk
+
+      - name: Upload APK to the download folder
+        if: ${{ env.MANITU_SSH_KEY != '' }}
+        env:
+          MANITU_SSH_KEY: ${{ secrets.MANITU_SSH_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 700 "$HOME/.ssh"
+          trap 'rm -f "$HOME/.ssh/manitu_deploy"' EXIT
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          raw = os.environ["MANITU_SSH_KEY"].replace("\r", "").strip()
+          if "BEGIN OPENSSH PRIVATE KEY" in raw:
+              key = raw.replace("\\n", "\n")
+          else:
+              key = base64.b64decode("".join(raw.split()), validate=True).decode("utf-8").replace("\r", "").strip()
+          if "BEGIN OPENSSH PRIVATE KEY" not in key or "END OPENSSH PRIVATE KEY" not in key:
+              raise SystemExit("MANITU_SSH_KEY does not contain a complete OpenSSH private key")
+          Path.home().joinpath(".ssh/manitu_deploy").write_text(key.strip() + "\n", encoding="utf-8")
+          PY
+          chmod 600 "$HOME/.ssh/manitu_deploy"
+          ssh_opts="-4 -i $HOME/.ssh/manitu_deploy -p 22 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12"
+          host=ssh300011111@ngcobalt378.manitu.net
+          target=/home/sites/site100047525/web/htdocs/sonnenhainrpg.de/download
+          ssh $ssh_opts "$host" "mkdir -p '$target' && chmod 770 '$target'"
+          # Erst unter neuem Namen hochladen, dann umbenennen: wer gerade lädt,
+          # bekommt nie eine halbe Datei.
+          timeout 900s rsync -az --omit-dir-times --no-owner --no-group --chmod=F660 \
+            -e "ssh $ssh_opts" \
+            build/android/sonnenhain-rpg.apk "$host:$target/sonnenhain-rpg.apk.neu"
+          size=$(stat -c %s build/android/sonnenhain-rpg.apk)
+          ssh $ssh_opts "$host" "
+            set -eu
+            test \"\$(stat -c %s '$target/sonnenhain-rpg.apk.neu')\" = '$size'
+            mv -f '$target/sonnenhain-rpg.apk.neu' '$target/sonnenhain-rpg.apk'
+            chmod 660 '$target/sonnenhain-rpg.apk'
+            ls -l '$target/sonnenhain-rpg.apk'
+          "
+          echo "::notice::Android-App ausgeliefert: $(numfmt --to=iec "$size") (Commit ${GITHUB_SHA:0:7})"
+
+      - name: Verify download stays behind the password gate
+        if: ${{ env.MANITU_SSH_KEY != '' }}
+        env:
+          MANITU_SSH_KEY: ${{ secrets.MANITU_SSH_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 https://sonnenhainrpg.de/download/sonnenhain-rpg.apk)"
+          echo "/download/sonnenhain-rpg.apk anonymous: HTTP $code"
+          test "$code" = "302"
+
+      - name: Manitu deploy not configured
+        if: ${{ env.MANITU_SSH_KEY == '' }}
+        env:
+          MANITU_SSH_KEY: ${{ secrets.MANITU_SSH_KEY }}
+        run: echo "MANITU_SSH_KEY is not configured; APK built but not published."

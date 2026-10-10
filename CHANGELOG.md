@@ -6,6 +6,19 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Android-App getrennt von Website und Server: neuer Workflow
+  `deploy-android.yml` (nur von Hand, eigene Bestätigung) baut die APK und legt
+  nur `/download/sonnenhain-rpg.apk` ab (Upload als `.neu`, Größe prüfen,
+  umbenennen). `deploy-pages.yml` baut keine APK mehr und schützt `/download/`
+  per `rsync --exclude`. `build-android.yml` prüft auch `components/app_*.gd`.
+- App-Eingabe nur bei `app_mode` (`OS.has_feature("android")`):
+  `components/app_keyboard.gd` (Bildschirmtastatur je Schreibfeld, Passworttyp,
+  Nachführen bei verworfenen Zeichen, Eingabeleiste oben),
+  `components/app_touch.gd` (Daumenlayout, Menü-Panel `app_menu`, Zielhilfe,
+  TapGuard gegen den von Android nachgeschobenen Mausklick, Zurück-Taste über
+  `NOTIFICATION_WM_GO_BACK_REQUEST`). `interaction_prompt()` aus `draw_hud`
+  herausgelöst. Test `tests/ui/check_app_input.gd`, Vorschau
+  `tools/capture_app_touch.gd`.
 - `access.php`: große Dateien ohne PHP-Zeitlimit (`set_time_limit(0)`), Ausgabe
   je MB geleert. `build_android_apk.sh` meldet Manifest und Signatur als
   Hinweise im Lauf.

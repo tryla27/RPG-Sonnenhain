@@ -10,6 +10,10 @@ landet und `main.gd` nicht weiter wächst.
   und auf Angelos ausdrückliche Bestätigung warten. Live-Schaltung heißt: ein
   Commit mit `[deploy]` auf `main` oder ein manueller Start der Deploy-Workflows.
   Eine Bestätigung gilt nur für diese eine Live-Schaltung.
+- **Android-App getrennt ausliefern.** Die App geht nur über
+  `deploy-android.yml` live, mit eigener Bestätigung. Website-Deploys bauen
+  keine APK und fassen `/download/` nicht an. App-Verhalten hängt an
+  `app_mode` (`components/app_*.gd`) und ändert Browser und PC nicht.
 - **Sonst freie Hand.** Branches, Commits, Pull Requests, Mergen nach grüner CI,
   Aufräumen, Bugfixes, Umbauten und Spielinhalte sind ohne Rückfrage erlaubt.
   Änderungen an Balancewerten, Aussehen oder Speicherständen im PR deutlich
