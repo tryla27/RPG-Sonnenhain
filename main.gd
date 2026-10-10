@@ -149,6 +149,7 @@ const MasterArmor=preload("res://components/master_armor.gd")
 const GolemBoss=preload("res://components/golem_boss.gd")
 const GolemDesign=preload("res://components/golem_design.gd")
 const PerfOverlay=preload("res://components/perf_overlay.gd")
+const HimmelsfalterArt=preload("res://components/himmelsfalter_art.gd")
 const ShopTrade=preload("res://components/shop_trade.gd")
 var fullscreen_escape = DisplayMode.EscapeCounter.new()
 const SpellReturn=preload("res://components/spell_return.gd")
@@ -7725,6 +7726,10 @@ func _draw() -> void:
 				continue
 			if str(shot.get("ability_id",""))=="druesensekret":
 				WoodlandAttackVFX.secretion(self,p,shot["dir"])
+				continue
+			if int(shot["type"]) == 25:
+				# Himmelsfalter: Sternenstaub-Schuss.
+				HimmelsfalterArt.draw_shot(self, p, Vector2(shot["dir"]), world_time + float(shot.get("age", 0.0)))
 				continue
 			var c := Color("b6e5fa") if shot["type"] == 11 else Color("d5acf3")
 			draw_line(p - shot["dir"] * 16, p, c.darkened(0.3), 8)
