@@ -17,7 +17,10 @@ const TYPES:=[27,28]
 const ALTAR:=Vector2(14900,8650)
 const ALTAR_USE_RANGE:=150.0
 const ARENA_RADIUS:=650.0
-const SUMMON_COST:={"Steinbeeren":30,"Rotkuchen":1,"Blaukuchen":1}
+## Opfergaben: vorerst keine, Angelo testet den Golem zuerst (10.10.2026).
+## Später gilt PLANNED_SUMMON_COST: SUMMON_COST einfach darauf setzen.
+const SUMMON_COST:={}
+const PLANNED_SUMMON_COST:={"Steinbeeren":30,"Rotkuchen":1,"Blaukuchen":1}
 
 ## Leben: ENEMY_TYPES 27/28 (6000/3000) mal Stufenfaktor wie alle Gegner
 ## (Himmelsgarten Stufe 40 → ×5,6), je weiterem Spieler +70 %.
@@ -111,10 +114,10 @@ static func in_arena(p:Vector2,margin:float=0.0)->bool:
 	return p.distance_to(ALTAR)<=ARENA_RADIUS+margin
 
 ## Fehlende Zutaten als Text ("" = alles da).
-static func missing_offerings(counts:Dictionary)->String:
+static func missing_offerings(counts:Dictionary,cost:Dictionary=SUMMON_COST)->String:
 	var missing:Array=[]
-	for name in SUMMON_COST:
-		var need:int=int(SUMMON_COST[name])
+	for name in cost:
+		var need:int=int(cost[name])
 		var have:int=int(counts.get(name,0))
 		if have<need:missing.append("%d× %s" % [need-have,name])
 	return ", ".join(missing)

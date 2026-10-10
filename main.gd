@@ -12378,7 +12378,10 @@ func draw_sorted_world_objects() -> void:
 				GolemDesign.draw_altar(self,GolemBoss.ALTAR,golem_world.fight_active,world_time)
 				if player_pos.distance_to(GolemBoss.ALTAR) < GolemBoss.ALTAR_USE_RANGE and not golem_world.fight_active:
 					text_at(GolemBoss.ALTAR+Vector2(-150,46),"E · Dunklen Golem beschwören",13,Color("e3b8ff"),HORIZONTAL_ALIGNMENT_CENTER,300)
-					text_at(GolemBoss.ALTAR+Vector2(-150,64),"30 Steinbeeren · 1 Rotkuchen · 1 Blaukuchen",11,Color("cfc4dc"),HORIZONTAL_ALIGNMENT_CENTER,300)
+					if not GolemBoss.SUMMON_COST.is_empty():
+						var cost_parts: Array = []
+						for item_name in GolemBoss.SUMMON_COST: cost_parts.append("%d %s" % [int(GolemBoss.SUMMON_COST[item_name]), item_name])
+						text_at(GolemBoss.ALTAR+Vector2(-150,64)," · ".join(cost_parts),11,Color("cfc4dc"),HORIZONTAL_ALIGNMENT_CENTER,300)
 			"remote": draw_spawn_elevated_actor(int(entry["peer"]))
 			"player": draw_spawn_elevated_actor(-1)
 

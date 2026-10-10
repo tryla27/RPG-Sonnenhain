@@ -43,23 +43,30 @@ func run()->void:
 		g.event_states.append(0);g.event_progress.append(0)
 	check(g.region_at(GolemBoss.ALTAR)==12,"Altar liegt im Himmelsgarten")
 	check(not g.is_blocked(GolemBoss.ALTAR+Vector2(0,90),GolemBoss.ALTAR+Vector2(0,100)),"Platz vor dem Altar ist begehbar")
-	check(GolemBoss.missing_offerings({"Steinbeeren":30,"Rotkuchen":1,"Blaukuchen":1})=="","alle Opfergaben da")
-	check(GolemBoss.missing_offerings({"Steinbeeren":12}).contains("18× Steinbeeren"),"fehlende Gaben genannt")
-
-	# Ohne Gaben passiert nichts.
+	# Geplante Opfergaben (später aktiv): Prüfung der Mengen.
+	var planned:=GolemBoss.PLANNED_SUMMON_COST
+	check(GolemBoss.missing_offerings({"Steinbeeren":30,"Rotkuchen":1,"Blaukuchen":1},planned)=="","alle Opfergaben da")
+	check(GolemBoss.missing_offerings({"Steinbeeren":12},planned).contains("18× Steinbeeren"),"fehlende Gaben genannt")
+	# Vorerst ohne Opfergaben: E am Altar reicht, Inventar bleibt unberührt.
+	check(GolemBoss.SUMMON_COST.is_empty(),"vorerst keine Opfergaben")
 	g.player_pos=GolemBoss.ALTAR+Vector2(0,60)
 	g.inventory.clear();g.enemies.clear()
-	g.interact()
-	check(the_golem(g).is_empty(),"ohne Gaben kein Golem")
-	# Mit Gaben: Golem erscheint, Gaben sind weg.
 	g.inventory.append(food(g,"Steinbeeren",34))
-	g.inventory.append(food(g,"Rotkuchen",1))
-	g.inventory.append(food(g,"Blaukuchen",2))
 	g.golem_world.boulders.append([GolemBoss.ALTAR.x+900,GolemBoss.ALTAR.y])
 	g.interact()
 	var golem:=the_golem(g)
-	check(not golem.is_empty() and int(golem["type"])==GolemBoss.TYPE_BIG,"Golem beschworen")
-	check(g.steinrose.inventory_count(g,"Steinbeeren")==4 and g.steinrose.inventory_count(g,"Rotkuchen")==0 and g.steinrose.inventory_count(g,"Blaukuchen")==1,"Gaben verbraucht")
+	check(not golem.is_empty() and int(golem["type"])==GolemBoss.TYPE_BIG,"Golem ohne Opfergaben beschworen")
+	check(g.steinrose.inventory_count(g,"Steinbeeren")==34,"nichts abgezogen")
+	# Golem-Rüstung gibt es nirgends zu kaufen.
+	check(MasterArmor.GOLEM not in MasterArmor.SHOP_IDS and MasterArmor.GOLEM not in MasterArmor.CLASS_BOSS_ARMOR,"Golem-Rüstung nicht im Laden, nicht von Klassenbossen")
+	for rotation in 12:
+		check(int(MasterArmor.smith_offer(40,rotation).get("master_armor",-1))!=MasterArmor.GOLEM,"Torvald verkauft sie in keiner Rotation (%d)" % rotation)
+	g.level=40
+	for rotation in 12:
+		g.refresh_shop_stock()
+		for key in g.shop_stock:
+			for offer in g.shop_stock[key]:
+				check(int(offer.get("master_armor",-1))!=MasterArmor.GOLEM,"kein Golem-Angebot im Laden")
 	check(g.golem_world.boulders.is_empty(),"alte Brocken verschwinden beim neuen Golem")
 	check(is_equal_approx(g.mob_visual_scale(golem),4.0),"Golem 4× so groß gezeichnet (5× Spieler)")
 	check(g.active_class_boss_music_theme()=="boss_golem","eigene Bossmusik")

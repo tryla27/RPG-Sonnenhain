@@ -32,7 +32,7 @@ class Sheet extends Node2D:
 		GolemDesign.draw_world_fx(self,world,1.2)
 		label(Vector2(170,1030),"Steinhagel-Feld 20 m · Brockenwurf 15 m")
 		GolemDesign.draw_altar(self,Vector2(980,900),false,0.3)
-		label(Vector2(850,960),"Altar: 30 Steinbeeren · Rotkuchen · Blaukuchen")
+		label(Vector2(850,960),"Altar: E drücken (Opfergaben später)")
 		for side in [-1,1]:
 			GolemDesign.draw_golem(self,Vector2(1380+side*100,930),GolemBoss.TYPE_HALF,{"state":"walk"},Vector2.DOWN,side*0.7,0.0)
 		label(Vector2(1250,1030),"Zerfall: zwei halbe Golems")

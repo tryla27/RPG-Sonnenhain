@@ -119,11 +119,8 @@ func run() -> void:
 	check(a.uses_server_world() and b.uses_server_world(),"beide Spieler in der Serverwelt")
 
 	# --- Beschwören -------------------------------------------------------
-	b.player_pos=GolemBoss.ALTAR+Vector2(40,90)
-	b.interact()
-	check(not b.golem_summon_pending,"ohne Zutaten keine Anfrage an den Server")
-	b.player_pos=GolemBoss.ALTAR+Vector2(70,150)
-	a.inventory.append(food(a,"Steinbeeren",31));a.inventory.append(food(a,"Rotkuchen",1));a.inventory.append(food(a,"Blaukuchen",1))
+	# Vorerst ohne Opfergaben: E am Altar reicht.
+	a.inventory.append(food(a,"Steinbeeren",31))
 	a.interact()
 	check(a.golem_summon_pending,"Anfrage gesendet")
 	deadline=Time.get_ticks_msec()+10000
@@ -131,7 +128,7 @@ func run() -> void:
 		if Time.get_ticks_msec()>deadline:check(false,"keine Antwort vom Server");break
 		await process_frame
 	check(golem_on(server).size()==1,"Server hat den Golem")
-	check(a.steinrose.inventory_count(a,"Steinbeeren")==1 and a.steinrose.inventory_count(a,"Rotkuchen")==0,"Zutaten beim Beschwörer abgezogen")
+	check(a.steinrose.inventory_count(a,"Steinbeeren")==31,"keine Zutaten abgezogen (Opfergaben kommen später)")
 	var big:Dictionary=golem_on(server)[0] if golem_on(server).size()>0 else {}
 	var single_hp:float=float(server.make_enemy(27,Vector2.ZERO)["max_hp"])
 	# A und B stehen am Altar, C ist weiter als 1600 px weg: zählt nicht.
@@ -140,7 +137,6 @@ func run() -> void:
 		if p.player_pos.distance_to(GolemBoss.ALTAR)<1600.0:near+=1
 	check(not big.is_empty() and is_equal_approx(float(big["max_hp"]),single_hp*(1.0+0.7*(near-1))),"Leben für %d Spieler: %s" % [near,big.get("max_hp",0)])
 	# Zweite Beschwörung während er lebt: abgelehnt, nichts abgezogen.
-	b.inventory.append(food(b,"Steinbeeren",30));b.inventory.append(food(b,"Rotkuchen",1));b.inventory.append(food(b,"Blaukuchen",1))
 	var frame:=0
 	for i in 20:
 		tick(server,players,frame,1.0/30.0);frame+=1
@@ -148,7 +144,6 @@ func run() -> void:
 	b.player_pos=GolemBoss.ALTAR+Vector2(40,90)
 	b.interact()
 	check(not b.golem_summon_pending,"zweiter Golem schon beim Spieler abgelehnt (lebt bereits)")
-	check(b.steinrose.inventory_count(b,"Steinbeeren")==30,"B behält seine Zutaten")
 	b.player_pos=GolemBoss.ALTAR+Vector2(70,150)
 	check(golem_on(a).size()==1 and golem_on(b).size()==1,"beide Spieler sehen den Golem")
 	if golem_on(a).size()==1:
