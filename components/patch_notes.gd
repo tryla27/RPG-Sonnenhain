@@ -1,6 +1,10 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Android-App · Eigenes Symbol", "Die App hat jetzt ein Sonnenhain-Symbol: eine goldene Sonne über einem kleinen Hain auf grünen Hügeln, im Pixelstil des Spiels. Auf neueren Handys passt es sich der Symbolform an."],
+["Android-App · Zauber zielen wie in Wild Rift", "Fähigkeiten wirken jetzt beim Loslassen. Antippen zielt automatisch auf einen Gegner. Hältst du den Knopf und ziehst, zeigt ein Pfeil vom Helden die Richtung, und der Zauber geht dorthin. Abbrechen: im roten Kreis oben rechts loslassen oder zurück zum Knopf ziehen."],
+["Android-App · Zielhilfe wählbar", "Im Menü unter STEUERUNG wählst du, wen die Zielhilfe bevorzugt: den nächsten Gegner, den mit den wenigsten Lebenspunkten oder den stärksten (gut für Bosse). Das gilt für den Angriffsknopf und für angetippte Fähigkeiten."],
+["Android-App · Knöpfe selbst anordnen", "Unter MENÜ → STEUERUNG → KNÖPFE ANORDNEN verschiebst du jeden Knopf (Stick, Angriff, vier Spells, Rolle, Aktion, Tränke, Chat, Tasche, Menü) mit dem Finger und machst ihn mit − und + größer oder kleiner. Die Anordnung wird auf dem Gerät gespeichert, STANDARD stellt sie wieder her."],
 ["Android-App · Fester Bewegungsstick", "Der Bewegungsstick sitzt in der App jetzt fest unten links und wandert nicht mehr mit dem Daumen mit. Antippen in seiner Nähe greift ihn, Ziehen über den Rand hinaus läuft mit voller Geschwindigkeit weiter."],
 ["Android-App · Update installierbar", "Die erste App-Version mit Tastatur trug eine kleinere Versionsnummer als die Vorgängerin, deshalb meldete Android beim Aktualisieren „App wurde nicht installiert“. Die Versionsnummer steigt jetzt bei jedem Build, Updates lassen sich über die alte App installieren."],
 ["Android-App · Tastatur in allen Feldern", "In der App öffnet sich die Handy-Tastatur jetzt beim Anmelden und Registrieren (Name, Passwort, Wiederholung), im Gruppenchat und beim Heldennamen. Oben zeigt eine Leiste, was du gerade tippst, weil die Tastatur die untere Bildhälfte verdeckt; Passwörter erscheinen als Punkte. Enter springt beim Anmelden ins nächste Feld und schickt im Chat die Nachricht ab."],

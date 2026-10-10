@@ -4,6 +4,7 @@ extends SceneTree
 
 const AppTouch=preload("res://components/app_touch.gd")
 const AppKeyboard=preload("res://components/app_keyboard.gd")
+const AppLayout=preload("res://components/app_layout.gd")
 
 class Game extends "res://main.gd":
 	var waystone_used:=0
@@ -48,7 +49,7 @@ func run()->void:
 	check(AppTouch.button_at(AppTouch.ACTION)=="interact","Aktion")
 	check(AppTouch.button_at(Vector2(200,450))=="","Bewegungsfläche frei")
 	for entry in AppTouch.MENU_BUTTONS:
-		var r:Rect2=entry[2]
+		var r:Rect2=AppLayout.rect(str(entry[0]))
 		check(AppTouch.button_at(r.get_center())==str(entry[0]),"Menüknopf "+str(entry[0]))
 		check(r.end.x<=976.0,"Menüknopf neben der Minikarte")
 	check(AppTouch.nearest_target(Vector2.ZERO,[{"pos":Vector2(300,0),"hp":5.0},{"pos":Vector2(100,0),"hp":0.0},{"pos":Vector2(0,200),"hp":3.0}])==Vector2(0,200),"Zielhilfe: nächster lebender Gegner")
@@ -67,17 +68,17 @@ func run()->void:
 	check(g.touch_button_at(Vector2(1032,526))=="attack","Browser-Touch unverändert")
 	g.app_mode=true
 	g.reset_touch_joystick();g.reset_touch_aim()
-	check(g.touch_move_base==AppTouch.MOVE_REST,"App: Stick in Ruhelage")
+	check(g.touch_move_base==AppLayout.center("move"),"App: Stick in Ruhelage")
 
 	# Fester Stick links: Basis bleibt stehen, auch wenn der Daumen weit zieht.
 	g.panel="";g.character_created=true;g.death_timer=0.0
-	touch(g,AppTouch.MOVE_REST+Vector2(40,-20),true,5)
-	check(g.touch_move_id==5 and g.touch_move_base==AppTouch.MOVE_REST,"Stick greift an fester Stelle")
-	var drag:=InputEventScreenDrag.new();drag.index=5;drag.position=AppTouch.MOVE_REST+Vector2(300,0)
+	touch(g,AppLayout.center("move")+Vector2(40,-20),true,5)
+	check(g.touch_move_id==5 and g.touch_move_base==AppLayout.center("move"),"Stick greift an fester Stelle")
+	var drag:=InputEventScreenDrag.new();drag.index=5;drag.position=AppLayout.center("move")+Vector2(300,0)
 	g._unhandled_input(drag)
-	check(g.touch_move_base==AppTouch.MOVE_REST and g.touch_move_vector.x>0.99,"Stick wandert nicht mit, volle Kraft")
+	check(g.touch_move_base==AppLayout.center("move") and g.touch_move_vector.x>0.99,"Stick wandert nicht mit, volle Kraft")
 	touch(g,drag.position,false,5)
-	check(g.touch_move_id==-1 and g.touch_move_base==AppTouch.MOVE_REST,"Stick zurück in Ruhelage")
+	check(g.touch_move_id==-1 and g.touch_move_base==AppLayout.center("move"),"Stick zurück in Ruhelage")
 	touch(g,Vector2(450,300),true,6)
 	check(g.touch_move_id==-1,"weit weg vom Stick: keine Bewegung")
 	touch(g,Vector2(450,300),false,6)
@@ -108,14 +109,14 @@ func run()->void:
 
 	# Ein Tap löst nur einmal aus, egal ob Touch oder Mausklick zuerst kommt.
 	g.panel=""
-	var bag:Rect2=AppTouch.MENU_BUTTONS[1][2]
+	var bag:Rect2=AppLayout.rect("inventory")
 	touch(g,bag.get_center());touch(g,bag.get_center(),false)
 	check(g.panel=="inventory","TASCHE öffnet das Inventar")
 	mouse(g,bag.get_center());mouse(g,bag.get_center(),false)
 	check(g.panel=="inventory","nachgeschobener Klick schließt nicht wieder")
 	await create_timer(0.4).timeout
 	g.panel=""
-	var menu_btn:Rect2=AppTouch.MENU_BUTTONS[2][2]
+	var menu_btn:Rect2=AppLayout.rect("app_menu")
 	mouse(g,menu_btn.get_center())
 	check(g.panel=="","Spielfeld: Mausklick allein tut nichts")
 	touch(g,menu_btn.get_center());touch(g,menu_btn.get_center(),false)
