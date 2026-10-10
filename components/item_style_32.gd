@@ -2,8 +2,17 @@ extends RefCounted
 const P=preload("res://components/pixel_style_32.gd")
 static func r(c:CanvasItem,p:Vector2,s:float,x:float,y:float,w:float,h:float,col:Color)->void:
 	P.rect(c,Rect2(p+Vector2(x,y)*s,Vector2(w,h)*s),col)
+## Legendäre Rüstungen (Entwurf 6–12): aus 3D-Modellen gerenderte Bilder,
+## 64×64 je Rüstung (tools/build_armor_icons.gd).
+const LEGENDARY_ARMOR:=preload("res://art/items/legendary_armor_64.png")
+const LEGENDARY_BASE:=6
+
 static func paint(c:CanvasItem,p:Vector2,kind:String,accent:Color,s:float,design:int)->void:
 	var outline=Color("182830")
+	if kind=="armor" and design>=LEGENDARY_BASE and design<LEGENDARY_BASE+7:
+		var id:=design-LEGENDARY_BASE
+		c.draw_texture_rect_region(LEGENDARY_ARMOR,Rect2(p,Vector2(32,32)*s),Rect2(id*64,0,64,64))
+		return
 	match kind:
 		"armor":
 			var col:Color=[Color("95734e"),Color("536d86"),Color("674e8c"),Color("426b55"),Color("963f40"),Color("a7aeb0")][clampi(design,0,5)]

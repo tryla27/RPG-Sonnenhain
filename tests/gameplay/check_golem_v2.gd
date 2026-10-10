@@ -54,7 +54,7 @@ func run()->void:
 	golem["pos"]=gp;golem["golem"]["state"]="walk"
 	g.enemies.append(golem)
 	var hp0:float=float(golem["hp"])
-	g.projectiles.append({"pos":Vector2(gp.x-225,head_y),"dir":Vector2.RIGHT,"speed":650.0,"life":2.0,"damage":100,"kind":3,"element":"","hits":[]})
+	g.projectiles.append({"pos":Vector2(gp.x-170,head_y),"dir":Vector2.RIGHT,"speed":650.0,"life":2.0,"damage":100,"kind":3,"element":"","hits":[]})
 	for i in 40:
 		g.update_projectiles(1.0/60.0)
 		if g.projectiles.is_empty():break
