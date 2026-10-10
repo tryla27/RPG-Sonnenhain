@@ -87,6 +87,10 @@ Der Gesamtplan steht in `docs/architecture/main-modularization.md`.
 - Alte Textsuchen, die bei einer Änderung brechen, durch Verhaltensprüfungen
   ersetzen statt den gesuchten Text wiederherzustellen.
 - Testdateien heißen `check_*.gd`. Die CI findet alles unter `tests/` automatisch.
+- Testskripte mit `extends SceneTree` müssen bei einem Fehler `quit(1)` aufrufen
+  (eigene `check()`-Funktion statt nacktem `assert`). Ein fehlgeschlagenes
+  `assert` hält das Skript an, ohne es zu beenden; ohne `timeout` hängt dann
+  die CI.
 - Vor dem Commit alle Tests laufen lassen: `tools/run_all_tests.sh` (prüft
   dieselben Tests wie die CI, inklusive `tools/check_content.py`; Godot-Pfad
   über `GODOT_BIN`, parallel mit `JOBS=4`).
