@@ -21,6 +21,8 @@ jobs:
   test-and-build:
     name: Tests and exports
     runs-on: ubuntu-latest
+    # Normal ~12 min; alles darüber ist ein hängender Schritt.
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -170,6 +172,9 @@ jobs:
 
       - name: Run dedicated server smoke test
         shell: bash
+        # Ein hängender Test (z. B. fehlgeschlagenes assert ohne quit) darf die CI
+        # nicht über eine Stunde blockieren.
+        timeout-minutes: 8
         run: |
           set -euo pipefail
           build/ci/server/sonnenhain-server.x86_64 --headless -- \
@@ -198,9 +203,9 @@ jobs:
           done
           ss -ltn | grep -q ':27845 '
           ss -ltn | grep -q ':31876 '
-          "$GODOT_BIN" --headless --path . --script tools/check_server_save_network.gd \
+          timeout 120 "$GODOT_BIN" --headless --path . --script tools/check_server_save_network.gd \
             -- --save-test-url=ws://127.0.0.1:31876
-          "$GODOT_BIN" --headless --path . --script tools/check_boss_head_save_network.gd \
+          timeout 120 "$GODOT_BIN" --headless --path . --script tools/check_boss_head_save_network.gd \
             -- --save-test-url=ws://127.0.0.1:31876
 
       - name: Upload CI builds
