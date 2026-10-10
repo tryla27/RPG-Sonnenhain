@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- 3D-Landschaft: Rückfall auf 2D, wenn der 3D-Viewport nach 0,8 s keine
+  Pixel zeigt (`WorldObstacles3D.active`, `probe`, `visible_pixels`; Log
+  `OBSTACLES_3D_FALLBACK`). Alte Ostmauern zeichnen im Rückfall wieder.
+  Test `tests/rendering/check_obstacles_3d_fallback.gd`, Bild
+  `docs/design/obstacles-live-3d/rueckfall-2d.png`.
 - Testmodus online: `valid_network_teleport` nimmt Kartenreisen von Spielern mit
   `test_mode` an (nur zu Wegstein-Ankunftspunkten), passend zu
   `WaystoneMap.source_valid`. Test `tests/network/check_testmode_travel.gd`.
