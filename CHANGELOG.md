@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Nahrungsbüsche: `FoodSystem.configure` verteilt 8–12 Fruchtbüsche + 3 Kräuter
+  je Gebiet (`spread_points`, `bush_spot_ok`, deterministisch). Alte Erntezeiten
+  an den bisherigen drei Plätzen verfallen. Test
+  `tests/gameplay/check_food_bushes.gd`, Bild `tools/capture_food_bushes.gd`.
 - Golem-Klänge nach Angelos Wahl (Klangprobe Runde 1): `golem_schritt_klein`
   (halbe Golems, Probe B), `brocken_landen` = Probe B, `golem_schrei` mit zwei
   Varianten (bisher + Probe C), zufällig (`"random":true` im Katalog,

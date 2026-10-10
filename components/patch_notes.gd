@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Welt · Mehr Nahrungsbüsche", "Statt drei Beerenbüschen in der Mitte wachsen jetzt in jedem Gebiet 8 bis 12 Fruchtbüsche und 3 Kräuter, über die ganze Map verteilt, abseits von Wegen, Wegsteinen und Bossfeldern."],
 ["Klang · Dunkler Golem", "Neue Golem-Klänge nach Klangprobe: Die halben Golems stampfen mit eigenem, tieferem Schritt, einschlagende Brocken krachen schwerer mit Beben und Schutt, und der Schrei wechselt zufällig zwischen zwei Varianten."],
 ["Fehlerbehebung · Landschaft fehlte", "Bei manchen Browsern blieben die neuen 3D-Bäume, -Büsche und -Felsen unsichtbar, nur ihre Schatten waren zu sehen. Das Spiel prüft jetzt nach dem ersten Bild, ob die 3D-Landschaft wirklich erscheint, und zeigt sonst automatisch wieder die bisherige Landschaft."],
 ["Fehlerbehebung · Testmodus online", "Wer im Testmodus über die Karte von irgendwo zu einem Wegstein reiste, stand für den Server noch am alten Ort: Gegner erschienen dort statt beim Spieler, griffen nicht an, und der Golem-Altar meldete „zu weit weg“. Der Server übernimmt die Reise jetzt auch im Testmodus. Neu: Der Golem-Altar hat ein lila Symbol auf der Karte."],
