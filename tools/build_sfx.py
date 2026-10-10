@@ -849,6 +849,62 @@ def r_busch_rascheln(rng, v):
     return finish(mix((crackle, 0.9), (swish, 0.5), (twigs, 0.35)), top=9000)
 
 
+def r_spawn_brummen(rng, v):
+    # Schlichtes Brummen am Spawn-Stein (Angelo 10.10.2026): nur ein tiefer Ton,
+    # der unregelmäßig (alle 4–9 s) sanft einen Ganzton höher gleitet und zurück.
+    # v=0 weicher (Grundton + zwei leise Obertöne), v=1 etwas brummiger
+    # (mehr Obertöne, leicht angezerrt). Nahtlose Schleife ≈ 40 s: Frequenzweg
+    # beginnt und endet auf dem Grundton, die Gesamtphase ist ein ganzzahliges
+    # Vielfaches, alle Obertöne schließen also ohne Knacks an.
+    low, high = 55.0, 55.0 * 2 ** (2 / 12)
+    glide = 1.4
+    plan = []  # (dauer, ziel)
+    total = 0.0
+    up = False
+    while total < 36.0:
+        hold = rng.uniform(4.0, 9.0)
+        plan.append((hold, high if up else low))
+        total += hold
+        up = not up
+    if up is False:  # letzter Abschnitt lag hoch: zurück auf den Grundton
+        plan.append((rng.uniform(4.0, 6.0), low))
+    n = int(sum(h for h, _ in plan) * SR)
+    f = np.full(n, low)
+    i = 0
+    prev = low
+    for hold, target in plan:
+        m = int(hold * SR)
+        g = min(m, int(glide * SR))
+        ramp = prev + (target - prev) * (0.5 - 0.5 * np.cos(np.linspace(0, np.pi, g)))
+        f[i:i + g] = ramp
+        f[i + g:i + m] = target
+        prev = target
+        i += m
+    f = f[:i]
+    cycles = np.sum(f) / SR
+    extra = int(round((np.ceil(cycles) - cycles) / low * SR))
+    f = np.concatenate([f, np.full(extra, low)])
+    phase = 2 * np.pi * np.cumsum(f) / SR
+    phase *= np.ceil(cycles) * 2 * np.pi / phase[-1]
+    d = len(f) / SR
+    t = np.arange(len(f)) / SR
+    # Langsames Atmen der Lautstärke, ganzzahlig über die Schleife.
+    breath = 0.88 + 0.12 * np.cos(2 * np.pi * 3 * t / d)
+    if v == 0:
+        x = np.sin(phase) + 0.42 * np.sin(2 * phase) + 0.16 * np.sin(3 * phase)
+        x = lp(x * breath, 420, 2)
+    else:
+        x = (np.sin(phase) + 0.55 * np.sin(2 * phase) + 0.32 * np.sin(3 * phase)
+             + 0.18 * np.sin(4 * phase) + 0.1 * np.sin(5 * phase))
+        x = np.tanh(1.6 * x * breath) / np.tanh(1.6)
+        x = lp(x, 650, 2)
+    # Filter einschwingen lassen: drei Durchläufe, der mittlere wird genommen.
+    x3 = np.tile(x, 3)
+    x3 = lp(x3, 900 if v else 600, 2)
+    x = x3[len(x):2 * len(x)]
+    return x / (np.max(np.abs(x)) + 1e-9) * 10 ** (-6 / 20)
+
+
 def r_teleport_brummen(rng, v):
     # Magisches Wegstein-Summen als nahtlose Schleife (1,92 s): tiefer Quint-Bordun,
     # langsam atmendes Schimmern und zwei leise Glöckchen. Alle Frequenzen sind
