@@ -6,6 +6,8 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- 3D-Landschaft: `WorldObstacles3D.probe_report` → `report_3d_probe` →
+  `rpc_client_3d_report` (Server-Log `CLIENT_3D`, in der Server-Diagnose sichtbar).
 - Spawn-Brummen aus (`SPAWN_HUM_ENABLED`). Vollbild: `DisplayMode.lock_escape`
   (Keyboard Lock im Browser), `EscapeCounter` für den F11-Hinweis.
   Ausrüstung: `toggle_equipment_item` tauscht neues und altes Teil im Inventar

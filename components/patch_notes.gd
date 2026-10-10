@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 09.10.2026"
 const NOTES=[
+["Technik · 3D-Landschaft prüfen", "Das Spiel meldet dem Server jetzt einmal pro Sitzung, ob die 3D-Landschaft bei dir sichtbar ist, zusammen mit Grafikkarte und Browser (ohne Namen). Damit lässt sich herausfinden, warum sie in manchen Browsern leer bleibt."],
 ["Oberfläche · Kleine Verbesserungen", "Das Brummen am Spawn-Stein ist weg. Escape beendet im Vollbild nicht mehr das Vollbild, sondern schließt wie gewohnt Spielfenster; nach zweimal Escape erscheint der Hinweis, dass F11 das Vollbild beendet (in Chrome, Edge, Brave und Opera; Escape gedrückt halten beendet es dort ebenfalls). Legst du ein Ausrüstungsteil anstelle eines getragenen an, tauschen die beiden ihre Plätze im Inventar. Im Inventar zeigen auch die getragenen Teile am Charakter ihre Infos, wenn du mit der Maus darüberfährst."],
 ["Fehlerbehebung · Pfeile zerschellen", "Pfeile und Zaubergeschosse, die an Laternen, Zäunen, dem Spawn-Stein, Mauern oder Felsen landen, verschwinden nicht mehr lautlos: Sie zerschellen sichtbar mit Bruchklang, an Stein und Metall mit passendem Aufprall. Online passiert das sofort beim eigenen Schuss, und Server und Spiel halten Geschosse an denselben Stellen auf."],
 ["Klang · Dunkler Golem", "Neue Golem-Klänge nach Klangprobe: Die halben Golems stampfen mit eigenem, tieferem Schritt, einschlagende Brocken krachen schwerer mit Beben und Schutt, und der Schrei wechselt zufällig zwischen zwei Varianten."],

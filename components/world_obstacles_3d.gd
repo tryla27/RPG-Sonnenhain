@@ -82,12 +82,25 @@ func probe(g,delta:float)->void:
 	var tex:=viewport.get_texture()
 	if tex==null:return
 	var pixels:=visible_pixels(tex.get_image())
+	if g.has_method("report_3d_probe"):g.report_3d_probe(probe_report(pixels))
 	if pixels>=PROBE_MIN_PIXELS:return
 	active=false
 	rows.clear();signature=""
 	viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;world.process_mode=Node.PROCESS_MODE_DISABLED
 	printerr("OBSTACLES_3D_FALLBACK pixels=%d – 3D-Landschaft bleibt leer, zeige 2D" % pixels)
 	if g.has_method("invalidate_static_cache"):g.invalidate_static_cache()
+
+## Was der Server über das 3D-Bild erfährt (zur Fehlersuche, ohne Namen):
+## Pixel, Objektzahl, Bildgröße, Grafikkarte, Grafik-API, Browser.
+func probe_report(pixels:int)->Dictionary:
+	var agent:=""
+	var brave:=false
+	if OS.get_name()=="Web" and ClassDB.class_exists("JavaScriptBridge"):
+		agent=str(JavaScriptBridge.eval("navigator.userAgent",true))
+		brave=bool(JavaScriptBridge.eval("!!(navigator.brave)",true))
+	return {"pixels":pixels,"rows":rows.size(),"size":[viewport.size.x,viewport.size.y] if is_instance_valid(viewport) else [0,0],
+		"adapter":RenderingServer.get_video_adapter_name(),"vendor":RenderingServer.get_video_adapter_vendor(),
+		"api":RenderingServer.get_video_adapter_api_version(),"agent":agent,"brave":brave,"os":OS.get_name()}
 
 func ensure(g:Node)->void:
 	if is_instance_valid(viewport):return

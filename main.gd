@@ -14274,6 +14274,23 @@ func rpc_projectile_break(payload:Dictionary)->void:
 	combat_feedback.burst(pos,Vector2(float(facing_data[0]),float(facing_data[1])),int(payload.get("kind",2)),str(payload.get("element","")))
 	play_break_sound(pos,int(payload.get("kind",2)),Vector2(float(facing_data[0]),float(facing_data[1])))
 
+## 3D-Landschaft: Ergebnis der Bildprüfung an den Server melden (Fehlersuche,
+## warum manche Browser die 3D-Körper nicht zeigen). Keine Spielernamen.
+func report_3d_probe(info: Dictionary) -> void:
+	printerr("OBSTACLES_3D_PROBE %s" % JSON.stringify(info))
+	if network_mode == "client" and multiplayer.multiplayer_peer != null:
+		rpc_client_3d_report.rpc_id(1, info)
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_client_3d_report(info: Dictionary) -> void:
+	if not dedicated_server_mode: return
+	var peer := multiplayer.get_remote_sender_id()
+	if peer <= 0 or not server_action_allowed(peer, "3d_report", 60000): return
+	var clean := {}
+	for key in ["pixels","rows","size","adapter","vendor","api","agent","brave","os"]:
+		if info.has(key): clean[key] = str(info[key]).substr(0, 160)
+	printerr("CLIENT_3D %s" % JSON.stringify(clean))
+
 ## Zerschellen: Bruchklang des Geschosses plus Aufprall je Material.
 func play_break_sound(pos:Vector2,kind:int,dir:Vector2=Vector2.ZERO)->void:
 	if dedicated_server_mode or pos.distance_to(player_pos)>=850:return
