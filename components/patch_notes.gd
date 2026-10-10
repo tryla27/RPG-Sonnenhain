@@ -1,6 +1,7 @@
 extends RefCounted
-const VERSION="PATCH 09.10.2026"
+const VERSION="PATCH 10.10.2026"
 const NOTES=[
+["Außenwelt · Echte 3D-Landschaft", "Alle zwölf Außenkarten besitzen jetzt räumliche Bäume, Büsche, Felsen, Pilze, Holz, Kristalle und Ruinen mit 64-Pixel-Materialien: sechs Motive pro Karte. Auch Außenmauern und Torpfeiler haben echte Körper. Gelegentlich bewegen sich Blätter oder kleine Umgebungsdetails. Figuren laufen passend davor und dahinter. Dorfkarte, freie Wege, Wegsteine, Bossflächen und Kampfregeln bleiben erhalten."],
 ["Spells · Höchstens 4, Abgabe bei Borin", "Ein Charakter kennt jetzt höchstens 4 Spells. Wer schon 4 kennt, kann bei Borin unter „Spells abgeben“ einen loswerden, auch eine Fusion. Dort siehst du zu jedem Spell Stufe, Kosten, Abklingzeit, Taste und Herkunft. Borin nimmt ihn mit einem lockeren Spruch, Skillpunkte gibt es dafür nicht zurück. Wer schon mehr als 4 kennt, behält sie, kann aber erst wieder lernen, wenn er unter 4 ist."],
 ["Leistung · Karte ohne Ruckeln", "Seit dem Start im Dunkeln ruckelte die Weltkarte stark. Der Nebel wird jetzt einmal als Bild vorbereitet statt jedes Bild neu aus tausenden Feldern gezeichnet, und die Dunkelheit im Spielbild wird nur neu berechnet, wenn sich etwas ändert."],
 ["Fehlerbehebung · Gegner frieren ein", "Waren viele Gegner und Beutestücke in der Welt unterwegs, wurde das Weltpaket des Servers zu groß und ging verloren: Gegner blieben stehen und Bosse wie der Dunkle Arkanhüter erschienen nicht. Jetzt bekommt jeder Spieler nur die Gegner und Beute in seiner Nähe, und die Verbindung nimmt größere Pakete an."],
