@@ -369,7 +369,7 @@ func walk_towards(g,enemy:Dictionary,info:Dictionary,target:Vector2,delta:float)
 		info["repath"]=float(info.get("repath",0.0))-delta
 		var path:Array=info.get("path",[])
 		var old_goal:=Vector2(info.get("path_goal",[target.x,target.y])[0],info.get("path_goal",[target.x,target.y])[1])
-		if float(info["repath"])<=0.0 or path.is_empty() or old_goal.distance_to(target)>128.0:
+		if float(info["repath"])<=0.0 or old_goal.distance_to(target)>128.0:
 			path=find_path(g,pos,target,body)
 			info["repath"]=NAV_REPATH if last_path_complete else NAV_RETRY_UNREACHABLE
 			info["path_goal"]=[target.x,target.y]
@@ -421,10 +421,11 @@ func _line_open_cached(g,info:Dictionary,pos:Vector2,target:Vector2,body:float,d
 		info["los"]=line_open(g,pos,target,body)
 	return bool(info.get("los",true))
 
-## Raster nach der Beschwörung nach und nach füllen (40 Zellen pro Bild),
+## Raster nach der Beschwörung nach und nach füllen (höchstens 8 Zellen pro Bild),
 ## damit die erste Wegsuche nicht auf einmal alles rechnen muss.
 var nav_warm_index:=0
-func warm_nav(g,count:int=40)->void:
+func warm_nav(g,count:int=8)->void:
+	var deadline:=Time.get_ticks_usec()+750
 	var cols:=ceili(5000.0/NAV_CELL)
 	var rows:=ceili(1920.0/NAV_CELL)
 	var body:=body_radius(TYPE_BIG)
@@ -434,6 +435,7 @@ func warm_nav(g,count:int=40)->void:
 		var cy:=nav_warm_index/cols
 		nav_warm_index+=1
 		cell_open(g,Vector2(11000.0+(cx+0.5)*NAV_CELL,7680.0+(cy+0.5)*NAV_CELL),body)
+		if Time.get_ticks_usec()>=deadline:return
 
 static func body_radius(type:int)->float:
 	return NAV_BODY*visual_scale(type)/4.0

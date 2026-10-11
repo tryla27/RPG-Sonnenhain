@@ -7,6 +7,16 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 
 ## Entscheidungen
 
+- 11.10.2026: Fertige Bereiche (Rezeptbuch, Golem-Musikstart und
+  Netzwerk-/Wegsuche-Optimierung) hochladen und live schalten, danach ein
+  Konzept für die verbleibenden Schritte erstellen. Ausdrückliche Freigabe
+  von Angelo. Grundlage ist der aktuelle Hauptstand einschließlich der
+  inzwischen übernommenen Android-Steuerung und Monsteranimationen.
+- 11.10.2026: Android-App ausdrücklich erst nach weiteren Updates ausliefern
+  (Angelo: „nein wir updaten zuerst noch weiter dann kommt die app“).
+  Der jetzige Live-Gang betrifft Website und Server; die bestehende APK
+  benötigt für Online-Spiel mit Protokoll 10 später ebenfalls ein Update.
+
 - 10.10.2026: Golem-Musik bestätigt: ausschließlich erste 24 Sekunden der letzten Probe fünfmal als 120-Sekunden-Loop. Beim Spawn langsam über sechs Sekunden einblenden; Bass und Snare ab Sekunde 12 jeder Wiederholung, keine zusätzliche Melodie ab Sekunde 24.
 
 - 10.10.2026: Echte 3D-Modelle mit Höhe und Tiefe für alle Außenmaps 1–12, sechs Motive je Karte und sechs Mauermodule. Map 0 bleibt unverändert. Live-Schaltung mit „Ok kannst live gehen“ ausdrücklich freigegeben; aktive Mesh-Instanzen werden in der bisherigen Spielperspektive mit Figuren sortiert.
