@@ -1,8 +1,12 @@
 # Sonnenhain – nächste Ziele
 
-Stand: 9. Oktober 2026. Arkanhalsketten und die ersten vier erneuerten
-Waldmonster sind veröffentlicht. Aktueller Schwerpunkt: Startbereich abrunden
-und weitere Spielinhalte.
+Stand: 11. Oktober 2026. Rezeptbuch, Golem-Musikstart und Netzwerkoptimierung
+sind veröffentlicht (PR #133, Live-Commit `3180af0`). Website und Server sowie
+die öffentlichen Mehrspieler- und Speicherprüfungen waren erfolgreich.
+Der aktuelle Arbeitsplan steht im
+[Konzept für die nächsten Schritte](konzepte/2026-10-11-naechste-schritte/KONZEPT.md).
+Die älteren Abschnitte darunter dokumentieren den Verlauf; ihr damaliger
+Offen-/PR-Stand kann inzwischen überholt sein.
 Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzepten.
 
 ## Entscheidungen
