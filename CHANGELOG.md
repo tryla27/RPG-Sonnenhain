@@ -6,6 +6,8 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Rezept-Reiter im Questbuch mit Almas Lernständen, Zutaten, Beständen und Fundgebieten. Golem-Musik durch zuverlässige Beschwörungsantwort und Export-Ressourcenverweis abgesichert. Golem-Wegsuche respektiert Wiederholpause; Raster-Erwärmung begrenzt. Netzwerkprotokoll 10: Bewegungsdeltas mit vollständigem Sekundenstand, spaltenbasierte Zstd-Weltpakete und WebSocket-Rückstaugrenze. SERVER_PERF protokolliert CPU und Netzlast. Befunde und Messgrenzen in docs/golem-network-performance.md.
+
 - App-Symbol: `tools/build_app_icon.py` erzeugt `art/app_icon/` (Hintergrund,
   Vordergrund, 192er); Export-Preset „Android“ setzt `launcher_icons/*`. Nur die
   App, Web und Desktop behalten ihr Symbol.

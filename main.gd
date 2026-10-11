@@ -431,6 +431,7 @@ var music_theme := ""
 var music_fading := false
 var music_fade_elapsed := 0.0
 var music_fade_duration := MUSIC_FADE_SECONDS
+var golem_music_spawn_until_ms := 0
 var music_enabled := true
 var music_volume := 0.90
 var effects_volume := 0.75
@@ -491,7 +492,7 @@ var network_status := "Offline"
 var network_port := 27844
 var websocket_port := 27845
 const LIVE_MULTIPLAYER_URL := "wss://multiplayer.sonnenhainrpg.de/"
-const NETWORK_PROTOCOL_VERSION := 9
+const NETWORK_PROTOCOL_VERSION := 10
 const PARTY_MAX_MEMBERS := 10
 const PARTY_XP_RANGE := 850.0
 const PARTY_BOSS_RANGE := 1100.0
@@ -504,6 +505,9 @@ var invite_code := ""
 var join_code := ""
 var remote_players: Dictionary = {}
 var local_peer_id := 1
+const ServerPerformance = preload("res://components/server_performance.gd")
+var server_performance = ServerPerformance.new()
+var movement_updates = NetworkCodec.new()
 var sync_timer := 0.0
 var server_spawn_timer := 0.0
 var server_status_timer := 0.0
@@ -550,6 +554,8 @@ const FoodSystem = preload("res://components/food_system.gd")
 var food_system = FoodSystem.new()
 const SteinroseKitchen = preload("res://components/steinrose_kitchen.gd")
 var steinrose = SteinroseKitchen.new()
+const RecipeJournal = preload("res://components/recipe_journal.gd")
+var recipe_journal = RecipeJournal.new()
 const WorldBuilder = preload("res://components/world_builder.gd")
 var world_builder = WorldBuilder.new()
 const WorldFog = preload("res://components/world_fog.gd")
@@ -1113,7 +1119,7 @@ func push_player_state() -> void:
 		return
 	if network_mode == "client" and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
-	var state := local_player_state()
+	var state := movement_updates.motion_packet(local_player_state(), Time.get_ticks_msec())
 	if network_mode == "client":
 		rpc_player_state.rpc_id(1, state)
 	elif network_mode == "host":
@@ -1125,6 +1131,9 @@ func push_player_state() -> void:
 func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 	var sender := multiplayer.get_remote_sender_id()
 	if sender <= 0: return
+	var previous_state: Dictionary = remote_players.get(sender,{})
+	var full_update := bool(state.get("_full",true))
+	state = NetworkCodec.merge_player_state(previous_state,state)
 	var pos_data: Array = state.get("pos", [])
 	var facing_data: Array = state.get("facing", [])
 	if pos_data.size() < 2 or facing_data.size() < 2: return
@@ -1229,12 +1238,14 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		for peer_id in multiplayer.get_peers():
 			if int(peer_id) != sender:
 				if reliable_vitals:rpc_receive_player_vitals.rpc_id(int(peer_id),sender,clean)
-				else:rpc_receive_player_state.rpc_id(int(peer_id), sender, clean)
+				elif WorldSnapshot.can_send(multiplayer.multiplayer_peer,int(peer_id)):
+					rpc_receive_player_state.rpc_id(int(peer_id), sender, NetworkCodec.player_delta(clean,previous_state,full_update))
 
 @rpc("authority", "call_remote", "unreliable", 0)
 func rpc_receive_player_state(peer_id: int, state: Dictionary) -> void:
 	if peer_id == multiplayer.get_unique_id(): return
 	var previous:Dictionary=remote_players.get(peer_id,{})
+	state = NetworkCodec.merge_player_state(previous,state)
 	if int(state.get("state_tick",0))<int(previous.get("state_tick",0)):return
 	if float(state.get("hp",1))<float(previous.get("hp",state.get("hp",1))):state["hurt_until"]=combat_feedback.clock+.18
 	else:state["hurt_until"]=previous.get("hurt_until",0.0)
@@ -1271,13 +1282,15 @@ func push_world_snapshot() -> void:
 			var peer_pos := network_player_position(int(peer_id))
 			var peer_snapshot := WorldSnapshot.for_peer(snapshot,peer_pos)
 			if not GolemBoss.needs_full(peer_pos): peer_snapshot["golem"] = golem_lite
-			rpc_world_snapshot.rpc_id(int(peer_id),peer_snapshot)
+			WorldSnapshot.transmit(self,int(peer_id),peer_snapshot)
 
 @rpc("authority", "call_remote", "unreliable", 1)
 func rpc_world_snapshot(snapshot: Dictionary) -> void:
 	if network_mode != "client" or multiplayer_context() != "world": return
 	if int(snapshot.get("protocol",-1)) != NETWORK_PROTOCOL_VERSION: return
 	if str(snapshot.get("context","world")) != "world": return
+	snapshot = WorldSnapshot.decode(snapshot)
+	if snapshot.is_empty(): return
 	server_last_reply_ms = Time.get_ticks_msec()
 	var crumble_before: float = golem_world.crumble
 	for tree_key in golem_world.apply_snapshot(snapshot.get("golem",{}),world_time): golem_trees_changed(str(tree_key))
@@ -1631,6 +1644,7 @@ func desired_music_theme() -> String:
 	if panel=="start":return "dorf"
 	if arena_mode!="":return "boss"
 	if dungeon_id>=0:return ["ruinen","kristall","quelle"][dungeon_id]
+	if MusicPlayback.golem_active(self): return "boss_golem"
 	var boss_theme:=active_class_boss_music_theme()
 	return boss_theme if boss_theme!="" else MUSIC_THEMES[region]
 
@@ -2367,6 +2381,7 @@ func update_dedicated_player_projectiles(delta: float) -> void:
 			projectiles.remove_at(i)
 
 func process_dedicated_server(delta: float) -> void:
+	var frame_started_us := Time.get_ticks_usec()
 	for i in boss_cooldowns.size():boss_cooldowns[i]=maxf(0,boss_cooldowns[i]-delta)
 	konflux.time += delta
 	konflux.authority_update(self,delta)
@@ -2405,6 +2420,7 @@ func process_dedicated_server(delta: float) -> void:
 	if sync_timer <= 0.0:
 		sync_timer = 0.10
 		push_world_snapshot()
+	server_performance.frame_done(Time.get_ticks_usec()-frame_started_us,delta)
 
 func update_player(delta: float) -> void:
 	var old_pos := player_pos
@@ -3360,6 +3376,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				elif inventory_drag_index>=0 and event.position.distance_to(inventory_drag_origin)>8.0:
 					finish_inventory_drag(event.position)
 					return
+	if recipe_journal.keyboard_input(self,event): return
 	if panel=="steinrose" and steinrose.keyboard_input(self,event):
 		return
 	if panel == "multiplayer" and event is InputEventKey and event.pressed and not event.echo:
@@ -6511,7 +6528,7 @@ func panel_click(mouse: Vector2) -> void:
 		"shop": click_shop(mouse)
 		"travel": click_travel(mouse)
 		"map": click_map(mouse)
-		"journal": quest_guide.click_journal(self,mouse)
+		"journal": recipe_journal.click(self,mouse)
 		"quest_details": quest_guide.click_details(self,mouse)
 
 func set_volume_from_mouse(mouse: Vector2) -> bool:
@@ -12016,33 +12033,7 @@ func draw_travel_panel() -> void:
 		text_at(rect.position + Vector2(48, 57), ("DORF · %s" % state) if i == 0 else ("EMPF. LV %d · %s" % [region_level(zone), state]), 13, Color("ffe2a8") if here else (Color("bfeee0") if available else Color("d2c6b6")))
 
 func draw_journal_panel() -> void:
-	text_at(Vector2(165, 125), "QUESTBUCH", 26, Color("ffeda9"))
-	text_at(Vector2(690, 125), "Die Dornenplage", 17, Color("dbebd4"))
-	ui_box(Rect2(165, 145, 815, 73), Color("675f55") if rescue_state == 1 else Color("527668"))
-	var story: String = ["Mira sorgt sich um Blütenweiler. Folge dem Weg östlich von Sonnenhain.", "Das Dorf ist umzingelt. Besiege die Dornenwesen (%d/%d)." % [rescue_kills, RESCUE_GOAL], "Das Dorf ist sicher. Sprich mit Nela am Dorfplatz und hole deinen Lohn.", "Nela: Die Plage stammt aus dem Turm der Alten Ruinen. Suche dort die Quelle."][rescue_state]
-	if rescue_state == 3 and bosses_defeated[0]: story = "Im Turm lag ein zerbrochenes Siegel. Der Kristallhüter bewacht sein Gegenstück."
-	if rescue_state == 3 and bosses_defeated[1]: story = "Beide Siegel weisen zur Asche und weiter zu den Sternen. Folge dem alten Weg."
-	if rescue_state == 3 and bosses_defeated[2]: story = "Der Aschefürst fiel. Hinter dem Sternenbruch glimmt noch die letzte Wache."
-	text_at(Vector2(180, 173), "HAUPTGESCHICHTE · Blütenweiler", 19, Color("ffe6a7"))
-	text_at(Vector2(180, 201), story, 16, Color("e7eedc"))
-	for row in 6:
-		var id := row + menu_scroll
-		if id >= QUESTS.size(): break
-		var q: Dictionary = QUESTS[id]
-		var state: int = quests[id]["state"]
-		var status: String = ["Noch verfügbar", "Aktiv", "Abgeben!", "Erledigt"][state]
-		var required := region_level(int(ENEMY_TYPES[int(q["target"])]["region"]))
-		if state == 0 and level + 3 < required: status = "Ab Level %d" % maxi(1, required - 3)
-		var y := 226 + row * 57
-		ui_box(Rect2(165, y, 815, 53), Color("577b69") if state == 2 else Color("45665f"))
-		text_at(Vector2(180, y + 21), "%s  ·  %s" % [q["title"], q["npc"]], 17, Color("fff1bc"))
-		var group_suffix := " · GRUPPE" if not (party_state.get("members",[]) as Array).is_empty() and state == 1 else ""
-		text_at(Vector2(180, y + 42), "%s %d/%d  ·  %d XP / %d Gold%s" % [ENEMY_TYPES[int(q["target"])]["name"], quests[id]["progress"], q["count"], q["xp"], q["gold"],group_suffix], 14, Color("d8e6d3"))
-		text_at(Vector2(867, y + 29), status, 14, Color("fff0ad"))
-	text_at(Vector2(170, 592), "Klicke eine Quest für Details. Mausrad / Pfeile: scrollen.", 15, Color("d9e6d5"))
-
-	ui_button(Rect2(855,558,55,36),"↑")
-	ui_button(Rect2(920,558,55,36),"↓")
+	recipe_journal.draw(self)
 
 func draw_map_panel() -> void:
 	if konflux.active:
@@ -15034,7 +15025,9 @@ func rpc_request_golem_summon() -> void:
 func rpc_golem_summon_result(ok: bool, text: String) -> void:
 	if network_mode != "client": return
 	golem_summon_pending = false
-	if ok: golem_consume_offerings()
+	if ok:
+		golem_consume_offerings()
+		MusicPlayback.golem_spawned(self)
 	message(text.substr(0, 120))
 
 ## Jeder Frame: Stoß, Zerfallsteile, auf Clients Geräusche aus dem Zustand.

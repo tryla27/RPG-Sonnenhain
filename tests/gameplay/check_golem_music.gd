@@ -68,6 +68,14 @@ func run() -> void:
 	g.update_music(6.0)
 	check(g.music_player.volume_db <= -80.0, "Lautstärke null respektiert")
 	g.music_volume = 0.9
+	g.enemies.clear()
+	g.golem_world.fight_active = true
+	check(g.desired_music_theme() == "boss_golem", "aktive Beschwörung ohne frühe Gegnerzeile")
+	g.golem_world.fight_active = false
+	g.network_mode = "client"
+	g.rpc_golem_summon_result(true,"Golem erhebt sich")
+	check(g.desired_music_theme() == "boss_golem", "zuverlässiges Spawn-Ergebnis startet Musik")
+	g.golem_music_spawn_until_ms = 0
 	g.player_pos = Vector2.ZERO
 	check(g.desired_music_theme() != "boss_golem", "fern vom Kampf keine Golem-Musik")
 	g.free()

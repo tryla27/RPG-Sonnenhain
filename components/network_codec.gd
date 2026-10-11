@@ -11,6 +11,32 @@ const GameContent = preload("res://components/game_content.gd")
 const BASE36_CHARS := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const INVITE_PREFIX := "SH"
 
+const MOTION_KEYS := ["protocol", "pos", "facing", "context", "instance_id", "teleport_serial"]
+var last_motion_state: Dictionary = {}
+var last_full_motion_ms := -1000
+
+## Ein vollständiger Stand je Sekunde heilt verlorene Einzeländerungen.
+func motion_packet(current: Dictionary, now_ms: int) -> Dictionary:
+	var full: bool = last_motion_state.is_empty() or now_ms-last_full_motion_ms >= 1000 or current.get("context") != last_motion_state.get("context") or current.get("instance_id") != last_motion_state.get("instance_id")
+	var packet := player_delta(current, last_motion_state, full)
+	last_motion_state = current.duplicate(true)
+	if full: last_full_motion_ms = now_ms
+	return packet
+
+static func player_delta(current: Dictionary, previous: Dictionary, full: bool) -> Dictionary:
+	var packet := current.duplicate(false) if full else {}
+	if not full:
+		for key in current:
+			if key in MOTION_KEYS or not previous.has(key) or current[key] != previous[key]: packet[key] = current[key]
+	packet["_full"] = full
+	return packet
+
+static func merge_player_state(previous: Dictionary, packet: Dictionary) -> Dictionary:
+	var state := previous.duplicate(false)
+	state.merge(packet, true)
+	state.erase("_full")
+	return state
+
 static func to_base36(value: int) -> String:
 	var n := maxi(0, value)
 	if n == 0: return "0"

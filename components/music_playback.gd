@@ -3,6 +3,15 @@ extends RefCounted
 const DEFAULT_FADE_SECONDS := 1.35
 const GOLEM_FADE_SECONDS := 6.0
 const GOLEM_PATH := "res://music/boss_golem.wav"
+const GOLEM_STREAM = preload("res://music/boss_golem.wav")
+
+static func golem_active(g) -> bool:
+	return g.region_at(g.player_pos) == 12 and (g.golem_world.fight_active or Time.get_ticks_msec() < g.golem_music_spawn_until_ms)
+
+static func golem_spawned(g) -> void:
+	# Zuverlässige Beschwörungsantwort kann vor dem ersten Weltpaket eintreffen.
+	g.golem_music_spawn_until_ms = Time.get_ticks_msec() + 6000
+	g.update_music(0.0)
 
 static func fade_seconds(theme: String) -> float:
 	return GOLEM_FADE_SECONDS if theme == "boss_golem" else DEFAULT_FADE_SECONDS
@@ -28,7 +37,7 @@ static func update(g, delta: float = 0.0) -> void:
 				g.music_incoming.stop()
 			g.music_fading = false
 		var path:String=g.music_path_for_theme(desired)
-		var stream: AudioStream = load(path)
+		var stream: AudioStream = GOLEM_STREAM if desired == "boss_golem" else load(path)
 		if stream == null: return
 		if stream is AudioStreamOggVorbis: stream.loop = true
 		if stream is AudioStreamWAV:

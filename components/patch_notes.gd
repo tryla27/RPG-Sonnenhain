@@ -1,6 +1,8 @@
 extends RefCounted
-const VERSION="PATCH 09.10.2026"
+const VERSION="PATCH 11.10.2026"
 const NOTES=[
+["Quests / Rezepte · Almas Rezeptbuch unterwegs", "Gelernte Rezepte findest du jetzt im Questbuch unter Rezepte: mit Zutaten, deinem Bestand, fehlenden Mengen und Fundgebieten. Kochen bleibt bei Alma."],
+["Dunkler Golem · Musikstart und Leistung", "Die Bossmusik startet schon mit der erfolgreichen Beschwörung am Altar und blendet langsam ein. Eine blockierte Wegsuche wird nicht mehr jedes Bild wiederholt; kleinere Bewegungs- und Weltpakete entlasten die Verbindung."],
 ["Android-App · Eigenes Symbol", "Die App hat jetzt ein Sonnenhain-Symbol: eine goldene Sonne über einem kleinen Hain auf grünen Hügeln, im Pixelstil des Spiels. Auf neueren Handys passt es sich der Symbolform an."],
 ["Android-App · Zauber zielen wie in Wild Rift", "Fähigkeiten wirken jetzt beim Loslassen. Antippen zielt automatisch auf einen Gegner. Hältst du den Knopf und ziehst, zeigt ein Pfeil vom Helden die Richtung, und der Zauber geht dorthin. Abbrechen: im roten Kreis oben rechts loslassen oder zurück zum Knopf ziehen."],
 ["Android-App · Zielhilfe wählbar", "Im Menü unter STEUERUNG wählst du, wen die Zielhilfe bevorzugt: den nächsten Gegner, den mit den wenigsten Lebenspunkten oder den stärksten (gut für Bosse). Das gilt für den Angriffsknopf und für angetippte Fähigkeiten."],
