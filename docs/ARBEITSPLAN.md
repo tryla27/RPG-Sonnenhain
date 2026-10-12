@@ -55,12 +55,11 @@ Keine vollständige Modularisierung nebenbei; sie bleibt pausiert. Keine automat
 
 **Aktuell:** geprüftes Einstiegspaket in PR/CI überführen. Danach die vollständige Quest-/Kampffolge aus Aufgabe 2 und die Browser-/Golem-Nachweise aus Aufgabe 3 schließen. Fehler mit betroffenen Live-Konten nur bei tatsächlich reproduziertem Befund als erledigt markieren.
 
-Upload ausstehend: lokaler Implementierungscommit `c28afb7` auf
-`fix/start-area-validation-20261011`. Die automatische Freigabeprüfung hat
-den Branch-Push zweimal abgelehnt und verlangt ausdrückliche Nutzerfreigabe
-für die Veröffentlichung dieser Änderungen im öffentlichen Repository
-`tryla27/RPG-Sonnenhain`. Trotz bestätigter Repository-Sichtbarkeit und
-Projektregeln kein Upload, kein PR, keine CI oder Live-Schaltung erfolgt.
+Upload am 12.10.2026 von Angelo nach konkreter Rückfrage mit „ok weiter“
+freigegeben. Branch `fix/start-area-validation-20261011` hochgeladen;
+[PR #134](https://github.com/tryla27/RPG-Sonnenhain/pull/134) angelegt.
+Die CI läuft. Keine Live-Schaltung erfolgt. Die frühere Upload-Sperre ist
+mit dieser ausdrücklichen Freigabe aufgehoben.
 
 ## Fortschrittsprotokoll
 
@@ -69,3 +68,5 @@ Projektregeln kein Upload, kein PR, keine CI oder Live-Schaltung erfolgt.
 | 12.10.2026 | Planung | Prioritäten und Abschlusskriterien aus bestehendem Konzept und lokalem Änderungsstand erstellt; keine erneuten Spieltests oder Liveprüfungen | Aufgabe 1 beginnen |
 | 12.10.2026 | 1 / Teil von 2 | GitHub-Hauptstand abgeglichen; Dorfstein-Ladefehler repariert; 133 lokale Projektprüfungen bestanden, Inhalts-/Browser-Brückenprüfung bestanden; fünf native Spielbilder erstellt. Details: `konzepte/2026-10-11-startbereich/README.md` | PR/CI; Quest-/Kampf-/Browserprüfung fortsetzen |
 | 12.10.2026 | Übergabe | Implementierung lokal als `c28afb7` committet; öffentliche Upload-Freigabe durch automatische Prüfung verlangt | Angelo um Freigabe für Branch-Upload und PR bitten |
+| 12.10.2026 | PR / weitere Einstiegsprüfung | Upload freigegeben, PR #134 angelegt; zusätzlicher Verhaltenstest für erste zwei Mira-Aufträge in allen drei Klassen besteht (286 reguläre Angriffe, Teilfortschritt/Abgabe/Belohnung nach Dateiladen) | Erweiterte vollständige Testsuite und CI abschließen |
+| 12.10.2026 | Weitere Nachweise | 134 lokale Prüfungen grün; erste CI auf `183216b` erfolgreich. Getrennte Web-Prüfszene zeigt Blütenwiesen und Pilzwald mit aktiver 3D-Landschaft im verbundenen Codex-Browser. Brave und manueller Kampf bleiben offen; veralteter Starttext „Mira am Dorfplatz“ als weiterer Einstiegspunkt gefunden | Ergänzungen in PR #134 prüfen; danach Starttexte und manuellen Einstieg fortsetzen |

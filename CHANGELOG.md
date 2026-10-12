@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Einstieg zusätzlich geprüft: erste zwei Mira-Aufträge mit regulären
+  Klassenangriffen, Teilfortschritt und einmaligen Belohnungen nach Dateiladen
+  in allen drei Klassen (`check_start_quest_lifecycle.gd`). Eigene Web-Prüfszene
+  und Exportwerkzeug ohne Änderung der Produktions-Startszene.
+
 - Dorf-Wegstein (Index 0) beim Laden erhalten statt auf Außenstein 1 begrenzen.
   Einstiegstest vergleicht Questzahlen nach JSON nach ihrem Zahlenwert und
   prüft zusätzlich Dorfstein, Boss-Sperren, zweimaliges Laden, Fusionsrang
