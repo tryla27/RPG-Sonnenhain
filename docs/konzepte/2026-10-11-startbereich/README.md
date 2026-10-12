@@ -40,4 +40,4 @@ Reproduktion der Bilder: `tools/capture_start_area.gd`. Netzwerk und Speichern s
 
 ## Veröffentlichung
 
-Noch nicht live. [PR #134](https://github.com/tryla27/RPG-Sonnenhain/pull/134) ist angelegt. Die CI des ersten Uploads (`183216b`) war erfolgreich; zusätzliche Quest-/Web-Prüfwerkzeuge werden am erweiterten PR-Kopf erneut geprüft. Live-Schaltung erst mit Angelos Bestätigung für dieses konkrete Paket.
+Seit 12.10.2026 live: [PR #134](https://github.com/tryla27/RPG-Sonnenhain/pull/134) wurde nach Angelos konkreter Merge-/Live-Freigabe als Commit `79bf216` zusammengeführt. Die [CI des endgültigen PR-Kopfs `1cf5348`](https://github.com/tryla27/RPG-Sonnenhain/actions/runs/38227814675) und beide Deploys waren erfolgreich. Website-/Server-Versionsgleichheit und öffentliche Mehrspieler-/Speicherprüfungen sind bestätigt. Einzelheiten: [Release-Bericht](RELEASE_2026-10-12.md). Android bleibt zurückgestellt.

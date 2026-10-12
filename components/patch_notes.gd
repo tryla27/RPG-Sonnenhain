@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 12.10.2026"
 const NOTES=[
+["Einstieg · Mira im Rathaus", "Der Prolog und die Startmeldung führen dich jetzt zum Rathaus von Sonnenhain, wo Mira tatsächlich ihre Aufträge vergibt."],
 ["Erkundung · Kleine Schritte bleiben sichtbar", "Auch beim langsamen Laufen wird die Karte jetzt dauerhaft aufgedeckt. Vorher wurde die Bewegungsstrecke jedes Bild zurückgesetzt und neu besuchte Wege blieben nach dem Weitergehen dunkel."],
 ["Speichern · Gebietslevel sind Empfehlungen", "Wer mit niedrigem Level einen offenen Bereich erkundet, bleibt nach dem Laden dort. Die frühere Levelprüfung setzte dich trotz offenem Tor ins Dorf zurück und änderte den letzten Wegstein. Auch der Dorf-Wegstein bleibt nach erneutem Laden erhalten. Feste Hindernisse und tatsächlich versiegelte Gebiete bleiben geschützt."],
 ["Dorf · Freier Weg zum Osttor", "Anschlagtafel und Bank vor der Ratshalle stehen näher an der Hausfront. Der Hauptweg vom Spawn zum Osttor ist jetzt auch mit breiten Figuren frei."],

@@ -7,11 +7,18 @@ Status und Abschlusskriterien fest; die Konzepte darunter liefern die Details.
 12.10.2026: Erstes Einstiegspaket lokal geprüft (134 Projektprüfungen grün):
 kleine Schritte decken die Karte auf, Laden beachtet echte Gebietssperren,
 Dorfstein bleibt erhalten, Ratshallen-Weg frei, Holztrefferklänge ergänzt.
-Noch nicht live. Details und verbleibende Prüfungen:
+Seit 12.10.2026 live (Commit `79bf216`, PR #134). Website-/Server-Versionsgleichheit
+und öffentliche Mehrspieler-/Speicherprüfungen sind bestätigt. Details und verbleibende Prüfungen:
 [Einstiegsbericht](konzepte/2026-10-11-startbereich/README.md).
-PR #134 ist nach Angelos Upload-Freigabe angelegt; erster CI-Lauf erfolgreich.
 Zusätzlicher Questablauf mit drei Klassen und isolierte Web-Prüfszene ergänzen
-den Nachweis; endgültigen PR-Kopf separat prüfen.
+den Nachweis; endgültiger PR-Kopf ebenfalls CI-grün und mit konkreter
+Merge-/Live-Freigabe veröffentlicht. Als Nächstes: veraltete Starttexte zu
+Miras Standort, manueller Einstieg, Brave-/Golem-Prüfung, anschließend Fortschritt.
+
+Folgearbeit 12.10.: Starttexte sind lokal korrigiert, bewegte Schleime/Käfer
+in drei Klassen geprüft (135 Projektprüfungen grün). Interaktive Prüfszene
+liegt vor; längerer manueller Browser-Durchgang blieb nach Werkzeugabbruch
+offen. Noch nicht veröffentlicht. [Bericht](konzepte/2026-10-12-einstieg/README.md).
 
 Stand: 11. Oktober 2026. Rezeptbuch, Golem-Musikstart und Netzwerkoptimierung
 sind veröffentlicht (PR #133, Live-Commit `3180af0`). Website und Server sowie

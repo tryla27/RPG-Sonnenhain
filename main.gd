@@ -6694,7 +6694,7 @@ func finish_intro() -> void:
 		if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 			rpc_player_presence.rpc_id(1, local_player_state())
 	play_sound("spieler_wiederbeleben")
-	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
+	message("Mira wartet im Rathaus. Sprich mit ihr (E).")
 
 func begin_repair_session()->void:
 	repair_targets={
@@ -11481,7 +11481,7 @@ func draw_intro_panel() -> void:
 	var lines := [
 		["SONNENHAIN", "Vor drei Nächten verstummten die Glocken im Blütenweiler."],
 		["DER WEG NACH OSTEN", "Rauch steigt zwischen den Feldern auf. Niemand ist zurückgekehrt."],
-		["DEINE REISE BEGINNT", "Mira wartet am Dorfplatz. Sie weiß, wo die ersten Spuren liegen."]]
+		["DEINE REISE BEGINNT", "Mira wartet im Rathaus von Sonnenhain. Sie weiß, wo die ersten Spuren liegen."]]
 	text_at(Vector2(230, 218), "KAPITEL I  ·  DIE STUMME GLOCKE", 21, Color("d9bc86"))
 	text_at(Vector2(230, 287), String(lines[page][0]), 34, Color("fff1c8"))
 	text_at(Vector2(230, 337), String(lines[page][1]), 18, Color("e4eadb"))

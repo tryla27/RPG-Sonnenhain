@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Prolog und Startmeldung nennen Miras tatsächlichen Standort im Rathaus
+  von Sonnenhain statt den früheren Dorfplatz.
+
 - Einstieg zusätzlich geprüft: erste zwei Mira-Aufträge mit regulären
   Klassenangriffen, Teilfortschritt und einmaligen Belohnungen nach Dateiladen
   in allen drei Klassen (`check_start_quest_lifecycle.gd`). Eigene Web-Prüfszene
