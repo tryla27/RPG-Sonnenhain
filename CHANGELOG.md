@@ -6,6 +6,26 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Einstieg zusätzlich geprüft: erste zwei Mira-Aufträge mit regulären
+  Klassenangriffen, Teilfortschritt und einmaligen Belohnungen nach Dateiladen
+  in allen drei Klassen (`check_start_quest_lifecycle.gd`). Eigene Web-Prüfszene
+  und Exportwerkzeug ohne Änderung der Produktions-Startszene.
+
+- Dorf-Wegstein (Index 0) beim Laden erhalten statt auf Außenstein 1 begrenzen.
+  Einstiegstest vergleicht Questzahlen nach JSON nach ihrem Zahlenwert und
+  prüft zusätzlich Dorfstein, Boss-Sperren, zweimaliges Laden, Fusionsrang
+  und Fusionsfreiheit des nächsten neuen Charakters.
+
+- Einstieg: dauerhaftes Aufdecken bei Bewegungen unter 16 px pro Bild repariert
+  (`WorldFog` behält den letzten tatsächlichen Aufdeckpunkt). Laden prüft
+  echte Gebietssperren statt Empfehlungslevel und behält legale Wegsteine.
+  Ratshallen-Tafel und -Bank um 33 px an die Fassade gerückt; Fußflächen
+  bleiben außerhalb der Gebäude und der Osttor-Weg wird frei. Materialklänge
+  nach `components/projectile_impacts.gd` ausgelagert; Holz erhält drei
+  deterministische 16-Bit-WAVs. Test `check_start_area_journey.gd`: echte
+  Anlage, Hin-/Rückweg, Toraktion, Datenträger-Roundtrip und 18 Identitäten.
+  Details und Spielansichten: `docs/konzepte/2026-10-11-startbereich/README.md`.
+
 - Rezept-Reiter im Questbuch mit Almas Lernständen, Zutaten, Beständen und Fundgebieten. Golem-Musik durch zuverlässige Beschwörungsantwort und Export-Ressourcenverweis abgesichert. Golem-Wegsuche respektiert Wiederholpause; Raster-Erwärmung begrenzt. Netzwerkprotokoll 10: Bewegungsdeltas mit vollständigem Sekundenstand, spaltenbasierte Zstd-Weltpakete und WebSocket-Rückstaugrenze. SERVER_PERF protokolliert CPU und Netzlast. Befunde und Messgrenzen in docs/golem-network-performance.md.
 
 - App-Symbol: `tools/build_app_icon.py` erzeugt `art/app_icon/` (Hintergrund,

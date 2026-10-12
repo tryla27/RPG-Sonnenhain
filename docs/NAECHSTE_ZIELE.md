@@ -1,5 +1,18 @@
 # Sonnenhain – nächste Ziele
 
+Aktueller priorisierter Arbeitsplan vom 12. Oktober 2026:
+[ARBEITSPLAN.md](ARBEITSPLAN.md). Er legt Reihenfolge, Wichtigkeit,
+Status und Abschlusskriterien fest; die Konzepte darunter liefern die Details.
+
+12.10.2026: Erstes Einstiegspaket lokal geprüft (134 Projektprüfungen grün):
+kleine Schritte decken die Karte auf, Laden beachtet echte Gebietssperren,
+Dorfstein bleibt erhalten, Ratshallen-Weg frei, Holztrefferklänge ergänzt.
+Noch nicht live. Details und verbleibende Prüfungen:
+[Einstiegsbericht](konzepte/2026-10-11-startbereich/README.md).
+PR #134 ist nach Angelos Upload-Freigabe angelegt; erster CI-Lauf erfolgreich.
+Zusätzlicher Questablauf mit drei Klassen und isolierte Web-Prüfszene ergänzen
+den Nachweis; endgültigen PR-Kopf separat prüfen.
+
 Stand: 11. Oktober 2026. Rezeptbuch, Golem-Musikstart und Netzwerkoptimierung
 sind veröffentlicht (PR #133, Live-Commit `3180af0`). Website und Server sowie
 die öffentlichen Mehrspieler- und Speicherprüfungen waren erfolgreich.

@@ -42,9 +42,33 @@ func run()->void:
 	check(not g.combat_feedback.breaks.is_empty(),"Zerschell-Bild allein")
 	check("arrow_break" in g.sounds and "treffer_metall" in g.sounds,"Bruch- und Metallklang allein (%s)" % [g.sounds])
 
+	# Holz wird bereits als Hindernis erkannt, braucht aber auch seinen Klang.
+	var wood: Vector2 = g.BORIN_MAGIC_TREE_POS
+	check(g.projectile_material(wood)=="holz" and g.projectile_world_blocked(wood),"Runenbaum ist ein Holzhindernis")
+	g.player_pos=wood+Vector2(0,-150)
+	g.sounds.clear()
+	g.play_break_sound(wood-Vector2(0,6),3,Vector2.DOWN)
+	check("arrow_break" in g.sounds and "treffer_holz" in g.sounds,"Pfeil: Holzklang")
+	check("treffer_metall" not in g.sounds and "treffer_stein" not in g.sounds,"Holz hat keinen falschen Materialklang")
+	g.sounds.clear()
+	g.play_break_sound(wood-Vector2(0,6),2,Vector2.DOWN)
+	check("magic_break" in g.sounds and "treffer_holz" in g.sounds,"Zauber: Holzklang")
+	g.dedicated_server_mode=true;g.sounds.clear()
+	g.play_break_sound(wood,3)
+	check(g.sounds.is_empty(),"Server spielt keinen Klang")
+	g.dedicated_server_mode=false
+	g.player_pos=wood+Vector2(900,0)
+	g.play_break_sound(wood,3)
+	check(g.sounds.is_empty(),"ferner Aufprall bleibt stumm")
+	g.player_pos=lamp+Vector2(-200,-8)
+
 	# Online: eigener (sichtbarer) Pfeil zerschellt sofort, Server-Meldung danach nicht doppelt.
 	g.network_mode="client"
 	check(g.uses_server_world(),"online in der Serverwelt")
+	g.player_pos=wood+Vector2(0,-150);g.sounds.clear()
+	g.play_break_sound(wood-Vector2(0,6),3,Vector2.DOWN)
+	check("treffer_holz" in g.sounds,"online: Holzklang")
+	g.player_pos=lamp+Vector2(-200,-8)
 	g.sounds.clear();g.combat_feedback.breaks.clear()
 	shoot(g,lamp+Vector2(-150,-8),Vector2.RIGHT,true)
 	check(not g.combat_feedback.breaks.is_empty() and "arrow_break" in g.sounds,"online: eigener Pfeil zerschellt mit Klang")

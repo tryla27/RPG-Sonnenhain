@@ -335,6 +335,15 @@ def r_treffer_stein(rng, v):
     return finish(mix((base, 1.0), (crunch, 0.8)), echo_wet=0.06)
 
 
+def r_treffer_holz(rng, v):
+    # Trockener Holzanschlag: kurzer, hohler Körper und ein leiser Splitter.
+    d = 0.18
+    body = thump(310 + 18 * v, 180 + 9 * v, d, 0.027)
+    grain = bp(noise(d, rng), 850, 3200) * env(d, 0.0007, 0.019, 3)
+    hollow = osc(640 + 35 * v, d, "tri") * env(d, 0.001, 0.022, 3)
+    return finish(mix((body, 1.0), (grain, 0.2), (hollow, 0.12)), echo_wet=0.0, top=6000)
+
+
 def r_treffer_geist(rng, v):
     # Geisterhaft: hohler Pappe-Anschlag als Kern, dazu ein luftiges Seufzen und ein
     # leiser, verstimmter Schimmer, der kurz nachhallt.
@@ -889,6 +898,7 @@ SOUNDS = {
     "treffer_chitin": ("treffer", r_treffer_chitin, 3),
     "treffer_fell": ("treffer", r_treffer_fell, 3),
     "treffer_stein": ("treffer", r_treffer_stein, 3),
+    "treffer_holz": ("treffer", r_treffer_holz, 3),
     "treffer_geist": ("treffer", r_treffer_geist, 3),
     "treffer_metall": ("treffer", r_treffer_metall, 3),
     "tod_weich": ("treffer", r_tod("weich"), 1),

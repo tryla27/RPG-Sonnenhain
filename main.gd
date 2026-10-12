@@ -33,6 +33,7 @@ var spell_return_count := 0
 var last_typing_ms := -1
 var patch_notice = PatchNotice.new()
 const ExperienceRules = preload("res://components/experience_rules.gd")
+const ProjectileImpacts = preload("res://components/projectile_impacts.gd")
 const ControllerControls = preload("res://components/controller_controls.gd")
 var controller = ControllerControls.new()
 const QuestGuide = preload("res://components/quest_guide.gd")
@@ -6108,7 +6109,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		for item in offers:ArcaneNecklaces.normalize(item)
 	equipped_ring_uid = int(data.get("equipped_ring_uid", -1))
 	equipped_ring2_uid = int(data.get("equipped_ring2_uid", -1)) if class_id == 1 else -1
-	last_waystone = clampi(int(data.get("last_waystone", 1)), 1, WAYSTONES.size() - 1)
+	last_waystone = clampi(int(data.get("last_waystone", 1)), 0, WAYSTONES.size() - 1)
 	var stored_stones: Array = data.get("waystone_unlocked", [])
 	for i in mini(stored_stones.size(), WAYSTONES.size()): waystone_unlocked[i] = bool(stored_stones[i])
 	if stored_stones.is_empty(): waystone_unlocked[last_waystone] = true
@@ -6169,10 +6170,12 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	for q in mini(quests.size(),QUESTS.size()):
 		var target:int=int(QUESTS[q]["target"])
 		if target in [12,13,14] and int(quests[q].get("state",0))>=2:bosses_defeated[target-12]=true
-	if is_blocked(player_pos) or (not creative_mode and level < region_level(region_at(player_pos))):
+	# Gebietslevel sind Empfehlungen. Nur feste Hindernisse oder tatsächlich
+	# versiegelte Gebiete machen einen gespeicherten Ort ungültig.
+	if is_blocked(player_pos) or (not creative_mode and not region_available(region_at(player_pos))):
 		player_pos = Vector2(825, 1020)
 	mark_network_teleport()
-	if level < region_level(region_at(WAYSTONES[last_waystone])): last_waystone = 1
+	if not creative_mode and not region_available(region_at(WAYSTONES[last_waystone])): last_waystone = 0
 	# Skill 19 ist jetzt Rissnova; der Klassen-Risssprung lebt separat auf Leertaste.
 	if class_id==1 and level<int(ABILITIES[19]["req"]):
 		learned[19]=false
@@ -14454,16 +14457,7 @@ func rpc_client_3d_report(info: Dictionary) -> void:
 
 ## Zerschellen: Bruchklang des Geschosses plus Aufprall je Material.
 func play_break_sound(pos:Vector2,kind:int,dir:Vector2=Vector2.ZERO)->void:
-	if dedicated_server_mode or pos.distance_to(player_pos)>=850:return
-	play_sound("arrow_break" if kind==3 else "magic_break")
-	# Das Geschoss stoppt kurz vor dem Hindernis: Material etwas weiter vorn prüfen.
-	var material:=""
-	for reach in [6.0,12.0,20.0]:
-		material=projectile_material(pos+dir.normalized()*reach)
-		if material!="":break
-	match material:
-		"stein":play_world_sound("treffer_stein",pos)
-		"metall":play_world_sound("treffer_metall",pos)
+	ProjectileImpacts.play(self,pos,kind,dir)
 
 func projectile_world_blocked(point:Vector2)->bool:
 	if point.x<26 or point.y<26 or point.x>WORLD.x-26 or point.y>WORLD.y-26:return true
