@@ -109,14 +109,20 @@ func party_positions(g)->Array:
 func update_from_game(g)->void:
 	if world_size!=g.WORLD:configure(g.WORLD)
 	var eyes:=party_positions(g)
+	var anchors:Array=[]
 	for pos in eyes:
 		var fresh:=true
+		var anchor:Vector2=pos
 		for old in last_reveal:
 			if Vector2(old).distance_to(pos)<REVEAL_STEP:
 				fresh=false
+				anchor=old
 				break
 		if fresh:reveal(pos)
-	last_reveal=eyes
+		# Kleine Schritte sammeln sich bis zum nächsten Aufdecken. Der Anker
+		# darf nicht bei jedem Bild auf die ungeprüfte Position nachrücken.
+		anchors.append(anchor)
+	last_reveal=anchors
 
 func visible_now(pos:Vector2,g,radius:float=REVEAL_RADIUS)->bool:
 	for eye in party_positions(g):

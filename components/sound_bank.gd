@@ -28,6 +28,7 @@ const CATALOG := {
 	"treffer_chitin": {"path":"treffer/treffer_chitin", "variants":3, "db":-10.0, "max":3, "prio":3, "pitch":0.07},
 	"treffer_fell": {"path":"treffer/treffer_fell", "variants":3, "db":-9.0, "max":3, "prio":3, "pitch":0.07},
 	"treffer_stein": {"path":"treffer/treffer_stein", "variants":3, "db":-9.0, "max":3, "prio":3, "pitch":0.06},
+	"treffer_holz": {"path":"treffer/treffer_holz", "variants":3, "db":-11.0, "max":3, "prio":3, "pitch":0.05},
 	"treffer_geist": {"path":"treffer/treffer_geist", "variants":3, "db":-11.0, "max":3, "prio":3, "pitch":0.04},
 	"treffer_metall": {"path":"treffer/treffer_metall", "variants":3, "db":-11.0, "max":3, "prio":3, "pitch":0.05},
 	"tod_weich": {"path":"treffer/tod_weich", "variants":1, "db":-9.0, "max":2, "prio":4, "pitch":0.06},

@@ -35,6 +35,12 @@ func run()->void:
 	check(not g.world_fog.explored_world(spawn+Vector2(800,0)),"25 m bleibt dunkel")
 	check(g.world_fog.corner_dark(g.world_fog.world_cell(spawn).x,g.world_fog.world_cell(spawn).y)==0.0,"um den Spieler keine Dunkelheit")
 
+	# Langsames Laufen darf nicht dauerhaft unter der 16-px-Schwelle bleiben.
+	for step in 400:
+		g.player_pos+=Vector2(2,0)
+		g.world_fog.update_from_game(g)
+	check(g.world_fog.explored_world(spawn+Vector2(1200,0)),"kleine Schritte decken dauerhaft weitere Zellen auf")
+
 	# Weggehen: Der alte Ort bleibt aufgedeckt (dauerhaft).
 	g.player_pos=spawn+Vector2(2000,0)
 	g.world_fog.update_from_game(g)

@@ -25,8 +25,9 @@ const ITEMS:=[
 	{"owner":"healer","item":"offering","point":Vector2(444,1624)},
 	{"owner":"borin","item":"books","point":Vector2(1360,512)},
 	{"owner":"borin","item":"scrolls","point":Vector2(1584,512)},
-	{"owner":"elder","item":"notices","point":Vector2(1184,1398)},
-	{"owner":"elder","item":"bench","point":Vector2(1440,1398)},
+	# Direkt an die Hausfront: der durchgehende Osttor-Weg bleibt frei.
+	{"owner":"elder","item":"notices","point":Vector2(1184,1365)},
+	{"owner":"elder","item":"bench","point":Vector2(1440,1365)},
 	{"owner":"innkeeper","item":"barrels","point":Vector2(196,2316)},
 	{"owner":"innkeeper","item":"bench","point":Vector2(442,2316)},
 	{"owner":"arena","item":"dummy","point":Vector2(944,2448)},

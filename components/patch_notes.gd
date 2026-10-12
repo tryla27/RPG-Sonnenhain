@@ -1,6 +1,10 @@
 extends RefCounted
-const VERSION="PATCH 11.10.2026"
+const VERSION="PATCH 12.10.2026"
 const NOTES=[
+["Erkundung · Kleine Schritte bleiben sichtbar", "Auch beim langsamen Laufen wird die Karte jetzt dauerhaft aufgedeckt. Vorher wurde die Bewegungsstrecke jedes Bild zurückgesetzt und neu besuchte Wege blieben nach dem Weitergehen dunkel."],
+["Speichern · Gebietslevel sind Empfehlungen", "Wer mit niedrigem Level einen offenen Bereich erkundet, bleibt nach dem Laden dort. Die frühere Levelprüfung setzte dich trotz offenem Tor ins Dorf zurück und änderte den letzten Wegstein. Auch der Dorf-Wegstein bleibt nach erneutem Laden erhalten. Feste Hindernisse und tatsächlich versiegelte Gebiete bleiben geschützt."],
+["Dorf · Freier Weg zum Osttor", "Anschlagtafel und Bank vor der Ratshalle stehen näher an der Hausfront. Der Hauptweg vom Spawn zum Osttor ist jetzt auch mit breiten Figuren frei."],
+["Klänge · Holztreffer", "Pfeile und Zaubergeschosse bekommen an hölzernen Hindernissen einen eigenen kurzen Holzanschlag zusätzlich zum Bruchklang. Die Kollisionen bleiben gleich."],
 ["Quests / Rezepte · Almas Rezeptbuch unterwegs", "Gelernte Rezepte findest du jetzt im Questbuch unter Rezepte: mit Zutaten, deinem Bestand, fehlenden Mengen und Fundgebieten. Kochen bleibt bei Alma."],
 ["Dunkler Golem · Musikstart und Leistung", "Die Bossmusik startet schon mit der erfolgreichen Beschwörung am Altar und blendet langsam ein. Eine blockierte Wegsuche wird nicht mehr jedes Bild wiederholt; kleinere Bewegungs- und Weltpakete entlasten die Verbindung."],
 ["Android-App · Eigenes Symbol", "Die App hat jetzt ein Sonnenhain-Symbol: eine goldene Sonne über einem kleinen Hain auf grünen Hügeln, im Pixelstil des Spiels. Auf neueren Handys passt es sich der Symbolform an."],
