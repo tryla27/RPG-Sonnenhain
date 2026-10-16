@@ -6,6 +6,10 @@ stehen als bearbeitbare Prototypen im Grafiklabor; sie ersetzen noch nicht
 flächendeckend die vorhandene Spielgrafik. Die gemeldeten Online-Lags sind
 damit noch nicht als behoben nachgewiesen. Es erfolgte kein Live-Gang.
 
+Prüfbarer Branch: `feature/quality-performance-20261016`,
+[Entwurfs-PR #136](https://github.com/tryla27/RPG-Sonnenhain/pull/136).
+Der aktuelle Hauptstand mit Server-Speicherfix ist integriert.
+
 ## Bereits im Spiel angebunden
 
 - Landschaftsobjekte behalten feste Plätze auf Atlasseiten. Ruhende Seiten
@@ -49,6 +53,7 @@ bleiben. Die vorhandenen Weltkollisionen bleiben maßgeblich.
 Native lokale Prüfrouten: Godot 4.7.2, RTX 3060, 1152 × 648,
 Zoom 1, ohne Netzwerk und Gegner-KI; 240 Bilder pro Route, die ersten 30
 nicht gewertet. Bewegung: 60 Bilder stehen, 90 hin, 90 zurück.
+Ausgangsstand: lokaler Commit `57832b5`; Optimierung: `b9a6219`.
 
 | Route | P95 vorher | P95 nachher | P99 vorher | P99 nachher |
 |---|---:|---:|---:|---:|
@@ -104,7 +109,10 @@ damit parallele App-Prüfungen ihre gemeinsame Touch-Konfiguration nicht ändern
 Zwei zusätzliche WebSocket-Speicherprüfungen gegen einen lokalen Testserver
 bestanden. Vorhandene Ressourcenfreigabe-/Enginewarnungen bleiben in den Logs;
 Erfolg bedeutet Rückgabecode 0 ohne `SCRIPT ERROR`, entsprechend der CI.
-Der normale Webexport ist erfolgreich. Die isolierte interaktive
+Web- und Linux-Serverexport sind erfolgreich. Die zunächst fehlenden
+Linuxvorlagen wurden aus dem offiziellen, SHA256-geprüften Godot-Archiv
+ergänzt. Unter Windows wurde das Linuxprogramm nicht ausgeführt; den Start
+prüft die Linux-CI. Die isolierte interaktive
 Browservorschau startet und lässt das Intro überspringen. Blütenwiesen und
 Pilzwald zeigen im verbundenen Chromium-Browser aktive 3D-Ausgabe
 (`active_3d=true`, 72 bzw. 106 Objekte, 1371 bzw. 1235 geprüfte Bildpunkte).
