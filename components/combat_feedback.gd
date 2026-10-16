@@ -1,4 +1,5 @@
 extends RefCounted
+const EffectFrames=preload("res://components/quality_effect_frames.gd")
 ## Presentation only: authoritative HP and projectile damage remain untouched.
 var bars:Dictionary={}
 var breaks:Array=[]
@@ -46,7 +47,7 @@ func draw(c:CanvasItem)->void:
 			var p:Vector2=hit["pos"]+direction*(3+age*(35+n*7))+Vector2(0,age*age*100)
 			if arrow:c.draw_line(p,p+direction*(4+n%3),Color(tint,fade),2)
 			else:c.draw_rect(Rect2(p.round(),Vector2.ONE*(3 if n%2 else 2)),Color(tint,fade))
-		if not arrow:c.draw_arc(hit["pos"],3+age*31,0,TAU,12,Color(tint,fade*.5),2)
+		if not arrow:EffectFrames.paint(c,hit["pos"],age,str(hit["element"]))
 static func break_sound(arrow:bool)->AudioStreamWAV:
 	var rate:=22050
 	var count:=roundi(rate*.16)

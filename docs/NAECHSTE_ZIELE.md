@@ -1,8 +1,39 @@
 # Sonnenhain – nächste Ziele
 
-Aktueller priorisierter Arbeitsplan vom 12. Oktober 2026:
+16.10.2026 · Umsetzung: Erstes Grafik-/Leistungspaket lokal eingebaut und
+geprüft. Stabile Atlasseiten, Minimapcache, Kampfvorbereitung, Effektfolgen
+und persönlicher Dorfschmuck sind angebunden. 23 neue Modelle, neun
+Kriegeranimationen, Ragdoll und Porträts stehen im Grafiklabor.
+[Stand, Messwerte, Vorschaubilder und offene Arbeit](QUALITY_V1_UMSETZUNG.md).
+Nächste Priorität: Browser-/Koopvergleich, PR/CI und kleiner Gebietspilot.
+Online-Lags sind noch nicht nachweislich behoben; keine Live-Schaltung.
+
+16.10.2026: Angelo priorisiert deutlich flüssigeres Spiel und feste
+Gegenstände wie Mauern. [Neues Grafik-/Gameplay-/Leistungskonzept](GRAFIK_GAMEPLAY_PERFORMANCE_KONZEPT.md):
+statische und dynamische Darstellung trennen, feste Module und Rendercaches
+erproben, erst danach den grafisch verbesserten Tor-/Hof-Piloten umsetzen.
+Status Konzept; keine gemessene Lag-Behebung oder neue Spielumsetzung.
+
+16.10.2026: Angelo meldet **Lags seit den 3D-Modellen auf den Maps**.
+Allgemeiner Online-/Leistungsfehler, nicht auf den Golem beschränkt.
+P1 vor weiterem breitem 3D-Ausbau, bei unspielbarem Verlauf P0.
+[Befund und Untersuchungsplan](SERVER_LAGS_3D.md); Ursache noch unbestätigt.
+
+16.10.2026: Eigenes [Verbesserungskonzept](VERBESSERUNGSKONZEPT.md)
+auf Angelos Auftrag erstellt: verständlicher Einstieg, lesbare Kämpfe,
+freiwillige Entdeckungen, sichtbare persönliche Dorfreaktionen und Fusionen
+als Schwerpunkt. Erstes vorgeschlagenes Paket: „Heimkehr nach Sonnenhain“.
+Status: Konzept; keine Spieländerungen oder neuen Prüfergebnisse.
+
+Aktueller priorisierter Arbeitsplan, ergänzt am 16. Oktober 2026:
 [ARBEITSPLAN.md](ARBEITSPLAN.md). Er legt Reihenfolge, Wichtigkeit,
 Status und Abschlusskriterien fest; die Konzepte darunter liefern die Details.
+
+16.10.2026: [Nächste Qualitätsstufe mit Blender, ComfyUI, Inkscape und Krita](NEXT_LEVEL_PLAN.md)
+ergänzt: gemeinsames Stilblatt, klare Quell-/Exportwege, Krieger-Pilot und
+anschließender Ausbau von Monstern, UI und Ausrüstung. Einstieg, Browser/Golem
+und Fortschrittsregeln bleiben die ersten Umsetzungspakete. Planungsänderung,
+noch keine neuen Assets, Installationen oder Veröffentlichung.
 
 12.10.2026: Erstes Einstiegspaket lokal geprüft (134 Projektprüfungen grün):
 kleine Schritte decken die Karte auf, Laden beachtet echte Gebietssperren,

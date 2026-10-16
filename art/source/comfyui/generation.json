@@ -1,0 +1,103 @@
+{
+  "model": "v1-5-pruned-emaonly-fp16.safetensors",
+  "sha256": "e9476a13728cd75d8279f6ec8bad753a66a1957ca375a1464dc63b37db6e3916",
+  "model_source": "https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive",
+  "license": "CreativeML OpenRAIL-M; Quelle/Lizenz vor Weitergabe prüfen",
+  "system": {
+    "system": {
+      "os": "win32",
+      "ram_total": 34276450304,
+      "ram_free": 18556583936,
+      "comfyui_version": "0.41.0",
+      "required_frontend_version": "1.55.17",
+      "installed_templates_version": "0.11.86",
+      "required_templates_version": "0.11.86",
+      "comfy_package_versions": [
+        {
+          "name": "comfyui-frontend-package",
+          "installed": "1.55.17",
+          "required": "1.55.17"
+        },
+        {
+          "name": "comfyui-workflow-templates",
+          "installed": "0.11.86",
+          "required": "0.11.86"
+        },
+        {
+          "name": "comfyui-embedded-docs",
+          "installed": "0.5.14",
+          "required": "0.5.14"
+        },
+        {
+          "name": "comfy-kitchen",
+          "installed": "0.2.37",
+          "required": "0.2.37"
+        },
+        {
+          "name": "comfy-aimdo",
+          "installed": "0.5.6",
+          "required": "0.5.6"
+        }
+      ],
+      "python_version": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+      "pytorch_version": "2.11.0+cu128",
+      "embedded_python": false,
+      "deploy_environment": "local-git",
+      "argv": [
+        "E:\\Sonnenhain-Tools\\ComfyUI-Backend\\main.py",
+        "--listen",
+        "127.0.0.1",
+        "--port",
+        "8188",
+        "--disable-auto-launch",
+        "--output-directory",
+        "C:\\Users\\angel\\OneDrive\\Dokumente\\ChatGPT\\SonnenhainRPG\\release-20261011\\build\\comfy-output"
+      ]
+    },
+    "devices": [
+      {
+        "name": "cuda:0 NVIDIA GeForce RTX 3060 : cudaMallocAsync",
+        "type": "cuda",
+        "index": 0,
+        "vram_total": 12884246528,
+        "vram_free": 9589565950,
+        "torch_vram_total": 33554432,
+        "torch_vram_free": 23407102
+      }
+    ]
+  },
+  "assets": [
+    {
+      "name": "mira_portrait",
+      "seed": 2026101621,
+      "prompt": "close up portrait painting of one person, head and shoulders only, one face centered in frame, detailed eyes, warm golden light, plain dark teal background, beautiful painterly fantasy illustration, single subject, one wise elderly woman, silver hair in a bun, purple shawl, gentle warm smile, kindly grandmother, modest clothing",
+      "negative": "text, lettering, watermark, logo, extra limbs, extra fingers, blurry, disfigured, duplicate face, two people, multiple people, full body, collage, grid, contact sheet, character sheet, lineup, turban, hat, line art, sketch, anime, modern clothes, plastic, 3d render",
+      "path": "art\\concepts\\quality_v1\\mira_portrait.png",
+      "status": "Entwurf, visuell prüfen"
+    },
+    {
+      "name": "fenna_portrait",
+      "seed": 2026101622,
+      "prompt": "close up portrait painting of one person, head and shoulders only, one face centered in frame, detailed eyes, warm golden light, plain dark teal background, beautiful painterly fantasy illustration, single subject, one woman with chestnut brown bob haircut, teal blouse, leather apron, friendly confident smile",
+      "negative": "text, lettering, watermark, logo, extra limbs, extra fingers, blurry, disfigured, duplicate face, two people, multiple people, full body, collage, grid, contact sheet, character sheet, lineup, turban, hat, line art, sketch, anime, modern clothes, plastic, 3d render",
+      "path": "art\\concepts\\quality_v1\\fenna_portrait.png",
+      "status": "Entwurf, visuell prüfen"
+    },
+    {
+      "name": "borin_portrait",
+      "seed": 2026101623,
+      "prompt": "close up portrait painting of one person, head and shoulders only, one face centered in frame, detailed eyes, warm golden light, plain dark teal background, beautiful painterly fantasy illustration, single subject, one wise elderly man with short grey hair and grey beard, blue cloak, amber brooch, gentle smile",
+      "negative": "text, lettering, watermark, logo, extra limbs, extra fingers, blurry, disfigured, duplicate face, two people, multiple people, full body, collage, grid, contact sheet, character sheet, lineup, turban, hat, line art, sketch, anime, modern clothes, plastic, 3d render",
+      "path": "art\\concepts\\quality_v1\\borin_portrait.png",
+      "status": "Entwurf, visuell prüfen"
+    },
+    {
+      "name": "moss_architecture",
+      "seed": 2026101624,
+      "prompt": "stylized hand painted fantasy game environment concept, modular ancient mossy stone wall and small stone arch, orthographic three quarter view, chunky irregular pale limestone blocks, teal shadows, moss green accents, warm soft light, isolated on plain dark teal background, readable shapes, restrained detail, no people, no text",
+      "negative": "text, lettering, watermark, logo, extra limbs, extra fingers, blurry, disfigured, duplicate face, two people, multiple people, full body, collage, grid, contact sheet, character sheet, lineup, turban, hat, line art, sketch, anime, modern clothes, plastic, 3d render",
+      "path": "art\\concepts\\quality_v1\\moss_architecture.png",
+      "status": "Entwurf, visuell prüfen"
+    }
+  ]
+}

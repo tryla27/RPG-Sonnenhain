@@ -6,6 +6,19 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Grafik-/Leistungspaket 16.10.: stabile Atlasseiten für echte 3D-Körper,
+  begrenzter Rückweg-/Geometriecache, Minimap-Geländecache und
+  ereignisabhängige Renderupdates.
+  Messwerkzeug mit nativer Vergleichsroute; Online-Lags noch nicht als gelöst bestätigt.
+- Klarere Vorbereitungsflächen, elementabhängige Effektfolgen, Questzeichen,
+  persönlicher Heimkehrschmuck und P95/P99 in der Leistungsanzeige.
+  Keine Änderung von Schaden, XP, Kollisionen oder gespeicherten Belohnungen.
+- Reproduzierbare Blender-/Inkscape-/Krita-Produktion: 23 GLB-Modelle,
+  Kriegerskelett mit neun Aktionen, sechs Iconmotive, Effektfolgen, Materialien
+  und Kartenentwurf. Isoliertes Grafiklabor; breite Modellübernahme ausstehend.
+- Lokale ComfyUI-Workflows und erste Porträt-/Architekturentwürfe.
+  Quellen unter `art/source/` werden nicht in den Godot-Import übernommen.
+
 - Prolog und Startmeldung nennen Miras tatsächlichen Standort im Rathaus
   von Sonnenhain statt den früheren Dorfplatz.
 

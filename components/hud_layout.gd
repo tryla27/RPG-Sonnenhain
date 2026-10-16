@@ -1,4 +1,5 @@
 extends RefCounted
+const QUEST_ICON=preload("res://art/ui/quality_v1/quest_32.png")
 const FoodSystem=preload("res://components/food_system.gd")
 # Schlankes HUD: Lage der HUD-Teile und Zeichnen der Statusbalken, der
 # Questzeile, der XP-Linie und des Kartennamens unter der Minimap.
@@ -82,7 +83,7 @@ static func draw_quest_line(g,rect:Rect2,text:String,hovered:bool)->void:
 	g.draw_rect(rect,Color(0.03,0.07,0.1,0.72 if hovered else 0.5))
 	g.draw_rect(Rect2(rect.position,Vector2(3,rect.size.y)),Color("e3c077"))
 	if hovered:g.draw_rect(rect,Color("ffe0a0",0.7),false,1.0)
-	g.text_at(rect.position+Vector2(12,17),"ZIEL",11,Color("e3c077"))
+	g.draw_texture_rect(QUEST_ICON,Rect2(rect.position+Vector2(12,3),Vector2(20,20)),false)
 	shadow_text(g,rect.position+Vector2(50,17),text,14,Color("fff2d9"),HORIZONTAL_ALIGNMENT_LEFT,int(rect.size.x)-60)
 
 static func draw_map_label(g,label:String)->void:

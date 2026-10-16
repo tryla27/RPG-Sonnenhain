@@ -1,6 +1,10 @@
 extends RefCounted
-const VERSION="PATCH 12.10.2026"
+const VERSION="PATCH 16.10.2026"
 const NOTES=[
+["Technik · Feste Landschaft", "Mauern und Landschaftskörper behalten feste Plätze im 3D-Atlas. Ruhende Seiten werden wiederverwendet, Geometrieabfragen zwischengespeichert und seltene Bewegungen gemeinsam getaktet. Wege und Kollisionen bleiben gleich. Die Untersuchung der Online-Lags läuft weiter."],
+["Kampf · Klarere Vorbereitung und Treffer", "Vorbereitete Nah- und Flächenangriffe zeigen ihre Reichweite deutlicher. Elementabhängige kurze Aufprallbilder ergänzen Treffer. Schaden, Reichweiten und Angriffszeiten bleiben gleich; der Wolf kündigt seinen Sprung weiterhin über seine Pose an."],
+["Dorf · Sichtbare Heimkehr", "Nach abgeschlossener Hilfe für Tessa, Blütenweilers Rettung und dem Finale zeigt der Dorf-Wegstein persönlichen Blütenschmuck. Dafür zählt dein vorhandener Fortschritt; Gegenstände und Belohnungen werden nicht erneut vergeben."],
+["Oberfläche · Questzeichen und Leistung", "Ein einheitliches Questzeichen markiert die Zielzeile. Die Minimap verwendet gespeicherte Geländefarben; Erkundung und bewegliche Marker bleiben aktuell. F3 zeigt zusätzlich P95 und P99 der Bildzeiten, damit kurze Ruckler besser erkennbar werden."],
 ["Einstieg · Mira im Rathaus", "Der Prolog und die Startmeldung führen dich jetzt zum Rathaus von Sonnenhain, wo Mira tatsächlich ihre Aufträge vergibt."],
 ["Erkundung · Kleine Schritte bleiben sichtbar", "Auch beim langsamen Laufen wird die Karte jetzt dauerhaft aufgedeckt. Vorher wurde die Bewegungsstrecke jedes Bild zurückgesetzt und neu besuchte Wege blieben nach dem Weitergehen dunkel."],
 ["Speichern · Gebietslevel sind Empfehlungen", "Wer mit niedrigem Level einen offenen Bereich erkundet, bleibt nach dem Laden dort. Die frühere Levelprüfung setzte dich trotz offenem Tor ins Dorf zurück und änderte den letzten Wegstein. Auch der Dorf-Wegstein bleibt nach erneutem Laden erhalten. Feste Hindernisse und tatsächlich versiegelte Gebiete bleiben geschützt."],

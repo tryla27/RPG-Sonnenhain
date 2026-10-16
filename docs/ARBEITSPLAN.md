@@ -1,14 +1,50 @@
 # Sonnenhain – verbindlicher Arbeitsplan
 
-Stand: 12. Oktober 2026. Auftrag von Angelo: einen verfolgbaren Plan erstellen und Aufgaben nach Wichtigkeit einteilen. Grundlage: `NAECHSTE_ZIELE.md` und `konzepte/2026-10-11-naechste-schritte/KONZEPT.md`.
+Umsetzung 16.10.: [Prüfbares erstes Grafik-/Leistungspaket](QUALITY_V1_UMSETZUNG.md)
+mit Werkzeugen, Messwerten, zehn Grafikvorhaben und Vorschaubildern. Die
+Renderer-/Minimapoptimierung ist lokal eingebaut, neue Modelle stehen im
+Grafiklabor. Der Live-Koopvergleich und die gebietsweise Übernahme bleiben offen.
+
+Stand: 16. Oktober 2026. Auftrag von Angelo: einen verfolgbaren Plan erstellen und Aufgaben nach Wichtigkeit einteilen. Grundlage: `NAECHSTE_ZIELE.md` und `konzepte/2026-10-11-naechste-schritte/KONZEPT.md`.
+
+Ergänzung vom 16.10.: [Plan für die nächste Qualitätsstufe](NEXT_LEVEL_PLAN.md)
+mit Bestandsaufnahme und Produktionsablauf für **Blender, ComfyUI, Inkscape
+und Krita**. Die P0-/P1-Reihenfolge bleibt bestehen; Werkzeugbasis und
+Stilblatt können vorbereitend entstehen. Danach folgt der Krieger als
+vollständige Qualitätsvorlage vor dem breiten Ausbau. Aktuelle Live-Version
+und frühere Prüfergebnisse wurden bei dieser Planergänzung nicht neu geprüft.
 
 ## Ausgangspunkt und Status
+
+Eigenes Gestaltungskonzept vom 16.10. auf Angelos Auftrag:
+[„Ein Dorf, das mit deinem Abenteuer wächst“](VERBESSERUNGSKONZEPT.md).
+Es konkretisiert den Qualitätsausbau durch einen besseren Einstieg,
+lesbare Begegnungen, freiwillige Entdeckungen und persönliche
+Heimkehrreaktionen. Erstes Inhaltspaket: „Heimkehr nach Sonnenhain“;
+Krieger-Grafikvorschau getrennt. Die P0-/P1-Aufgaben behalten Vorrang.
+Neue Mechaniken und Zielwerte sind Entwürfe, noch keine Umsetzung.
 
 Bestätigter Live-Stand: 12.10.2026, Commit `79bf21682ed6ba2f43c18e27a5785e7df9b9f7c2`, Einstiegspaket aus PR #134. Website und Spielserver liefern denselben Stand; öffentliche Verbindungs-, Mehrspieler- und Speicherprüfungen waren erfolgreich. Details: `konzepte/2026-10-11-startbereich/RELEASE_2026-10-12.md`. Lokaler Arbeitsstand: `release-20261011`, auf den Merge-Commit vorgerückt. Erzeugte Import-/UID-Dateien und lokale Fortschrittsdokumentation bleiben außerhalb des veröffentlichten Pakets. Vor weiterer Umsetzung den Hauptstand abgleichen; fremde Änderungen erhalten.
 
 Status je Aufgabe: **offen → in Arbeit → geprüft → zur Veröffentlichung bereit → live bestätigt**. Konzepte und vorhandene Testdateien allein zählen nicht als geprüfte Umsetzung. Datum, Prüfergebnis, Bilder und gegebenenfalls PR-/Commit-Verweis beim Abschluss unten eintragen.
 
 ## Prioritäten und Reihenfolge
+
+**Neue Schwerpunktsetzung 16.10. auf Angelos Auftrag:**
+[Flüssige Welt, feste Architektur, Grafik und Gameplay](GRAFIK_GAMEPLAY_PERFORMANCE_KONZEPT.md).
+Lag-Messung und ein Pilot mit festen Mauern, stabiler Ressourcenbelegung
+und getrenntem statischem/dynamischem Rendering rücken vor den breiten
+Grafikausbau. Danach Architekturset und kleine Gameplay-Verbesserung mit
+Blender, Krita, Inkscape und ComfyUI. Der Runtime-Cachepfad wird zunächst
+gegen persistente echte 3D-Instanzen geprüft; noch keine Technikübernahme.
+P0 bleibt vorrangig, Fortschritt und Speichern werden nicht fallen gelassen.
+
+**Neue Meldung 16.10.: Lags im Online-Spiel seit Einführung der
+3D-Landschaftsmodelle auf den Maps.** Als übergreifenden P1-Fehler vor
+weiterem breitem 3D-Ausbau untersuchen; bei unspielbaren Kämpfen/Abbrüchen
+oder Fortschrittsverlust P0. Erweitert Aufgabe 3 über Brave und Golem hinaus.
+[Fehlereintrag und Messplan](SERVER_LAGS_3D.md). Ursache noch offen;
+Client-Framezeiten, Serverlast und Netzwerkverzögerung gemeinsam prüfen.
 
 P0 = Spiel oder Fortschritt gefährdet; unterbricht andere Arbeit bei bestätigtem Fehler.
 P1 = wichtig für einen verlässlichen Einstieg und zusammenhängenden Fortschritt.
@@ -55,6 +91,11 @@ Keine vollständige Modularisierung nebenbei; sie bleibt pausiert. Keine automat
 
 **Aktuell:** Startmeldung und Prolog nennen das Rathaus korrekt; 135 lokale Tests einschließlich bewegter Schleim-/Käfer-Einzelkämpfe in allen drei Klassen bestehen. Folgepaket und interaktive Prüfszene werden zur Überprüfung vorbereitet. Der längere manuelle Browser-Durchgang wurde wegen Werkzeugunterbrechung nicht abgeschlossen und bleibt offen. Bericht: `konzepte/2026-10-12-einstieg/README.md`. Brave-/Golem-Nachweise bleiben ebenfalls offen. Danach folgt das Fortschrittspaket; seine Vorprüfung liegt in `konzepte/2026-10-12-fortschritt/VORPRUEFUNG.md`. PR #134 bleibt der bestätigte Live-Stand `79bf216`.
 
+Folgepaket lokal committet als `57832b5` auf `fix/start-intro-combat-20261012`.
+Die automatische Freigabeprüfung hat den Branch-Push abgelehnt, weil sie
+eine konkrete Freigabe für den öffentlichen Upload dieses Folgepakets
+verlangt. Kein Upload, PR, Merge oder Live-Gang dieses Folgepakets erfolgt.
+
 Upload am 12.10.2026 von Angelo nach konkreter Rückfrage mit „ok weiter“
 freigegeben. Branch `fix/start-area-validation-20261011` hochgeladen;
 [PR #134](https://github.com/tryla27/RPG-Sonnenhain/pull/134) angelegt.
@@ -80,3 +121,4 @@ erfolgt. Android bleibt zurückgestellt.
 | 12.10.2026 | Veröffentlichung gestartet | Merge und Live-Gang freigegeben; PR #134 als `79bf216` mit `[deploy]` zusammengeführt; Website- und Server-Workflow gestartet | Erfolgreiche Auslieferung, Versionsgleichheit und öffentliche Mehrspielerprüfung bestätigen |
 | 12.10.2026 | Live bestätigt | Website- und Server-Deploy erfolgreich, Versionsgleichheit für `79bf216` bestätigt. Öffentliche TLS/WSS-, Zwei-Spieler- und Speicher-/Reconnect-Prüfungen bestanden. Bericht: `konzepte/2026-10-11-startbereich/RELEASE_2026-10-12.md` | Starttexte und manuellen Einstieg fortsetzen |
 | 12.10.2026 | Einstieg-Folgepaket | Starttexte korrigiert, HUD-Meldung ungekürzt sichtbar; 135 Tests grün, sechs KI-Einzelkämpfe bestehen. Interaktive Prüfszene vorbereitet; manueller Browser-Durchgang wegen Werkzeugunterbrechung offen | Folgepaket über PR/CI prüfen; manuellen Durchgang fortsetzen |
+| 12.10.2026 | Folgepaket-Übergabe | Commit `57832b5` lokal fertig; öffentlicher Upload durch automatische Prüfung wegen fehlender konkreter Payload-Freigabe abgelehnt | Freigabe für dieses Folgepaket einholen |

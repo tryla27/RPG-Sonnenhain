@@ -5,6 +5,7 @@
 extends Node2D
 const WorldObstacles3D=preload("res://components/world_obstacles_3d.gd")
 var world_obstacles_3d:=WorldObstacles3D.new()
+var minimap_ground_cache:=preload("res://components/minimap_ground_cache.gd").new()
 const PatchNotice = preload("res://components/patch_notice.gd")
 const PatchNotes = preload("res://components/patch_notes.gd")
 const MenuFeedback = preload("res://components/menu_feedback.gd")
@@ -9625,15 +9626,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 		if float(state.get("age",0))<float(MobCombat.attack_timing(profile,state.get("ability",{}))["windup"]):
 			var ability:Dictionary=state["ability"]
 			var warn:Color=[Color("f36f5d",.72),Color("ba7cff",.72),Color("9cdd72",.72)][type-12] if boss else Color("efd49a",.6)
-			if ability["shape"]=="cloud":
-				draw_arc(p,float(ability["range"]),0,TAU,48,Color("b9d965",.75),2)
-			elif ability["shape"]=="leap":
-				pass # Wolf anticipation is shown by its pose, without a target marker.
-			elif ability["shape"]=="line":
-				PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.25),20)
-			elif ability["shape"]=="arc":
-				PixelStyle32.arc(self,p,float(ability["range"]),aim.angle()-float(ability["half_angle"]),aim.angle()+float(ability["half_angle"]),18,warn,2)
-			else:PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.3),2)
+			preload("res://components/attack_telegraph.gd").paint(self,p,aim,ability,warn,float(state.get("age",0))/maxf(.001,float(MobCombat.attack_timing(profile,ability)["windup"])))
 	var enemy_color:Color=ENEMY_TYPES[type]["color"]
 	var model_pos:Vector2=p
 	var stride:float=world_time*(3.5 if bool(profile["heavy"]) else 7.0) if bool(enemy.get("walking",false)) else 0.0
@@ -10611,18 +10604,7 @@ func draw_local_minimap(rect: Rect2) -> void:
 	var radius := 1500.0
 	var scale_map := inset.size / (radius * 2.0)
 	var start := player_pos - Vector2(radius, radius)
-	for gx in 21:
-		for gy in 21:
-			var point := start + Vector2((gx + 0.5) * radius * 2.0 / 21.0, (gy + 0.5) * radius * 2.0 / 21.0)
-			var area := visual_region_at(point)
-			var tint: Color = [Color("699b73"), Color("7da66b"), Color("365b50"), Color("535b61"), Color("355a68"), Color("755045"), Color("b7a578"), Color("48415c"), Color("52696a"), Color("a48a52"), Color("477579"), Color("575b73"), Color("6e6384")][area]
-			if area == 0:
-				var ground_kind := StartTileMap32.kind_at(point)
-				if ground_kind == 2: tint = Color("a4aa91")
-				elif ground_kind == 1: tint = Color("a0b47d")
-			elif distance_to_trail(point) < 110: tint = Color("d2ba86")
-			if not world_fog.explored_world(point): tint = Color("0b1218")
-			draw_rect(Rect2(inset.position + Vector2(gx, gy) * inset.size / 21.0, inset.size / 21.0 + Vector2.ONE), tint)
+	minimap_ground_cache.paint(self,inset,start,radius)
 	for stone in WAYSTONES:
 		var p: Vector2 = inset.position + (stone - start) * scale_map
 		if inner.has_point(p) and world_fog.explored_world(stone): draw_circle(p, 3, Color("8af0e9"))
@@ -12183,6 +12165,7 @@ func draw_atlas_crystal(point: Vector2) -> void:
 func draw_waystone(p: Vector2) -> void:
 	if p==WAYSTONES[0]:
 		SpawnPlatform32.core(self,p-Vector2(0,16))
+		preload("res://components/homecoming_decor.gd").paint(self,p,event_states,rescue_state,final_completed)
 		return
 	var active := false
 	for i in WAYSTONES.size():
