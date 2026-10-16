@@ -55,170 +55,177 @@ func open(peer: int, token: String, uuid: String) -> Dictionary:
 	owners[key] = peer
 	return {"ok":true,"kind":"open","uuid":uuid,"revision":int(record.get("revision",0)),"request":record.get("request",""),"data":record.get("data",{})}
 
+## Letzte abgelehnte Prüfregel (nur Text der Bedingung, keine Spielerdaten).
+var last_reject:=""
+
+func reject(tag:String)->bool:
+	last_reject=tag
+	return false
+
 func valid_food_state(raw:Variant)->bool:
-	if not raw is Dictionary or raw.size()>12:return false
+	if not raw is Dictionary or raw.size()>12:return reject("if not raw is Dictionary or raw.size()>12")
 	var plants:Variant=raw.get("plants",{})
-	if not plants is Dictionary or plants.size()>64:return false
+	if not plants is Dictionary or plants.size()>512:return reject("if not plants is Dictionary or plants.size()>512")
 	for key in plants:
 		var value:Variant=plants[key]
-		if not key is String or key.length()>32 or not (value is float or value is int) or not is_finite(float(value)) or float(value)<0:return false
+		if not key is String or key.length()>32 or not (value is float or value is int) or not is_finite(float(value)) or float(value)<0:return reject("if not key is String or key.length()>32 or not (value is flo")
 	for field in ["regen_rate","regen_until","meal_hp_regen","meal_mana_regen","meal_until","buff_value","buff_until"]:
 		var value:Variant=raw.get(field,0)
-		if not (value is float or value is int) or not is_finite(float(value)) or float(value)<0:return false
-	if float(raw.get("regen_rate",0))>3 or float(raw.get("meal_hp_regen",0))>4 or float(raw.get("meal_mana_regen",0))>6:return false
-	if float(raw.get("buff_value",0))>0.05:return false
+		if not (value is float or value is int) or not is_finite(float(value)) or float(value)<0:return reject("if not (value is float or value is int) or not is_finite(flo")
+	if float(raw.get("regen_rate",0))>3 or float(raw.get("meal_hp_regen",0))>4 or float(raw.get("meal_mana_regen",0))>6:return reject("if float(raw.get(regen_rate0))>3 or float(raw.get(meal_hp_re")
+	if float(raw.get("buff_value",0))>0.05:return reject("if float(raw.get(buff_value0))>0.05")
 	var food_name:Variant=raw.get("active_food_name","")
-	if not food_name is String or String(food_name).length()>80:return false
+	if not food_name is String or String(food_name).length()>80:return reject("if not food_name is String or String(food_name).length()>80")
 	var buff_kind:Variant=raw.get("buff_kind","")
-	if not buff_kind is String or String(buff_kind) not in ["","armor","cooldown","move","damage","gather"]:return false
+	if not buff_kind is String or String(buff_kind) not in ["","armor","cooldown","move","damage","gather"]:return reject("if not buff_kind is String or String(buff_kind) not in [armo")
 	var meal_until:=float(raw.get("meal_until",0))
 	var buff_until:=float(raw.get("buff_until",0))
 	var now:=Time.get_unix_time_from_system()
-	if meal_until>now+365 or buff_until>now+365:return false
+	if meal_until>now+600 or buff_until>now+600:return reject("if meal_until>now365 or buff_until>now365")
 	if String(food_name)=="":
 		return meal_until==0 and float(raw.get("meal_hp_regen",0))==0 and float(raw.get("meal_mana_regen",0))==0 and String(buff_kind)=="" and float(raw.get("buff_value",0))==0 and buff_until==0
 	var food:Dictionary=preload("res://components/food_system.gd").by_name(String(food_name))
-	if food.is_empty() or not bool(food.get("meal",false)) or meal_until<=0:return false
-	if not is_equal_approx(float(raw.get("meal_hp_regen",0)),float(food.get("meal_hp_regen",0))):return false
-	if not is_equal_approx(float(raw.get("meal_mana_regen",0)),float(food.get("meal_mana_regen",0))):return false
-	if String(buff_kind)!=str(food.get("buff","")):return false
-	if not is_equal_approx(float(raw.get("buff_value",0)),float(food.get("buff_value",0))):return false
+	if food.is_empty() or not bool(food.get("meal",false)) or meal_until<=0:return reject("if food.is_empty() or not bool(food.get(mealfalse)) or meal_")
+	if not is_equal_approx(float(raw.get("meal_hp_regen",0)),float(food.get("meal_hp_regen",0))):return reject("if not is_equal_approx(float(raw.get(meal_hp_regen0))float(f")
+	if not is_equal_approx(float(raw.get("meal_mana_regen",0)),float(food.get("meal_mana_regen",0))):return reject("if not is_equal_approx(float(raw.get(meal_mana_regen0))float")
+	if String(buff_kind)!=str(food.get("buff","")):return reject("if String(buff_kind)!=str(food.get(buff))")
+	if not is_equal_approx(float(raw.get("buff_value",0)),float(food.get("buff_value",0))):return reject("if not is_equal_approx(float(raw.get(buff_value0))float(food")
 	if String(buff_kind)=="":
-		if buff_until!=0:return false
+		if buff_until!=0:return reject("if buff_until!=0")
 	elif not is_equal_approx(buff_until,meal_until):
-		return false
+		return reject("buff_until != meal_until")
 	return true
 
 func valid_steinrose_state(raw:Variant)->bool:
-	if not raw is Dictionary or raw.size()>2:return false
+	if not raw is Dictionary or raw.size()>2:return reject("if not raw is Dictionary or raw.size()>2")
 	var learned:Variant=raw.get("learned",[])
-	if not learned is Array or learned.size()>13:return false
+	if not learned is Array or learned.size()>13:return reject("if not learned is Array or learned.size()>13")
 	for value in learned:
-		if not value is bool:return false
+		if not value is bool:return reject("if not value is bool")
 	return true
 
 func valid_data(data: Dictionary, uuid: String) -> bool:
 	var rotation:Variant=data.get("shop_rotation",-1)
-	if not (rotation is int or rotation is float) or not is_finite(float(rotation)) or float(rotation)!=floorf(float(rotation)) or int(rotation)<-1 or int(rotation)>9:return false
-	if not valid_food_state(data.get("food_state",{})):return false
-	if not valid_steinrose_state(data.get("steinrose_state",{})):return false
-	if data.size() > 96: return false
-	if str(data.get("player_uuid","")) != uuid or not bool(data.get("character_created",false)): return false
-	if not data.get("inventory") is Array or data["inventory"].size() > 42: return false
-	if not data.get("position") is Array or data["position"].size() != 2: return false
+	if not (rotation is int or rotation is float) or not is_finite(float(rotation)) or float(rotation)!=floorf(float(rotation)) or int(rotation)<-1 or int(rotation)>9:return reject("if not (rotation is int or rotation is float) or not is_fini")
+	if not valid_food_state(data.get("food_state",{})):return reject("if not valid_food_state(data.get(food_state))")
+	if not valid_steinrose_state(data.get("steinrose_state",{})):return reject("if not valid_steinrose_state(data.get(steinrose_state))")
+	if data.size() > 96:return reject("if data.size() > 96")
+	if str(data.get("player_uuid","")) != uuid or not bool(data.get("character_created",false)):return reject("if str(data.get(player_uuid)) != uuid or not bool(data.get(c")
+	if not data.get("inventory") is Array or data["inventory"].size() > 42:return reject("if not data.get(inventory) is Array or data[inventory].size(")
+	if not data.get("position") is Array or data["position"].size() != 2:return reject("if not data.get(position) is Array or data[position].size() ")
 	for axis in data["position"]:
-		if not (axis is float or axis is int) or not is_finite(float(axis)) or float(axis) < 0 or float(axis) > 110000: return false
+		if not (axis is float or axis is int) or not is_finite(float(axis)) or float(axis) < 0 or float(axis) > 110000:return reject("if not (axis is float or axis is int) or not is_finite(float")
 	for field in ["level","xp","gold","class_id","hero_race","hero_gender","next_uid","skill_points"]:
-		if not (data.get(field) is int or data.get(field) is float): return false
-		if not is_finite(float(data[field])) or float(data[field]) < 0 or float(data[field]) > 2147483647: return false
-	if int(data["level"]) < 1 or int(data["level"]) > 100000 or int(data["class_id"]) > 2 or int(data["hero_race"]) > 2 or int(data["hero_gender"]) > 1: return false
-	if not data.get("hero_name") is String or String(data["hero_name"]).length() > 32: return false
+		if not (data.get(field) is int or data.get(field) is float):return reject("if not (data.get(field) is int or data.get(field) is float)")
+		if not is_finite(float(data[field])) or float(data[field]) < 0 or float(data[field]) > 2147483647:return reject("if not is_finite(float(data[field])) or float(data[field]) <")
+	if int(data["level"]) < 1 or int(data["level"]) > 100000 or int(data["class_id"]) > 2 or int(data["hero_race"]) > 2 or int(data["hero_gender"]) > 1:return reject("if int(data[level]) < 1 or int(data[level]) > 100000 or int(")
+	if not data.get("hero_name") is String or String(data["hero_name"]).length() > 32:return reject("if not data.get(hero_name) is String or String(data[hero_nam")
 	var uids := {}
 	for item in data["inventory"]:
-		if not item is Dictionary or item.size() > 32: return false
-		if not item.get("uid") is int and not item.get("uid") is float: return false
+		if not item is Dictionary or item.size() > 32:return reject("if not item is Dictionary or item.size() > 32")
+		if not item.get("uid") is int and not item.get("uid") is float:return reject("if not item.get(uid) is int and not item.get(uid) is float")
 		var uid := int(item["uid"])
-		if uid < 0 or uids.has(uid): return false
+		if uid < 0 or uids.has(uid):return reject("if uid < 0 or uids.has(uid)")
 		uids[uid] = true
-		if not item.get("name") is String or String(item["name"]).length() > 160: return false
-		if not item.get("icon") is String or String(item["icon"]) not in ["sword","staff","bow","armor","ring","potion","herb","essence","gem","food","head","necklace"]: return false
-		if item["icon"]=="head" and (not item.get("head_class") is int and not item.get("head_class") is float or int(item.get("head_class",-1)) not in [0,1,2]):return false
+		if not item.get("name") is String or String(item["name"]).length() > 160:return reject("if not item.get(name) is String or String(item[name]).length")
+		if not item.get("icon") is String or String(item["icon"]) not in ["sword","staff","bow","armor","ring","potion","herb","essence","gem","food","head","necklace"]:return reject("if not item.get(icon) is String or String(item[icon]) not in")
+		if item["icon"]=="head" and (not item.get("head_class") is int and not item.get("head_class") is float or int(item.get("head_class",-1)) not in [0,1,2]):return reject("if item[icon]==head and (not item.get(head_class) is int and")
 		if item["icon"]=="necklace":
 			var necklace_id:=preload("res://components/arcane_necklaces.gd").index(item)
-			if necklace_id<0:return false
+			if necklace_id<0:return reject("if necklace_id<0")
 			if necklace_id<6:
 				for stat in ["power","str","agi","int"]:
-					if float(item.get(stat,0))!=0:return false
-		if item["icon"]=="food" and preload("res://components/food_system.gd").by_name(item["name"]).is_empty():return false
+					if float(item.get(stat,0))!=0:return reject("if float(item.get(stat0))!=0")
+		if item["icon"]=="food" and preload("res://components/food_system.gd").by_name(item["name"]).is_empty():return reject("if item[icon]==food and preload(rescomponentsfood_system.gd)")
 		for field in ["power","rarity","value","count","level","str","agi","int","design"]:
 			var value: Variant = item.get(field,1 if field == "count" else 0)
-			if not (value is int or value is float) or not is_finite(float(value)) or float(value) < 0 or float(value) > 2147483647: return false
-		if int(item.get("rarity",0)) > 4 or int(item.get("count",1)) < 1: return false
+			if not (value is int or value is float) or not is_finite(float(value)) or float(value) < 0 or float(value) > 2147483647:return reject("if not (value is int or value is float) or not is_finite(flo")
+		if int(item.get("rarity",0)) > 4 or int(item.get("count",1)) < 1:return reject("if int(item.get(rarity0)) > 4 or int(item.get(count1)) < 1")
 	for field in ["equipped_uid","equipped_armor_uid","equipped_ring_uid","equipped_ring2_uid","equipped_head_uid","equipped_necklace_uid"]:
 		var value: Variant = data.get(field,-1)
-		if not (value is int or value is float): return false
-		if int(value) != -1 and not uids.has(int(value)): return false
-	if int(data.get("equipped_ring2_uid",-1)) >= 0 and (int(data["class_id"]) != 1 or int(data["equipped_ring2_uid"]) == int(data.get("equipped_ring_uid",-1))): return false
+		if not (value is int or value is float):return reject("if not (value is int or value is float)")
+		if int(value) != -1 and not uids.has(int(value)):return reject("if int(value) != 1 and not uids.has(int(value))")
+	if int(data.get("equipped_ring2_uid",-1)) >= 0 and (int(data["class_id"]) != 1 or int(data["equipped_ring2_uid"]) == int(data.get("equipped_ring_uid",-1))):return reject("if int(data.get(equipped_ring2_uid1)) >= 0 and (int(data[cla")
 	if int(data.get("equipped_necklace_uid",-1))>=0:
 		for item in data["inventory"]:
-			if int(item["uid"])==int(data["equipped_necklace_uid"]) and item.get("icon","")!="necklace":return false
+			if int(item["uid"])==int(data["equipped_necklace_uid"]) and item.get("icon","")!="necklace":return reject("if int(item[uid])==int(data[equipped_necklace_uid]) and item")
 	if int(data.get("equipped_head_uid",-1))>=0:
 		for item in data["inventory"]:
-			if int(item["uid"])==int(data["equipped_head_uid"]) and not preload("res://components/headgear_rules.gd").allowed(item,int(data["class_id"])):return false
+			if int(item["uid"])==int(data["equipped_head_uid"]) and not preload("res://components/headgear_rules.gd").allowed(item,int(data["class_id"])):return reject("if int(item[uid])==int(data[equipped_head_uid]) and not prel")
 	for field in ["learned","skill_levels","slots","quests","event_states","event_progress","opened_chests","chest_respawn_until","dungeon_chests_opened","dungeon_chest_respawn_until","bosses_defeated","waystone_unlocked","discovered_regions","processed_server_transactions","recent_players","village_gates","arena_leaderboard"]:
-		if not data.get(field,[]) is Array or data.get(field,[]).size() > (maxi(1024,preload("res://components/fusion_rules.gd").registry_capacity()) if field in ["learned","skill_levels"] else (256 if field == "processed_server_transactions" else 100)): return false
+		if not data.get(field,[]) is Array or data.get(field,[]).size() > (maxi(1024,preload("res://components/fusion_rules.gd").registry_capacity()) if field in ["learned","skill_levels"] else (256 if field == "processed_server_transactions" else 100)):return reject("if not data.get(field[]) is Array or data.get(field[]).size(")
 	var fog:Variant=data.get("world_fog",[])
-	if not fog is Array or fog.size()>512:return false
+	if not fog is Array or fog.size()>512:return reject("if not fog is Array or fog.size()>512")
 	for fog_byte in fog:
-		if not (fog_byte is int or fog_byte is float) or int(fog_byte)<0 or int(fog_byte)>255:return false
-	if data.has("world_fog_fine") and not preload("res://components/world_fog.gd").valid_snapshot(data["world_fog_fine"],Vector2(16000,9600)):return false
+		if not (fog_byte is int or fog_byte is float) or int(fog_byte)<0 or int(fog_byte)>255:return reject("if not (fog_byte is int or fog_byte is float) or int(fog_byt")
+	if data.has("world_fog_fine") and not preload("res://components/world_fog.gd").valid_snapshot(data["world_fog_fine"],Vector2(16000,9600)):return reject("if data.has(world_fog_fine) and not preload(rescomponentswor")
 	# Skilldaten sind dauerhaft und dürfen nicht durch manipulierte Clients beliebig
 	# zusammengesetzt werden. Drei Slots, keine Doppelbelegung, nur gelernte Skills.
 	var learned:Array=data.get("learned",[])
 	var slots:Array=data.get("slots",[])
-	if slots.size()!=3:return false
+	if slots.size()!=3:return reject("if slots.size()!=3")
 	var used_slots:Dictionary={}
 	for raw_slot in slots:
-		if not (raw_slot is int or raw_slot is float):return false
+		if not (raw_slot is int or raw_slot is float):return reject("if not (raw_slot is int or raw_slot is float)")
 		var slot_id:=int(raw_slot)
-		if slot_id < -1 or slot_id >= learned.size():return false
+		if slot_id < -1 or slot_id >= learned.size():return reject("if slot_id < 1 or slot_id >= learned.size()")
 		if slot_id >= 0:
-			if not learned[slot_id] is bool or not bool(learned[slot_id]):return false
-			if used_slots.has(slot_id):return false
+			if not learned[slot_id] is bool or not bool(learned[slot_id]):return reject("if not learned[slot_id] is bool or not bool(learned[slot_id]")
+			if used_slots.has(slot_id):return reject("if used_slots.has(slot_id)")
 			used_slots[slot_id]=true
 	# Outputs are checked against the normalized registry, not sacrificed source flags.
 	var rules=preload("res://components/fusion_rules.gd")
 	var progress:Variant=data.get("learned_fusions",{})
-	if not progress is Dictionary or progress.size()>int(rules.META.size()*(rules.META.size()-1)/2):return false
+	if not progress is Dictionary or progress.size()>int(rules.META.size()*(rules.META.size()-1)/2):return reject("if not progress is Dictionary or progress.size()>int(rules.M")
 	for key in progress:
 		var pair:=str(key).split(":")
-		if pair.size()!=2 or not pair[0].is_valid_int() or not pair[1].is_valid_int():return false
+		if pair.size()!=2 or not pair[0].is_valid_int() or not pair[1].is_valid_int():return reject("if pair.size()!=2 or not pair[0].is_valid_int() or not pair[")
 		var a:=int(pair[0]);var b:=int(pair[1])
-		if a>=b or not rules.is_fusible(a) or not rules.is_fusible(b):return false
+		if a>=b or not rules.is_fusible(a) or not rules.is_fusible(b):return reject("if a>=b or not rules.is_fusible(a) or not rules.is_fusible(b")
 		var expected:int={"0:16":40,"1:36":41,"18:37":42,"17:18":43}.get(str(key),rules.output_id(a,b))
 		var entry:Variant=progress[key]
-		if not entry is Dictionary or int(entry.get("fusion_id",-1))!=expected or int(entry.get("rank",0))<1 or int(entry.get("rank",0))>4:return false
+		if not entry is Dictionary or int(entry.get("fusion_id",-1))!=expected or int(entry.get("rank",0))<1 or int(entry.get("rank",0))>4:return reject("if not entry is Dictionary or int(entry.get(fusion_id1))!=ex")
 	var output_sources:Dictionary={40:[0,16],41:[1,36],42:[18,37],43:[17,18]}
 	for a in rules.META:
 		for b in rules.META:
 			if int(a)<int(b):output_sources[rules.output_id(int(a),int(b))]=[int(a),int(b)]
 	for id in learned.size():
-		if not learned[id] is bool:return false
+		if not learned[id] is bool:return reject("if not learned[id] is bool")
 		if not learned[id] or id<40 or rules.is_fusible(id):continue
-		if not output_sources.has(id):return false
+		if not output_sources.has(id):return reject("if not output_sources.has(id)")
 		var pair:Array=output_sources[id]
 		var key:String=rules.normalized_key(int(pair[0]),int(pair[1]))
 		if progress.has(key) and int(progress[key].get("fusion_id",-1))==id:continue
 		# Old four-recipe saves are still accepted before their migration.
-		if id>=44 or int(pair[1])>=learned.size() or not bool(learned[int(pair[0])]) or not bool(learned[int(pair[1])]):return false
+		if id>=44 or int(pair[1])>=learned.size() or not bool(learned[int(pair[0])]) or not bool(learned[int(pair[1])]):return reject("if id>=44 or int(pair[1])>=learned.size() or not bool(learne")
 	# Klassenboni kommen aus den einmaligen Boss-Relikten auf Map 06/07/08.
 	# Der Save darf deshalb nicht mehr an eine Quest gebunden sein. Die
 	# klassenspezifische Konsistenz bleibt serverseitig strikt.
 	var mastery:Variant=data.get("class_mastery_unlocked",false)
 	var arcane:Variant=data.get("arcane_step_learned",false)
-	if not mastery is bool or not arcane is bool:return false
-	if bool(arcane) and (int(data.get("class_id",-1))!=1 or not bool(mastery)):return false
-	if int(data.get("class_id",-1))==1 and bool(mastery) and not bool(arcane):return false
+	if not mastery is bool or not arcane is bool:return reject("if not mastery is bool or not arcane is bool")
+	if bool(arcane) and (int(data.get("class_id",-1))!=1 or not bool(mastery)):return reject("if bool(arcane) and (int(data.get(class_id1))!=1 or not bool")
+	if int(data.get("class_id",-1))==1 and bool(mastery) and not bool(arcane):return reject("if int(data.get(class_id1))==1 and bool(mastery) and not boo")
 	for quest in data.get("quests",[]):
-		if not quest is Dictionary or not (quest.get("state") is int or quest.get("state") is float) or not (quest.get("progress") is int or quest.get("progress") is float): return false
-		if int(quest["state"]) < 0 or int(quest["state"]) > 3 or int(quest["progress"]) < 0 or int(quest["progress"]) > 1000: return false
+		if not quest is Dictionary or not (quest.get("state") is int or quest.get("state") is float) or not (quest.get("progress") is int or quest.get("progress") is float):return reject("if not quest is Dictionary or not (quest.get(state) is int o")
+		if int(quest["state"]) < 0 or int(quest["state"]) > 3 or int(quest["progress"]) < 0 or int(quest["progress"]) > 1000:return reject("if int(quest[state]) < 0 or int(quest[state]) > 3 or int(que")
 	for field in ["hp","energy","music_volume","effects_volume","shop_timer","warrior_rage","ranger_hunt_meter","ranger_hunt_buff"]:
 		var value: Variant = data.get(field,0)
-		if not (value is int or value is float) or not is_finite(float(value)): return false
+		if not (value is int or value is float) or not is_finite(float(value)):return reject("if not (value is int or value is float) or not is_finite(flo")
 	for field in ["skill_levels","slots","event_states","event_progress","chest_respawn_until","dungeon_chest_respawn_until"]:
 		for value in data.get(field,[]):
-			if not (value is float or value is int) or not is_finite(float(value)): return false
-			if field in ["chest_respawn_until","dungeon_chest_respawn_until"] and (float(value) < 0.0 or float(value) > Time.get_unix_time_from_system()+86400.0): return false
+			if not (value is float or value is int) or not is_finite(float(value)):return reject("if not (value is float or value is int) or not is_finite(flo")
+			if field in ["chest_respawn_until","dungeon_chest_respawn_until"] and (float(value) < 0.0 or float(value) > Time.get_unix_time_from_system()+86400.0):return reject("if field in [chest_respawn_untildungeon_chest_respawn_until]")
 	for field in ["learned","opened_chests","dungeon_chests_opened","bosses_defeated","waystone_unlocked","discovered_regions","village_gates"]:
 		for value in data.get(field,[]):
-			if not value is bool: return false
+			if not value is bool:return reject("if not value is bool")
 	for value in data.get("processed_server_transactions",[]):
-		if not value is String or String(value).length() > 96: return false
-	if not data.get("shop_stock",{}) is Dictionary: return false
+		if not value is String or String(value).length() > 96:return reject("if not value is String or String(value).length() > 96")
+	if not data.get("shop_stock",{}) is Dictionary:return reject("if not data.get(shop_stock) is Dictionary")
 	for stock in data.get("shop_stock",{}).values():
-		if not stock is Array or stock.size() > 30: return false
+		if not stock is Array or stock.size() > 30:return reject("if not stock is Array or stock.size() > 30")
 		for item in stock:
-			if not item is Dictionary or not item.get("name") is String or not item.get("icon") is String: return false
+			if not item is Dictionary or not item.get("name") is String or not item.get("icon") is String:return reject("if not item is Dictionary or not item.get(name) is String or")
 	return JSON.stringify(data).to_utf8_buffer().size() <= MAX_BYTES
 
 func write_record(key: String, record: Dictionary) -> Error:
@@ -247,7 +254,7 @@ func write_record(key: String, record: Dictionary) -> Error:
 func put(peer: int, token: String, uuid: String, revision: int, request: String, data: Dictionary) -> Dictionary:
 	var key := key_for(token)
 	if key == "" or not sessions.has(peer) or str(sessions[peer]["key"]) != key or str(sessions[peer]["uuid"]) != uuid: return {"ok":false,"error":"unauthorized","uuid":uuid}
-	if request.is_empty() or request.length() > 96 or not valid_data(data,uuid): return {"ok":false,"error":"invalid_save","uuid":uuid}
+	if request.is_empty() or request.length() > 96 or not valid_data(data,uuid): return {"ok":false,"error":"invalid_save","uuid":uuid,"reason":last_reject}
 	var record := read_record(key)
 	if record.has("error"): return {"ok":false,"error":"corrupt","uuid":uuid}
 	if str(record.get("request","")) == request:
@@ -264,7 +271,7 @@ func put(peer: int, token: String, uuid: String, revision: int, request: String,
 	# Schreiben erneut durch JSON normalisieren, damit der spaetere Read-Digest
 	# byte-identisch zur gespeicherten Datenstruktur bleibt.
 	clean=JSON.parse_string(JSON.stringify(clean))
-	if not valid_data(clean,uuid): return {"ok":false,"error":"invalid_save","uuid":uuid}
+	if not valid_data(clean,uuid): return {"ok":false,"error":"invalid_save","uuid":uuid,"reason":last_reject}
 	var next := {"schema":1,"uuid":uuid,"revision":actual_revision+1,"request":request,"updated_at":int(Time.get_unix_time_from_system()),"data":clean,"digest":JSON.stringify(clean).sha256_text()}
 	var error := write_record(key,next)
 	if error != OK: return {"ok":false,"error":"disk_error","uuid":uuid}

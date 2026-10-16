@@ -14343,6 +14343,7 @@ func rpc_zz_save_put(token: String, uuid: String, revision: int, request: String
 		rpc_zz_save_reply.rpc_id(peer,{"ok":false,"uuid":uuid,"error":"retry"})
 		return
 	var response:=server_save_store.put(peer,token,uuid,revision,request,data)
+	if str(response.get("error",""))=="invalid_save":print("SAVE_REJECTED reason=",response.get("reason",""))
 	if bool(response.get("ok",false)) and str(response.get("kind",""))=="saved":
 		if not account_store.sync_character_save(peer,uuid,token,data,int(response.get("revision",revision))):
 			print("ACCOUNT_SAVE_META_PENDING peer=",peer," uuid=",uuid)
