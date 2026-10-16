@@ -78,6 +78,30 @@ und [benchmark-after.json](design/quality-v1/benchmark-after.json).
 Rohprotokolle liegen lokal unter `build/`; die Labor-Messdatei ist unter
 [design/quality-v1/warriors_20.json](design/quality-v1/warriors_20.json) abgelegt.
 
+### Nachtrag 17.10.: Ursache der Bildspitzen
+
+Ein Lauf mit Bildprotokoll (Software-Rendering, Mesa llvmpipe, daher nur
+relative Aussagen) zeigt: Die langsamsten Bilder fallen fast immer auf Bilder,
+in denen mehrere Atlasseiten gleichzeitig neu gezeichnet werden. Auslöser war
+vor allem das Ausblenden von Körpern beim Weiterlaufen, obwohl ihr fester
+Atlasplatz gar nicht mehr gezeichnet wird.
+
+Änderung: Ausblenden und Entfernen lösen kein Neuzeichnen mehr aus. Ein Körper
+wird nur nachgezeichnet, wenn seine Seite inzwischen ohne ihn gerendert wurde.
+Pro Bild wird höchstens eine ruhende Seite neu gezeichnet; weitere folgen in
+den nächsten Bildern, verdeckt durch die vorgeladene Randzone.
+
+| Route | Neuzeichnungen vorher | nachher | P99 vorher (2 Läufe) | P99 nachher (2 Läufe) |
+|---|---:|---:|---:|---:|
+| Wiese | 26 | 15 | 124 / 96 ms | 89 / 85 ms |
+| Mauertor | 67 | 35 | 116 / 112 ms | 81 / 107 ms |
+| Pilzwald | 119 | 60 | 190 / 199 ms | 110 / 102 ms |
+
+Die absoluten Zeiten gelten nur für die Software-Grafik. Die Wirkung auf der
+RTX 3060 muss `tools/benchmark_landscape.gd` erneut messen; der Bericht enthält
+jetzt je Route `slow_frames` mit Neuzeichnungen, neuen Körpern und Modellen pro
+langsamem Bild.
+
 ## Werkzeuge und Reparatur
 
 Blender 5.2.2 LTS, Inkscape 1.4.4 als portable Extraktion, Krita 5.3.4.1

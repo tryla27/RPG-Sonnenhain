@@ -18,6 +18,12 @@ class Game extends "res://main.gd":
 
 func _initialize()->void:call_deferred("run")
 
+## Summe aller Atlas-Neuzeichnungen, um langsame Bilder zuordnen zu können.
+func page_updates(renderer)->int:
+	var total:=0
+	for page in renderer.atlas_pages:total+=page.render_updates
+	return total
+
 func percentile(values:Array,part:float)->float:
 	var ordered:=values.duplicate();ordered.sort()
 	return float(ordered[mini(ordered.size()-1,ceili(ordered.size()*part)-1)])
@@ -36,12 +42,14 @@ func run()->void:
 	for test in [["wiese",Vector2(3650,2650)],["mauertor",Vector2(5000,1250)],["pilzwald",Vector2(3150,4780)]]:
 		g.world_obstacles_3d.signature=""
 		var times:Array=[];var update_times:Array=[];var draw_times:Array=[];var long_frames:=0
+		var slow:Array=[];var renderer=g.world_obstacles_3d
 		var previous:=Time.get_ticks_usec()
 		for frame in 240:
 			# Erst stehen, dann dieselbe Strecke hin und zurück laufen.
 			var offset:=0.0 if frame<60 else float(frame-60 if frame<150 else 240-frame)*5.0
 			g.player_pos=test[1]+Vector2(offset,0)
 			g.camera_pos=g.player_pos-g.VIEW*.5;g.camera_smooth=g.camera_pos
+			var before:={"pages":page_updates(renderer),"instances":renderer.created_instances,"models":renderer.models.size(),"collections":renderer.collections}
 			var started:=Time.get_ticks_usec()
 			g.world_obstacles_3d.update(g,1.0/60.0)
 			g.update_static_cache()
@@ -52,6 +60,8 @@ func run()->void:
 				var ms:=float(now-previous)/1000.0;times.append(ms);update_times.append(update_ms)
 				draw_times.append(float(g.performance_draw_us)/1000.0)
 				if ms>50:long_frames+=1
+				# Langsame Bilder mit dem zuordnen, was der Renderer darin tat.
+				if ms>25:slow.append({"frame":frame,"ms":snappedf(ms,.01),"update_ms":snappedf(update_ms,.01),"page_updates":page_updates(renderer)-int(before["pages"]),"new_instances":renderer.created_instances-int(before["instances"]),"new_models":renderer.models.size()-int(before["models"]),"collected":renderer.collections>int(before["collections"])})
 			previous=now
 		# Auch bei minimiertem Prüf-Fenster den Sichtbeleg abschließen.
 		# Außerhalb der gewerteten Bildzeiten, danach erneut 30 Bilder Aufwärmen.
@@ -59,6 +69,7 @@ func run()->void:
 		vp.get_texture().get_image().save_png(out.path_join(str(test[0])+".png"))
 		var entry:Dictionary={"scene":test[0],"frames":times.size(),"p50_ms":percentile(times,.5),"p95_ms":percentile(times,.95),"p99_ms":percentile(times,.99),"over_50_ms":long_frames,"collection_p95_ms":percentile(update_times,.95),"draw_cpu_p95_ms":percentile(draw_times,.95),"visible_objects":g.world_obstacles_3d.rows.size()}
 		entry["last_draw_sections_us"]=g.section_us.duplicate()
+		entry["slow_frames"]=slow
 		if g.world_obstacles_3d.has_method("metrics_snapshot"):entry["renderer"]=g.world_obstacles_3d.metrics_snapshot()
 		results.append(entry);print("LANDSCAPE_BENCH ",JSON.stringify(entry))
 	var report:Dictionary={"version":Engine.get_version_info()["string"],"adapter":RenderingServer.get_video_adapter_name(),"viewport":[1152,648],"zoom":1.0,"route":"60 stand + 90 hin + 90 zurück, 5 Welteinheiten/Bild; erste 30 Bilder nicht gewertet","scope":"Native lokale Darstellung ohne Netzwerk und KI; kein Live-Lag-Nachweis","results":results}

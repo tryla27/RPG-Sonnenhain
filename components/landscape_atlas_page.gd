@@ -10,6 +10,10 @@ var camera:Camera3D
 var bodies:Dictionary={}
 var players:Dictionary={}
 var shown:Dictionary={}
+## Welche Körper beim letzten Seitenrender sichtbar waren und daher noch im
+## Atlas stehen. Ausblenden braucht kein neues Bild; nur ein Wiedereinblenden
+## nach einem Render ohne den Körper.
+var painted:Dictionary={}
 var dirty:=true
 var was_playing:=false
 var idle_clock:=0.0
@@ -57,13 +61,18 @@ func set_visible_keys(wanted:Dictionary)->void:
 		if show==bool(shown.get(key,false)):continue
 		shown[key]=show;bodies[key].visible=show
 		bodies[key].process_mode=Node.PROCESS_MODE_INHERIT if show else Node.PROCESS_MODE_DISABLED
-		dirty=true
+		# Der feste Atlasplatz behält sein Bild; nur fehlende Bilder nachzeichnen.
+		if show and not bool(painted.get(key,false)):dirty=true
 
 func remove_body(key:String)->void:
 	if not bodies.has(key):return
-	bodies[key].free();bodies.erase(key);shown.erase(key);players.erase(key);dirty=true
+	# Der Platz wird erst beim nächsten add_body neu belegt und dann gezeichnet.
+	bodies[key].free();bodies.erase(key);shown.erase(key);painted.erase(key);players.erase(key)
 
-func step(delta:float)->void:
+## allow_static=false verschiebt ein reines Nachzeichnen ruhender Körper auf ein
+## späteres Bild, damit nicht mehrere Seiten im selben Bild neu entstehen.
+## Rückgabe: true, wenn dieses Bild ein solches Nachzeichnen ausgelöst hat.
+func step(delta:float,allow_static:bool=true)->bool:
 	idle_clock+=delta
 	if idle_clock>=.25:
 		for key in players:
@@ -72,9 +81,14 @@ func step(delta:float)->void:
 	var playing:=false
 	for key in players:
 		if bool(shown.get(key,false)) and players[key].is_playing():playing=true;break
-	if dirty or playing or was_playing:
-		viewport.render_target_update_mode=SubViewport.UPDATE_ONCE;render_updates+=1
-	dirty=false;was_playing=playing
+	var animating:=playing or was_playing
+	was_playing=playing
+	if not animating and (not dirty or not allow_static):return false
+	viewport.render_target_update_mode=SubViewport.UPDATE_ONCE;render_updates+=1
+	for key in bodies:painted[key]=bool(shown.get(key,false))
+	var consumed:=dirty and not animating
+	dirty=false
+	return consumed
 
 func suspend()->void:
 	world.process_mode=Node.PROCESS_MODE_DISABLED

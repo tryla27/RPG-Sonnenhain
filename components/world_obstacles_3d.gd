@@ -32,6 +32,7 @@ var collection_us:=0
 var peak_collection_us:=0
 var decoration_cells:Dictionary={}
 const DECORATION_CACHE_LIMIT:=4096
+const STATIC_RENDERS_PER_FRAME:=1
 
 ## Rückfall (10.10.2026): Rendert der 3D-Viewport im Browser nichts (z. B. bei
 ## manchen Grafiktreibern), zeichnet das Spiel wieder die 2D-Landschaft. Einmal
@@ -141,8 +142,12 @@ func update(g,delta:float)->void:
 		rows.clear();signature=""
 		for page in atlas_pages:page.suspend()
 		return
+	# Höchstens eine ruhende Seite pro Bild nachzeichnen; die vorgeladene
+	# Randzone verdeckt die Verzögerung von wenigen Bildern.
+	var static_budget:=STATIC_RENDERS_PER_FRAME
 	for page in atlas_pages:
-		page.world.process_mode=Node.PROCESS_MODE_INHERIT;page.step(delta)
+		page.world.process_mode=Node.PROCESS_MODE_INHERIT
+		if page.step(delta,static_budget>0):static_budget-=1
 	var bounds:Rect2=g.camera_world_rect().grow(160)
 	var next_signature:="%s:%s" % [Vector2i(bounds.position/64),Vector2i(bounds.size)]
 	collection_clock-=delta

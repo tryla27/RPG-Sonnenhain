@@ -10,6 +10,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
   begrenzter Rückweg-/Geometriecache, Minimap-Geländecache und
   ereignisabhängige Renderupdates.
   Messwerkzeug mit nativer Vergleichsroute; Online-Lags noch nicht als gelöst bestätigt.
+- Atlasseiten 17.10.: Ausblenden und Entfernen zeichnen keine Seite mehr neu,
+  höchstens eine ruhende Seite pro Bild. Neuzeichnungen auf den Prüfrouten etwa
+  halbiert; Messwerkzeug ordnet langsame Bilder den Renderereignissen zu.
 - Klarere Vorbereitungsflächen, elementabhängige Effektfolgen, Questzeichen,
   persönlicher Heimkehrschmuck und P95/P99 in der Leistungsanzeige.
   Keine Änderung von Schaden, XP, Kollisionen oder gespeicherten Belohnungen.
