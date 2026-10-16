@@ -10,6 +10,14 @@ Kämpfen, Abbrüchen oder Fortschrittsverlust P0. Vor weiterem breitem
 
 ## Was feststeht
 
+Ergänzung 16.10. nach Umsetzung: Die Kamerabewegung umgeht den Sammelabstand
+nicht mehr; ruhende Atlasseiten werden ereignisabhängig aktualisiert.
+Die Minimap verwendet begrenzte Geländecaches. Drei lokale Vergleichsrouten
+zeigen kürzere P95-Bildzeiten und beide Außenmaps liefern im Chromium-Browser
+3D-Ausgabe. Messgrenzen und verbleibende Lade-/Onlineprüfung:
+[Umsetzungsbericht](QUALITY_V1_UMSETZUNG.md). Die folgenden Befunde zur
+laufenden Darstellung beschreiben den Ausgangsstand vor diesem Paket.
+
 - Angelo beschreibt einen zeitlichen Zusammenhang mit der Einführung der
   räumlichen Landschaftskörper. Dieser Zusammenhang ist eine wichtige
   Regressionsspur, noch kein technischer Ursachennachweis.

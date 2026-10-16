@@ -1,0 +1,94 @@
+{
+	"adapter": "NVIDIA GeForce RTX 3060",
+	"results": [
+		{
+			"collection_p95_ms": 3.823,
+			"draw_cpu_p95_ms": 11.014,
+			"frames": 210,
+			"last_draw_sections_us": {
+				"atmosphere": 508,
+				"ground": 291,
+				"hud": 2456,
+				"objects": 3861
+			},
+			"over_50_ms": 3,
+			"p50_ms": 16.665,
+			"p95_ms": 17.351,
+			"p99_ms": 51.061,
+			"renderer": {
+				"atlas_color_bytes": 12582912,
+				"collection_us": 254658,
+				"collections": 15,
+				"instances_created": 115,
+				"page_updates": 26,
+				"pages": 9,
+				"peak_collection_us": 192874,
+				"resident_instances": 115
+			},
+			"scene": "wiese",
+			"visible_objects": 91
+		},
+		{
+			"collection_p95_ms": 2.572,
+			"draw_cpu_p95_ms": 8.438,
+			"frames": 210,
+			"last_draw_sections_us": {
+				"atmosphere": 798,
+				"ground": 274,
+				"hud": 2558,
+				"objects": 3771
+			},
+			"over_50_ms": 3,
+			"p50_ms": 16.666,
+			"p95_ms": 16.739,
+			"p99_ms": 51.399,
+			"renderer": {
+				"atlas_color_bytes": 12582912,
+				"collection_us": 433225,
+				"collections": 30,
+				"instances_created": 205,
+				"page_updates": 67,
+				"pages": 9,
+				"peak_collection_us": 192874,
+				"resident_instances": 96
+			},
+			"scene": "mauertor",
+			"visible_objects": 69
+		},
+		{
+			"collection_p95_ms": 3.249,
+			"draw_cpu_p95_ms": 10.212,
+			"frames": 210,
+			"last_draw_sections_us": {
+				"atmosphere": 1022,
+				"ground": 302,
+				"hud": 2458,
+				"objects": 4724
+			},
+			"over_50_ms": 3,
+			"p50_ms": 16.666,
+			"p95_ms": 16.708,
+			"p99_ms": 52.479,
+			"renderer": {
+				"atlas_color_bytes": 14680064,
+				"collection_us": 668174,
+				"collections": 45,
+				"instances_created": 346,
+				"page_updates": 119,
+				"pages": 11,
+				"peak_collection_us": 192874,
+				"resident_instances": 140
+			},
+			"scene": "pilzwald",
+			"visible_objects": 108
+		}
+	],
+	"route": "60 stand + 90 hin + 90 zurück, 5 Welteinheiten/Bild; erste 30 Bilder nicht gewertet",
+	"scope": "Native lokale Darstellung ohne Netzwerk und KI; kein Live-Lag-Nachweis",
+	"version": "4.7.2-stable (official)",
+	"viewport": [
+		1152,
+		648
+	],
+	"zoom": 1.0
+}

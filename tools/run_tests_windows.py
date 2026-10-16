@@ -13,7 +13,7 @@ def main():
     (logs/"content.log").write_bytes(content.stdout+content.stderr)
     if content.returncode:print("FAIL Inhaltsprüfung",flush=True);return 1
     excluded={"check_party_xp_network.gd","check_boss_head_save_network.gd","check_server_save_network.gd","check_app_controls.gd"}
-    tests=sorted(p for folder in (ROOT/"tools",ROOT/"tests") for p in folder.rglob("check_*.gd") if p.name not in excluded)
+    tests=sorted(p for p in list((ROOT/"tools").glob("check_*.gd"))+list((ROOT/"tests").rglob("check_*.gd")) if p.name not in excluded)
     def run(path):
         relative=path.relative_to(ROOT).as_posix();log=logs/(relative.replace("/","_")+".log")
         try:

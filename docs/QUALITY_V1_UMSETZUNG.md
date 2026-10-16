@@ -52,18 +52,24 @@ nicht gewertet. Bewegung: 60 Bilder stehen, 90 hin, 90 zurück.
 
 | Route | P95 vorher | P95 nachher | P99 vorher | P99 nachher |
 |---|---:|---:|---:|---:|
-| Wiese | 31,081 ms | 16,725 ms | 61,599 ms | 46,427 ms |
-| Mauertor | 27,116 ms | 16,710 ms | 60,413 ms | 48,003 ms |
+| Wiese | 31,081 ms | 17,351 ms | 61,599 ms | 51,061 ms |
+| Mauertor | 27,116 ms | 16,739 ms | 60,413 ms | 51,399 ms |
+| Pilzwald | 32,276 ms | 16,708 ms | 62,345 ms | 52,479 ms |
 
-Damit sank die P95-Bildzeit dieser beiden lokalen Routen um etwa 46 bzw.
-38 Prozent. Der HUD-Zeichenabschnitt lag zuletzt bei rund 2 statt 13 ms.
+Damit sank die P95-Bildzeit dieser lokalen Routen um etwa 38 bis 48 Prozent.
+Der HUD-Zeichenabschnitt lag zuletzt bei rund 2,5 statt 13 ms.
 Es gibt weiterhin einzelne langsame Bilder und hohe Kosten beim ersten
 Modellaufbau. Die kurze Messung unter laufender Entwicklungsumgebung ist
 keine Garantie für stabile 60 FPS, Browser, Smartphone oder Live-Koop.
-Die Pilzwald-Nachmessung ist noch offen; dafür wird kein Gewinn behauptet.
+Die letzte Messung enthielt drei Bilder über 50 ms je Route.
+Die erste Modellsammlung kostete bis zu rund 193 ms; dieses Laden bleibt
+ein Ansatzpunkt für weitere Arbeit. Die Atlasfarbpuffer belegten je nach
+Route etwa 12 bis 14 MiB; Tiefenpuffer und sonstiger Speicher kommen hinzu.
 
 Das isolierte Labor mit 20 animierten Kriegern ergab über 120 Bilder
 P95 16,698 ms. Auch das ist kein Lastnachweis für das gesamte Spiel.
+Die Vergleichsberichte stehen unter [design/quality-v1/benchmark-before.json](design/quality-v1/benchmark-before.json)
+und [benchmark-after.json](design/quality-v1/benchmark-after.json).
 Rohprotokolle liegen lokal unter `build/`; die Labor-Messdatei ist unter
 [design/quality-v1/warriors_20.json](design/quality-v1/warriors_20.json) abgelegt.
 
@@ -90,8 +96,10 @@ durch `.gdignore` vom Spieleimport ausgeschlossen.
 
 ## Prüfstand und nächste Arbeit
 
-Die vollständige lokale Suite meldete zuletzt 140 bestandene Prüfungen,
-ohne Fehler. Eine zustandsverändernde UI-Prüfung läuft einmal isoliert,
+Nach Abgleich mit Hauptstand `bb43f65` sind 141 lokale Prüfungen bestanden.
+Der erste Lauf enthielt eine Portkollision beim Gruppen-XP-Test mit dem
+zusätzlich gestarteten Testserver. Nach dessen Beenden bestand der isolierte
+Wiederholungslauf. Eine zustandsverändernde UI-Prüfung läuft einmal isoliert,
 damit parallele App-Prüfungen ihre gemeinsame Touch-Konfiguration nicht ändern.
 Zwei zusätzliche WebSocket-Speicherprüfungen gegen einen lokalen Testserver
 bestanden. Vorhandene Ressourcenfreigabe-/Enginewarnungen bleiben in den Logs;

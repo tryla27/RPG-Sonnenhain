@@ -1,0 +1,43 @@
+{
+	"adapter": "NVIDIA GeForce RTX 3060",
+	"results": [
+		{
+			"collection_p95_ms": 7.436,
+			"frames": 210,
+			"over_50_ms": 3,
+			"p50_ms": 23.023,
+			"p95_ms": 31.081,
+			"p99_ms": 61.599,
+			"scene": "wiese",
+			"visible_objects": 88
+		},
+		{
+			"collection_p95_ms": 6.03,
+			"frames": 210,
+			"over_50_ms": 3,
+			"p50_ms": 20.54,
+			"p95_ms": 27.116,
+			"p99_ms": 60.413,
+			"scene": "mauertor",
+			"visible_objects": 68
+		},
+		{
+			"collection_p95_ms": 8.073,
+			"frames": 210,
+			"over_50_ms": 4,
+			"p50_ms": 23.44,
+			"p95_ms": 32.276,
+			"p99_ms": 62.345,
+			"scene": "pilzwald",
+			"visible_objects": 106
+		}
+	],
+	"route": "60 stand + 90 hin + 90 zurück, 5 Welteinheiten/Bild; erste 30 Bilder nicht gewertet",
+	"scope": "Native lokale Darstellung ohne Netzwerk und KI; kein Live-Lag-Nachweis",
+	"version": "4.7.2-stable (official)",
+	"viewport": [
+		1152,
+		648
+	],
+	"zoom": 1.0
+}
