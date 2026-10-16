@@ -124,6 +124,7 @@ func reply(g, response: Dictionary) -> void:
 		retry_after_ms = Time.get_ticks_msec()+5000
 		var labels := {"already_online":"Charakter bereits in einem anderen Fenster online", "disk_error":"Server kann gerade nicht speichern", "corrupt":"Serverstand beschädigt · vorhandene Daten bleiben geschützt", "invalid_save":"Spielstand konnte nicht geprüft werden", "revision_conflict":"Neuerer Serverstand vorhanden · gleiche ab", "identity_mismatch":"Spielstand und Charakter passen nicht zusammen", "unauthorized":"Speicherzugriff nicht bestätigt"}
 		status = str(labels.get(error,"Server-Speicherfehler"))+" · lokal gesichert"
+		if str(response.get("reason",""))!="":status+=" · Regel: "+str(response["reason"]).left(48)
 		problem = true
 		g.pause_status=status
 		g.message(status)

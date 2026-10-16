@@ -159,7 +159,7 @@ func run() -> void:
 	bad_food["active_food_name"]="Gefälschtes Essen"
 	assert(not store.valid_food_state(bad_food))
 	bad_food=food_state.duplicate(true)
-	bad_food["meal_until"]=Time.get_unix_time_from_system()+500
+	bad_food["meal_until"]=Time.get_unix_time_from_system()+700
 	assert(not store.valid_food_state(bad_food))
 
 	print("STEINROSE_KITCHEN_OK 13 low-fee recipes, exactly one regional herb each, 12 regional herb bushes, 360s meals, instant full mana/HP cakes and durable saves")

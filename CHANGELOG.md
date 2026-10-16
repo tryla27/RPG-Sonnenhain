@@ -25,6 +25,7 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
   deterministische 16-Bit-WAVs. Test `check_start_area_journey.gd`: echte
   Anlage, Hin-/Rückweg, Toraktion, Datenträger-Roundtrip und 18 Identitäten.
   Details und Spielansichten: `docs/konzepte/2026-10-11-startbereich/README.md`.
+- Server-Speicherprüfung: Pflanzengrenze 64 → 512, Mahlzeit-Zeitfenster 365 s → 600 s, `reject()` merkt die abgelehnte Regel (`last_reject`), die Antwort `invalid_save` trägt `reason`, Client-Meldung und Server-Log (`SAVE_REJECTED`) zeigen sie. Test `tests/save/check_save_validation.gd`.
 
 - Rezept-Reiter im Questbuch mit Almas Lernständen, Zutaten, Beständen und Fundgebieten. Golem-Musik durch zuverlässige Beschwörungsantwort und Export-Ressourcenverweis abgesichert. Golem-Wegsuche respektiert Wiederholpause; Raster-Erwärmung begrenzt. Netzwerkprotokoll 10: Bewegungsdeltas mit vollständigem Sekundenstand, spaltenbasierte Zstd-Weltpakete und WebSocket-Rückstaugrenze. SERVER_PERF protokolliert CPU und Netzlast. Befunde und Messgrenzen in docs/golem-network-performance.md.
 
