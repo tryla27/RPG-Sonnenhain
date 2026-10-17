@@ -27,3 +27,22 @@ static func restore(data:Dictionary)->int:
 		for i in THEMES.size():
 			if str(offer.get("name","")).ends_with(THEMES[i]["suffix"]):return i
 	return -1
+
+## Ab so vielen Stufen Rückstand bringt das Öffnen eines Händlers sofort eine
+## neue Lieferung zur aktuellen Stufe (statt bis zu 7 Minuten zu warten).
+const LEVEL_GAP:=3
+## Stufe der neuesten stufenabhängigen Angebote; -1, wenn keine (Kräuter,
+## Tränke, Essen haben keine Stufe im eigentlichen Sinn).
+static func newest_offer_level(offers:Array)->int:
+	var newest:=-1
+	for offer in offers.slice(maxi(0,offers.size()-BATCH_SIZE)):
+		if offer is Dictionary and offer.has("level") and str(offer.get("icon","")) not in ["herb","potion","food"]:
+			newest=maxi(newest,int(offer["level"]))
+	return newest
+## Braucht der Bestand eine frische Lieferung für diese Käuferstufe?
+static func needs_fresh_batch(stock:Dictionary,level:int)->bool:
+	if stock.is_empty():return true
+	var newest:=-1
+	for role in stock:
+		if stock[role] is Array:newest=maxi(newest,newest_offer_level(stock[role]))
+	return newest>=0 and newest<=level-LEVEL_GAP
