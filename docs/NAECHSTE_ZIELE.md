@@ -77,6 +77,11 @@ Die zuletzt bestätigten Nutzerentscheidungen haben Vorrang vor älteren Konzept
 
 ## Entscheidungen
 
+- 17.10.2026 (Vorschlag in PR, wartet auf Angelos Bestätigung beim Live-Gang):
+  Gemeinsame Levelregel `components/level_rules.gd`. Bisherige XP-Kurve bis
+  Stufe 100, danach je Aufstieg das Vierfache. Sichtbare Höchststufe 118, weil
+  größere XP-Werte in Spielständen nicht mehr exakt speicherbar wären. Essenz
+  bleibt bei 40 Punkten; Stufen über 40 geben weiter je einen Skillpunkt.
 - 11.10.2026: Fertige Bereiche (Rezeptbuch, Golem-Musikstart und
   Netzwerk-/Wegsuche-Optimierung) hochladen und live schalten, danach ein
   Konzept für die verbleibenden Schritte erstellen. Ausdrückliche Freigabe

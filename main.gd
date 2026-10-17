@@ -109,6 +109,7 @@ const NpcPortraits=preload("res://components/npc_portraits.gd")
 const VILLAGE_PROP_MARGIN:=1600.0
 const BossGateSeal=preload("res://components/boss_gate_seal.gd")
 const HiddenFinds=preload("res://components/hidden_finds.gd")
+const LevelRules=preload("res://components/level_rules.gd")
 const RuinCourtyard=preload("res://components/ruin_courtyard.gd")
 var hidden_finds:=HiddenFinds.new()
 const RegionBanner=preload("res://components/region_banner.gd")
@@ -1198,7 +1199,7 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 	var clean_facing := Vector2(float(facing_data[0]), float(facing_data[1]))
 	if not clean_facing.is_finite() or clean_facing.length_squared() < 0.01: clean_facing = Vector2.DOWN
 	clean_facing = clean_facing.normalized()
-	var clean_runes:=EssenceSystem.network_ranks(state.get("rune_ranks",[]),clampi(int(state.get("level",1)),1,99))
+	var clean_runes:=EssenceSystem.network_ranks(state.get("rune_ranks",[]),LevelRules.clamp_level(int(state.get("level",1))))
 	var clean := {
 		"rune_ranks":clean_runes,
 		"protocol":NETWORK_PROTOCOL_VERSION,
@@ -1228,14 +1229,14 @@ func rpc_player_state(state: Dictionary,reliable_vitals:bool=false) -> void:
 		"race":clampi(int(state.get("race",0)),0,2),
 		"gender":clampi(int(state.get("gender",0)),0,1),
 		"name":str(state.get("name","Held")).strip_edges().substr(0,16),
-		"level":clampi(int(state.get("level",1)),1,99),
+		"level":LevelRules.clamp_level(int(state.get("level",1))),
 		"hp":clampf(float(state.get("hp",1.0)),0.0,100000.0),
 		"max_hp":clampf(float(state.get("max_hp",1.0)),1.0,100000.0),
 		"walking":bool(state.get("walking",false)),
 		"running":bool(state.get("running",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
-		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
+		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+LevelRules.clamp_level(int(state.get("level",1)))*30),
 		"head":clampi(int(state.get("head",-1)),-1,5),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
@@ -1769,7 +1770,7 @@ func primary_attribute() -> int:
 	return item_attribute(["str", "int", "agi"][class_id])
 
 func xp_required() -> int:
-	return 120 + (level - 1) * 85 + (level - 1) * (level - 1) * 10
+	return LevelRules.xp_required(level)
 
 func region_at(p: Vector2) -> int:
 	return WorldGeometry.region_at(p)
@@ -3809,7 +3810,7 @@ func equipped_weapon_variant() -> String:
 	return class_weapon_icon()
 
 func warrior_crit_chance(for_level:int=level)->float:
-	return clampf(0.08+float(clampi(for_level,1,99)-1)*0.0015,0.08,0.20)
+	return clampf(0.08+float(LevelRules.clamp_level(for_level)-1)*0.0015,0.08,0.20)
 
 func warrior_crit_multiplier()->float:
 	return 1.75
@@ -3964,7 +3965,7 @@ func rpc_client_normal_attack(origin_data: Array, dir_data: Array, remote_class:
 	design = clampi(int(state.get("weapon",0)),0,32)
 	element = str(state.get("element",""))
 	server_relay_combat_visual(sender,{"kind":"normal","pos":[origin.x,origin.y],"dir":[dir.x,dir.y],"class":remote_class,"weapon":design,"element":element,"eternal":remote_class==2 and bool(state.get("eternal_arrows",false))})
-	var level_cap := clampi(int(state.get("level",1)),1,99)
+	var level_cap := LevelRules.clamp_level(int(state.get("level",1)))
 	power = clampi(power,1,80 + level_cap * 20)
 	if remote_class == 0:
 		var axe := design % 3 == 2
@@ -4016,7 +4017,7 @@ func damage_enemy(index: int, amount: int, push: Vector2, stun: bool = false, el
 		effect(enemy["pos"] + Vector2(0, -25), str(maxi(0, amount)), Color("fff1a1"), 0.55)
 		return
 	var attacker_class:=class_id if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("class",-1)),0,2)
-	var attacker_level:=level if source_peer<=0 else clampi(int(remote_players.get(source_peer,{}).get("level",1)),1,99)
+	var attacker_level:=level if source_peer<=0 else LevelRules.clamp_level(int(remote_players.get(source_peer,{}).get("level",1)))
 	if apply_runes:amount=maxi(1,roundi(amount*rune_damage_mult(enemy,source_peer)))
 	var crit_chance:float=(warrior_crit_chance(attacker_level) if attacker_class==0 else 0.0)+(0.03*rune_rank(0,0,source_peer) if apply_runes else 0.0)
 	var critical:=apply_runes and randf()<crit_chance
@@ -4120,7 +4121,7 @@ func rpc_client_ability(id: int, pos_data: Array, dir_data: Array, power: int, r
 		visual_payload["fusion_key"]=fusion_key_value
 		visual_payload["fusion_rank"]=rank
 	server_relay_combat_visual(sender,visual_payload)
-	var level_cap := clampi(int(state.get("level",1)),1,99)
+	var level_cap := LevelRules.clamp_level(int(state.get("level",1)))
 	if id==CLASS_ULTIMATES[remote_class] and level_cap<ultimate_unlock_level(remote_class):return
 	power = clampi(power,1,(360 + level_cap * 55) if id in CLASS_ULTIMATES else (140 + level_cap * 30))
 	if necklace_cast_eligible(id) and necklaces.cast(necklace_visual(sender),sender,Time.get_ticks_msec()):power=roundi(power*1.2)
@@ -5405,8 +5406,8 @@ func register_boss_defeat(boss_index:int,shared:bool=false)->bool:
 
 func gain_xp(amount: int) -> void:
 	if test_level_lock>0:test_level_lock=0
-	xp += amount
-	while xp >= xp_required():
+	xp += maxi(0, amount)
+	while level < LevelRules.MAX_LEVEL and xp >= xp_required():
 		xp -= xp_required()
 		level += 1
 		skill_points += 1
@@ -5419,8 +5420,12 @@ func gain_xp(amount: int) -> void:
 			skill_levels[class_ultimate()] = mini(MAX_SKILL_RANK,1+int((level-ultimate_level)/5.0))
 		hp = max_hp()
 		energy = max_energy()
-		message("LEVEL %d! +1 SKILLPUNKT · +1 ESSENZ · %d/%d Essenz frei" % [level,essence.available(level),essence.total_for_level(level)])
+		if level <= EssenceSystem.MAX_LEVEL:
+			message("LEVEL %d! +1 SKILLPUNKT · +1 ESSENZ · %d/%d Essenz frei" % [level,essence.available(level),essence.total_for_level(level)])
+		else:
+			message("LEVEL %d! +1 SKILLPUNKT%s" % [level, " · HÖCHSTSTUFE" if level >= LevelRules.MAX_LEVEL else ""])
 		play_sound("level_auf")
+	if level >= LevelRules.MAX_LEVEL: xp = 0
 
 func restore_level_skill_point_progress(data:Dictionary)->int:
 	var expected:=maxi(0,level-1)
@@ -6156,7 +6161,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	sprint_heading = Vector2.ZERO
 	sprint_exhausted = false
 	character_created = bool(data.get("character_created", data.has("class_id")))
-	test_level_lock = clampi(int(data.get("test_level_lock",0)),0,40)
+	test_level_lock = clampi(int(data.get("test_level_lock",0)),0,LevelRules.MAX_LEVEL)
 	player_uuid = str(data.get("player_uuid",""))
 	ensure_player_uuid()
 	if not from_server and not creative_mode: server_save.restore(data)
@@ -6184,10 +6189,11 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if int(data.get("world_version", 1)) < 2 and region_at(player_pos) != 0:
 		player_pos = Vector2(825, 1020)
 	mark_network_teleport()
-	level = maxi(1, int(data.get("level", 1)))
+	level = LevelRules.clamp_level(int(data.get("level", 1)))
 	essence.restore(data.get("essence_state",{}))
 	book_system.restore(data.get("book_state",{}),level)
 	xp = maxi(0, int(data.get("xp", 0)))
+	if level >= LevelRules.MAX_LEVEL: xp = 0
 	gold = maxi(0, int(data.get("gold", 55)))
 	music_enabled = bool(data.get("music_enabled", true))
 	music_volume = clampf(float(data.get("music_volume", 0.90)), 0.0, 1.0)
@@ -6861,7 +6867,7 @@ func adjust_repair_value(key:String,delta:int,min_value:int,max_value:int)->void
 	queue_redraw()
 
 func apply_repair_patch()->void:
-	if bool(repair_dirty.get("level",false)):level=clampi(int(repair_targets["level"]),1,40)
+	if bool(repair_dirty.get("level",false)):level=LevelRules.clamp_level(int(repair_targets["level"]))
 	if bool(repair_dirty.get("xp",false)):xp=maxi(0,int(repair_targets["xp"]))
 	if bool(repair_dirty.get("gold",false)):gold=maxi(0,int(repair_targets["gold"]))
 	if bool(repair_dirty.get("skill_points",false)):skill_points=maxi(0,int(repair_targets["skill_points"]))
@@ -6900,7 +6906,7 @@ func draw_repair_panel()->void:
 
 func click_repair_panel(mouse:Vector2)->void:
 	var rows:Array=[
-		["level",1,40,1,10],
+		["level",1,LevelRules.MAX_LEVEL,1,10],
 		["xp",0,99999999,100,1000],
 		["gold",0,99999999,100,1000],
 		["skill_points",0,9999,1,10]
@@ -6976,7 +6982,7 @@ func toggle_creative_mode() -> void:
 
 func set_creative_level(target: int) -> void:
 	if not creative_mode: return
-	level = clampi(target, 1, 40)
+	level = LevelRules.clamp_level(target)
 	xp = 0
 	skill_points = maxi(skill_points, 60)
 	var ultimate_level:=ultimate_unlock_level()
@@ -12827,13 +12833,13 @@ func rpc_player_presence(state: Dictionary) -> void:
 		"race":clampi(int(state.get("race",0)),0,2),
 		"gender":clampi(int(state.get("gender",0)),0,1),
 		"name":str(state.get("name","Held")).strip_edges().substr(0,16),
-		"level":clampi(int(state.get("level",1)),1,99),
+		"level":LevelRules.clamp_level(int(state.get("level",1))),
 		"hp":clampf(float(state.get("hp",1.0)),0.0,100000.0),
 		"max_hp":clampf(float(state.get("max_hp",1.0)),1.0,100000.0),
 		"walking":bool(state.get("walking",false)),
 		"weapon":clampi(int(state.get("weapon",0)),0,32),
 		"armor":clampi(int(state.get("armor",-1)),-1,32),
-		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+clampi(int(state.get("level",1)),1,99)*30),
+		"necklace_serial":maxi(0,int(state.get("necklace_serial",0))), "necklace":clampi(int(state.get("necklace",-1)),-1,ArcaneNecklaces.IDS.size()-1), "normal_power":clampi(int(state.get("normal_power",1)),1,140+LevelRules.clamp_level(int(state.get("level",1)))*30),
 		"head":clampi(int(state.get("head",-1)),-1,5),"rings":clampi(int(state.get("rings",0)),0,3),
 		"element":str(state.get("element","")) if str(state.get("element","")) in ["","feuer","eis","blitz","gift"] else "",
 		"region":region_at(incoming_pos),
@@ -13553,7 +13559,7 @@ func remember_recent_player(state: Dictionary) -> void:
 		"uuid":uuid,
 		"name":str(state.get("name","Held")).substr(0,16),
 		"class":clampi(int(state.get("class",0)),0,2),
-		"level":clampi(int(state.get("level",1)),1,99),
+		"level":LevelRules.clamp_level(int(state.get("level",1))),
 		"seen":int(Time.get_unix_time_from_system())
 	}
 	for i in range(recent_players.size()-1,-1,-1):

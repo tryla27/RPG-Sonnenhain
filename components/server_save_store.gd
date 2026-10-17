@@ -117,7 +117,9 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 		if not (axis is float or axis is int) or not is_finite(float(axis)) or float(axis) < 0 or float(axis) > 110000:return reject("if not (axis is float or axis is int) or not is_finite(float")
 	for field in ["level","xp","gold","class_id","hero_race","hero_gender","next_uid","skill_points"]:
 		if not (data.get(field) is int or data.get(field) is float):return reject("if not (data.get(field) is int or data.get(field) is float)")
-		if not is_finite(float(data[field])) or float(data[field]) < 0 or float(data[field]) > 2147483647:return reject("if not is_finite(float(data[field])) or float(data[field]) <")
+		# XP ab Stufe 107 über 2^31: bis zur exakt speicherbaren Grenze erlaubt (level_rules.gd).
+		var upper:float=float(preload("res://components/level_rules.gd").MAX_EXACT_XP) if field=="xp" else 2147483647.0
+		if not is_finite(float(data[field])) or float(data[field]) < 0 or float(data[field]) > upper:return reject("if not is_finite(float(data[field])) or float(data[field]) <")
 	if int(data["level"]) < 1 or int(data["level"]) > 100000 or int(data["class_id"]) > 2 or int(data["hero_race"]) > 2 or int(data["hero_gender"]) > 1:return reject("if int(data[level]) < 1 or int(data[level]) > 100000 or int(")
 	if not data.get("hero_name") is String or String(data["hero_name"]).length() > 32:return reject("if not data.get(hero_name) is String or String(data[hero_nam")
 	var uids := {}

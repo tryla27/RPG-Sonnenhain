@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Levelregel 17.10. (`components/level_rules.gd`): bisherige Kurve bis 100,
+  danach ×4 je Aufstieg, Höchststufe 118. **Balance:** XP-Bedarf ab 100
+  (100 → 101 = 417.960 statt 106.545). Grenzen 40/99 in Testmodus, Reparatur,
+  Netzwerk, Konten vereinheitlicht; Server erlaubt XP bis 2^53 − 1 statt 2^31.
+  Test `tests/gameplay/check_level_rules.gd`.
 - `Shapes.polygon`: Dreiecke und konvexe Vierecke über `draw_primitive`
   (~1,2 statt ~5,5 µs, Farbrundung höchstens 1/255), alle zweiargumentigen
   `draw_colored_polygon`-Aufrufe umgestellt (Ausnahme: `Brush` in
