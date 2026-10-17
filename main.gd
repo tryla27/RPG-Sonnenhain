@@ -2800,12 +2800,25 @@ func terrain_blocked(p: Vector2,radius:float=-1.0) -> bool:
 	var cy := int(floorf(p.y / 250.0))
 	for x in range(cx - 1, cx + 2):
 		for y in range(cy - 1, cy + 2):
-			var obstacle := obstacle_in_cell(x, y)
-			if obstacle.is_empty():continue
-			var collision_radius:=obstacle_collision_radius(obstacle)
-			if collision_radius>0.0 and p.distance_to(obstacle["pos"]) < collision_radius + radius+2.0:
+			var blocker := obstacle_blocker(x, y)
+			if blocker.z>0.0 and p.distance_to(Vector2(blocker.x,blocker.y)) < blocker.z + radius+2.0:
 				return true
 	return false
+
+## Kollisionskreis des Hindernisses einer 250er-Zelle als (x, y, Radius);
+## Radius 0 = nichts blockiert. Zwischengespeichert, weil Wegsuchen
+## terrain_blocked() tausendfach pro Sekunde aufrufen.
+var obstacle_blocker_cache: Dictionary = {}
+func obstacle_blocker(cx: int, cy: int) -> Vector3:
+	var cell := Vector2i(cx, cy)
+	if obstacle_blocker_cache.has(cell): return obstacle_blocker_cache[cell]
+	var blocker := Vector3.ZERO
+	var obstacle := obstacle_in_cell(cx, cy)
+	if not obstacle.is_empty():
+		var position: Vector2 = obstacle["pos"]
+		blocker = Vector3(position.x, position.y, obstacle_collision_radius(obstacle))
+	obstacle_blocker_cache[cell] = blocker
+	return blocker
 
 func can_cross_gate(from_region: int, to_region: int, start: Vector2, end: Vector2) -> bool:
 	if from_region >= 8 or to_region >= 8: return false

@@ -46,8 +46,14 @@ den anderen Anteil: Der andere Spieler sieht dann 250 ms Lücken in dessen
 Bewegung. Clientruckler (z. B. Modellaufbau) wirken für Mitspieler also
 ebenfalls wie Lag; dafür sind Atlas- und Modellbudget im Client zuständig.
 
+Vier Spieler (50 s, 16 Gegner): längste Bewegungslücke 98–100 ms, keine über
+150 ms, längstes Serverbild 47 ms. Ein früherer Vier-Spieler-Lauf zeigte
+einzelne 300-ms-Lücken ohne passende Serverspitze; bei fünf Prozessen auf zwei
+Kernen ist das am ehesten Rechenzeitmangel der Prüfmaschine. Hinderniskreise
+je Zelle sind jetzt zwischengespeichert (`obstacle_blocker`), Prüfung 9,4 → 8,0 µs.
+
 Offen: Live-Server-Protokolle (`SERVER_PERF cpu_max`) nach dem nächsten
-Live-Gang vergleichen; Vier-Spieler- und Golem-Lauf.
+Live-Gang vergleichen; Golem-Kampf als Belastungsfall.
 
 ## Was feststeht
 
