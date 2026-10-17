@@ -244,6 +244,7 @@ const STATIC_CACHE_LIMIT := 32
 var static_chunks: Dictionary = {}
 var foreground_cache: Dictionary = {}
 var static_renderer_script: Script
+var static_chunk_renderer: Node2D
 var static_draw_bounds := Rect2()
 var performance_cache_enabled := true
 var performance_draw_us := 0
@@ -12366,7 +12367,15 @@ func update_static_cache() -> void:
 		viewport.disable_3d = true
 		viewport.gui_disable_input = true
 		viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-		var renderer = static_renderer_script.new()
+		# Ein einziger Zeichner wandert von Abschnitt zu Abschnitt. Eine neue
+		# Instanz dieses großen Skripts kostet 16–35 ms; das Umhängen nichts.
+		# Höchstens ein neuer Abschnitt pro Bild, der vorige ist dann gerendert.
+		var renderer = static_chunk_renderer
+		if renderer == null or not is_instance_valid(renderer):
+			renderer = static_renderer_script.new()
+			static_chunk_renderer = renderer
+		elif renderer.get_parent() != null:
+			renderer.get_parent().remove_child(renderer)
 		renderer.static_draw_bounds = Rect2(Vector2(key)*STATIC_CHUNK_SIZE,Vector2.ONE*STATIC_CHUNK_SIZE)
 		renderer.camera_pos = renderer.static_draw_bounds.position
 		renderer.font = font
@@ -12376,6 +12385,7 @@ func update_static_cache() -> void:
 		renderer.touch_enabled = touch_enabled
 		renderer.bindings = bindings.duplicate()
 		viewport.add_child(renderer)
+		renderer.queue_redraw()
 		add_child(viewport)
 		static_chunks[key] = {"viewport":viewport,"texture":viewport.get_texture(),"created":Engine.get_process_frames(),"used":Engine.get_process_frames()}
 		created += 1
@@ -12385,6 +12395,8 @@ func update_static_cache() -> void:
 			if needed.has(key): continue
 			if oldest == null or static_chunks[key]["used"] < static_chunks[oldest]["used"]: oldest = key
 		if oldest == null: break
+		if static_chunk_renderer != null and is_instance_valid(static_chunk_renderer) and static_chunk_renderer.get_parent() == static_chunks[oldest]["viewport"]:
+			static_chunks[oldest]["viewport"].remove_child(static_chunk_renderer)
 		static_chunks[oldest]["viewport"].queue_free()
 		static_chunks.erase(oldest)
 
@@ -12398,6 +12410,10 @@ func draw_cached_overworld() -> bool:
 	return true
 
 func invalidate_static_cache() -> void:
+	# Der gemeinsame Zeichner wird mit seinem Abschnitt freigegeben und neu erzeugt.
+	if static_chunk_renderer != null and is_instance_valid(static_chunk_renderer) and static_chunk_renderer.get_parent() == null:
+		static_chunk_renderer.free()
+	static_chunk_renderer = null
 	for entry in static_chunks.values(): entry["viewport"].queue_free()
 	static_chunks.clear()
 	for entry in foreground_cache.values(): entry["viewport"].queue_free()
