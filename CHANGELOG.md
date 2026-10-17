@@ -6,6 +6,12 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Verborgene Funde 17.10. (`components/hidden_finds.gd`): vier optionale
+  Nebenpfade mit Steinmal, je Charakter einmal; neues Speicherfeld
+  `hidden_finds` (vom Server geprüft, alte Stände ohne Feld gelten als
+  „nichts gefunden“). **Balance:** neue einmalige Belohnungen 80–170 Gold,
+  70–240 EP. Test `tests/gameplay/check_hidden_finds.gd`, Bilder unter
+  `docs/design/hidden-finds`.
 - Grafik-/Leistungspaket 16.10.: stabile Atlasseiten für echte 3D-Körper,
   begrenzter Rückweg-/Geometriecache, Minimap-Geländecache und
   ereignisabhängige Renderupdates.

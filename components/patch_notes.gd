@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 16.10.2026"
 const NOTES=[
+["Erkundung · Verborgene Funde", "Abseits der Hauptwege führen Trittsteine in den Blütenwiesen, im Pilzwald, an den Alten Ruinen und in den Kristallhöhlen zu einem Steinmal. Dort wartet je Charakter einmal ein Fundstück mit etwas Gold, Erfahrung und einer kleinen Geschichte (80–170 Gold, 70–240 EP)."],
 ["Welt · Siegeltore", "Tore, die erst nach einem Bosssieg öffnen, zeigen jetzt ein eisernes Fallgitter mit leuchtendem Siegel statt eines violetten Kastens. Die Sperre selbst bleibt unverändert."],
 ["Technik · Flüssiger im Browser", "Gegner planen ihre Wege auch im Einzelspiel in kleineren Schritten, Kollisionsprüfungen sind viermal schneller und die Welt zeichnet pro Bild weniger doppelt. In Brave und Edge lief die Blütenwiese vorher mit vielen Rucklern über 100 ms; jetzt bleibt sie flüssig."],
 ["Erkundung · Gebietsbanner mit Wappen", "Beim ersten Betreten eines Gebiets erscheint ein Banner mit eigenem Wappen, Gebietsname, empfohlener Stufe und dem Erkundungsspruch. Vorher wurde der Spruch sofort von „Neues Gebiet“ überdeckt. Je Charakter einmal, aus dem vorhandenen Entdeckungsstand."],

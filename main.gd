@@ -107,6 +107,8 @@ const MobNavigation=preload("res://components/mob_navigation.gd")
 const NpcPortraits=preload("res://components/npc_portraits.gd")
 const VILLAGE_PROP_MARGIN:=1600.0
 const BossGateSeal=preload("res://components/boss_gate_seal.gd")
+const HiddenFinds=preload("res://components/hidden_finds.gd")
+var hidden_finds:=HiddenFinds.new()
 const RegionBanner=preload("res://components/region_banner.gd")
 const WebBenchmark=preload("res://components/web_benchmark.gd")
 var web_benchmark:=WebBenchmark.new()
@@ -5604,6 +5606,11 @@ func interact() -> void:
 		if player_pos.distance_to(chest_position(i)) < 125:
 			open_chest(i)
 			return
+	if interior_id < 0 and dungeon_id < 0 and arena_mode == "":
+		var find_index := hidden_finds.nearby(player_pos)
+		if find_index >= 0:
+			claim_hidden_find(find_index)
+			return
 	for i in WORLD_EVENTS.size():
 		if player_pos.distance_to(WORLD_EVENTS[i]["pos"]) < 112:
 			interact_world_event(i)
@@ -5703,6 +5710,18 @@ func dungeon_chest_ready(index: int) -> bool:
 		dungeon_chests_opened[index] = false
 		dungeon_chest_respawn_until[index] = 0.0
 	return not bool(dungeon_chests_opened[index])
+
+func claim_hidden_find(index: int) -> void:
+	var find: Dictionary = hidden_finds.claim(index)
+	if find.is_empty():
+		message("Hier hast du schon nachgesehen.")
+		return
+	gold += int(find["gold"])
+	gain_xp(int(find["xp"]))
+	play_sound("truhe_auf")
+	message("%s · +%d XP · +%d Gold" % [find["name"], int(find["xp"]), int(find["gold"])])
+	add_chat_line("FUND", str(find["lore"]))
+	save_game()
 
 func open_chest(index: int) -> void:
 	if not chest_ready(index):
@@ -5992,6 +6011,7 @@ func capture_save_data() -> Dictionary:
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
+	data["hidden_finds"] = hidden_finds.snapshot()
 	data["golem_world"] = golem_world.save_state()
 	data["essence_state"] = essence.snapshot()
 	data["book_state"] = book_system.snapshot()
@@ -6064,6 +6084,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		event_progress[i] = 0
 	for i in bosses_defeated.size(): bosses_defeated[i] = false
 	for i in opened_chests.size(): opened_chests[i] = false
+	hidden_finds.reset()
 	dungeon_id = -1
 	interior_id = -1
 	for i in dungeon_chests_opened.size(): dungeon_chests_opened[i] = false
@@ -6097,6 +6118,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if not from_server and not creative_mode: server_save.restore(data)
 	food_system.restore(data.get("food_state",{}))
 	steinrose.restore(data.get("steinrose_state",{}))
+	hidden_finds.restore(data.get("hidden_finds",[]))
 	if not uses_server_world(): golem_world.load_state(data.get("golem_world",{}))
 	world_fog.restore(data.get("world_fog",[]),WORLD,data.get("world_fog_fine",""))
 	var stored_recent: Variant = data.get("recent_players",[])
@@ -6733,6 +6755,7 @@ func reset_character_state() -> void:
 	party_state = {}
 	food_system.restore({})
 	steinrose.restore({})
+	hidden_finds.reset()
 	golem_world = GolemBoss.new()
 	golem_debris.clear()
 	pip_loan_level = 0
@@ -8805,6 +8828,7 @@ func draw_world() -> void:
 		draw_static_overworld(camera_world_rect())
 	draw_class_boss_arenas()
 	draw_region_gates()
+	hidden_finds.paint(self, camera_world_rect(), world_time)
 
 func draw_class_boss_house(index:int)->void:
 	var base:Vector2=CLASS_BOSS_HOUSE_POS[index]
@@ -10485,6 +10509,8 @@ func interaction_prompt(nearby_food: Dictionary) -> String:
 		if player_pos.distance_to(chest_position(i)) < 125:
 			nearest = "E  ·  Schatztruhe öffnen" if chest_ready(i) else "E  ·  Schatztruhe · %ds" % chest_cooldown_seconds(i)
 			break
+	if nearest == "" and interior_id < 0 and dungeon_id < 0 and arena_mode == "":
+		nearest = hidden_finds.prompt(hidden_finds.nearby(player_pos))
 	if player_pos.distance_to(BORIN_CRYSTAL_POS)<95: nearest="E  ·  Kristall der Verschmelzung"
 	var nearby_house:=nearby_village_house_door(110.0) if interior_id<0 else {}
 	if not nearby_house.is_empty():
