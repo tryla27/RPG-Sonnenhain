@@ -61,7 +61,8 @@ func step(g)->void:
 		draw_calls.append(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	if frame==0:route_start=counters(g)
 	last_us=now
-	g.panel="";g.enemies.clear()
+	# Landschaft messen, nicht Gegner: Spawns und Blütenweiler-Angriff aussetzen.
+	g.panel="";g.enemies.clear();g.spawn_timer=-1000.0;g.rescue_state=3
 	var local:=maxi(frame,0)
 	var offset:=0.0 if local<60 else float(local-60 if local<150 else FRAMES-local)*5.0
 	g.player_pos=ROUTES[route][1]+Vector2(offset,0)

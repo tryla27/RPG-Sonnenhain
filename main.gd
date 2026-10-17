@@ -2110,8 +2110,8 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 			result.append({"id":0,"pos":player_pos,"hp":hp,"max_hp":maxf(1.0,hp),"detection_mult":1.0-.08*essence.rank(3,3)})
 	return result
 
-func mob_walkable(point:Vector2,origin:Vector2,enemy:Dictionary,server:bool)->bool:
-	if terrain_blocked(point,mob_hit_radius(enemy)) or blocked_by_region_wall(point) or region_at(point)!=region_at(origin):return false
+func mob_walkable(point:Vector2,origin:Vector2,enemy:Dictionary,server:bool,hit_radius:float=-1.0)->bool:
+	if terrain_blocked(point,hit_radius if hit_radius>=0.0 else mob_hit_radius(enemy)) or blocked_by_region_wall(point) or region_at(point)!=region_at(origin):return false
 	if server or (arena_mode=="" and dungeon_id<0):
 		if waystone_safe_at(point):return false
 	if not server and arena_mode!="":return point.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
@@ -2186,7 +2186,8 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			var away:Vector2=origin-Vector2(other["pos"])
 			var spacing:float=mob_hit_radius(enemy)+mob_hit_radius(other)+8
 			if away.length_squared()>.01 and away.length()<spacing:separation+=away.normalized()*(spacing-away.length())/spacing
-		var walkable:=func(point:Vector2)->bool:return mob_walkable(point,origin,enemy,server)
+		var body_radius:=mob_hit_radius(enemy)
+		var walkable:=func(point:Vector2)->bool:return mob_walkable(point,origin,enemy,server,body_radius)
 		var destination:Vector2=enemy.get("pursuit_target",origin+movement*240.0) if not bool(enemy.get("returning",false)) else enemy["home"]
 		var routed:=MobNavigation.direction(enemy,destination,delta,walkable)
 		if routed.length_squared()>.001:
@@ -2615,6 +2616,9 @@ const REGION_WALLS := [
 ]
 
 func blocked_by_region_wall(pos: Vector2) -> bool:
+	# Schnell aussortieren: Mauern liegen nur auf diesen Achsen (±51 px).
+	if absf(pos.x-1780.0)>51.0 and absf(pos.x-5000.0)>51.0 and absf(pos.x-8500.0)>51.0 and absf(pos.y-2600.0)>51.0 and absf(pos.y-4200.0)>51.0:
+		return false
 	for wall in REGION_WALLS:
 		var along: float = pos.y if wall["vertical"] else pos.x
 		var across: float = pos.x if wall["vertical"] else pos.y
@@ -2807,20 +2811,39 @@ func terrain_blocked(p: Vector2,radius:float=-1.0) -> bool:
 		for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			if Rect2(RESCUE_POS + offset - Vector2(73, 54), Vector2(146, 108)).grow(16).has_point(p): return true
 	# Nur Stamm/Wurzel blockieren; die Krone bleibt begehbar.
-	var tree_tx := int(floorf(p.x/64.0))
-	var tree_ty := int(floorf(p.y/64.0))
+	# Baumstämme und Hindernisse der Umgebung liegen je 64er-Zelle gesammelt vor.
+	for circle in terrain_circles(int(floorf(p.x/64.0)),int(floorf(p.y/64.0))):
+		if p.distance_to(Vector2(circle.x,circle.y)) < circle.z+radius: return true
+	return false
+
+## Alle Kollisionskreise, die terrain_blocked() für Punkte dieser 64er-Zelle
+## prüft: Stämme der 3×3 Baumzellen und Hindernisse der 250er-Nachbarzellen
+## (Radius bereits um die 2 px Hindernisabstand erweitert). Zusätzliche ferne
+## Kreise ändern kein Ergebnis, weil sie weiter als jeder Prüfradius entfernt
+## liegen. Wegsuchen rufen terrain_blocked() tausendfach auf.
+var terrain_circle_cache: Dictionary = {}
+func terrain_circles(tree_tx:int,tree_ty:int) -> PackedVector3Array:
+	var cell := Vector2i(tree_tx,tree_ty)
+	if terrain_circle_cache.has(cell): return terrain_circle_cache[cell]
+	var circles := PackedVector3Array()
 	for tx in range(tree_tx-1,tree_tx+2):
 		for ty in range(tree_ty-1,tree_ty+2):
 			var tree := decorative_tree_in_cell(tx,ty)
-			if not tree.is_empty() and p.distance_to(tree["point"]) < float(tree["radius"])+radius: return true
-	var cx := int(floorf(p.x / 250.0))
-	var cy := int(floorf(p.y / 250.0))
-	for x in range(cx - 1, cx + 2):
-		for y in range(cy - 1, cy + 2):
+			if not tree.is_empty():
+				var point:Vector2=tree["point"]
+				circles.append(Vector3(point.x,point.y,float(tree["radius"])))
+	# Die Zelle kann zwei 250er-Zellen je Achse berühren: deren Nachbarschaften vereinen.
+	var low_x := int(floorf(tree_tx*64.0/250.0))
+	var low_y := int(floorf(tree_ty*64.0/250.0))
+	var high_x := int(floorf((tree_tx*64.0+63.999)/250.0))
+	var high_y := int(floorf((tree_ty*64.0+63.999)/250.0))
+	for x in range(low_x - 1, high_x + 2):
+		for y in range(low_y - 1, high_y + 2):
 			var blocker := obstacle_blocker(x, y)
-			if blocker.z>0.0 and p.distance_to(Vector2(blocker.x,blocker.y)) < blocker.z + radius+2.0:
-				return true
-	return false
+			if blocker.z>0.0: circles.append(Vector3(blocker.x,blocker.y,blocker.z+2.0))
+	if terrain_circle_cache.size() >= 32768: terrain_circle_cache.clear()
+	terrain_circle_cache[cell] = circles
+	return circles
 
 ## Kollisionskreis des Hindernisses einer 250er-Zelle als (x, y, Radius);
 ## Radius 0 = nichts blockiert. Zwischengespeichert, weil Wegsuchen
@@ -5066,6 +5089,13 @@ func update_rescue() -> void:
 		enemies.append(invader)
 
 func update_enemies(delta:float)->void:
+	# Wie auf dem Server: höchstens wenige neue Wegsuchen pro Bild. Im Browser
+	# kosteten gleichzeitig planende Gegner sonst über 100 ms pro Bild.
+	MobNavigation.routes_left=MOB_ROUTES_PER_FRAME
+	update_enemies_unbounded(delta)
+	MobNavigation.routes_left=-1
+
+func update_enemies_unbounded(delta:float)->void:
 	for i in range(enemies.size()-1,-1,-1):
 		if i>=enemies.size():continue
 		var enemy:Dictionary=enemies[i]
@@ -14906,6 +14936,7 @@ func golem_minion_spawn(type: int, maximum: int) -> void:
 ## Umgeworfene Bäume neu zeichnen und Kollision neu rechnen. Mit Schlüssel
 ## "tx:ty" nur diese Zelle und die Kartenkacheln darum (statt alles, ruckelte).
 func golem_trees_changed(key: String) -> void:
+	terrain_circle_cache.clear()
 	var parts := key.split(":")
 	if parts.size() != 2:
 		decorative_tree_cache.clear()

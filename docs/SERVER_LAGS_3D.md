@@ -52,6 +52,17 @@ einzelne 300-ms-Lücken ohne passende Serverspitze; bei fünf Prozessen auf zwei
 Kernen ist das am ehesten Rechenzeitmangel der Prüfmaschine. Hinderniskreise
 je Zelle sind jetzt zwischengespeichert (`obstacle_blocker`), Prüfung 9,4 → 8,0 µs.
 
+## Browser 17.10.: Brave und Edge auf der RTX 3060
+
+Messmodus `?bench=1` im echten Webexport (`components/web_benchmark.gd`).
+Mauertor und Pilzwald liefen in Brave und Edge mit P50 21–29 ms und P95
+26–41 ms, also rund 35–48 Bilder/s. Die Blütenwiesen-Route hatte P95 um
+125 ms und rund 78 Bilder über 50 ms, auch mit `noanim=1` und `no3d=1`.
+Die 3D-Landschaft war also nicht die Ursache, sondern die Gegner-Wegsuche des
+Einzelspielers (Blütenweiler-Angriff) ohne Begrenzung im Client.
+Behoben wie auf dem Server, plus Kreis-Cache für Kollisionen (siehe CHANGELOG).
+Brave verhält sich wie Edge; ein Brave-spezifischer Fehler zeigte sich nicht.
+
 Offen: Live-Server-Protokolle (`SERVER_PERF cpu_max`) nach dem nächsten
 Live-Gang vergleichen; Golem-Kampf als Belastungsfall.
 

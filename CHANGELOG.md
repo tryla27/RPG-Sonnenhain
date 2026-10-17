@@ -34,6 +34,12 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
   Weg ohne Dorfbeschnitt. Landschaftsobjekte 3,0 → 1,9 ms pro Bild (lokal).
 - Browser-Messmodus `?bench=1` (`components/web_benchmark.gd`,
   `tools/web_bench_server.py`) mit Diagnoseschaltern `noanim=1`/`no3d=1`.
+- Einzelspieler-Gegner-KI 17.10.: Browser-Messung zeigte 125 ms-Bilder in den
+  Blütenwiesen ohne 3D-Anteil. Ursache: Wegsuche im Client ohne Begrenzung.
+  Jetzt dieselbe Grenze wie auf dem Server, Kollisionskreise je 64er-Zelle
+  zwischengespeichert (terrain_blocked 15,4 → 3,7 µs, 200.000 Zufallspunkte
+  identisch), Gebietsmauerprüfung mit Schnellausschluss, Körperradius je Gegner
+  einmal pro Schritt.
 - Klarere Vorbereitungsflächen, elementabhängige Effektfolgen, Questzeichen,
   persönlicher Heimkehrschmuck und P95/P99 in der Leistungsanzeige.
   Keine Änderung von Schaden, XP, Kollisionen oder gespeicherten Belohnungen.
