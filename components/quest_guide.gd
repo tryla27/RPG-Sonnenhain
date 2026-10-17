@@ -110,7 +110,7 @@ func draw_on_minimap(g, rect: Rect2, scale_map: Vector2) -> void:
 	draw_marker(g,point,true)
 	if fit < 1.0:
 		var dir := offset.normalized()
-		g.draw_colored_polygon(PackedVector2Array([point+dir*8,point-dir*2+dir.orthogonal()*4,point-dir*2-dir.orthogonal()*4]),marker_color(Time.get_ticks_msec()/1000.0))
+		Shapes.polygon(g,PackedVector2Array([point+dir*8,point-dir*2+dir.orthogonal()*4,point-dir*2-dir.orthogonal()*4]),marker_color(Time.get_ticks_msec()/1000.0))
 
 func click_journal(g, mouse: Vector2) -> void:
 	if Rect2(165,145,815,73).has_point(mouse): open(g,STORY); return

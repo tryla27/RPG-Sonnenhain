@@ -94,10 +94,10 @@ static func normal_house(c:CanvasItem,p:Vector2,kind:String)->void:
 			c.draw_rect(Rect2(p+Vector2(16,137),Vector2(160,10)),Color("6f4d37"))
 			for x in [36,68,100,132,164]:Shapes.circle(c,p+Vector2(x,149),4,Color("d49a58"))
 		"elder":
-			c.draw_colored_polygon(PackedVector2Array([p+Vector2(96,15),p+Vector2(112,38),p+Vector2(96,31),p+Vector2(80,38)]),accent.lightened(.35))
+			Shapes.polygon(c,PackedVector2Array([p+Vector2(96,15),p+Vector2(112,38),p+Vector2(96,31),p+Vector2(80,38)]),accent.lightened(.35))
 		"apprentice":
 			for x in [24,56,128,160]:
-				c.draw_colored_polygon(PackedVector2Array([p+Vector2(x,118),p+Vector2(x+6,103),p+Vector2(x+12,118),p+Vector2(x+6,132)]),Color("8bdfff"))
+				Shapes.polygon(c,PackedVector2Array([p+Vector2(x,118),p+Vector2(x+6,103),p+Vector2(x+12,118),p+Vector2(x+6,132)]),Color("8bdfff"))
 		"smith":
 			local_tile(c,p,4,1,1,2,Color("5b4b49"))
 			Shapes.circle(c,p+Vector2(144,24),9,Color("73706e",.5))
@@ -146,7 +146,7 @@ static func arena_building(c:CanvasItem,p:Vector2)->void:
 	door_tile(c,p,5,5,true)
 	for x in [74,290]:
 		c.draw_rect(Rect2(p+Vector2(x,94),Vector2(20,68)),Color("793d45"))
-		c.draw_colored_polygon(PackedVector2Array([p+Vector2(x,162),p+Vector2(x+10,178),p+Vector2(x+20,162)]),Color("793d45"))
+		Shapes.polygon(c,PackedVector2Array([p+Vector2(x,162),p+Vector2(x+10,178),p+Vector2(x+20,162)]),Color("793d45"))
 	c.draw_rect(Rect2(p+Vector2(112,78),Vector2(160,26)),Color("302f2c"))
 	c.draw_rect(Rect2(p+Vector2(120,85),Vector2(144,12)),Color("70523d"))
 

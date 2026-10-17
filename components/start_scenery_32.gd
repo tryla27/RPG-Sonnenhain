@@ -113,7 +113,7 @@ static func waystone(c:CanvasItem,p:Vector2,_active:bool)->void:
 	if objects != null:
 		sprite(c,objects,Rect2(1020,535,515,470),Rect2(p+Vector2(-78,-113),Vector2(156,156)))
 		return
-	c.draw_colored_polygon(PackedVector2Array([p+Vector2(0,-70),p+Vector2(34,-18),p+Vector2(24,48),p+Vector2(-24,48),p+Vector2(-34,-18)]),Color("657b7d"))
+	Shapes.polygon(c,PackedVector2Array([p+Vector2(0,-70),p+Vector2(34,-18),p+Vector2(24,48),p+Vector2(-24,48),p+Vector2(-34,-18)]),Color("657b7d"))
 	Shapes.circle(c,p+Vector2(0,-12),13,Color("8fd9e1"))
 	Shapes.circle(c,p+Vector2(0,-12),6,Color("d8ffff"))
 static func wall(c:CanvasItem,face:Rect2)->void:

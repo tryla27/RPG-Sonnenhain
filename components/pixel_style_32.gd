@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Shared pixel-art geometry. Tiles are 32 world units; detail pixels are 2.
 const TILE_SIZE=32
 const STEP=2.0
@@ -33,7 +34,7 @@ static func polygon(c:CanvasItem,points:PackedVector2Array,col:Color,_uv:PackedV
 		if vertices.is_empty() or vertices[-1]!=v:vertices.append(v)
 	if vertices.size()>1 and vertices[0]==vertices[-1]:vertices.remove_at(vertices.size()-1)
 	if vertices.size()>=3 and not Geometry2D.triangulate_polygon(vertices).is_empty():
-		c.draw_colored_polygon(vertices,col)
+		Shapes.polygon(c,vertices,col)
 static func arc(c:CanvasItem,p:Vector2,radius:float,start:float,finish:float,count:int,col:Color,width:float=1.0,_aa:bool=false)->void:
 	var segments=maxi(8,count)
 	for i in segments:

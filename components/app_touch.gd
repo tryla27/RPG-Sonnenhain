@@ -364,7 +364,7 @@ static func _draw_skill_aim(g,state:Dictionary)->void:
 		g.draw_line(origin,tip,Color(tint,0.35),14.0*zoom)
 		g.draw_line(origin,tip,Color(tint,0.9),4.0)
 		var side:=dir.orthogonal()
-		g.draw_colored_polygon(PackedVector2Array([tip+dir*16.0,tip+side*11.0,tip-side*11.0]),Color(tint,0.95))
+		Shapes.polygon(g,PackedVector2Array([tip+dir*16.0,tip+side*11.0,tip-side*11.0]),Color(tint,0.95))
 	# Verbindung Knopf → Finger
 	var from:Vector2=AppLayout.center("ability_%d"%(st.skill_slot+1))
 	g.draw_line(from,st.skill_pos,Color(tint,0.55),2.0)

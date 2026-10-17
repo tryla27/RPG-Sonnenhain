@@ -8098,13 +8098,13 @@ func _draw() -> void:
 			if spell_id == 16:
 				var flame_tail := p - d * 15.0
 				Shapes.circle(self,flame_tail, 18 + sin(world_time * 24) * 3, Color("d84d28", 0.42))
-				draw_colored_polygon(PackedVector2Array([p-d*20-side*10,p+d*9-side*8,p+d*20,p+d*8+side*9,p-d*19+side*10]),Color("ed672f"))
+				Shapes.polygon(self,PackedVector2Array([p-d*20-side*10,p+d*9-side*8,p+d*20,p+d*8+side*9,p-d*19+side*10]),Color("ed672f"))
 				Shapes.circle(self,p, 12, Color("ff9a3f"))
 				Shapes.circle(self,p + side * 3 - d * 2, 6, Color("fff0a6"))
 			elif spell_id == 22:
 				draw_line(p-d*28,p+d*14,Color("a83d26",0.55),14)
 				draw_line(p-d*23,p+d*10,Color("ff7b32"),8)
-				draw_colored_polygon(PackedVector2Array([p+d*25,p+side*8,p-d*24,p-side*8]),Color("ffad4d"))
+				Shapes.polygon(self,PackedVector2Array([p+d*25,p+side*8,p-d*24,p-side*8]),Color("ffad4d"))
 				Shapes.circle(self,p-d*7,6,Color("fff0a6"))
 			elif spell_id == 18:
 				draw_line(p - d * 70, p + d * 31, Color("f5d56c", 0.6), 13)
@@ -8119,13 +8119,13 @@ func _draw() -> void:
 			elif spell_id == 25:
 				draw_line(p - d * 58, p + d * 36, Color("f9e1a3", 0.4), 11)
 				draw_line(p - d * 42, p + d * 20, Color("fff7d4"), 4)
-				draw_colored_polygon(PackedVector2Array([p + d * 39, p + side * 9, p - side * 9]), Color("f6e3b0"))
+				Shapes.polygon(self,PackedVector2Array([p + d * 39, p + side * 9, p - side * 9]), Color("f6e3b0"))
 			elif spell_id == 28:
 				draw_line(p - d * 19, p + d * 12, Color("625b3a"), 5)
-				draw_colored_polygon(PackedVector2Array([p + d * 22, p + side * 9, p - side * 9]), Color("c0eb69"))
+				Shapes.polygon(self,PackedVector2Array([p + d * 22, p + side * 9, p - side * 9]), Color("c0eb69"))
 				for drop in 3: Shapes.circle(self,p - d * (8 + drop * 10) + side * sin(world_time * 15 + drop) * 7, 4, Color("91cd5f", 0.72))
 			elif spell_id == 29:
-				draw_colored_polygon(PackedVector2Array([p + d * 30, p + side * 10, p - d * 25, p - side * 10]), Color("d4f9ff"))
+				Shapes.polygon(self,PackedVector2Array([p + d * 30, p + side * 10, p - d * 25, p - side * 10]), Color("d4f9ff"))
 				draw_line(p - d * 21, p + d * 18, Color("78c6eb"), 4)
 				for shard in [-1, 1]: draw_rect(Rect2(p - d * 15 + side * shard * 13 - Vector2(3, 3), Vector2(6, 6)), Color("9ee6f4"))
 			elif spell_id == 30:
@@ -8139,12 +8139,12 @@ func _draw() -> void:
 				Shapes.circle(self,p - d * 3, 5, Color.WHITE)
 			elif int(projectile["kind"]) == 3:
 				draw_line(p - d * 27, p + d * 16, Color("735a47"), 4)
-				draw_colored_polygon(PackedVector2Array([p + d * 23, p + side * 7, p - side * 7]), accent)
+				Shapes.polygon(self,PackedVector2Array([p + d * 23, p + side * 7, p - side * 7]), accent)
 				draw_line(p - d * 21 + side * 8, p - d * 25, Color("f3eee1"), 3)
 				draw_line(p - d * 21 - side * 8, p - d * 25, Color("f3eee1"), 3)
 			else:
 				draw_line(p - d * 25, p - d * 58, Color(accent, 0.25), 13)
-				draw_colored_polygon(PackedVector2Array([p + d * 24, p + side * 11, p - d * 18, p - side * 11]), accent)
+				Shapes.polygon(self,PackedVector2Array([p + d * 24, p + side * 11, p - d * 18, p - side * 11]), accent)
 				draw_line(p - d * 11, p + d * 16, Color.WHITE, 3)
 			var vfx_kind := 5 if int(projectile["kind"]) == 3 else (0 if spell_id in [16,22] else (1 if spell_id in [17,29] else (2 if spell_id in [18,30] else (3 if spell_id in [28] else 4))))
 			if spell_id >= 0: draw_vfx_sprite(vfx_kind, p, 24.0)
@@ -8406,7 +8406,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 				var offset := Vector2((arrow % 3 - 1) * 28, (arrow / 3 - 1) * 25)
 				var top := p + offset + Vector2(0, -75 + progress * 95)
 				draw_line(top - Vector2(0, 19), top + Vector2(0, 13), Color(hue, alpha), 4)
-				draw_colored_polygon(PackedVector2Array([top + Vector2(-6, 8), top + Vector2(0, 20), top + Vector2(6, 8)]), Color(hue, alpha))
+				Shapes.polygon(self,PackedVector2Array([top + Vector2(-6, 8), top + Vector2(0, 20), top + Vector2(6, 8)]), Color(hue, alpha))
 		23, 24:
 			for ring in 3:
 				var hue: Color = [Color("a9eafa"), Color("ffe7a0"), Color("b6e6a1")][ring]
@@ -9120,8 +9120,8 @@ func draw_torch(p: Vector2, blue: bool, flame: bool) -> void:
 		var halo_radius := 18.0 + float(halo) * 23.0 + flicker * 0.7
 		Shapes.circle(self,p + Vector2(0, -24), halo_radius, Color(light, 0.022 if halo == 3 else (0.036 if halo == 2 else 0.065)))
 	Shapes.circle(self,p + Vector2(0, -24), 16 + flicker * 0.45, Color(light, 0.13))
-	draw_colored_polygon(PackedVector2Array([p + Vector2(-7, -10), p + Vector2(0, -37 - flicker), p + Vector2(8, -10)]), light)
-	draw_colored_polygon(PackedVector2Array([p + Vector2(-3, -11), p + Vector2(2, -27 - flicker), p + Vector2(5, -11)]), Color("e8ffff") if blue else Color("fff2bf"))
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(-7, -10), p + Vector2(0, -37 - flicker), p + Vector2(8, -10)]), light)
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(-3, -11), p + Vector2(2, -27 - flicker), p + Vector2(5, -11)]), Color("e8ffff") if blue else Color("fff2bf"))
 
 func draw_dungeon_atmosphere() -> void:
 	var shadow_color := Color("080f18") if dungeon_id != 2 else Color("0a1515")
@@ -9194,7 +9194,7 @@ func _trail_theme(region: int) -> int:
 ## deren Rand (Mauerlinie der Tore) gerade abgeschnitten.
 func draw_trail_band(a: Vector2, b: Vector2, width: float, color: Color) -> void:
 	for piece in trail_band_polygons(a, b, width):
-		draw_colored_polygon(piece, color)
+		Shapes.polygon(self,piece, color)
 
 static func trail_band_polygons(a: Vector2, b: Vector2, width: float) -> Array:
 	var side := (b - a).normalized().rotated(PI * 0.5) * width * 0.5
@@ -9292,7 +9292,7 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 				draw_crystal(p + offset, key + int(offset.x))
 		5:
 			Shapes.circle(self,p, r, Color("504247"))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-r, 20), p + Vector2(-r * 0.45, -r * 0.8), p + Vector2(r * 0.35, -r), p + Vector2(r, 15)]), Color("795552"))
+			Shapes.polygon(self,PackedVector2Array([p + Vector2(-r, 20), p + Vector2(-r * 0.45, -r * 0.8), p + Vector2(r * 0.35, -r), p + Vector2(r, 15)]), Color("795552"))
 			for crack in [-0.45, 0.05, 0.42]:
 				draw_line(p + Vector2(r * crack, -r * 0.4), p + Vector2(r * (crack + 0.18), r * 0.35), Color("f0a066"), 5)
 		6:
@@ -9304,7 +9304,7 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 			Shapes.circle(self,p, r, Color("514e61"))
 			for i in 4:
 				var shard := p + Vector2.RIGHT.rotated(i * TAU / 4.0) * r * 0.48
-				draw_colored_polygon(PackedVector2Array([shard + Vector2(0,-28),shard + Vector2(10,5),shard + Vector2(-9,8)]), Color("c3b2e4"))
+				Shapes.polygon(self,PackedVector2Array([shard + Vector2(0,-28),shard + Vector2(10,5),shard + Vector2(-9,8)]), Color("c3b2e4"))
 		8:
 			draw_bush_cluster(p, zone, key)
 			for twig in [-1.0, 1.0]: draw_line(p + Vector2(twig * 12, 9), p + Vector2(twig * 24, -22), Color("6c6256"), 5)
@@ -9319,13 +9319,13 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 				draw_line(p + ray * 8, p + ray * r * 0.72, Color("a7d9d7"), 5)
 			Shapes.circle(self,p, r * 0.25, Color("d9f1e8"))
 		11:
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-r, 17), p + Vector2(-r * 0.45, -r), p + Vector2(r * 0.25, -r * 0.78), p + Vector2(r, 21)]), Color("5d5f72"))
+			Shapes.polygon(self,PackedVector2Array([p + Vector2(-r, 17), p + Vector2(-r * 0.45, -r), p + Vector2(r * 0.25, -r * 0.78), p + Vector2(r, 21)]), Color("5d5f72"))
 			for ridge in 3: draw_line(p + Vector2(-r * 0.45 + ridge * r * 0.35, -r * 0.5), p + Vector2(-r * 0.2 + ridge * r * 0.35, 12), Color("a6a7b7"), 4)
 		12:
 			Shapes.circle(self,p, r, Color("675f78"))
 			for i in 6:
 				var shard := p + Vector2.RIGHT.rotated(i * TAU / 6.0) * r * 0.5
-				draw_colored_polygon(PackedVector2Array([shard + Vector2(0,-24),shard + Vector2(8,5),shard + Vector2(-8,6)]), Color("d6c8ed"))
+				Shapes.polygon(self,PackedVector2Array([shard + Vector2(0,-24),shard + Vector2(8,5),shard + Vector2(-8,6)]), Color("d6c8ed"))
 			Shapes.circle(self,p, 8, Color("fff1bb"))
 		_:
 			Shapes.circle(self,p, r, Color("53666c"))
@@ -9590,9 +9590,9 @@ func draw_ruin(p: Vector2, key: int) -> void:
 func draw_crystal(p: Vector2, key: int) -> void:
 	var c := Color('92ddea') if key % 2 == 0 else Color('c1a2ed')
 	var c2 := c.lightened(0.3)
-	draw_colored_polygon(PackedVector2Array([p + Vector2(20, -18), p + Vector2(35, 7), p + Vector2(18, 31), p + Vector2(3, 7)]), c)
-	draw_colored_polygon(PackedVector2Array([p + Vector2(8, 6), p + Vector2(18, -9), p + Vector2(25, 10), p + Vector2(13, 24)]), c2)
-	if key % 3 == 0: draw_colored_polygon(PackedVector2Array([p + Vector2(30, -4), p + Vector2(40, 10), p + Vector2(32, 25), p + Vector2(24, 10)]), c.darkened(0.08))
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(20, -18), p + Vector2(35, 7), p + Vector2(18, 31), p + Vector2(3, 7)]), c)
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(8, 6), p + Vector2(18, -9), p + Vector2(25, 10), p + Vector2(13, 24)]), c2)
+	if key % 3 == 0: Shapes.polygon(self,PackedVector2Array([p + Vector2(30, -4), p + Vector2(40, 10), p + Vector2(32, 25), p + Vector2(24, 10)]), c.darkened(0.08))
 	draw_rect(Rect2(p + Vector2(15, -4), Vector2(5, 25)), Color('eefcff', 0.85))
 	draw_rect(Rect2(p + Vector2(10, 25), Vector2(24, 6)), c.darkened(0.34))
 
@@ -9606,8 +9606,8 @@ func draw_rock(p: Vector2) -> void:
 	if region_at(p) == 0:
 		ReferenceScenery.rock(self,p)
 		return
-	draw_colored_polygon(PackedVector2Array([p + Vector2(2, 24), p + Vector2(15, 6), p + Vector2(31, 0), p + Vector2(45, 11), p + Vector2(47, 28), p + Vector2(19, 30)]), Color('6c6a6f'))
-	draw_colored_polygon(PackedVector2Array([p + Vector2(15, 8), p + Vector2(29, 3), p + Vector2(36, 16), p + Vector2(22, 18)]), Color('97908a'))
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(2, 24), p + Vector2(15, 6), p + Vector2(31, 0), p + Vector2(45, 11), p + Vector2(47, 28), p + Vector2(19, 30)]), Color('6c6a6f'))
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(15, 8), p + Vector2(29, 3), p + Vector2(36, 16), p + Vector2(22, 18)]), Color('97908a'))
 	draw_rect(Rect2(p + Vector2(12, 19), Vector2(15, 4)), Color('b4a99a'))
 
 func draw_pebbles(p: Vector2) -> void:
@@ -9693,7 +9693,7 @@ func draw_event_scene(index: int) -> void:
 		draw_rect(Rect2(p + offset, Vector2(8, 75)), Color("685749"))
 		draw_rect(Rect2(p + offset + Vector2(-4, -10), Vector2(16, 12)), Color("f1d093"))
 	var flag: Color = Color("84c596") if state >= 2 else Color("dd876c")
-	draw_colored_polygon(PackedVector2Array([p + Vector2(-70,-34), p + Vector2(0,-77), p + Vector2(70,-34)]), flag)
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(-70,-34), p + Vector2(0,-77), p + Vector2(70,-34)]), flag)
 	draw_rect(Rect2(p + Vector2(-54, 27), Vector2(28, 18)), Color("936f4e"))
 	draw_rect(Rect2(p + Vector2(35, 23), Vector2(23, 20)), Color("937a5a"))
 	for fire in 4:
@@ -10235,20 +10235,20 @@ func draw_hero_sword(hand: Vector2, blade_dir: Vector2, preview: bool = false) -
 		draw_line(hilt - across * (10 + stage), hilt + across * (10 + stage), Color('ddae68'), 5)
 	var width := 5 + stage * 0.9
 	if design == 1:
-		draw_colored_polygon(PackedVector2Array([shoulder + across * width, tip + across * 9, tip + across * 5 + blade_dir * 3, tip - blade_dir * 10 - across * 3, shoulder - across * width]), metal)
+		Shapes.polygon(self,PackedVector2Array([shoulder + across * width, tip + across * 9, tip + across * 5 + blade_dir * 3, tip - blade_dir * 10 - across * 3, shoulder - across * width]), metal)
 	elif design == 2: # Axtkopf
 		var haft_end := shoulder + blade_dir * 55
 		draw_line(shoulder, haft_end, Color('6b4d38'), 7)
 		draw_line(shoulder, haft_end, Color('b68a5d'), 4)
 		var axe_head := haft_end + blade_dir * 9
-		draw_colored_polygon(PackedVector2Array([axe_head + across * 4, axe_head + across * 19 - blade_dir * 3, axe_head + across * 13 + blade_dir * 17, axe_head - across * 5 + blade_dir * 10, axe_head - across * 5 - blade_dir * 10]), metal)
-		draw_colored_polygon(PackedVector2Array([axe_head - across * 4, axe_head - across * 16 - blade_dir * 3, axe_head - across * 11 + blade_dir * 12, axe_head + across * 1 + blade_dir * 7]), metal.darkened(0.12))
+		Shapes.polygon(self,PackedVector2Array([axe_head + across * 4, axe_head + across * 19 - blade_dir * 3, axe_head + across * 13 + blade_dir * 17, axe_head - across * 5 + blade_dir * 10, axe_head - across * 5 - blade_dir * 10]), metal)
+		Shapes.polygon(self,PackedVector2Array([axe_head - across * 4, axe_head - across * 16 - blade_dir * 3, axe_head - across * 11 + blade_dir * 12, axe_head + across * 1 + blade_dir * 7]), metal.darkened(0.12))
 		draw_line(haft_end - across * 2, haft_end + across * 2, Color('f5efce'), 2)
 	elif design == 3:
-		draw_colored_polygon(PackedVector2Array([shoulder + across * width, tip - blade_dir * 10 + across * width, tip - across * 5, tip - blade_dir * 7, tip + across * 5, tip - blade_dir * 10 - across * width, shoulder - across * width]), metal)
+		Shapes.polygon(self,PackedVector2Array([shoulder + across * width, tip - blade_dir * 10 + across * width, tip - across * 5, tip - blade_dir * 7, tip + across * 5, tip - blade_dir * 10 - across * width, shoulder - across * width]), metal)
 	else:
-		draw_colored_polygon(PackedVector2Array([shoulder + across * width, tip - blade_dir * 7, tip, tip - blade_dir * 7 - across * width, shoulder - across * width]), Color('354959'))
-		draw_colored_polygon(PackedVector2Array([shoulder + across * (width - 2), tip - blade_dir * 8, tip - blade_dir * 2, shoulder - across * (width - 2)]), metal)
+		Shapes.polygon(self,PackedVector2Array([shoulder + across * width, tip - blade_dir * 7, tip, tip - blade_dir * 7 - across * width, shoulder - across * width]), Color('354959'))
+		Shapes.polygon(self,PackedVector2Array([shoulder + across * (width - 2), tip - blade_dir * 8, tip - blade_dir * 2, shoulder - across * (width - 2)]), metal)
 	if design != 2: draw_line(shoulder, tip - blade_dir * 5, Color('f8fcf2', 0.65), 2)
 	if equipped_uid >= 0 and not preview:
 		Shapes.circle(self,hilt, 3 + stage * 0.35, RARITY_COLORS[rarity])
@@ -11804,9 +11804,9 @@ func draw_fusion_crystal() -> void:
 	for x in [-24,-8,8,24]: draw_rect(Rect2(p+Vector2(x,30),Vector2(8,4)),Color("c7b985"))
 	draw_rect(Rect2(p+Vector2(-32,-18),Vector2(64,48)),Color("6758b1",0.14))
 	var outer:=PackedVector2Array([p+Vector2(0,-64),p+Vector2(28,-24),p+Vector2(20,18),p+Vector2(0,34),p+Vector2(-22,18),p+Vector2(-30,-24)])
-	draw_colored_polygon(outer,Color("7967d7"))
-	draw_colored_polygon(PackedVector2Array([p+Vector2(0,-56),p+Vector2(12,-21),p+Vector2(8,16),p+Vector2(0,26)]),Color("ddd5ff"))
-	draw_colored_polygon(PackedVector2Array([p+Vector2(0,-56),p+Vector2(-15,-20),p+Vector2(-10,16),p+Vector2(0,26)]),Color("a993f2"))
+	Shapes.polygon(self,outer,Color("7967d7"))
+	Shapes.polygon(self,PackedVector2Array([p+Vector2(0,-56),p+Vector2(12,-21),p+Vector2(8,16),p+Vector2(0,26)]),Color("ddd5ff"))
+	Shapes.polygon(self,PackedVector2Array([p+Vector2(0,-56),p+Vector2(-15,-20),p+Vector2(-10,16),p+Vector2(0,26)]),Color("a993f2"))
 	draw_line(p+Vector2(0,-60),p+Vector2(0,26),Color("f1ebff",0.72),3)
 	for spark in [Vector2(-38,-18),Vector2(36,-34),Vector2(-28,-48),Vector2(42,2)]:
 		draw_rect(Rect2(p+spark,Vector2(4,4)),Color("bdeaff"))
@@ -12021,7 +12021,7 @@ func draw_item_signature(p: Vector2, item: Dictionary) -> void:
 	var center := p + Vector2(27, 25)
 	match signature % 4:
 		0: Shapes.circle(self,center, 4, tint)
-		1: draw_colored_polygon(PackedVector2Array([center + Vector2(0,-6),center + Vector2(5,0),center + Vector2(0,6),center + Vector2(-5,0)]), tint)
+		1: Shapes.polygon(self,PackedVector2Array([center + Vector2(0,-6),center + Vector2(5,0),center + Vector2(0,6),center + Vector2(-5,0)]), tint)
 		2:
 			draw_line(center + Vector2(-5,-5), center + Vector2(5,5), tint, 3)
 			draw_line(center + Vector2(-5,5), center + Vector2(5,-5), tint, 3)
@@ -12308,8 +12308,8 @@ func draw_world_atlas(rect: Rect2) -> void:
 	quest_guide.draw_on_map(self,inset,map_scale)
 	var player_map := inset.position + (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)) * map_scale
 	draw_arc(player_map, 9.0 + sin(world_time * 3.0) * 1.0, 0.0, TAU, 24, Color("ffffff"), 3)
-	draw_colored_polygon(PackedVector2Array([player_map + Vector2(0,-7),player_map + Vector2(6,0),player_map + Vector2(0,7),player_map + Vector2(-6,0)]), Color("252b32"))
-	draw_colored_polygon(PackedVector2Array([player_map + Vector2(0,-5),player_map + Vector2(4,0),player_map + Vector2(0,5),player_map + Vector2(-4,0)]), Color("ffffff"))
+	Shapes.polygon(self,PackedVector2Array([player_map + Vector2(0,-7),player_map + Vector2(6,0),player_map + Vector2(0,7),player_map + Vector2(-6,0)]), Color("252b32"))
+	Shapes.polygon(self,PackedVector2Array([player_map + Vector2(0,-5),player_map + Vector2(4,0),player_map + Vector2(0,5),player_map + Vector2(-4,0)]), Color("ffffff"))
 	draw_rect(rect, Color("ead6a9"), false, 2)
 
 func draw_atlas_tree(point: Vector2) -> void:
@@ -12318,11 +12318,11 @@ func draw_atlas_tree(point: Vector2) -> void:
 	draw_rect(Rect2(point + Vector2(-2, -7), Vector2(5, 3)), Color("739775"))
 
 func draw_atlas_peak(point: Vector2) -> void:
-	draw_colored_polygon(PackedVector2Array([point + Vector2(-6,5),point + Vector2(0,-6),point + Vector2(7,5)]), Color("3f4a54"))
+	Shapes.polygon(self,PackedVector2Array([point + Vector2(-6,5),point + Vector2(0,-6),point + Vector2(7,5)]), Color("3f4a54"))
 	draw_rect(Rect2(point + Vector2(-1,-5), Vector2(3,3)), Color("c7bdab"))
 
 func draw_atlas_crystal(point: Vector2) -> void:
-	draw_colored_polygon(PackedVector2Array([point + Vector2(0,-6),point + Vector2(4,0),point + Vector2(0,6),point + Vector2(-4,0)]), Color("b0d8dc"))
+	Shapes.polygon(self,PackedVector2Array([point + Vector2(0,-6),point + Vector2(4,0),point + Vector2(0,6),point + Vector2(-4,0)]), Color("b0d8dc"))
 	draw_rect(Rect2(point + Vector2(-1,-4), Vector2(2,4)), Color("f6e9c7"))
 
 func draw_waystone(p: Vector2) -> void:
@@ -12366,8 +12366,8 @@ func draw_landmark(landmark: Dictionary) -> void:
 		"hamlet":
 			draw_hamlet(p)
 		"camp":
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-66, 32), p + Vector2(0, -72), p + Vector2(69, 32)]), Color("e2ac7b"))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-25, 30), p + Vector2(0, -24), p + Vector2(27, 30)]), Color("765d57"))
+			Shapes.polygon(self,PackedVector2Array([p + Vector2(-66, 32), p + Vector2(0, -72), p + Vector2(69, 32)]), Color("e2ac7b"))
+			Shapes.polygon(self,PackedVector2Array([p + Vector2(-25, 30), p + Vector2(0, -24), p + Vector2(27, 30)]), Color("765d57"))
 			draw_rect(Rect2(p + Vector2(-82, 34), Vector2(163, 9)), Color("946e61"))
 			for offset in [-73, 74]:
 				draw_rect(Rect2(p + Vector2(offset, -16), Vector2(8, 46)), Color("8a674f"))
@@ -12420,14 +12420,14 @@ func draw_hamlet(p: Vector2) -> void:
 		for fire_offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			var fire_pos: Vector2 = p + fire_offset + Vector2(0, -78)
 			Shapes.circle(self,fire_pos + Vector2(0, 18), 18, Color("d85f57", 0.40))
-			draw_colored_polygon(PackedVector2Array([fire_pos + Vector2(0, -28), fire_pos + Vector2(13, 15), fire_pos + Vector2(-13, 15)]), Color("e66c50"))
-			draw_colored_polygon(PackedVector2Array([fire_pos + Vector2(0, -16), fire_pos + Vector2(8, 12), fire_pos + Vector2(-8, 12)]), Color("ffdd78"))
+			Shapes.polygon(self,PackedVector2Array([fire_pos + Vector2(0, -28), fire_pos + Vector2(13, 15), fire_pos + Vector2(-13, 15)]), Color("e66c50"))
+			Shapes.polygon(self,PackedVector2Array([fire_pos + Vector2(0, -16), fire_pos + Vector2(8, 12), fire_pos + Vector2(-8, 12)]), Color("ffdd78"))
 			for smoke_i in 3:
 				var smoke_pos := fire_pos + Vector2(sin(world_time * 1.3 + smoke_i) * 12, -36 - smoke_i * 24)
 				Shapes.circle(self,smoke_pos, 14 + smoke_i * 3, Color(0.20, 0.23, 0.25, 0.24 - smoke_i * 0.045))
 		# Alarmbanner am zentralen Weg, schon aus größerer Entfernung lesbar.
 		draw_rect(Rect2(p + Vector2(-6, -185), Vector2(10, 135)), Color("684e50"))
-		draw_colored_polygon(PackedVector2Array([p + Vector2(4, -178), p + Vector2(105, -158), p + Vector2(4, -138)]), Color("c95762"))
+		Shapes.polygon(self,PackedVector2Array([p + Vector2(4, -178), p + Vector2(105, -158), p + Vector2(4, -138)]), Color("c95762"))
 		text_at(p + Vector2(-92, -218), "HILFE!", 22, Color("ffd28b"), HORIZONTAL_ALIGNMENT_CENTER, 184)
 	else:
 		# Nach der Rettung bleibt ein sichtbarer Wiederaufbau zurück.
@@ -12452,8 +12452,8 @@ func draw_hamlet(p: Vector2) -> void:
 	if not safe:
 		for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			var roof: Vector2 = p + offset + Vector2(32, -66)
-			draw_colored_polygon(PackedVector2Array([roof + Vector2(-12, 7), roof + Vector2(0,-31 - sin(world_time * 8) * 5), roof + Vector2(15,7)]), Color("f38858", 0.85))
-			draw_colored_polygon(PackedVector2Array([roof + Vector2(-5, 8), roof + Vector2(3,-17), roof + Vector2(9,8)]), Color("ffe083"))
+			Shapes.polygon(self,PackedVector2Array([roof + Vector2(-12, 7), roof + Vector2(0,-31 - sin(world_time * 8) * 5), roof + Vector2(15,7)]), Color("f38858", 0.85))
+			Shapes.polygon(self,PackedVector2Array([roof + Vector2(-5, 8), roof + Vector2(3,-17), roof + Vector2(9,8)]), Color("ffe083"))
 			for i in 3:
 				Shapes.circle(self,roof + Vector2(sin(world_time + i * 2.0) * 15, -46 - i * 22), 12 + i * 5, Color(0.25,0.27,0.28,0.22))
 	for x in [-155, 140]:

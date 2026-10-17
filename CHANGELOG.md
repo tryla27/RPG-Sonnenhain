@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- `Shapes.polygon`: Dreiecke und konvexe Vierecke über `draw_primitive`
+  (~1,2 statt ~5,5 µs, Farbrundung höchstens 1/255), alle zweiargumentigen
+  `draw_colored_polygon`-Aufrufe umgestellt (Ausnahme: `Brush` in
+  `character_adornments.gd`). Zeichnen ohne Gegner 3,6 → 3,0 ms.
 - Tiefensortierung der Weltobjekte über `PackedVector2Array.sort()`
   (Tiefe, Stelle) statt `sort_custom` (120 Einträge: 0,25 → 0,03 ms), gleiche
   Tiefe bleibt stabil; Fruchtpflanzen-Sichtprüfung mit einem Rechteck je Bild.

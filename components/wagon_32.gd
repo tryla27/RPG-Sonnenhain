@@ -1,11 +1,12 @@
 ﻿extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 # Coarse pixel geometry: one logical pixel = two game pixels, footprint 128x96.
 static func box(c:CanvasItem,o:Vector2,r:Rect2,col:Color)->void:
  c.draw_rect(Rect2(o+r.position*2,r.size*2),col)
 static func face(c:CanvasItem,o:Vector2,points:Array,col:Color)->void:
  var vertices=PackedVector2Array()
  for point in points:vertices.append(o+Vector2(point)*2)
- c.draw_colored_polygon(vertices,col)
+ Shapes.polygon(c,vertices,col)
 static func wheel(c:CanvasItem,o:Vector2,p:Vector2,far:bool=false)->void:
  var radius:=4 if far else 6
  face(c,o,[p+Vector2(-radius,-2),p+Vector2(-2,-radius),p+Vector2(3,-radius),p+Vector2(radius,-2),p+Vector2(radius,3),p+Vector2(2,radius),p+Vector2(-3,radius),p+Vector2(-radius,2)],Color("30363a"))

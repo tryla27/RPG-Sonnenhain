@@ -31,9 +31,9 @@ static func block(c:CanvasItem,center:Vector2,size:Vector2,u:float,shade:Color=B
 	for v in local:pts.append(center+(v as Vector2).rotated(rot))
 	var outline:=PackedVector2Array()
 	for p in pts:outline.append(center+(p-center)*1.0+(p-center).normalized()*u*0.6)
-	c.draw_colored_polygon(outline,OUTLINE)
-	c.draw_colored_polygon(pts,shade)
-	c.draw_colored_polygon(PackedVector2Array([pts[0],pts[1],pts[2],center+Vector2(w,-h*0.35).rotated(rot),center+Vector2(-w,-h*0.35).rotated(rot),pts[7]]),shade.lightened(0.10))
+	Shapes.polygon(c,outline,OUTLINE)
+	Shapes.polygon(c,pts,shade)
+	Shapes.polygon(c,PackedVector2Array([pts[0],pts[1],pts[2],center+Vector2(w,-h*0.35).rotated(rot),center+Vector2(-w,-h*0.35).rotated(rot),pts[7]]),shade.lightened(0.10))
 	c.draw_line(pts[0],pts[1],BASALT_TOP,maxf(1.0,u*0.9))
 
 ## Echter Stein (Golem v2): unregelmäßige Form mit 9–12 Ecken, drei
@@ -57,8 +57,8 @@ static func draw_stone(c:CanvasItem,center:Vector2,radius:float,seed:int,rot:flo
 	for v in local:pts.append(center+v.rotated(rot))
 	var outline:=PackedVector2Array()
 	for v in local:outline.append(center+(v+v.normalized()*maxf(1.5,radius*0.07)).rotated(rot))
-	c.draw_colored_polygon(outline,Color(OUTLINE,fade))
-	c.draw_colored_polygon(pts,Color(BASALT,fade))
+	Shapes.polygon(c,outline,Color(OUTLINE,fade))
+	Shapes.polygon(c,pts,Color(BASALT,fade))
 	# Lichtfläche: Ecken oben links, zur Mitte hin versetzt.
 	var light_dir:=Vector2(-0.6,-0.8).rotated(-rot)
 	var lit:=PackedVector2Array()
@@ -69,10 +69,10 @@ static func draw_stone(c:CanvasItem,center:Vector2,radius:float,seed:int,rot:flo
 		if d<0.2:shade.append(center+(v*0.96).rotated(rot))
 	if lit.size()>=3:
 		lit.append(center+(light_dir*radius*0.05).rotated(rot))
-		c.draw_colored_polygon(lit,Color(BASALT_LIGHT,fade))
+		Shapes.polygon(c,lit,Color(BASALT_LIGHT,fade))
 	if shade.size()>=3:
 		shade.append(center+(-light_dir*radius*0.15).rotated(rot))
-		c.draw_colored_polygon(shade,Color(BASALT.darkened(0.28),fade))
+		Shapes.polygon(c,shade,Color(BASALT.darkened(0.28),fade))
 	# Oberkante hell.
 	var rng:=RandomNumberGenerator.new()
 	rng.seed=seed*7+3
@@ -94,8 +94,8 @@ static func draw_stone(c:CanvasItem,center:Vector2,radius:float,seed:int,rot:flo
 		for v in dent:
 			rim.append(center+(p+v*1.15+Vector2(r*0.3,r*0.3)).rotated(rot))
 			hole.append(center+(p+v).rotated(rot))
-		c.draw_colored_polygon(rim,Color(BASALT_TOP,0.75*fade))
-		c.draw_colored_polygon(hole,Color(BASALT.darkened(0.45),0.9*fade))
+		Shapes.polygon(c,rim,Color(BASALT_TOP,0.75*fade))
+		Shapes.polygon(c,hole,Color(BASALT.darkened(0.45),0.9*fade))
 	# Feiner Riss.
 	var a0:=Vector2(rng.randf_range(-0.5,-0.1),rng.randf_range(-0.5,0.0))*radius
 	var a1:=a0+Vector2(radius*0.3,radius*rng.randf_range(0.1,0.3))
@@ -153,7 +153,7 @@ static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:
 	if state=="scream_pause":glow=1.0
 	# Schatten
 	var shadow_w:=52.0*u
-	c.draw_colored_polygon(_ellipse(pos+Vector2(0,u*2),shadow_w,shadow_w*0.28),Color(0,0,0,0.30))
+	Shapes.polygon(c,_ellipse(pos+Vector2(0,u*2),shadow_w,shadow_w*0.28),Color(0,0,0,0.30))
 	var col:=frame_index(state,walking,time)
 	var row:=view_row(facing)
 	var region:=Rect2(col*FRAME,row*FRAME,FRAME,FRAME)
@@ -170,7 +170,7 @@ static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:
 	c.draw_texture_rect_region(GLOW,dest,region,Color(1,1,1,(0.45+0.55*glow)*rise))
 	if state=="shield":
 		# Steinhülle: dunkler Schleier über dem gebeugten Körper
-		c.draw_colored_polygon(_ellipse(pos+Vector2(0,-42*u),40*u,34*u),Color(0.10,0.09,0.13,0.40))
+		Shapes.polygon(c,_ellipse(pos+Vector2(0,-42*u),40*u,34*u),Color(0.10,0.09,0.13,0.40))
 		c.draw_arc(pos+Vector2(0,-42*u),38*u,PI*1.05,PI*1.95,24,Color(CRACK,0.5),u)
 	if flash>0.0:
 		c.draw_texture_rect_region(SHEET,dest,region,Color(2.6,2.6,2.6,minf(0.55,flash*3.0)))
@@ -188,7 +188,7 @@ static func _ellipse(center:Vector2,rx:float,ry:float)->PackedVector2Array:
 
 ## Altar im Himmelsgarten: Steinplatte mit lila Rissen und drei Opferschalen.
 static func draw_altar(c:CanvasItem,pos:Vector2,active:bool,time:float)->void:
-	c.draw_colored_polygon(_ellipse(pos+Vector2(0,10),120,40),Color(0,0,0,0.25))
+	Shapes.polygon(c,_ellipse(pos+Vector2(0,10),120,40),Color(0,0,0,0.25))
 	block(c,pos,Vector2(56,22),4.0,BASALT)
 	var glow:=0.4+0.4*sin(time*2.0)
 	if active:glow=0.15
@@ -203,7 +203,7 @@ static func draw_altar(c:CanvasItem,pos:Vector2,active:bool,time:float)->void:
 static func draw_map_marker(c:CanvasItem,point:Vector2,active:bool,time:float,sleeping:bool=false)->void:
 	var pulse:=0.5+0.5*sin(time*(6.0 if active else 2.0))
 	Shapes.circle(c,point,10,OUTLINE)
-	c.draw_colored_polygon(PackedVector2Array([point+Vector2(-7,-4),point+Vector2(-3,-8),point+Vector2(4,-8),point+Vector2(8,-3),point+Vector2(7,5),point+Vector2(-6,6)]),Color("5c5a60") if sleeping else BASALT_LIGHT)
+	Shapes.polygon(c,PackedVector2Array([point+Vector2(-7,-4),point+Vector2(-3,-8),point+Vector2(4,-8),point+Vector2(8,-3),point+Vector2(7,5),point+Vector2(-6,6)]),Color("5c5a60") if sleeping else BASALT_LIGHT)
 	if sleeping:
 		c.draw_polyline(PackedVector2Array([point+Vector2(-5,-1),point+Vector2(-1,2),point+Vector2(2,-3),point+Vector2(5,1)]),Color("8d8a92"),2.0)
 		c.draw_arc(point,11,0,TAU,20,Color("8d8a92",0.6),2.0)
@@ -222,7 +222,7 @@ static func draw_world_fx(c:CanvasItem,world,time:float)->void:
 	for h in world.hail:
 		var p:=Vector2(h["pos"][0],h["pos"][1])
 		var t:=1.0-clampf(float(h["delay"])/GolemBoss.HAIL_DELAY,0.0,1.0)
-		c.draw_colored_polygon(_ellipse(p,GolemBoss.HAIL_RADIUS*(0.4+0.6*t),GolemBoss.HAIL_RADIUS*0.45*(0.4+0.6*t)),Color(0,0,0,0.18+0.25*t))
+		Shapes.polygon(c,_ellipse(p,GolemBoss.HAIL_RADIUS*(0.4+0.6*t),GolemBoss.HAIL_RADIUS*0.45*(0.4+0.6*t)),Color(0,0,0,0.18+0.25*t))
 		c.draw_arc(p,GolemBoss.HAIL_RADIUS,0,TAU,24,Color(CRACK,0.35+0.4*t),2.0)
 		var falling:=p+Vector2(-20,-260)*(1.0-t)
 		draw_stone(c,falling,13.0,int(absf(p.x)*3.0+absf(p.y)),t*5.0)
@@ -232,7 +232,7 @@ static func draw_world_fx(c:CanvasItem,world,time:float)->void:
 		var tt:=float(t["t"])
 		var p:=GolemBoss.throw_position(start,dir,tt)
 		var lift:=GolemBoss.throw_height(tt)
-		c.draw_colored_polygon(_ellipse(p,GolemBoss.BOULDER_RADIUS,GolemBoss.BOULDER_RADIUS*0.35),Color(0,0,0,0.3))
+		Shapes.polygon(c,_ellipse(p,GolemBoss.BOULDER_RADIUS,GolemBoss.BOULDER_RADIUS*0.35),Color(0,0,0,0.3))
 		draw_stone(c,p+Vector2(0,-lift-26),46.0,stone_seed(start),tt*7.0,1.0,0.5)
 	# Zerbröseln nach dem Kampf: Brocken sinken ein und werden blasser.
 	var keep:=clampf(world.crumble/GolemBoss.CRUMBLE_TIME,0.0,1.0) if world.crumble>0.0 else 1.0
@@ -243,7 +243,7 @@ static func stone_seed(p:Vector2)->int:
 	return int(absf(p.x)*13.0+absf(p.y)*7.0)
 
 static func draw_boulder(c:CanvasItem,p:Vector2,keep:float=1.0)->void:
-	c.draw_colored_polygon(_ellipse(p+Vector2(0,10),GolemBoss.BOULDER_RADIUS*keep,GolemBoss.BOULDER_RADIUS*0.32*keep),Color(0,0,0,0.3*keep))
+	Shapes.polygon(c,_ellipse(p+Vector2(0,10),GolemBoss.BOULDER_RADIUS*keep,GolemBoss.BOULDER_RADIUS*0.32*keep),Color(0,0,0,0.3*keep))
 	if keep<0.08:return
 	draw_stone(c,p+Vector2(0,-16*keep),46.0*keep,stone_seed(p),0.0,clampf(keep*1.4,0.0,1.0),0.35 if keep>0.6 else 0.0)
 
@@ -261,8 +261,8 @@ static func draw_stomp_warning(c:CanvasItem,info:Dictionary,type:int,ring_only:b
 		line.append(line[0])
 		c.draw_polyline(line,Color(CRACK_GLOW,0.35+0.3*t),2.0)
 		return
-	c.draw_colored_polygon(_ellipse(spot,radius,radius*0.5),Color(CRACK,0.10+0.12*t))
-	c.draw_colored_polygon(_ellipse(spot,maxf(1.0,radius*t),maxf(0.5,radius*0.5*t)),Color(CRACK,0.28))
+	Shapes.polygon(c,_ellipse(spot,radius,radius*0.5),Color(CRACK,0.10+0.12*t))
+	Shapes.polygon(c,_ellipse(spot,maxf(1.0,radius*t),maxf(0.5,radius*0.5*t)),Color(CRACK,0.28))
 	var ring:=_ellipse(spot,radius,radius*0.5)
 	ring.append(ring[0])
 	c.draw_polyline(ring,Color(CRACK_GLOW,0.55+0.4*t),3.0)
@@ -274,7 +274,7 @@ static func draw_scrape_warning(c:CanvasItem,pos:Vector2,info:Dictionary)->void:
 	var t:=1.0-clampf(float(info.get("timer",0.0))/GolemBoss.SCRAPE_TIME,0.0,1.0)
 	var length:=GolemBoss.THROW_FLIGHT+GolemBoss.THROW_ROLL
 	var side:=dir.orthogonal()*GolemBoss.BOULDER_RADIUS
-	c.draw_colored_polygon(PackedVector2Array([pos-side,pos+side,pos+dir*length+side,pos+dir*length-side]),Color(CRACK,0.10+0.18*t))
+	Shapes.polygon(c,PackedVector2Array([pos-side,pos+side,pos+dir*length+side,pos+dir*length-side]),Color(CRACK,0.10+0.18*t))
 
 ## Schrei: Wellenringe, die über die ganze Map laufen (Bildschirmmitte).
 static func draw_scream(c:CanvasItem,center:Vector2,age:float)->void:
@@ -335,6 +335,6 @@ static func draw_debris(c:CanvasItem,parts:Array)->void:
 	for d in parts:
 		var fade:=clampf(float(d["life"])/1.5,0.0,1.0)
 		var p:Vector2=d["pos"]
-		c.draw_colored_polygon(_ellipse(p,Vector2(d["size"]).x*float(d["u"])*0.4,Vector2(d["size"]).x*float(d["u"])*0.12),Color(0,0,0,0.25*fade))
+		Shapes.polygon(c,_ellipse(p,Vector2(d["size"]).x*float(d["u"])*0.4,Vector2(d["size"]).x*float(d["u"])*0.12),Color(0,0,0,0.25*fade))
 		var size:Vector2=d["size"]
 		draw_stone(c,p+Vector2(0,-float(d["z"])),(size.x+size.y)*0.5*float(d["u"])*0.42,int(d.get("seed",int(size.x*97+size.y*13))),float(d["rot"]),clampf(fade*1.3,0.0,1.0),0.6 if bool(d.get("head",false)) else 0.0)

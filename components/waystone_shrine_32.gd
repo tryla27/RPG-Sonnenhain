@@ -103,8 +103,8 @@ static func draw_upper(c:CanvasItem,stone:Vector2,active:bool,time:float)->void:
 		Shapes.circle(c,crystal,13.0,Color(glow,0.16+pulse*0.1))
 	var body:=Color("5fc3cf") if active else Color("74878a")
 	var face:=Color("d8fbf2") if active else Color("a9b6b4")
-	c.draw_colored_polygon(PackedVector2Array([crystal+Vector2(0,-18),crystal+Vector2(10,-2),crystal+Vector2(0,16),crystal+Vector2(-10,-2)]),Color("26343a"))
-	c.draw_colored_polygon(PackedVector2Array([crystal+Vector2(0,-15),crystal+Vector2(8,-2),crystal+Vector2(0,13),crystal+Vector2(-8,-2)]),body)
-	c.draw_colored_polygon(PackedVector2Array([crystal+Vector2(0,-12),crystal+Vector2(-5,-2),crystal+Vector2(0,6)]),face)
+	Shapes.polygon(c,PackedVector2Array([crystal+Vector2(0,-18),crystal+Vector2(10,-2),crystal+Vector2(0,16),crystal+Vector2(-10,-2)]),Color("26343a"))
+	Shapes.polygon(c,PackedVector2Array([crystal+Vector2(0,-15),crystal+Vector2(8,-2),crystal+Vector2(0,13),crystal+Vector2(-8,-2)]),body)
+	Shapes.polygon(c,PackedVector2Array([crystal+Vector2(0,-12),crystal+Vector2(-5,-2),crystal+Vector2(0,6)]),face)
 	# Schatten des Kristalls auf der Spitze.
 	c.draw_rect(Rect2(stone+OBELISK_FOOT+Vector2(-6,-150),Vector2(12,3)),Color(0,0,0,0.25))

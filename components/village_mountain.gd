@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 const Catalog=preload("res://components/terrain/terrain_catalog_32.gd")
 const LEVELS:=6
 const STEP_HEIGHT:=16.0
@@ -43,8 +44,8 @@ static func paint_generated(c:CanvasItem)->void:
 		for p:Vector2 in contours[level]:
 			top.append(p-Vector2(0,(level+1)*STEP_HEIGHT))
 			bottom.append(p-Vector2(0,level*STEP_HEIGHT))
-		c.draw_colored_polygon(bottom,Color("675b48"))
-		c.draw_colored_polygon(top,Color("718047"))
+		Shapes.polygon(c,bottom,Color("675b48"))
+		Shapes.polygon(c,top,Color("718047"))
 		var min_y:=INF
 		var max_y:=-INF
 		for p:Vector2 in top:min_y=minf(min_y,p.y);max_y=maxf(max_y,p.y)
@@ -65,7 +66,7 @@ static func paint_generated(c:CanvasItem)->void:
 		for i in top.size():
 			var a:=top[i];var b:=top[(i+1)%top.size()]
 			if b.x<a.x:
-				c.draw_colored_polygon(PackedVector2Array([a,b,b+Vector2(0,16),a+Vector2(0,16)]),Color("75654f") if i%3 else Color("665744"))
+				Shapes.polygon(c,PackedVector2Array([a,b,b+Vector2(0,16),a+Vector2(0,16)]),Color("75654f") if i%3 else Color("665744"))
 				# Broken rock strata, small fissures and hanging grass replace continuous rings.
 				var count:=maxi(1,int(a.distance_to(b)/12))
 				for detail in count:
@@ -89,6 +90,6 @@ static func paint_generated(c:CanvasItem)->void:
 static func rock(c:CanvasItem,p:Vector2,size:float)->void:
 	p=p.snapped(Vector2(2,2))
 	var outline:=PackedVector2Array([p+Vector2(-size,2),p+Vector2(-size+2,-5),p+Vector2(-3,-size),p+Vector2(size-3,-size+2),p+Vector2(size,0),p+Vector2(size-2,4),p+Vector2(-size+3,5)])
-	c.draw_colored_polygon(outline,Color("5c6053"))
-	c.draw_colored_polygon(PackedVector2Array([outline[1],outline[2],outline[3],p+Vector2(4,-1),p+Vector2(-5,0)]),Color("9b9e83"))
+	Shapes.polygon(c,outline,Color("5c6053"))
+	Shapes.polygon(c,PackedVector2Array([outline[1],outline[2],outline[3],p+Vector2(4,-1),p+Vector2(-5,0)]),Color("9b9e83"))
 	c.draw_line(p+Vector2(-5,2),p+Vector2(size-3,2),Color("737b60"),2,false)

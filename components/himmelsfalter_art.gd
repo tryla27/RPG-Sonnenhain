@@ -57,7 +57,7 @@ static func paint(c:CanvasItem,foot:Vector2,look:Vector2,phase:float,attack:floa
 	# Schatten am Boden, kleiner je höher er schwebt.
 	var shadow_w:=26.0*scale*(1.0-height/140.0)
 	c.draw_set_transform(Vector2.ZERO)
-	c.draw_colored_polygon(_ellipse(foot,shadow_w,shadow_w*0.3,14),Color(0.08,0.06,0.12,0.28*alpha))
+	Shapes.polygon(c,_ellipse(foot,shadow_w,shadow_w*0.3,14),Color(0.08,0.06,0.12,0.28*alpha))
 	var side_view:=absf(look.x)>0.65
 	var facing_right:=look.x>=0.0
 	var back:=look.y<-0.5 and not side_view
@@ -89,7 +89,7 @@ static func paint(c:CanvasItem,foot:Vector2,look:Vector2,phase:float,attack:floa
 			# Innenfläche und Perlmuttrand.
 			var inner:=PackedVector2Array()
 			for p in pts:inner.append(p*0.68+Vector2(side*2.0*width,0))
-			c.draw_colored_polygon(inner,col.call(WING_INNER if layer=="upper" else LAVENDER.darkened(0.25)))
+			Shapes.polygon(c,inner,col.call(WING_INNER if layer=="upper" else LAVENDER.darkened(0.25)))
 			var rim:=PackedVector2Array(pts);rim.append(pts[0])
 			c.draw_polyline(rim,col.call(Color(PEARL,0.55)),1.4)
 			if layer=="upper" and width>0.3:
@@ -98,7 +98,7 @@ static func paint(c:CanvasItem,foot:Vector2,look:Vector2,phase:float,attack:floa
 				var glow:=0.0
 				if attack>=0.0:glow=smoothstep(0.0,0.35,attack)*(1.0-smoothstep(0.5,0.8,attack))
 				if glow>0.0:Shapes.circle(c,eye,9.0*width+4.0*glow,col.call(Color(GOLD,0.35*glow)))
-				c.draw_colored_polygon(_star(eye,6.5*maxf(0.55,width),2.8*maxf(0.55,width),side),col.call(GOLD.lerp(PEARL,glow*0.6)))
+				Shapes.polygon(c,_star(eye,6.5*maxf(0.55,width),2.8*maxf(0.55,width),side),col.call(GOLD.lerp(PEARL,glow*0.6)))
 				Shapes.circle(c,eye,1.6*width,col.call(OUTLINE))
 				# Goldene Aderlinie.
 				c.draw_line(Vector2(3*side,-2),Vector2(38.0*width*side,-26),col.call(Color(GOLD,0.5)),1.2)
@@ -106,11 +106,11 @@ static func paint(c:CanvasItem,foot:Vector2,look:Vector2,phase:float,attack:floa
 	for k in 3:
 		var y:=10.0+k*7.0
 		var r:=6.5-k*1.6
-		c.draw_colored_polygon(_ellipse(Vector2(0,y),r+1.2,4.6+1.2,10),col.call(OUTLINE))
-		c.draw_colored_polygon(_ellipse(Vector2(0,y),r,4.6,10),col.call(BODY.lightened(0.05*k)))
+		Shapes.polygon(c,_ellipse(Vector2(0,y),r+1.2,4.6+1.2,10),col.call(OUTLINE))
+		Shapes.polygon(c,_ellipse(Vector2(0,y),r,4.6,10),col.call(BODY.lightened(0.05*k)))
 		c.draw_line(Vector2(-r*0.6,y-2),Vector2(r*0.6,y-2),col.call(Color(LAVENDER,0.35)),1.0)
-	c.draw_colored_polygon(_ellipse(Vector2(0,-1),9.0,10.0,14),col.call(OUTLINE))
-	c.draw_colored_polygon(_ellipse(Vector2(0,-1),7.8,8.8,14),col.call(BODY))
+	Shapes.polygon(c,_ellipse(Vector2(0,-1),9.0,10.0,14),col.call(OUTLINE))
+	Shapes.polygon(c,_ellipse(Vector2(0,-1),7.8,8.8,14),col.call(BODY))
 	for k in 7:
 		var a:=k*TAU/7.0+clock*0.3
 		Shapes.circle(c,Vector2(cos(a)*6.0,sin(a)*6.5-2.0),2.2,col.call(FUZZ))
@@ -146,13 +146,13 @@ static func draw_shot(c:CanvasItem,p:Vector2,dir:Vector2,age:float)->void:
 		var q:=p-d*(8.0+k*7.0)+d.orthogonal()*sin(age*20.0+k)*3.0
 		Shapes.circle(c,q,4.4-k*0.45,Color(LAVENDER if k%2==0 else GOLD,0.6-k*0.07))
 	Shapes.circle(c,p,14.0,Color(LAVENDER,0.25))
-	c.draw_colored_polygon(_star(p,12.0,4.6,1.0,age*6.0),Color(PEARL))
-	c.draw_colored_polygon(_star(p,6.5,2.6,1.0,age*6.0),Color(GOLD))
+	Shapes.polygon(c,_star(p,12.0,4.6,1.0,age*6.0),Color(PEARL))
+	Shapes.polygon(c,_star(p,6.5,2.6,1.0,age*6.0),Color(GOLD))
 
 ## Fläche mit dunklem Umriss (Linie statt zweitem Polygon: bleibt auch bei
 ## fast zugeklappten Flügeln gültig).
 static func _outlined(c:CanvasItem,pts:PackedVector2Array,color:Color)->void:
-	c.draw_colored_polygon(pts,color)
+	Shapes.polygon(c,pts,color)
 	var line:=PackedVector2Array(pts);line.append(pts[0])
 	c.draw_polyline(line,Color(OUTLINE,color.a),1.8)
 

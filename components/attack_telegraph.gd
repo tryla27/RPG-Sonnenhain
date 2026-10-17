@@ -20,7 +20,7 @@ static func paint(c:CanvasItem,p:Vector2,direction:Vector2,ability:Dictionary,ti
 			c.draw_line(p,p+direction*reach,Color(tint,opacity),20)
 			c.draw_line(p,p+direction*reach,Color(tint,.7),2)
 		"arc":
-			c.draw_colored_polygon(outline(p,direction,ability),Color(tint,opacity))
+			Shapes.polygon(c,outline(p,direction,ability),Color(tint,opacity))
 			var half:=float(ability["half_angle"])
 			c.draw_arc(p,reach,direction.angle()-half,direction.angle()+half,20,tint,2)
 		_:
