@@ -64,9 +64,10 @@ func run() -> void:
 	g.steinrose.open(g)
 	assert(g.panel=="steinrose")
 	assert(g.steinrose.tab==0)
+	# Drei Seiten: KOCHEN (Rezeptwahl, Lernen, Kochen zusammen), VORRAT, WIRKUNGEN.
 	g.steinrose.set_tab(g,1);assert(g.steinrose.tab==1)
 	g.steinrose.set_tab(g,2);assert(g.steinrose.tab==2)
-	g.steinrose.set_tab(g,3);assert(g.steinrose.tab==3)
+	g.steinrose.set_tab(g,3);assert(g.steinrose.tab==2)
 	g.steinrose.set_tab(g,0)
 	g.steinrose.selected=0
 	assert(g.steinrose.keyboard_input(g,key_event(KEY_S)))
@@ -77,14 +78,21 @@ func run() -> void:
 	assert(g.steinrose.selected==Kitchen.RECIPES.size()-1)
 	assert(g.steinrose.keyboard_input(g,key_event(KEY_DOWN)))
 	assert(g.steinrose.selected==0)
-	g.steinrose.learned[1]=true
-	g.steinrose.set_tab(g,3)
-	assert(g.steinrose.keyboard_input(g,key_event(KEY_S)))
-	assert(g.steinrose.selected==1)
-	assert(g.steinrose.keyboard_input(g,key_event(KEY_W)))
-	assert(g.steinrose.selected==0)
-	g.steinrose.learned[1]=false
+	# Auf den Nebenseiten steuert die Tastatur keine Rezepte.
+	g.steinrose.set_tab(g,1)
+	assert(not g.steinrose.keyboard_input(g,key_event(KEY_S)))
 	g.steinrose.set_tab(g,0)
+	# Enter lernt nie versehentlich (kostet Gold), kocht aber Gelerntes.
+	var gold_before:int=g.gold
+	g.steinrose.selected=1
+	assert(g.steinrose.keyboard_input(g,key_event(KEY_ENTER)))
+	assert(g.gold==gold_before and not g.steinrose.learned[1])
+	# Ein Knopf: lernt Unbekanntes, kocht Gelerntes.
+	g.gold=1000
+	g.steinrose.click(g,Vector2(600,560))
+	assert(g.steinrose.learned[1] and g.gold==1000-int(Kitchen.RECIPES[1]["learn_cost"]))
+	g.steinrose.learned[1]=false
+	g.steinrose.selected=0
 	g.panel=""
 
 	var allowed_buffs:=["","armor","cooldown","move","damage","gather"]

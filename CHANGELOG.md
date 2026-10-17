@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Alma 17.10.: Seiten REZEPTE und KOCHEN zu „KOCHEN“ zusammengelegt
+  (`steinrose_kitchen.gd`, drei Seiten statt vier). **Aussehen.** Bilder
+  `docs/design/alma-cooking`, Werkzeug `tools/capture_alma_cooking.gd`.
 - `Shapes.polygon`: Dreiecke und konvexe Vierecke über `draw_primitive`
   (~1,2 statt ~5,5 µs, Farbrundung höchstens 1/255), alle zweiargumentigen
   `draw_colored_polygon`-Aufrufe umgestellt (Ausnahme: `Brush` in
