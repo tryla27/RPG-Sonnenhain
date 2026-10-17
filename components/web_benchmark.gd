@@ -39,7 +39,7 @@ func start(g)->void:
 	# Diagnoseschalter: ?noanim=1 hält seltene Landschaftsanimationen an,
 	# ?no3d=1 zeigt die bisherige 2D-Landschaft.
 	var query:=str(JavaScriptBridge.eval("location.search",true)) if OS.has_feature("web") else ""
-	variant=("noanim" if query.contains("noanim=1") else ("no3d" if query.contains("no3d=1") else "normal"))
+	variant=("noanim" if query.contains("noanim=1") else ("no3d" if query.contains("no3d=1") else ("ai" if query.contains("ai=1") else "normal")))
 	if variant=="noanim":AtlasPage.freeze_animation=true
 	if variant=="no3d":
 		Obstacles.active=false
@@ -62,7 +62,9 @@ func step(g)->void:
 	if frame==0:route_start=counters(g)
 	last_us=now
 	# Landschaft messen, nicht Gegner: Spawns und Blütenweiler-Angriff aussetzen.
-	g.panel="";g.enemies.clear();g.spawn_timer=-1000.0;g.rescue_state=3
+	# ?ai=1 lässt Spawns und den Blütenweiler-Angriff zu (Gegner-KI im Browser).
+	g.panel=""
+	if variant!="ai":g.enemies.clear();g.spawn_timer=-1000.0;g.rescue_state=3
 	var local:=maxi(frame,0)
 	var offset:=0.0 if local<60 else float(local-60 if local<150 else FRAMES-local)*5.0
 	g.player_pos=ROUTES[route][1]+Vector2(offset,0)
