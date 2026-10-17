@@ -54,6 +54,10 @@ jobs:
           printf '%s\n' "$all" | grep 'CLIENT_3D' | tail -4 | cut -c1-400 | sed 's/^/HB /'
           # Laufzeiten (jede Minute): CPU je Serverbild, Weltpakete, Golem. Mit Zeitstempel,
           # damit sich Zeiten vor und nach einer Auslieferung vergleichen lassen.
+          echo "PERF_COUNTS journal=$(journalctl --user -u sonnenhain.service --since '-36h' --no-pager -o cat 2>/dev/null | grep -c 'SERVER_PERF') log=$(grep -c 'SERVER_PERF' "$HOME/sonnenhain-server/server.log" 2>/dev/null) logs_dir=$(ls "$HOME/sonnenhain-server" 2>/dev/null | tr '\n' ',' | cut -c1-150)"
+          # Die Logdatei hat keine Zeitstempel: Zeilen seit dem letzten Serverstart
+          # (Start-/Patchmeldung) gelten als "nachher".
+          grep -nE 'SERVER_PERF|GOLEM_PERF|SERVER_HEARTBEAT|SERVER_PATCH_NOTICE_SENT|Godot Engine' "$HOME/sonnenhain-server/server.log" 2>/dev/null | tail -n 4000 | cut -c1-220 | sed 's/^/LOGPERF /'
           echo "RELEASE_EPOCH $(stat -c %Y "$HOME/sonnenhain-server/releases/current/sonnenhain-server.x86_64" 2>/dev/null || echo 0)"
           journalctl --user -u sonnenhain.service --since "-36h" --no-pager -o short-unix 2>/dev/null | grep -E 'SERVER_PERF|GOLEM_PERF|SERVER_HEARTBEAT' | sed -E 's/^([0-9.]+) [^:]*: /\1 /' | cut -c1-220 | sed 's/^/PERF /'
           uptime -p 2>/dev/null | sed 's/^/UPTIME /'
@@ -71,6 +75,7 @@ jobs:
           peers = {"vorher": [], "nachher": []}
           for line in open("diag.txt", encoding="utf-8", errors="replace"):
               if line.startswith("RELEASE_EPOCH "): release = float(line.split()[1])
+              if line.startswith("PERF_COUNTS"): print("::notice title=Serverlast Quellen::" + line.strip())
           for line in open("diag.txt", encoding="utf-8", errors="replace"):
               if not line.startswith("PERF "): continue
               parts = line.split(" ", 2)
@@ -82,6 +87,17 @@ jobs:
               if "SERVER_PERF" in text: rows[side].append(values)
               elif "GOLEM_PERF" in text: golem[side].append(values)
               elif "SERVER_HEARTBEAT" in text and "peers" in values: peers[side].append(int(values["peers"]))
+          # Logdatei: alles nach dem letzten Serverstart zählt als "nachher".
+          log_lines = [l for l in open("diag.txt", encoding="utf-8", errors="replace") if l.startswith("LOGPERF ")]
+          if not rows["vorher"] and not rows["nachher"] and log_lines:
+              last_start = max([i for i, l in enumerate(log_lines) if "Godot Engine" in l] or [0])
+              for i, l in enumerate(log_lines):
+                  side = "nachher" if i >= last_start else "vorher"
+                  text = l.split(":", 1)[1] if ":" in l else l
+                  values = dict(re.findall(r"(\w+)=([-\d.]+)", text))
+                  if "SERVER_PERF" in text: rows[side].append(values)
+                  elif "GOLEM_PERF" in text: golem[side].append(values)
+                  elif "SERVER_HEARTBEAT" in text and "peers" in values: peers[side].append(int(values["peers"]))
           def pct(values, part):
               values = sorted(values)
               return values[min(len(values) - 1, max(0, int(len(values) * part + .999) - 1))] if values else 0
