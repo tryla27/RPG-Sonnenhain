@@ -52,11 +52,16 @@ jobs:
           printf '%s\n' "$all" | grep 'SERVER_HEARTBEAT' | tail -4 | cut -c1-230 | sed 's/^/HB /'
           printf '%s\n' "$all" | grep 'BOSS_' | tail -5 | cut -c1-160 | sed 's/^/BOSS /'
           printf '%s\n' "$all" | grep 'CLIENT_3D' | tail -4 | cut -c1-400 | sed 's/^/HB /'
+          # Laufzeiten (jede Minute): CPU je Serverbild, Weltpakete, Golem. Mit Zeitstempel,
+          # damit sich Zeiten vor und nach einer Auslieferung vergleichen lassen.
+          journalctl --user -u sonnenhain.service --since "-36h" --no-pager -o short-iso 2>/dev/null | grep -E 'SERVER_PERF|GOLEM_PERF' | tail -n 120 | sed -E 's/^([0-9T:+-]+) [^:]*: /\1 /' | cut -c1-200 | sed 's/^/PERF /'
           uptime -p 2>/dev/null | sed 's/^/UPTIME /'
           pgrep -af "[s]onnenhain-server.x86_64" | sed 's/^/PROC /' | cut -c1-120
           ps -o etime= -p "$(pgrep -f '[s]onnenhain-server.x86_64 --headless' | head -1)" 2>/dev/null | sed 's/^/PROC_AGE /'
           REMOTE
           cat diag.txt >> "$GITHUB_STEP_SUMMARY"
+          # Laufzeitzeilen (anonym) auch ins Protokoll, damit sie sich abrufen lassen.
+          grep '^PERF ' diag.txt || true
           while IFS= read -r line; do
             safe=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
             echo "::notice title=Server-Diagnose::$safe"
