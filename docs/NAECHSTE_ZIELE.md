@@ -1,5 +1,14 @@
 # Sonnenhain – nächste Ziele
 
+17.10.2026 · Folgeprüfung nach Zusammenführung von PR #136, Basis `e572894`:
+Browser-Messroute um die fehlenden 30 Rückwegbilder ergänzt, abgeschlossene
+Messbilder und Gegnerzahlen getestet. Waldgegner vermeiden unbenutzte
+Posenberechnung; 160 Posen im GPU-Bildvergleich identisch.
+[Befund und Nachweise](COMBAT_PERFORMANCE_FOLLOWUP_20261017.md).
+Neue Vergleichsmessungen mit Berichtsschema 2 getrennt von alten Browser-
+Berichten behandeln. Dieses Folgepaket ist noch nicht live.
+Die nachstehenden Angaben „PR #136, nicht live“ sind historische Planstände.
+
 17.10.2026 (Abend) · PR #136, nicht live: Kämpfe mit vielen Gegnern rund
 halb so teuer (Wegsuche, Kreise, Minikarte), Golem-Weltpakete zu viert halbiert,
 Spielpiloten Nebenpfad (verborgene Funde) und Ruinenhof hinter dem Mauertor
