@@ -46,14 +46,10 @@ static func pose(type:int,phase:float,attack:float,ability_id:String="")->Dictio
 static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,phase:float,attack:float,scale_factor:float,stretch:Vector2,ability_id:String="",visual:Dictionary={})->bool:
 	if type<0 or type>=PATHS.size() or Sprites.texture(PATHS[type])==null:return false
 	var heading:=direction_index(look)
-	var motion:=pose(type,phase,attack,ability_id)
+	# Die bisherigen Verfügbarkeitsprüfungen wärmen die Animationsbilder auf.
+	# Das erste Angreifen soll keinen zusätzlichen verzögerten Import auslösen.
 	var animated_wolf:=type==3 and WolfAnimation.available(heading)
 	var animated_woodland:=type in [0,1,2] and PoseAnimation.available(type,heading)
-	if animated_wolf:
-		# Joint poses already move the body. Keep only the real leap height.
-		motion={"offset":Vector2(0,-AttackVFX.leap_height(attack)) if ability_id=="sprungbiss" else Vector2.ZERO,"stretch":Vector2.ONE,"lunge":0.0}
-	elif animated_woodland:
-		motion={"offset":Vector2(0,-PoseAnimation.lift(type,phase,attack,visual)),"stretch":Vector2.ONE,"lunge":0.0}
 	var canvas_scale:=stretch*scale_factor
 	# Waldschleim beim Laufen und Stehen: stufenlos verformt (forest_slime_motion.gd).
 	if type==0 and attack<0.0 and float(visual.get("death",-1.0))<0.0 and float(visual.get("hurt",0.0))<=0.0 and SlimeMotion.available(heading):
@@ -65,6 +61,15 @@ static func paint(c:CanvasItem,foot:Vector2,type:int,look:Vector2,base:Color,pha
 		SlimeMotion.draw(c,foot,heading,canvas_scale*SCALES[0],shape,_tint(type,base))
 		c.draw_set_transform(Vector2.ZERO)
 		return true
+	# Erst den tatsächlich benutzten Zeichenpfad bestimmen. Bei fertigen
+	# Animationsbildern wurde die prozedurale Pose bisher sofort verworfen.
+	var motion:Dictionary
+	if animated_wolf:
+		motion={"offset":Vector2(0,-AttackVFX.leap_height(attack)) if ability_id=="sprungbiss" else Vector2.ZERO,"stretch":Vector2.ONE,"lunge":0.0}
+	elif animated_woodland:
+		motion={"offset":Vector2(0,-PoseAnimation.lift(type,phase,attack,visual)),"stretch":Vector2.ONE,"lunge":0.0}
+	else:
+		motion=pose(type,phase,attack,ability_id)
 	c.draw_set_transform(foot,0,canvas_scale)
 	# The ground contact stays fixed when the creature hops or lunges.
 	var shadow_alpha:=1.0-smoothstep(.35,.9,float(visual["death"])) if (animated_wolf or animated_woodland) and float(visual.get("death",-1.0))>=0.0 else 1.0

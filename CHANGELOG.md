@@ -6,6 +6,16 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Folgeprüfung 17.10.: Browser-Messmodus fährt die vollständigen 240 Bilder
+  der nativen Route und erfasst 210 vollständig abgeschlossene Bilder.
+  Berichtsschema 2 enthält Messfenster und Gegnerzahlen. Alte Browserberichte
+  beschreiben einen kürzeren Rückweg und sind nicht direkt gleichzusetzen.
+- Waldgegner berechnen prozedurale Ersatzposen nur noch im Rückfallpfad.
+  Animationsbilder werden weiterhin zur bisherigen Zeit geladen. 160 Posen
+  auf der RTX 3060 im GPU-Vergleich ohne abweichenden Farbkanal.
+  Kein zusätzlicher belastbarer Gesamt-FPS-Gewinn behauptet.
+  Details: `docs/COMBAT_PERFORMANCE_FOLLOWUP_20261017.md`.
+
 - `Shapes.polygon`: Dreiecke und konvexe Vierecke über `draw_primitive`
   (~1,2 statt ~5,5 µs, Farbrundung höchstens 1/255), alle zweiargumentigen
   `draw_colored_polygon`-Aufrufe umgestellt (Ausnahme: `Brush` in

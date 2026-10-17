@@ -1,6 +1,7 @@
 extends RefCounted
-const VERSION="PATCH 16.10.2026"
+const VERSION="PATCH 17.10.2026"
 const NOTES=[
+["Technik · Waldgegner", "Beim Zeichnen der Waldgegner werden unbenutzte Ersatzposen nicht mehr mitberechnet. Animationen, Aussehen und Kampfwerte bleiben gleich."],
 ["Alte Ruinen · Ruinenhof", "Serins Lager hinter dem Mauertor liegt jetzt in einem alten gepflasterten Hof mit niedrigen Grundmauern. Die Feuerschalen am Eingang zeigen, was los ist: kalt, solange niemand hilft, rot flackernd während des Kampfes und golden, sobald der Hof gesäubert ist; dann leuchtet auch das Siegel in der Mitte. Gegner, Ziel und Belohnung bleiben gleich. Die Bäume, die dort standen, sind dem Hof gewichen."],
 ["Online · Ruhigerer Golemkampf", "Spieler, die dasselbe sehen, bekommen jetzt ein gemeinsames Weltpaket, statt dass der Server es für jeden einzeln packt. Im Golemkampf zu viert braucht der Server dafür etwa halb so viel Zeit; Spitzen werden seltener. Inhalt und Häufigkeit der Pakete bleiben gleich."],
 ["Technik · Kämpfe mit vielen Gegnern", "Gegner planen ihren Weg zu dir nur noch neu, wenn du dich bewegst oder der Weg versperrt ist, statt alle 0,6 Sekunden. Abstandsprüfungen unter Gegnern und Geländeprüfungen sind schneller. Kreise, Schatten, Minikarte und Stufenschilder werden mit weniger Aufwand gezeichnet, ohne dass sich ihr Aussehen ändert. Mit 25 Gegnern auf der Blütenwiese braucht ein Bild etwa halb so viel Rechenzeit; Verfolgung, Schaden und Reichweiten bleiben gleich."],
