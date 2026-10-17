@@ -18,6 +18,14 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
   unerreichbarer Ziele und höchstens drei Suchen pro Serverbild; Mauerliste
   konstant. Lokaler Zwei-Spieler-Lauf: längstes Serverbild 306 → 42–71 ms.
   Neues Werkzeug `tools/benchmark_coop_network.gd`.
+- Statischer Kartencache 17.10.: ein wiederverwendeter Zeichner statt einer
+  main.gd-Instanz je 512er-Abschnitt (16–35 ms je neuem Abschnitt).
+- Architektur-Set v2 (`tools/art_pipeline/build_architecture_v2.py`, Blender):
+  14 Bauteile in `art/models/architecture_v2`, geladen über
+  `components/architecture_kit.gd`; exakt gleiche Begrenzung wie zuvor.
+  Vorschau: `tools/capture_architecture.gd`, Bilder in `docs/design/architecture-v2`.
+- Pixel-Porträts (`tools/art_pipeline/pixel_portraits.py`) für Meldungen von
+  Mira, Fenna und Borin (`components/npc_portraits.gd`).
 - Klarere Vorbereitungsflächen, elementabhängige Effektfolgen, Questzeichen,
   persönlicher Heimkehrschmuck und P95/P99 in der Leistungsanzeige.
   Keine Änderung von Schaden, XP, Kollisionen oder gespeicherten Belohnungen.

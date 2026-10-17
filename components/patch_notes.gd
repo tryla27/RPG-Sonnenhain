@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 16.10.2026"
 const NOTES=[
+["Welt · Neue Mauern und Ruinen", "Mauern, Ecken, Endstücke, Torpfeiler und die Ruinenbauteile der Alten Ruinen, des Dämmergrats und des Himmelsgartens wurden in Blender neu gebaut: echtes Mauerwerk, Plattenbelag auf den Wehrgängen, Randsteine und Moos. Platz, Größe, Wege und Kollisionen bleiben genau gleich."],
+["Oberfläche · Gesichter zu Meldungen", "Wenn Mira, Fenna oder Borin dir etwas sagen, erscheint ihr Porträt neben der Meldung."],
 ["Technik · Feste Landschaft", "Mauern und Landschaftskörper behalten feste Plätze im 3D-Atlas. Ruhende Seiten werden wiederverwendet, Geometrieabfragen zwischengespeichert und seltene Bewegungen gemeinsam getaktet. Neue Modelle entstehen verteilt über mehrere Bilder statt auf einmal. Wege und Kollisionen bleiben gleich."],
 ["Online · Weniger Serverhänger", "Die Wegsuche der Gegner konnte den Server bei schwer erreichbaren Zielen für einen Moment anhalten; dann standen alle Mitspieler und Gegner kurz still. Gegner planen ihre Wege jetzt in kleineren Schritten und versuchen unerreichbare Ziele seltener. Gegnerverhalten, Schaden und Reichweiten bleiben gleich."],
 ["Kampf · Klarere Vorbereitung und Treffer", "Vorbereitete Nah- und Flächenangriffe zeigen ihre Reichweite deutlicher. Elementabhängige kurze Aufprallbilder ergänzen Treffer. Schaden, Reichweiten und Angriffszeiten bleiben gleich; der Wolf kündigt seinen Sprung weiterhin über seine Pose an."],

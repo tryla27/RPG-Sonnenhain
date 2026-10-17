@@ -104,6 +104,7 @@ const DisplayMode=preload("res://components/display_mode.gd")
 const BossRelics=preload("res://components/boss_relics.gd")
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobNavigation=preload("res://components/mob_navigation.gd")
+const NpcPortraits=preload("res://components/npc_portraits.gd")
 ## Neue Wegsuchen je Serverbild; verhindert, dass viele Gegner im selben Bild planen.
 const MOB_ROUTES_PER_FRAME:=3
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
@@ -10366,6 +10367,7 @@ func draw_hud() -> void:
 		# App: Hinweise über der Bildmitte statt unter dem Bewegungsstick.
 		var notice_rect := Rect2(321, 420, 510, 34) if app_mode else HudLayout.NOTICE_RECT
 		ui_box(notice_rect, Color("415f59"))
+		NpcPortraits.paint(self, notice_rect, notice)
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
 		text_at(notice_rect.position+Vector2(11, 23), short_notice, 15, Color("fff3c3"))
 	var nearest := interaction_prompt(nearby_food)

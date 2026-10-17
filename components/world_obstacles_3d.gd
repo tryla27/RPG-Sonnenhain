@@ -6,6 +6,7 @@ const Models=preload("res://components/world_obstacle_models_3d.gd")
 const Geometry=preload("res://components/world_geometry.gd")
 const AtlasSlots=preload("res://components/landscape_atlas_slots.gd")
 const AtlasPage=preload("res://components/landscape_atlas_page.gd")
+const ArchitectureKit=preload("res://components/architecture_kit.gd")
 const CELL:=128
 const UNITS:=3.7
 const FOOT:=Vector2(.5,.66)
@@ -129,6 +130,8 @@ func ensure(g:Node)->void:
 	for spec in data["objects"]+data["common_objects"]:specs[str(spec["id"])]=spec
 
 func animated_row(row:Dictionary)->bool:
+	# Blender-Bauteile sind feste Körper ohne Idle-Animation.
+	if ArchitectureKit.replaces(str(row["model"])):return false
 	return int(specs[str(row["model"])]["animation"]["frames"])>1
 
 func metrics_snapshot()->Dictionary:
@@ -182,7 +185,11 @@ func update(g,delta:float)->void:
 				# unsichtbar; die vorgeladene Randzone verdeckt das meist.
 				if built>0 and Time.get_ticks_usec()-build_started>MODEL_BUILD_BUDGET_US:
 					pending_models+=1;continue
-				var body:=builder.build(specs[id]);var scene:=PackedScene.new();scene.pack(body);body.free();models[id]=scene;built+=1
+				var kit_scene:=ArchitectureKit.scene_for(id)
+				if kit_scene!=null:models[id]=kit_scene
+				else:
+					var body:=builder.build(specs[id]);var scene:=PackedScene.new();scene.pack(body);body.free();models[id]=scene
+				built+=1
 			var instance:Node3D=models[id].instantiate()
 			instance.name="Object_"+str(created_instances);instances[key]=instance;created_instances+=1
 			page.add_body(key,instance,int(allocation["slot"]),row)
