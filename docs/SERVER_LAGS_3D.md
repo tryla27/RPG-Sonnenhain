@@ -66,6 +66,25 @@ Brave verhält sich wie Edge; ein Brave-spezifischer Fehler zeigte sich nicht.
 Offen: Live-Server-Protokolle (`SERVER_PERF cpu_max`) nach dem nächsten
 Live-Gang vergleichen; Golem-Kampf als Belastungsfall.
 
+## Live-Server nach der Auslieferung 17.10.
+
+Auslieferung von PR #136 am 17.10. gegen 18:20. Die Diagnose
+(`diagnose-server.yml`, nur lesend) fasst jetzt die minütlichen Laufzeitzeilen
+der Serverlogdatei vor und nach der aktuellen Auslieferung zusammen.
+
+| Messgröße (je Minute) | vorher (≈ 32 h) | nachher (86 min) |
+|---|---:|---:|
+| Mittlere CPU je Serverbild | 0,49 ms | 0,08 ms |
+| Längstes Serverbild, P95 | 10,8 ms | 9,4 ms |
+| Längstes Serverbild, max | mehrere 100 ms | 19,4 ms |
+| Minuten mit Spitzen über 50 ms | 5 (66–800+ ms) | 0 |
+| Golem, längster Schritt | 13,4 ms | 2,5 ms |
+
+Die großen Spitzen lagen 27–32 Stunden vor der Messung. Nach der Auslieferung
+war höchstens ein Spieler gleichzeitig online. Das ist ein gutes Zeichen, aber
+noch keine Bestätigung unter Last: Dafür braucht es eine Runde mit mehreren
+Spielern (Koop-Kampf, Golem).
+
 ## Golemkampf zu viert 17.10.: Weltpakete
 
 Werkzeug `tools/benchmark_golem_server.gd`: dedizierter Server, vier Spieler
