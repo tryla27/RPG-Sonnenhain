@@ -2180,12 +2180,16 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		candidate["attack_clear"]=cached["clear"]
 	if float(enemy["sight_wait"])<=0.0:enemy["sight_wait"]=.25
 	enemy["attack_sight"]=sight
-	var previous_attack_state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
+	# Nur Kennung und Form des vorherigen Angriffs werden gebraucht; eine tiefe
+	# Kopie des Angriffszustands kostete bei vielen Gegnern spürbar Zeit.
+	var previous_attack:Dictionary=enemy.get("attack_state",{})
+	var previous_attack_id:=int(previous_attack.get("id",-1))
+	var previous_attack_shape:=str(previous_attack.get("ability",{}).get("shape",""))
 	var gait_origin:Vector2=enemy["pos"]
 	var action:=MobCombat.step(enemy,profile,targets,delta)
 	if not server and int(enemy.get("type",-1)) in [12,13,14]:
 		var current_attack:Dictionary=enemy.get("attack_state",{})
-		var previous_id:=int(previous_attack_state.get("id",-1))
+		var previous_id:=previous_attack_id
 		var current_id:=int(current_attack.get("id",-1))
 		if current_id>=0 and current_id!=previous_id:
 			var current_ability:Dictionary=current_attack.get("ability",{})
@@ -2196,12 +2200,17 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		var speed:float=float(profile["movement_speed"])*(.45 if float(enemy.get("slow",0))>0 else (float(enemy.get("necklace_frost_mult",1.0)) if float(enemy.get("necklace_frost",0))>0 else 1.0))
 		var origin:Vector2=enemy["pos"]
 		var separation:=Vector2.ZERO
+		var body_radius:=mob_hit_radius(enemy)
+		# Grober Vorabtest: weiter entfernte Gegner können den Mindestabstand
+		# (größter Trefferradius MOB_MAX_HIT_RADIUS) nie unterschreiten. Spart bei
+		# vielen Gegnern die meisten Radiusberechnungen (n² pro Bild).
+		var reach_sq:=(body_radius+MOB_MAX_HIT_RADIUS+8.0)*(body_radius+MOB_MAX_HIT_RADIUS+8.0)
 		for other in enemies:
 			if other==enemy:continue
 			var away:Vector2=origin-Vector2(other["pos"])
-			var spacing:float=mob_hit_radius(enemy)+mob_hit_radius(other)+8
+			if away.length_squared()>=reach_sq:continue
+			var spacing:float=body_radius+mob_hit_radius(other)+8
 			if away.length_squared()>.01 and away.length()<spacing:separation+=away.normalized()*(spacing-away.length())/spacing
-		var body_radius:=mob_hit_radius(enemy)
 		var walkable:=func(point:Vector2)->bool:return mob_walkable(point,origin,enemy,server,body_radius)
 		var destination:Vector2=enemy.get("pursuit_target",origin+movement*240.0) if not bool(enemy.get("returning",false)) else enemy["home"]
 		var routed:=MobNavigation.direction(enemy,destination,delta,walkable)
@@ -2284,7 +2293,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			apply_master_thorns(enemy,int(event["damage"]),master_armor_id())
 	if int(enemy["type"]) in [0,1,2,3]:
 		enemy["walking"]=moved
-		if moved and str(previous_attack_state.get("ability",{}).get("shape",""))!="leap":
+		if moved and previous_attack_shape!="leap":
 			var previous_phase:=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU)))
 			var distance:=Vector2(enemy["pos"]).distance_to(gait_origin)
 			enemy["gait_phase"]=WolfAnimation.advance_gait(previous_phase,distance) if int(enemy["type"])==3 else WoodlandPoseAnimation.advance_gait(int(enemy["type"]),previous_phase,distance)
@@ -2818,12 +2827,21 @@ func trail_clearance_points(step:float=48.0)->Array:
 				if region_at(point)!=0:out.append(point)
 	return out
 
+const RESCUE_HUT_OFFSETS:=[Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]
+## Größter Abstand eines Hüttenrands (inkl. 16 Abstand) vom Lagermittelpunkt, plus Reserve.
+const RESCUE_HUT_REACH:=Vector2(460.0,320.0)
 func terrain_blocked(p: Vector2,radius:float=-1.0) -> bool:
 	if radius<0:radius=hero_collision_radius()
-	for house_index in CLASS_BOSS_HOUSE_POS.size():
-		if class_boss_house_rect(house_index).grow(radius).has_point(p):return true
-	if region_at(p) == 1:
-		for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
+	# Klassenboss-Häuser: dieselbe Prüfung wie class_boss_house_rect(i).grow(radius)
+	# .has_point(p), ohne pro Aufruf drei Rechtecke zu bauen (Wegsuchen prüfen
+	# tausende Punkte pro Sekunde).
+	var house_half:=WorldGeometry.CLASS_BOSS_HOUSE_SIZE.x*.5+radius
+	var house_top:=WorldGeometry.CLASS_BOSS_HOUSE_SIZE.y+radius
+	for center:Vector2 in CLASS_BOSS_HOUSE_POS:
+		if p.x>=center.x-house_half and p.x<center.x+house_half and p.y>=center.y-house_top and p.y<center.y+radius:return true
+	# Rettungslager: Hütten liegen höchstens 449 × 310 vom Lagermittelpunkt entfernt.
+	if absf(p.x-RESCUE_POS.x)<RESCUE_HUT_REACH.x and absf(p.y-RESCUE_POS.y)<RESCUE_HUT_REACH.y and region_at(p) == 1:
+		for offset in RESCUE_HUT_OFFSETS:
 			if Rect2(RESCUE_POS + offset - Vector2(73, 54), Vector2(146, 108)).grow(16).has_point(p): return true
 	# Nur Stamm/Wurzel blockieren; die Krone bleibt begehbar.
 	# Baumstämme und Hindernisse der Umgebung liegen je 64er-Zelle gesammelt vor.
@@ -14637,6 +14655,9 @@ func shot_hit_zone(a:Vector2,b:Vector2,enemy:Dictionary)->String:
 func golem_head_point(enemy:Dictionary)->Vector2:
 	return Vector2(enemy["pos"])+GolemBoss.HEAD_CENTER*GolemBoss.visual_scale(int(enemy.get("type",GolemBoss.TYPE_BIG)))+Vector2(0,-30)
 
+## Größter möglicher Trefferradius: großer Golem (Maßstab 4). Alle anderen
+## Gegner liegen darunter (Klassenboss 1,3, Champion ×1,42).
+const MOB_MAX_HIT_RADIUS:=28.0*4.0
 func mob_hit_radius(enemy:Dictionary)->float:
 	return maxf(8,28*mob_visual_scale(enemy))
 

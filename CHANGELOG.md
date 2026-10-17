@@ -6,6 +6,13 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Gegner-KI 17.10.: vollständige Wege zu kaum bewegten Zielen werden
+  weiterbenutzt (`MobNavigation.still_valid`), statt alle 0,6 s neu zu suchen
+  (25 Schleime: 434 → 27 Suchen in 3,5 s). Abstandsprüfung mit Vorabtest,
+  keine tiefe Kopie des Angriffszustands, `terrain_blocked` ohne neue Rechtecke
+  je Aufruf. KI-Zeit mit 25 Wiesengegnern 8,1 → 2,5 ms (nativ, Container).
+  Werkzeug `tools/profile_enemies.gd`, Tests `check_mob_path_reuse.gd`,
+  `check_terrain_blocked.gd`.
 - Verborgene Funde 17.10. (`components/hidden_finds.gd`): vier optionale
   Nebenpfade mit Steinmal, je Charakter einmal; neues Speicherfeld
   `hidden_finds` (vom Server geprüft, alte Stände ohne Feld gelten als
