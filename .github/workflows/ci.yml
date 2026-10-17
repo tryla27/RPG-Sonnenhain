@@ -72,6 +72,10 @@ jobs:
       - name: Validate content
         run: python3 tools/check_content.py
 
+      - name: Werkzeugzentrale runner tests
+        working-directory: tools/werkzeugzentrale
+        run: timeout 300 python3 -m unittest -v test_runner
+
       - name: Check password-only website access
         run: |
           php -l website/access/access.php

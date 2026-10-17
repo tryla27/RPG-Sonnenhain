@@ -14,6 +14,11 @@ Stilblatt können vorbereitend entstehen. Danach folgt der Krieger als
 vollständige Qualitätsvorlage vor dem breiten Ausbau. Aktuelle Live-Version
 und frühere Prüfergebnisse wurden bei dieser Planergänzung nicht neu geprüft.
 
+Werkzeugzentrale (17.10.): Regeln in `AGENTS.md`, Konzept und Plan unter
+[docs/werkzeugzentrale](werkzeugzentrale/UMSETZUNGSPLAN.md). Paket 0/1
+(Projektaufnahme, begrenzte Aufträge, Abbruch) umgesetzt, Windows-Nachprüfung
+und Pakete 2–7 offen: [Prüfstand](werkzeugzentrale/PRUEFSTAND.md).
+
 ## Ausgangspunkt und Status
 
 Eigenes Gestaltungskonzept vom 16.10. auf Angelos Auftrag:
