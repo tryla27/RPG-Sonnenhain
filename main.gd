@@ -116,6 +116,8 @@ const WebBenchmark=preload("res://components/web_benchmark.gd")
 var web_benchmark:=WebBenchmark.new()
 var web_benchmark_requested:=false
 var region_banner:=RegionBanner.new()
+const FusionPreview=preload("res://components/fusion_preview.gd")
+var fusion_preview:=FusionPreview.new()
 ## Neue Wegsuchen je Serverbild; verhindert, dass viele Gegner im selben Bild planen.
 const MOB_ROUTES_PER_FRAME:=3
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
@@ -1906,6 +1908,7 @@ func _process(delta: float) -> void:
 	robotics_overclock_timer = maxf(0.0, robotics_overclock_timer - delta)
 	notice_timer = maxf(0.0, notice_timer - delta)
 	region_banner.tick(delta)
+	fusion_preview.tick(self, delta)
 	party_reward_notice_timer = maxf(0.0,party_reward_notice_timer-delta)
 	if party_reward_notice_timer<=0.0: party_reward_notice=""
 	rescue_intro_timer = maxf(0.0, rescue_intro_timer - delta)
@@ -11845,7 +11848,7 @@ func draw_fusion_panel() -> void:
 		ui_box(box,Color("30474e") if enabled else Color("202b34"))
 		if enabled:draw_rect(box.grow(-2),Color("9bead4"),false,2)
 		var tint:=Color("fff1bc") if enabled else Color("83908e")
-		text_at(Vector2(180,y+20),str(ABILITIES[id]["name"]),14,tint,HORIZONTAL_ALIGNMENT_LEFT,550)
+		text_at(Vector2(180,y+20),str(ABILITIES[id]["name"]),14,tint,HORIZONTAL_ALIGNMENT_LEFT,400)
 		text_at(Vector2(180,y+39),"%s + %s" % [ABILITIES[a]["name"],ABILITIES[b]["name"]],11,tint)
 		var missing:=fusion_missing_sources(f)
 		var requirement:=maxi(int(ABILITIES[a]["req"]),int(ABILITIES[b]["req"]))
@@ -11855,13 +11858,27 @@ func draw_fusion_panel() -> void:
 		text_at(Vector2(180,y+56),"Level %d · %d Gold · Rang %d/4" % [requirement,int(f["gold"]),int(skill_levels[id])],10,tint)
 		text_at(Vector2(180,y+71),"Bereit" if missing.is_empty() else "Fehlt: %s" % ", ".join(missing),10,Color("a4e4bc") if enabled else Color("b18f88"),HORIZONTAL_ALIGNMENT_LEFT,550)
 		ui_button(Rect2(745,y+18,190,40),fusion_button_label(f),enabled)
+		ui_button(Rect2(600,y+18,135,40),"VORSCHAU")
 	ui_button(Rect2(675,530,205,40),"NÄCHSTE BEREITE",not available_fusions().is_empty())
 	text_at(Vector2(250,557),"%d Kombinationen · Seite %d / %d" % [FUSIONS.size(),fusion_page+1,pages],14,Color("cbd9da"))
 	ui_button(Rect2(165,530,64,40),"<",fusion_page>0)
 	ui_button(Rect2(900,530,64,40),">",fusion_page<pages-1)
 	text_at(Vector2(165,596),"Passives, Ultimates, reine Ausweichbewegung und Fusionsspells sind keine Zutaten.",11,Color("93a4a3"))
+	# Vorschau liegt über der Liste (eigene Übungswelt, verbraucht nichts).
+	fusion_preview.paint(self)
 
 func click_fusion(mouse:Vector2) -> void:
+	if fusion_preview.active():
+		fusion_preview.click(self, mouse)
+		return
+	for row in 4:
+		var preview_index:=fusion_page*4+row
+		if preview_index<FUSIONS.size() and Rect2(600,195+row*86,135,40).has_point(mouse):
+			var preview_id:=int(FUSIONS[preview_index]["id"])
+			ensure_skill_state_size()
+			fusion_preview.open(self, preview_id, maxi(1,int(skill_levels[preview_id])))
+			play_sound("menu")
+			return
 	if Rect2(675,530,205,40).has_point(mouse):
 		for step in FUSIONS.size():
 			var candidate:=posmod((fusion_page+1)*4+step,FUSIONS.size())

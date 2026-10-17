@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Fusionsvorschau 17.10. (`components/fusion_preview.gd`,
+  `components/fusion_preview_sandbox.gd`): eigene Übungsinstanz (main.gd-Unterklasse
+  ohne Speichern/Netz/Eingabe/Klang) in 576×324-SubViewport, wirkt über
+  `use_ability`; misst Treffer, Schaden, Abklingzeit. **Aussehen.** Test
+  `tests/ui/check_fusion_preview.gd`, Bilder `docs/design/fusion-preview`.
 - `Shapes.polygon`: Dreiecke und konvexe Vierecke über `draw_primitive`
   (~1,2 statt ~5,5 µs, Farbrundung höchstens 1/255), alle zweiargumentigen
   `draw_colored_polygon`-Aufrufe umgestellt (Ausnahme: `Brush` in
