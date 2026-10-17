@@ -8,6 +8,7 @@ const AtlasSlots=preload("res://components/landscape_atlas_slots.gd")
 const AtlasPage=preload("res://components/landscape_atlas_page.gd")
 const ArchitectureKit=preload("res://components/architecture_kit.gd")
 const Shapes=preload("res://components/canvas_shapes.gd")
+const Courtyard=preload("res://components/ruin_courtyard.gd")
 const CELL:=128
 const UNITS:=3.7
 const FOOT:=Vector2(.5,.66)
@@ -243,6 +244,7 @@ func decoration_in_cell(g,tx:int,ty:int)->Dictionary:
 
 static func clear_decoration(g,p:Vector2,zone:int)->bool:
 	if not Geometry.region_rect(zone).grow(-100).has_point(p):return false
+	if Courtyard.clears(p,40.0):return false
 	if g.distance_to_trail(p)<145 or g.class_boss_arena_index_at(p,100)>=0 or g.point_near_class_boss_house(p,120) or g.near_waystone_shrine(p,100):return false
 	if zone==12 and p.distance_to(g.GolemBoss.ALTAR)<280:return false
 	if zone==6 and p.y>6850+sin(p.x/220.0)*125:return false

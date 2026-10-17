@@ -147,6 +147,21 @@ Weitere Grafik und Spielführung aus dem Konzept, alle mit Vorschaubildern:
   [Bild](design/region-banner/ruinen.jpg).
 - Siegeltor an bossgesperrten Toren: [Bild](design/boss-seal/siegeltor.jpg).
 - Pixel-Porträts zu Meldungen von Mira, Fenna und Borin.
+- Spielpilot Nebenpfad: vier verborgene Funde abseits der Hauptwege
+  (Trittsteine, Steinmal, je Charakter einmal, neues Speicherfeld
+  `hidden_finds`): [Bild](design/hidden-finds/bluetenwiesen.jpg).
+- Spielpilot Hof hinter dem Tor: Ruinenhof um Serins Ereignis hinter dem
+  Mauertor (gleiche Gegner, Ziele und Belohnungen; Feuerschalen und Siegel
+  zeigen Anfang, Kampf und Abschluss): [vorher](design/ruin-courtyard/vorher.jpg),
+  [offen](design/ruin-courtyard/hof_offen.jpg),
+  [Kampf](design/ruin-courtyard/hof_kampf.jpg),
+  [gesäubert](design/ruin-courtyard/hof_gesaeubert.jpg).
+
+Kampf mit vielen Gegnern (17.10., `tools/profile_enemies.gd`, 25 Wiesengegner,
+nativ im Container): KI 8,1 → 2,6 ms, Zeichnen 8,5 → 6,2 ms je Bild. Wege
+werden weiterbenutzt statt alle 0,6 s neu gesucht; Kreise und Schatten über
+fertige Netze (pixelgleich); Minikarte als kleines Bild. Golemkampf zu viert:
+Weltpaket P95 15–17 → 6–10 ms ([Server-Befund](SERVER_LAGS_3D.md)).
 
 Bewusst nicht übernommen: Die Waffen-Itembilder und der Kartenentwurf vom
 16.10. sind schwächer als die vorhandene Spielgrafik. Die gemalten Porträts

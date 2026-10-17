@@ -1,5 +1,12 @@
 # Sonnenhain – nächste Ziele
 
+17.10.2026 (Abend) · PR #136, nicht live: Kämpfe mit vielen Gegnern rund
+halb so teuer (Wegsuche, Kreise, Minikarte), Golem-Weltpakete zu viert halbiert,
+Spielpiloten Nebenpfad (verborgene Funde) und Ruinenhof hinter dem Mauertor
+umgesetzt. [Messungen und Bilder](QUALITY_V1_UMSETZUNG.md).
+Nächstes: Browserbestätigung auf Angelos PC, Fels fürs Architekturset,
+Live-Gang nur nach Freigabe.
+
 17.10.2026 · Weiterarbeit an PR #136 (nicht live): Server-Lags lokal auf die
 Gegner-Wegsuche zurückgeführt und behoben; auf Angelos RTX 3060 keine Bilder
 über 50 ms mehr; Brave/Edge-Ruckler in den Blütenwiesen behoben. Neu:

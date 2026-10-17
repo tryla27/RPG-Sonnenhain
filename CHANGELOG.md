@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Ruinenhof 17.10. (`components/ruin_courtyard.gd`): Boden im statischen
+  Geländecache, Feuerschalen/Siegel je Zustand von Weltereignis 3 (Serin),
+  `HOF GESÄUBERT` beim Abschluss. **Aussehen:** Bäume/Felsen/Deko im Hof
+  entfernt (Darstellung und Kollision gemeinsam). Test
+  `check_ruin_courtyard.gd`, Bilder `docs/design/ruin-courtyard`.
 - Server 17.10. (Golem zu viert): gemeinsame kodierte Weltpakete für
   gleiche Ausschnitte (`WorldSnapshot.for_peer`/`transmit` mit
   Inhaltsschlüssel), Geschosszeilen mit festen Feldern. Weltpaket P95

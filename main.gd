@@ -109,6 +109,7 @@ const NpcPortraits=preload("res://components/npc_portraits.gd")
 const VILLAGE_PROP_MARGIN:=1600.0
 const BossGateSeal=preload("res://components/boss_gate_seal.gd")
 const HiddenFinds=preload("res://components/hidden_finds.gd")
+const RuinCourtyard=preload("res://components/ruin_courtyard.gd")
 var hidden_finds:=HiddenFinds.new()
 const RegionBanner=preload("res://components/region_banner.gd")
 const WebBenchmark=preload("res://components/web_benchmark.gd")
@@ -2765,6 +2766,7 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	var radius := 43.0 + float(key % 4) * 9.0
 	if not region_rect(zone).grow(-52).encloses(Rect2(p-Vector2(radius*1.4,radius*1.8),Vector2(radius*2.8,radius*2.8))): return {}
 	if distance_to_trail(p) < radius + 115.0: return {}
+	if RuinCourtyard.clears(p, radius + 30.0): return {}
 	for landmark in LANDMARKS:
 		if p.distance_to(landmark["pos"]) < radius + 180.0: return {}
 	for stone in WAYSTONES:
@@ -2794,6 +2796,7 @@ func make_decorative_tree(tx:int,ty:int) -> Dictionary:
 	if class_boss_arena_index_at(point+Vector2(24,42),70.0)>=0 or point_near_class_boss_house(point+Vector2(24,42),85.0):return {}
 	if not region_rect(zone).grow(-45).encloses(Rect2(point-Vector2(100,160),Vector2(200,210))): return {}
 	if distance_to_trail(point)<120.0:return {}
+	if RuinCourtyard.clears(point+Vector2(24,42),40.0):return {}
 	if near_waystone_shrine(point+Vector2(24,42), 56.0):return {}
 	if golem_world.tree_knocked(Vector2i(tx,ty)) or (point+Vector2(24,42)).distance_to(GolemBoss.ALTAR)<260.0:return {}
 	var tree := false
@@ -5345,6 +5348,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 			event_states[event_index] = 2
 			message("%s ist in Sicherheit! Sprich erneut mit %s (E)." % [WORLD_EVENTS[event_index]["role"], WORLD_EVENTS[event_index]["name"]])
 			play_sound("quest_bereit")
+			world_event_cleared_fx(event_index)
 	if invasion and rescue_state == 1:
 		apply_rescue_progress(1,false)
 	if type in [12, 13, 14]:
@@ -5685,6 +5689,11 @@ func interact() -> void:
 		pending_purchase = -1
 		pending_sale = -1
 		pending_purchase_item = {}
+
+## Sichtbarer Abschluss eines Weltereignisses (zusätzlich zur Meldung).
+func world_event_cleared_fx(index: int) -> void:
+	if index == RuinCourtyard.EVENT_INDEX:
+		effect(RuinCourtyard.SEAL + Vector2(0, -70), "HOF GESÄUBERT", Color("ffe39a"), 1.8)
 
 func interact_world_event(index: int) -> void:
 	var encounter: Dictionary = WORLD_EVENTS[index]
@@ -8864,6 +8873,8 @@ func draw_world() -> void:
 	draw_class_boss_arenas()
 	draw_region_gates()
 	hidden_finds.paint(self, camera_world_rect(), world_time)
+	if camera_world_rect().grow(80).intersects(RuinCourtyard.RECT):
+		RuinCourtyard.paint_state(self, int(event_states[RuinCourtyard.EVENT_INDEX]), world_time)
 
 func draw_class_boss_house(index:int)->void:
 	var base:Vector2=CLASS_BOSS_HOUSE_POS[index]
@@ -8999,6 +9010,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 				elif key % 3 == 0: draw_flower(p, key)
 				else: draw_grass(p)
 	draw_trails()
+	if bounds.intersects(RuinCourtyard.RECT.grow(40)): RuinCourtyard.paint_floor(self)
 	var cell_min_x := maxi(0, int(bounds.position.x / 250) - 2)
 	var cell_max_x := mini(int(WORLD.x / 250) + 1, int((bounds.end.x) / 250) + 2)
 	var cell_min_y := maxi(0, int(bounds.position.y / 250) - 2)
@@ -14228,6 +14240,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 			event_states[event_id] = 2
 			message("%s%s ist in Sicherheit! Sprich erneut mit %s (E)." % ["Gruppe · " if shared else "",WORLD_EVENTS[event_id]["role"],WORLD_EVENTS[event_id]["name"]])
 			play_sound("quest_bereit")
+			world_event_cleared_fx(event_id)
 		changed = true
 	if bool(payload.get("rescue",false)):
 		apply_rescue_progress(1,shared)
