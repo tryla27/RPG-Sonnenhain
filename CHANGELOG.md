@@ -6,6 +6,89 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- `Shapes.polygon`: Dreiecke und konvexe Vierecke über `draw_primitive`
+  (~1,2 statt ~5,5 µs, Farbrundung höchstens 1/255), alle zweiargumentigen
+  `draw_colored_polygon`-Aufrufe umgestellt (Ausnahme: `Brush` in
+  `character_adornments.gd`). Zeichnen ohne Gegner 3,6 → 3,0 ms.
+- Tiefensortierung der Weltobjekte über `PackedVector2Array.sort()`
+  (Tiefe, Stelle) statt `sort_custom` (120 Einträge: 0,25 → 0,03 ms), gleiche
+  Tiefe bleibt stabil; Fruchtpflanzen-Sichtprüfung mit einem Rechteck je Bild.
+- Ruinenhof 17.10. (`components/ruin_courtyard.gd`): Boden im statischen
+  Geländecache, Feuerschalen/Siegel je Zustand von Weltereignis 3 (Serin),
+  `HOF GESÄUBERT` beim Abschluss. **Aussehen:** Bäume/Felsen/Deko im Hof
+  entfernt (Darstellung und Kollision gemeinsam). Test
+  `check_ruin_courtyard.gd`, Bilder `docs/design/ruin-courtyard`.
+- Server 17.10. (Golem zu viert): gemeinsame kodierte Weltpakete für
+  gleiche Ausschnitte (`WorldSnapshot.for_peer`/`transmit` mit
+  Inhaltsschlüssel), Geschosszeilen mit festen Feldern. Weltpaket P95
+  15–17 → 6–10 ms. Werkzeug `tools/benchmark_golem_server.gd`, Test
+  `tests/network/check_world_snapshot_sharing.gd`.
+- Zeichnen 17.10.: `components/canvas_shapes.gd` (fertige Netze für Kreise und
+  Schatten über `draw_mesh`, ~0,6 statt ~5 µs je Form, pixelgleich zu
+  `draw_circle`); alle einfachen `draw_circle`-Aufrufe umgestellt. Minikarte als
+  21×21-Bild, nur bei Bewegung/Nebeländerung neu gefüllt. Landschaftskörper
+  merken Schatten und Zielrechteck je Zeile. Stufenschilder zwischengespeichert,
+  `food_system.nearest` prüft erst den Abstand. Mit 25 Wiesengegnern: KI +
+  Zeichnen 16,6 → 8,8 ms je Bild (nativ, Container).
+- Gegner-KI 17.10.: vollständige Wege zu kaum bewegten Zielen werden
+  weiterbenutzt (`MobNavigation.still_valid`), statt alle 0,6 s neu zu suchen
+  (25 Schleime: 434 → 27 Suchen in 3,5 s). Abstandsprüfung mit Vorabtest,
+  keine tiefe Kopie des Angriffszustands, `terrain_blocked` ohne neue Rechtecke
+  je Aufruf. KI-Zeit mit 25 Wiesengegnern 8,1 → 2,5 ms (nativ, Container).
+  Werkzeug `tools/profile_enemies.gd`, Tests `check_mob_path_reuse.gd`,
+  `check_terrain_blocked.gd`.
+- Verborgene Funde 17.10. (`components/hidden_finds.gd`): vier optionale
+  Nebenpfade mit Steinmal, je Charakter einmal; neues Speicherfeld
+  `hidden_finds` (vom Server geprüft, alte Stände ohne Feld gelten als
+  „nichts gefunden“). **Balance:** neue einmalige Belohnungen 80–170 Gold,
+  70–240 EP. Test `tests/gameplay/check_hidden_finds.gd`, Bilder unter
+  `docs/design/hidden-finds`.
+- Grafik-/Leistungspaket 16.10.: stabile Atlasseiten für echte 3D-Körper,
+  begrenzter Rückweg-/Geometriecache, Minimap-Geländecache und
+  ereignisabhängige Renderupdates.
+  Messwerkzeug mit nativer Vergleichsroute; Online-Lags noch nicht als gelöst bestätigt.
+- Atlasseiten 17.10.: Ausblenden und Entfernen zeichnen keine Seite mehr neu,
+  höchstens eine ruhende Seite pro Bild. Neuzeichnungen auf den Prüfrouten etwa
+  halbiert; Messwerkzeug ordnet langsame Bilder den Renderereignissen zu.
+- Modellaufbau 17.10.: höchstens 6 ms Modellbau pro Bild, geteilte Materialien.
+- Server 17.10.: Gegner-Wegsuche mit Prüfgedächtnis, Prüfbudget, Rückstellung
+  unerreichbarer Ziele und höchstens drei Suchen pro Serverbild; Mauerliste
+  konstant. Lokaler Zwei-Spieler-Lauf: längstes Serverbild 306 → 42–71 ms.
+  Neues Werkzeug `tools/benchmark_coop_network.gd`.
+- Statischer Kartencache 17.10.: ein wiederverwendeter Zeichner statt einer
+  main.gd-Instanz je 512er-Abschnitt (16–35 ms je neuem Abschnitt).
+- Architektur-Set v2 (`tools/art_pipeline/build_architecture_v2.py`, Blender):
+  14 Bauteile in `art/models/architecture_v2`, geladen über
+  `components/architecture_kit.gd`; exakt gleiche Begrenzung wie zuvor.
+  Vorschau: `tools/capture_architecture.gd`, Bilder in `docs/design/architecture-v2`.
+- Pixel-Porträts (`tools/art_pipeline/pixel_portraits.py`) für Meldungen von
+  Mira, Fenna und Borin (`components/npc_portraits.gd`).
+- Gebietsbanner (`components/region_banner.gd`) mit 13 Inkscape-Wappen
+  (`art/source/inkscape/regions` → `art/ui/regions`); behebt den sofort
+  überschriebenen Erkundungsspruch. Nutzt `discovered_regions`, kein neues Speicherfeld.
+- Zeichnen pro Bild 17.10.: Pflanzen-Zeichenliste einmal statt je Bild,
+  Dorfobjekte nur in Dorfnähe, vorberechnete Schattenkreise und ein schneller
+  Weg ohne Dorfbeschnitt. Landschaftsobjekte 3,0 → 1,9 ms pro Bild (lokal).
+- Browser-Messmodus `?bench=1` (`components/web_benchmark.gd`,
+  `tools/web_bench_server.py`) mit Diagnoseschaltern `noanim=1`/`no3d=1`.
+- Einzelspieler-Gegner-KI 17.10.: Browser-Messung zeigte 125 ms-Bilder in den
+  Blütenwiesen ohne 3D-Anteil. Ursache: Wegsuche im Client ohne Begrenzung.
+  Jetzt dieselbe Grenze wie auf dem Server, Kollisionskreise je 64er-Zelle
+  zwischengespeichert (terrain_blocked 15,4 → 3,7 µs, 200.000 Zufallspunkte
+  identisch), Gebietsmauerprüfung mit Schnellausschluss, Körperradius je Gegner
+  einmal pro Schritt.
+- Klarere Vorbereitungsflächen, elementabhängige Effektfolgen, Questzeichen,
+  persönlicher Heimkehrschmuck und P95/P99 in der Leistungsanzeige.
+  Keine Änderung von Schaden, XP, Kollisionen oder gespeicherten Belohnungen.
+- Reproduzierbare Blender-/Inkscape-/Krita-Produktion: 23 GLB-Modelle,
+  Kriegerskelett mit neun Aktionen, sechs Iconmotive, Effektfolgen, Materialien
+  und Kartenentwurf. Isoliertes Grafiklabor; breite Modellübernahme ausstehend.
+- Lokale ComfyUI-Workflows und erste Porträt-/Architekturentwürfe.
+  Quellen unter `art/source/` werden nicht in den Godot-Import übernommen.
+
+- Prolog und Startmeldung nennen Miras tatsächlichen Standort im Rathaus
+  von Sonnenhain statt den früheren Dorfplatz.
+
 - Einstieg zusätzlich geprüft: erste zwei Mira-Aufträge mit regulären
   Klassenangriffen, Teilfortschritt und einmaligen Belohnungen nach Dateiladen
   in allen drei Klassen (`check_start_quest_lifecycle.gd`). Eigene Web-Prüfszene

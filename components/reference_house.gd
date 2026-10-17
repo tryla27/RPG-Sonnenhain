@@ -1,4 +1,5 @@
 extends Node2D
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Original procedural house, inspired by the reference's material palette.
 ## Local footprint 192 x 160 world units. No image textures required.
 @export var roof_color := Color("a7422d")
@@ -32,7 +33,7 @@ static func poly(c: CanvasItem, p: Vector2, points: Array, color: Color) -> void
 	var vertices := PackedVector2Array()
 	for point in points:
 		vertices.append(p + Vector2(point[0], point[1]))
-	c.draw_colored_polygon(vertices, color)
+	Shapes.polygon(c,vertices, color)
 
 static func paint(c: CanvasItem, p: Vector2, roof: Color = Color("a7422d"), light: Color = Color("ffd482"), opened: bool = false) -> void:
 	# Shadow and stepped stone foundation.

@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Native design renderer. Preview only; no combat stats or loot changes.
 const Combat=preload("res://components/mob_combat.gd")
 const Hero=preload("res://components/rpg_hero.gd")
@@ -21,10 +22,10 @@ static func box(c:CanvasItem,p:Vector2,x:float,y:float,w:float,h:float,col:Color
 	else:
 		c.draw_rect(rect.grow(-.5),col)
 static func diamond(c:CanvasItem,p:Vector2,col:Color,size:float)->void:
-	c.draw_colored_polygon(PackedVector2Array([p+Vector2(0,-size-2),p+Vector2(size*.6+2,0),p+Vector2(0,size+2),p+Vector2(-size*.6-2,0)]),Color("17242a"))
-	c.draw_colored_polygon(PackedVector2Array([p+Vector2(0,-size),p+Vector2(size*.6,0),p+Vector2(0,size),p+Vector2(-size*.6,0)]),col)
-	c.draw_colored_polygon(PackedVector2Array([p+Vector2(0,-size),p,p+Vector2(-size*.6,0)]),col.lightened(.3))
-	c.draw_colored_polygon(PackedVector2Array([p,p+Vector2(size*.6,0),p+Vector2(0,size)]),col.darkened(.25))
+	Shapes.polygon(c,PackedVector2Array([p+Vector2(0,-size-2),p+Vector2(size*.6+2,0),p+Vector2(0,size+2),p+Vector2(-size*.6-2,0)]),Color("17242a"))
+	Shapes.polygon(c,PackedVector2Array([p+Vector2(0,-size),p+Vector2(size*.6,0),p+Vector2(0,size),p+Vector2(-size*.6,0)]),col)
+	Shapes.polygon(c,PackedVector2Array([p+Vector2(0,-size),p,p+Vector2(-size*.6,0)]),col.lightened(.3))
+	Shapes.polygon(c,PackedVector2Array([p,p+Vector2(size*.6,0),p+Vector2(0,size)]),col.darkened(.25))
 static func weapon(c:CanvasItem,p:Vector2,t:int,level:int,side:int,back:bool,look:Vector2,attack:float=-1.0,canvas_origin:Vector2=Vector2.ZERO,canvas_scale:Vector2=Vector2.ONE)->void:
 	var rank=tier(level)
 	var metal=[Color("8d795b"),Color("aa967a"),Color("b9c7cd"),Color("83dbe5"),Color("f6aa65"),Color("dbbaf2")][rank]

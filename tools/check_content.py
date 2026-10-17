@@ -298,7 +298,8 @@ assert 'func blocked_by_region_wall' in source and 'absf(across - float(wall["ax
 wall_draw = source.split('func draw_gate_wall(', 1)[1].split('func draw_grass(', 1)[0]
 assert 'for row in rows:' in wall_draw and 'var stone_len := 44.0' in wall_draw, 'wall texture does not cover full wall face'
 assert 'draw_path_tile' not in source and 'paths_32.png' not in source, 'floating road texture atlas still referenced'
-assert 'draw_circle(point, 58.0, edge_colors[theme_for_trail])' in source, 'rounded path joins missing'
+# Runde Wegverbindungen; Kreise laufen seit 17.10. über canvas_shapes.gd (gleiches Bild).
+assert re.search(r'(draw_circle\(|Shapes\.circle\(self,)point, 58\.0, edge_colors\[theme_for_trail\]\)', source), 'rounded path joins missing'
 assert 'func draw_day_night_overlay() -> void:' in source and 'fposmod(world_time, 720.0)' in source, 'day/night cycle missing'
 assert 'const MobDesign32=preload("res://components/monster_design_32.gd")' in source and 'MobDesign32.paint(self,' in source, 'shared native eight-direction monster renderer is not used'
 assert 'MobCombat.step(enemy,profile,targets,delta)' in source, 'server/offline shared mob combat is not used'

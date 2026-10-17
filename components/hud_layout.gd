@@ -1,4 +1,6 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
+const QUEST_ICON=preload("res://art/ui/quality_v1/quest_32.png")
 const FoodSystem=preload("res://components/food_system.gd")
 # Schlankes HUD: Lage der HUD-Teile und Zeichnen der Statusbalken, der
 # Questzeile, der XP-Linie und des Kartennamens unter der Minimap.
@@ -82,7 +84,7 @@ static func draw_quest_line(g,rect:Rect2,text:String,hovered:bool)->void:
 	g.draw_rect(rect,Color(0.03,0.07,0.1,0.72 if hovered else 0.5))
 	g.draw_rect(Rect2(rect.position,Vector2(3,rect.size.y)),Color("e3c077"))
 	if hovered:g.draw_rect(rect,Color("ffe0a0",0.7),false,1.0)
-	g.text_at(rect.position+Vector2(12,17),"ZIEL",11,Color("e3c077"))
+	g.draw_texture_rect(QUEST_ICON,Rect2(rect.position+Vector2(12,3),Vector2(20,20)),false)
 	shadow_text(g,rect.position+Vector2(50,17),text,14,Color("fff2d9"),HORIZONTAL_ALIGNMENT_LEFT,int(rect.size.x)-60)
 
 static func draw_map_label(g,label:String)->void:
@@ -135,7 +137,7 @@ static func draw_effect_chips(g,origin:Vector2,chips:Array,mouse:Vector2)->float
 		if int(chip.get("icon",-1))>=0:
 			FoodSystem.icon(g,r.position+Vector2(2,1),int(chip["icon"]),0.55)
 		else:
-			g.draw_circle(r.position+Vector2(14,14),6,Color(chip.get("color",Color.WHITE)))
+			Shapes.circle(g,r.position+Vector2(14,14),6,Color(chip.get("color",Color.WHITE)))
 		var t:=int(chip.get("time",0))
 		shadow_text(g,r.position+Vector2(30,17),"%d:%02d" % [int(t/60),t%60],12,Color("e8f0ff"))
 		g.draw_rect(Rect2(r.position+Vector2(30,21),Vector2(r.size.x-36,3)),Color("1b2f35"))

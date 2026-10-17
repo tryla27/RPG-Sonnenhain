@@ -1,17 +1,70 @@
 # Sonnenhain – nächste Ziele
 
-Aktueller priorisierter Arbeitsplan vom 12. Oktober 2026:
+17.10.2026 (Abend) · PR #136, nicht live: Kämpfe mit vielen Gegnern rund
+halb so teuer (Wegsuche, Kreise, Minikarte), Golem-Weltpakete zu viert halbiert,
+Spielpiloten Nebenpfad (verborgene Funde) und Ruinenhof hinter dem Mauertor
+umgesetzt. [Messungen und Bilder](QUALITY_V1_UMSETZUNG.md).
+Nächstes: Browserbestätigung auf Angelos PC, Fels fürs Architekturset,
+Live-Gang nur nach Freigabe.
+
+17.10.2026 · Weiterarbeit an PR #136 (nicht live): Server-Lags lokal auf die
+Gegner-Wegsuche zurückgeführt und behoben; auf Angelos RTX 3060 keine Bilder
+über 50 ms mehr; Brave/Edge-Ruckler in den Blütenwiesen behoben. Neu:
+Blender-Architekturset, Gebietsbanner mit Wappen, Siegeltore, NPC-Porträts.
+[Messungen und Bilder](QUALITY_V1_UMSETZUNG.md), [Server-Befund](SERVER_LAGS_3D.md).
+Nächstes: Live-Bestätigung nach Freigabe, Gegnerzeichnen im Browser,
+Hof-/Nebenpfad-Pilot.
+
+16.10.2026 · Umsetzung: Erstes Grafik-/Leistungspaket lokal eingebaut und
+geprüft. Stabile Atlasseiten, Minimapcache, Kampfvorbereitung, Effektfolgen
+und persönlicher Dorfschmuck sind angebunden. 23 neue Modelle, neun
+Kriegeranimationen, Ragdoll und Porträts stehen im Grafiklabor.
+[Stand, Messwerte, Vorschaubilder und offene Arbeit](QUALITY_V1_UMSETZUNG.md).
+Nächste Priorität: Browser-/Koopvergleich, PR/CI und kleiner Gebietspilot.
+Online-Lags sind noch nicht nachweislich behoben; keine Live-Schaltung.
+
+16.10.2026: Angelo priorisiert deutlich flüssigeres Spiel und feste
+Gegenstände wie Mauern. [Neues Grafik-/Gameplay-/Leistungskonzept](GRAFIK_GAMEPLAY_PERFORMANCE_KONZEPT.md):
+statische und dynamische Darstellung trennen, feste Module und Rendercaches
+erproben, erst danach den grafisch verbesserten Tor-/Hof-Piloten umsetzen.
+Status Konzept; keine gemessene Lag-Behebung oder neue Spielumsetzung.
+
+16.10.2026: Angelo meldet **Lags seit den 3D-Modellen auf den Maps**.
+Allgemeiner Online-/Leistungsfehler, nicht auf den Golem beschränkt.
+P1 vor weiterem breitem 3D-Ausbau, bei unspielbarem Verlauf P0.
+[Befund und Untersuchungsplan](SERVER_LAGS_3D.md); Ursache noch unbestätigt.
+
+16.10.2026: Eigenes [Verbesserungskonzept](VERBESSERUNGSKONZEPT.md)
+auf Angelos Auftrag erstellt: verständlicher Einstieg, lesbare Kämpfe,
+freiwillige Entdeckungen, sichtbare persönliche Dorfreaktionen und Fusionen
+als Schwerpunkt. Erstes vorgeschlagenes Paket: „Heimkehr nach Sonnenhain“.
+Status: Konzept; keine Spieländerungen oder neuen Prüfergebnisse.
+
+Aktueller priorisierter Arbeitsplan, ergänzt am 16. Oktober 2026:
 [ARBEITSPLAN.md](ARBEITSPLAN.md). Er legt Reihenfolge, Wichtigkeit,
 Status und Abschlusskriterien fest; die Konzepte darunter liefern die Details.
+
+16.10.2026: [Nächste Qualitätsstufe mit Blender, ComfyUI, Inkscape und Krita](NEXT_LEVEL_PLAN.md)
+ergänzt: gemeinsames Stilblatt, klare Quell-/Exportwege, Krieger-Pilot und
+anschließender Ausbau von Monstern, UI und Ausrüstung. Einstieg, Browser/Golem
+und Fortschrittsregeln bleiben die ersten Umsetzungspakete. Planungsänderung,
+noch keine neuen Assets, Installationen oder Veröffentlichung.
 
 12.10.2026: Erstes Einstiegspaket lokal geprüft (134 Projektprüfungen grün):
 kleine Schritte decken die Karte auf, Laden beachtet echte Gebietssperren,
 Dorfstein bleibt erhalten, Ratshallen-Weg frei, Holztrefferklänge ergänzt.
-Noch nicht live. Details und verbleibende Prüfungen:
+Seit 12.10.2026 live (Commit `79bf216`, PR #134). Website-/Server-Versionsgleichheit
+und öffentliche Mehrspieler-/Speicherprüfungen sind bestätigt. Details und verbleibende Prüfungen:
 [Einstiegsbericht](konzepte/2026-10-11-startbereich/README.md).
-PR #134 ist nach Angelos Upload-Freigabe angelegt; erster CI-Lauf erfolgreich.
 Zusätzlicher Questablauf mit drei Klassen und isolierte Web-Prüfszene ergänzen
-den Nachweis; endgültigen PR-Kopf separat prüfen.
+den Nachweis; endgültiger PR-Kopf ebenfalls CI-grün und mit konkreter
+Merge-/Live-Freigabe veröffentlicht. Als Nächstes: veraltete Starttexte zu
+Miras Standort, manueller Einstieg, Brave-/Golem-Prüfung, anschließend Fortschritt.
+
+Folgearbeit 12.10.: Starttexte sind lokal korrigiert, bewegte Schleime/Käfer
+in drei Klassen geprüft (135 Projektprüfungen grün). Interaktive Prüfszene
+liegt vor; längerer manueller Browser-Durchgang blieb nach Werkzeugabbruch
+offen. Noch nicht veröffentlicht. [Bericht](konzepte/2026-10-12-einstieg/README.md).
 
 Stand: 11. Oktober 2026. Rezeptbuch, Golem-Musikstart und Netzwerkoptimierung
 sind veröffentlicht (PR #133, Live-Commit `3180af0`). Website und Server sowie

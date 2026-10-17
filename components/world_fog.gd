@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Dauerhafter Nebel über der ganzen Welt (C1 „Start im Dunkeln“).
 ## Ein Raster über alle Gebietsgrenzen hinweg: Was ein Charakter einmal gesehen
 ## hat, bleibt aufgedeckt (pro Charakter gespeichert). Unaufgedecktes ist im
@@ -287,5 +288,5 @@ func draw_live_party_vision(g,inset:Rect2,map_scale:Vector2)->void:
 		var pos:=Vector2(raw)
 		var center:=inset.position+pos*map_scale
 		var radius:=REVEAL_RADIUS*minf(map_scale.x,map_scale.y)
-		g.draw_circle(center,maxf(3.0,radius),Color("9ee7d2",0.06))
+		Shapes.circle(g,center,maxf(3.0,radius),Color("9ee7d2",0.06))
 		g.draw_arc(center,maxf(4.0,radius),0,TAU,24,Color("9ee7d2",0.35),1.0)

@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 
 const HEAD_NAMES:=["Ohne","Magnet +/−","Blitzantennen","Einzelantenne","Doppelantenne","Blitzableiter","Tesla-Spule","Radar","Energiekugel","Mechanische Hörner","Elektrokontakte"]
 const BADGE_NAMES:=["Ohne","Sonne","Mond","Stern","Blatt","Flamme","Kristall","Schild","Rune","Krone","Zaubersiegel"]
@@ -17,7 +18,7 @@ class Brush:
 	func draw_colored_polygon(points:PackedVector2Array,color:Color)->void:
 		var transformed:=PackedVector2Array()
 		for point in points:transformed.append((origin+point*factor).round())
-		canvas.draw_colored_polygon(transformed,color)
+		Shapes.polygon(canvas,transformed,color)
 
 static func pixel(c:Brush,p:Vector2,size:Vector2,color:Color)->void:
 	c.draw_rect(Rect2(p.round(),size),color)

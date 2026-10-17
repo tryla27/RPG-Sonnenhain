@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## One procedural model family for selection, all maps and multiplayer.
 const H = preload("res://components/reference_house.gd")
 const GoldenSprites = preload("res://components/golden_sprite_runtime.gd")
@@ -77,7 +78,7 @@ static func poly(c:CanvasItem,p:Vector2,points:Array,color:Color)->void:
 	var vertices := PackedVector2Array()
 	for point in points:
 		vertices.append(p+Vector2(roundf(float(point[0])/PIXEL_STEP),roundf(float(point[1])/PIXEL_STEP))*PIXEL_STEP)
-	c.draw_colored_polygon(vertices,color.lerp(Color("fff3de"),hurt_flash*.75))
+	Shapes.polygon(c,vertices,color.lerp(Color("fff3de"),hurt_flash*.75))
 
 static func direction_index(look:Vector2)->int:
 	if look.length_squared()<0.0001:return 0

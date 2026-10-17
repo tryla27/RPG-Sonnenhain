@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 # Neue Wegsteine (Wunsch 9.10.2026): erhöhtes Steinplateau mit Treppe, Runenkreis
 # und Obelisk mit schwebendem Kristall. Gilt für alle regionalen Wegsteine,
 # nicht für den Spawnstein (der hat spawn_platform_32.gd).
@@ -98,12 +99,12 @@ static func draw_upper(c:CanvasItem,stone:Vector2,active:bool,time:float)->void:
 	var bob:=sin(time*1.7+stone.y*0.01)*4.0 if active else 0.0
 	var crystal:=stone+OBELISK_FOOT+Vector2(0,-176+bob)
 	if active:
-		c.draw_circle(crystal,22.0,Color(glow,0.10+pulse*0.08))
-		c.draw_circle(crystal,13.0,Color(glow,0.16+pulse*0.1))
+		Shapes.circle(c,crystal,22.0,Color(glow,0.10+pulse*0.08))
+		Shapes.circle(c,crystal,13.0,Color(glow,0.16+pulse*0.1))
 	var body:=Color("5fc3cf") if active else Color("74878a")
 	var face:=Color("d8fbf2") if active else Color("a9b6b4")
-	c.draw_colored_polygon(PackedVector2Array([crystal+Vector2(0,-18),crystal+Vector2(10,-2),crystal+Vector2(0,16),crystal+Vector2(-10,-2)]),Color("26343a"))
-	c.draw_colored_polygon(PackedVector2Array([crystal+Vector2(0,-15),crystal+Vector2(8,-2),crystal+Vector2(0,13),crystal+Vector2(-8,-2)]),body)
-	c.draw_colored_polygon(PackedVector2Array([crystal+Vector2(0,-12),crystal+Vector2(-5,-2),crystal+Vector2(0,6)]),face)
+	Shapes.polygon(c,PackedVector2Array([crystal+Vector2(0,-18),crystal+Vector2(10,-2),crystal+Vector2(0,16),crystal+Vector2(-10,-2)]),Color("26343a"))
+	Shapes.polygon(c,PackedVector2Array([crystal+Vector2(0,-15),crystal+Vector2(8,-2),crystal+Vector2(0,13),crystal+Vector2(-8,-2)]),body)
+	Shapes.polygon(c,PackedVector2Array([crystal+Vector2(0,-12),crystal+Vector2(-5,-2),crystal+Vector2(0,6)]),face)
 	# Schatten des Kristalls auf der Spitze.
 	c.draw_rect(Rect2(stone+OBELISK_FOOT+Vector2(-6,-150),Vector2(12,3)),Color(0,0,0,0.25))

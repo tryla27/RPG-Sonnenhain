@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Reference-inspired environment rendered as geometry, with no image assets.
 const House = preload("res://components/reference_house.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
@@ -87,10 +88,10 @@ static func well(c:CanvasItem,p:Vector2) -> void:
 	for row in range(3):
 		var pts:=PackedVector2Array()
 		for i in range(16):pts.append(p+Vector2(cos(i*TAU/16.0)*42,sin(i*TAU/16.0)*23+12-row*8))
-		c.draw_colored_polygon(pts,Color(["5b625b","929689","b7b6a0"][row]))
+		Shapes.polygon(c,pts,Color(["5b625b","929689","b7b6a0"][row]))
 	var water:=PackedVector2Array()
 	for i in range(16):water.append(p+Vector2(cos(i*TAU/16.0)*28,sin(i*TAU/16.0)*14-4))
-	c.draw_colored_polygon(water,Color("334c51"))
+	Shapes.polygon(c,water,Color("334c51"))
 	for i in range(6):rect(c,p,-34+i*13,6,2,17,"6e766b")
 	for side in [-1,1]:
 		rect(c,p,side*33-4,-66,8,76,"60452e")
@@ -138,7 +139,7 @@ static func gatepost(c:CanvasItem,p:Vector2) -> void:
 	rect(c,p,-28,-27,56,67,"294e75")
 	rect(c,p,-28,-27,3,65,"e2b965")
 	rect(c,p,25,-27,3,65,"e2b965")
-	c.draw_circle(p+Vector2(0,0),10,Color("e8bc58"))
+	Shapes.circle(c,p+Vector2(0,0),10,Color("e8bc58"))
 	for i in range(8):
 		var ray:Vector2=Vector2.RIGHT.rotated(i*TAU/8.0)
 		c.draw_line(p+ray*15,p+ray*22,Color("e8bc58"),3)
@@ -148,7 +149,7 @@ static func waystone(c:CanvasItem,p:Vector2,active:bool) -> void:
 		var radius:float=75-step*5
 		var pts:=PackedVector2Array()
 		for i in range(16):pts.append(p+Vector2(cos(i*TAU/16.0)*radius,sin(i*TAU/16.0)*radius*0.62+22-step*4))
-		c.draw_colored_polygon(pts,Color(["555f5e","8d9690","c1c4ac"][step]))
+		Shapes.polygon(c,pts,Color(["555f5e","8d9690","c1c4ac"][step]))
 	for i in range(12):
 		var ray:=Vector2(cos(i*TAU/12.0),sin(i*TAU/12.0)*0.62)
 		c.draw_line(p+ray*39+Vector2(0,14),p+ray*67+Vector2(0,14),Color("78847c"),2)

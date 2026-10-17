@@ -3,8 +3,10 @@
 # Release marker: [deploy] class bosses, shared loot, boss arenas/houses, harvest visuals/timers, HUD separation and audiovisual combat.
 # Release marker: production rollout for class bosses, HUD separation, Borin route, harvest timers and boss audiovisual combat.
 extends Node2D
+const Shapes=preload("res://components/canvas_shapes.gd")
 const WorldObstacles3D=preload("res://components/world_obstacles_3d.gd")
 var world_obstacles_3d:=WorldObstacles3D.new()
+var minimap_ground_cache:=preload("res://components/minimap_ground_cache.gd").new()
 const PatchNotice = preload("res://components/patch_notice.gd")
 const PatchNotes = preload("res://components/patch_notes.gd")
 const MenuFeedback = preload("res://components/menu_feedback.gd")
@@ -103,6 +105,19 @@ const DisplayMode=preload("res://components/display_mode.gd")
 const BossRelics=preload("res://components/boss_relics.gd")
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobNavigation=preload("res://components/mob_navigation.gd")
+const NpcPortraits=preload("res://components/npc_portraits.gd")
+const VILLAGE_PROP_MARGIN:=1600.0
+const BossGateSeal=preload("res://components/boss_gate_seal.gd")
+const HiddenFinds=preload("res://components/hidden_finds.gd")
+const RuinCourtyard=preload("res://components/ruin_courtyard.gd")
+var hidden_finds:=HiddenFinds.new()
+const RegionBanner=preload("res://components/region_banner.gd")
+const WebBenchmark=preload("res://components/web_benchmark.gd")
+var web_benchmark:=WebBenchmark.new()
+var web_benchmark_requested:=false
+var region_banner:=RegionBanner.new()
+## Neue Wegsuchen je Serverbild; verhindert, dass viele Gegner im selben Bild planen.
+const MOB_ROUTES_PER_FRAME:=3
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
 const WolfAnimation=preload("res://components/wolf_animation.gd")
 const WoodlandPoseAnimation=preload("res://components/woodland_pose_animation.gd")
@@ -241,6 +256,7 @@ const STATIC_CACHE_LIMIT := 32
 var static_chunks: Dictionary = {}
 var foreground_cache: Dictionary = {}
 var static_renderer_script: Script
+var static_chunk_renderer: Node2D
 var static_draw_bounds := Rect2()
 var performance_cache_enabled := true
 var performance_draw_us := 0
@@ -732,6 +748,7 @@ func _ready() -> void:
 	var user_args := OS.get_cmdline_user_args()
 	dedicated_server_mode = OS.has_feature("dedicated_server") or "--dedicated-server" in user_args
 	multiplayer_smoke_client_mode = "--multiplayer-smoke-client" in user_args
+	web_benchmark_requested = WebBenchmark.requested()
 	if dedicated_server_mode:
 		var notice_path := server_patch_notice_path()
 		if FileAccess.file_exists(notice_path): patch_notice.last_token = FileAccess.get_file_as_string(notice_path).strip_edges().left(80)
@@ -1268,7 +1285,19 @@ func push_world_snapshot() -> void:
 		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0),"boss_spawn_timer":enemy.get("boss_spawn_timer",0.0),"golem":GolemBoss.net_info(enemy.get("golem",{}))})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
-		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0),"kind":shot.get("kind","projectile"),"ability_id":shot.get("ability_id","basic"),"radius":shot.get("radius",0.0),"age":shot.get("age",0.0),"duration":shot.get("duration",0.0)})
+		# Feste Angaben eines Geschosses einmal als Zeile anlegen, je Paket nur die
+		# veränderlichen Werte setzen (Golemkampf: bis zu 270 Geschosse).
+		var row: Dictionary = shot.get("_net_row", {})
+		if row.is_empty():
+			row = {"speed":shot.get("speed",265.0),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0),"kind":shot.get("kind","projectile"),"ability_id":shot.get("ability_id","basic"),"duration":shot.get("duration",0.0)}
+			shot["_net_row"] = row
+		row["pos"] = [shot["pos"].x,shot["pos"].y]
+		row["dir"] = [shot["dir"].x,shot["dir"].y]
+		row["life"] = shot.get("life",1.0)
+		row["damage"] = shot.get("damage",1)
+		row["radius"] = shot.get("radius",0.0)
+		row["age"] = shot.get("age",0.0)
+		shot_rows.append(row)
 	var drop_rows:Array=[]
 	for drop in drops:
 		if not drop.has("drop_uid") or not drop.has("item"):continue
@@ -1277,13 +1306,17 @@ func push_world_snapshot() -> void:
 	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows,"drops":drop_rows,"golem":golem_world.snapshot(world_time)}
 	# Golem-Daten voll nur in und am Himmelsgarten, sonst nur Kartensymbol und Pause.
 	var golem_lite := golem_world.lite_snapshot()
+	# Gleiche Ausschnitte teilen sich ein fertig kodiertes Paket.
+	var shared_packets: Dictionary = {}
 	for peer_id in multiplayer.get_peers():
 		var state: Dictionary = remote_players.get(int(peer_id),{})
 		if str(state.get("context","world")) == "world":
 			var peer_pos := network_player_position(int(peer_id))
 			var peer_snapshot := WorldSnapshot.for_peer(snapshot,peer_pos)
-			if not GolemBoss.needs_full(peer_pos): peer_snapshot["golem"] = golem_lite
-			WorldSnapshot.transmit(self,int(peer_id),peer_snapshot)
+			var full_golem := GolemBoss.needs_full(peer_pos)
+			if not full_golem: peer_snapshot["golem"] = golem_lite
+			peer_snapshot["_share_key"].append(full_golem)
+			WorldSnapshot.transmit(self,int(peer_id),peer_snapshot,shared_packets)
 
 @rpc("authority", "call_remote", "unreliable", 1)
 func rpc_world_snapshot(snapshot: Dictionary) -> void:
@@ -1779,6 +1812,10 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 
 func _process(delta: float) -> void:
 	perf_overlay.tick(delta)
+	if web_benchmark_requested:
+		# Browser-Messmodus (?bench=1): nach dem Laden die feste Route abfahren.
+		if not web_benchmark.active and Engine.get_process_frames() > 60: web_benchmark.start(self)
+		web_benchmark.step(self)
 	if app_mode: app_keyboard_tick()
 	if not world_obstacles_3d.enabled(self):world_obstacles_3d.update(self,delta)
 	combat_feedback.step(delta)
@@ -1868,6 +1905,7 @@ func _process(delta: float) -> void:
 	ranger_stealth_timer = maxf(0.0, ranger_stealth_timer - delta)
 	robotics_overclock_timer = maxf(0.0, robotics_overclock_timer - delta)
 	notice_timer = maxf(0.0, notice_timer - delta)
+	region_banner.tick(delta)
 	party_reward_notice_timer = maxf(0.0,party_reward_notice_timer-delta)
 	if party_reward_notice_timer<=0.0: party_reward_notice=""
 	rescue_intro_timer = maxf(0.0, rescue_intro_timer - delta)
@@ -2070,7 +2108,19 @@ func server_cleanup_orphan_mobs() -> void:
 		if now-int(enemy["spawned_at_ms"]) < 30000: continue
 		enemies.remove_at(i)
 
+## Kampfprofile hängen nur von Typ, Elitestufe, Arenastärke und Wächtergröße ab.
+## Gegner fragen sie jedes Bild ab; daher einmal je Kombination bauen und teilen
+## (nur lesend verwendet). Aufrufer, die ändern wollen, kopieren mit duplicate().
+var mob_profile_cache: Dictionary = {}
 func mob_profile(enemy:Dictionary)->Dictionary:
+	var key:="%d:%d:%s:%d" % [int(enemy["type"]),int(enemy.get("elite",0)),str(enemy.get("arena_power",1.0)),int(bool(enemy.get("small_guardian",false)))]
+	if mob_profile_cache.has(key): return mob_profile_cache[key]
+	var built:=build_mob_profile(enemy)
+	if mob_profile_cache.size()>=512: mob_profile_cache.clear()
+	mob_profile_cache[key]=built
+	return built
+
+func build_mob_profile(enemy:Dictionary)->Dictionary:
 	var type:int=int(enemy["type"])
 	var damage:int=roundi(enemy_damage(type)*[1.0,1.15,1.3][clampi(int(enemy.get("elite",0)),0,2)]*float(enemy.get("arena_power",1.0)))
 	var profile:Dictionary=MobCombat.profile(type,ENEMY_TYPES[type],enemy_level(type),damage)
@@ -2093,8 +2143,8 @@ func mob_targets(enemy:Dictionary,server:bool)->Array:
 			result.append({"id":0,"pos":player_pos,"hp":hp,"max_hp":maxf(1.0,hp),"detection_mult":1.0-.08*essence.rank(3,3)})
 	return result
 
-func mob_walkable(point:Vector2,origin:Vector2,enemy:Dictionary,server:bool)->bool:
-	if terrain_blocked(point,mob_hit_radius(enemy)) or blocked_by_region_wall(point) or region_at(point)!=region_at(origin):return false
+func mob_walkable(point:Vector2,origin:Vector2,enemy:Dictionary,server:bool,hit_radius:float=-1.0)->bool:
+	if terrain_blocked(point,hit_radius if hit_radius>=0.0 else mob_hit_radius(enemy)) or blocked_by_region_wall(point) or region_at(point)!=region_at(origin):return false
 	if server or (arena_mode=="" and dungeon_id<0):
 		if waystone_safe_at(point):return false
 	if not server and arena_mode!="":return point.distance_to(ARENA_CENTER)<ARENA_RADIUS-16
@@ -2148,12 +2198,16 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		candidate["attack_clear"]=cached["clear"]
 	if float(enemy["sight_wait"])<=0.0:enemy["sight_wait"]=.25
 	enemy["attack_sight"]=sight
-	var previous_attack_state:Dictionary=enemy.get("attack_state",{}).duplicate(true)
+	# Nur Kennung und Form des vorherigen Angriffs werden gebraucht; eine tiefe
+	# Kopie des Angriffszustands kostete bei vielen Gegnern spürbar Zeit.
+	var previous_attack:Dictionary=enemy.get("attack_state",{})
+	var previous_attack_id:=int(previous_attack.get("id",-1))
+	var previous_attack_shape:=str(previous_attack.get("ability",{}).get("shape",""))
 	var gait_origin:Vector2=enemy["pos"]
 	var action:=MobCombat.step(enemy,profile,targets,delta)
 	if not server and int(enemy.get("type",-1)) in [12,13,14]:
 		var current_attack:Dictionary=enemy.get("attack_state",{})
-		var previous_id:=int(previous_attack_state.get("id",-1))
+		var previous_id:=previous_attack_id
 		var current_id:=int(current_attack.get("id",-1))
 		if current_id>=0 and current_id!=previous_id:
 			var current_ability:Dictionary=current_attack.get("ability",{})
@@ -2164,12 +2218,18 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 		var speed:float=float(profile["movement_speed"])*(.45 if float(enemy.get("slow",0))>0 else (float(enemy.get("necklace_frost_mult",1.0)) if float(enemy.get("necklace_frost",0))>0 else 1.0))
 		var origin:Vector2=enemy["pos"]
 		var separation:=Vector2.ZERO
+		var body_radius:=mob_hit_radius(enemy)
+		# Grober Vorabtest: weiter entfernte Gegner können den Mindestabstand
+		# (größter Trefferradius MOB_MAX_HIT_RADIUS) nie unterschreiten. Spart bei
+		# vielen Gegnern die meisten Radiusberechnungen (n² pro Bild).
+		var reach_sq:=(body_radius+MOB_MAX_HIT_RADIUS+8.0)*(body_radius+MOB_MAX_HIT_RADIUS+8.0)
 		for other in enemies:
 			if other==enemy:continue
 			var away:Vector2=origin-Vector2(other["pos"])
-			var spacing:float=mob_hit_radius(enemy)+mob_hit_radius(other)+8
+			if away.length_squared()>=reach_sq:continue
+			var spacing:float=body_radius+mob_hit_radius(other)+8
 			if away.length_squared()>.01 and away.length()<spacing:separation+=away.normalized()*(spacing-away.length())/spacing
-		var walkable:=func(point:Vector2)->bool:return mob_walkable(point,origin,enemy,server)
+		var walkable:=func(point:Vector2)->bool:return mob_walkable(point,origin,enemy,server,body_radius)
 		var destination:Vector2=enemy.get("pursuit_target",origin+movement*240.0) if not bool(enemy.get("returning",false)) else enemy["home"]
 		var routed:=MobNavigation.direction(enemy,destination,delta,walkable)
 		if routed.length_squared()>.001:
@@ -2251,7 +2311,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 			apply_master_thorns(enemy,int(event["damage"]),master_armor_id())
 	if int(enemy["type"]) in [0,1,2,3]:
 		enemy["walking"]=moved
-		if moved and str(previous_attack_state.get("ability",{}).get("shape",""))!="leap":
+		if moved and previous_attack_shape!="leap":
 			var previous_phase:=float(enemy.get("gait_phase",fposmod(float(enemy.get("seed",0.0))*.73,TAU)))
 			var distance:=Vector2(enemy["pos"]).distance_to(gait_origin)
 			enemy["gait_phase"]=WolfAnimation.advance_gait(previous_phase,distance) if int(enemy["type"])==3 else WoodlandPoseAnimation.advance_gait(int(enemy["type"]),previous_phase,distance)
@@ -2259,6 +2319,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 
 func update_dedicated_enemies(delta:float)->void:
 	server_moving_mobs=0
+	MobNavigation.routes_left=MOB_ROUTES_PER_FRAME
 	for i in range(enemies.size()-1,-1,-1):
 		var enemy:Dictionary=enemies[i]
 		if float(enemy.get("hp",0))<=0:
@@ -2270,6 +2331,7 @@ func update_dedicated_enemies(delta:float)->void:
 			golem_perf_add(Time.get_ticks_usec()-started_us)
 		elif advance_mob(enemy,delta,true):server_moving_mobs+=1
 		if float(enemy.get("hp",0))<=0:defeat_enemy(i,int(enemy.get("last_hit_peer",0)))
+	MobNavigation.routes_left=-1
 	var world_us:=Time.get_ticks_usec()
 	golem_world.update_world(self,delta,true)
 	golem_perf_add(Time.get_ticks_usec()-world_us)
@@ -2499,10 +2561,13 @@ func update_player(delta: float) -> void:
 		previous_region = region
 		if not discovered_regions[region]:
 			discovered_regions[region] = true
-			var whispers := ["", "Unter den Blüten liegt etwas Dunkles.", "Die Pilze leuchten, obwohl kein Sonnenstrahl hierher reicht.", "Der Turm bewacht ein vergessenes Versprechen.", "Im Kristall spiegelt sich ein Himmel ohne Sterne.", "Die Asche trägt Spuren eines alten Feuers.", "Das Meer flüstert Namen aus vergangenen Tagen.", "Jenseits des Bruchs wartet die Quelle des Unheils.", "Eine Glocke schlägt tief im Nebel.", "Goldenes Harz verschließt die Wunden des Waldes.", "Wasser steigt aus der Erde und singt eine Warnung.", "Am Grat verlischt das letzte Wachtfeuer.", "Über den Gärten sammelt sich das Licht der Morgenwache."]
-			message("%s · %s" % [region_name(region), whispers[region]])
+			# Erstes Betreten: Banner mit Wappen, Stufe und Spruch (früher wurde
+			# der Spruch sofort von „Neues Gebiet“ überschrieben).
+			region_banner.show(region, region_name(region), region_level(region))
+			message("Gebiet entdeckt: %s" % region_name(region))
 			save_game()
-		message("Neues Gebiet: %s" % region_name(region))
+		else:
+			message("Neues Gebiet: %s" % region_name(region))
 		if region != 0:
 			for i in 5: spawn_enemy()
 	# Gedrückt halten löst nach jeder Abklingzeit den nächsten Hieb aus.
@@ -2578,20 +2643,25 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 			return true
 	return false
 
+## Gebietsmauern mit Toren; konstant, damit Wegprüfungen sie nicht je Aufruf neu bauen.
+const REGION_WALLS := [
+	{"vertical":true,"axis":1780.0,"from":0.0,"to":2600.0,"gate":1120.0,"level":1,"boss":-1},
+	{"vertical":true,"axis":1780.0,"from":2600.0,"to":8500.0,"gate":6200.0,"level":8,"boss":-1},
+	{"vertical":false,"axis":2600.0,"from":0.0,"to":1780.0,"gate":875.0,"level":5,"boss":-1},
+	{"vertical":false,"axis":4200.0,"from":1780.0,"to":5000.0,"gate":2900.0,"level":8,"boss":-1},
+	{"vertical":true,"axis":5000.0,"from":0.0,"to":4200.0,"gate":1250.0,"level":15,"boss":-1},
+	{"vertical":true,"axis":5000.0,"from":4200.0,"to":8500.0,"gate":6200.0,"level":22,"boss":0},
+	{"vertical":false,"axis":4200.0,"from":5000.0,"to":8500.0,"gate":6600.0,"level":22,"boss":0},
+	{"vertical":true,"axis":8500.0,"from":0.0,"to":4200.0,"gate":1900.0,"level":29,"boss":1},
+	{"vertical":true,"axis":8500.0,"from":4200.0,"to":8500.0,"gate":6350.0,"level":36,"boss":1},
+	{"vertical":false,"axis":4200.0,"from":8500.0,"to":11000.0,"gate":9750.0,"level":36,"boss":-1}
+]
+
 func blocked_by_region_wall(pos: Vector2) -> bool:
-	var walls := [
-		{"vertical":true,"axis":1780.0,"from":0.0,"to":2600.0,"gate":1120.0,"level":1,"boss":-1},
-		{"vertical":true,"axis":1780.0,"from":2600.0,"to":8500.0,"gate":6200.0,"level":8,"boss":-1},
-		{"vertical":false,"axis":2600.0,"from":0.0,"to":1780.0,"gate":875.0,"level":5,"boss":-1},
-		{"vertical":false,"axis":4200.0,"from":1780.0,"to":5000.0,"gate":2900.0,"level":8,"boss":-1},
-		{"vertical":true,"axis":5000.0,"from":0.0,"to":4200.0,"gate":1250.0,"level":15,"boss":-1},
-		{"vertical":true,"axis":5000.0,"from":4200.0,"to":8500.0,"gate":6200.0,"level":22,"boss":0},
-		{"vertical":false,"axis":4200.0,"from":5000.0,"to":8500.0,"gate":6600.0,"level":22,"boss":0},
-		{"vertical":true,"axis":8500.0,"from":0.0,"to":4200.0,"gate":1900.0,"level":29,"boss":1},
-		{"vertical":true,"axis":8500.0,"from":4200.0,"to":8500.0,"gate":6350.0,"level":36,"boss":1},
-		{"vertical":false,"axis":4200.0,"from":8500.0,"to":11000.0,"gate":9750.0,"level":36,"boss":-1}
-	]
-	for wall in walls:
+	# Schnell aussortieren: Mauern liegen nur auf diesen Achsen (±51 px).
+	if absf(pos.x-1780.0)>51.0 and absf(pos.x-5000.0)>51.0 and absf(pos.x-8500.0)>51.0 and absf(pos.y-2600.0)>51.0 and absf(pos.y-4200.0)>51.0:
+		return false
+	for wall in REGION_WALLS:
 		var along: float = pos.y if wall["vertical"] else pos.x
 		var across: float = pos.x if wall["vertical"] else pos.y
 		if along < float(wall["from"]) - 20.0 or along > float(wall["to"]) + 20.0: continue
@@ -2696,6 +2766,7 @@ func make_obstacle(cx: int, cy: int) -> Dictionary:
 	var radius := 43.0 + float(key % 4) * 9.0
 	if not region_rect(zone).grow(-52).encloses(Rect2(p-Vector2(radius*1.4,radius*1.8),Vector2(radius*2.8,radius*2.8))): return {}
 	if distance_to_trail(p) < radius + 115.0: return {}
+	if RuinCourtyard.clears(p, radius + 30.0): return {}
 	for landmark in LANDMARKS:
 		if p.distance_to(landmark["pos"]) < radius + 180.0: return {}
 	for stone in WAYSTONES:
@@ -2725,6 +2796,7 @@ func make_decorative_tree(tx:int,ty:int) -> Dictionary:
 	if class_boss_arena_index_at(point+Vector2(24,42),70.0)>=0 or point_near_class_boss_house(point+Vector2(24,42),85.0):return {}
 	if not region_rect(zone).grow(-45).encloses(Rect2(point-Vector2(100,160),Vector2(200,210))): return {}
 	if distance_to_trail(point)<120.0:return {}
+	if RuinCourtyard.clears(point+Vector2(24,42),40.0):return {}
 	if near_waystone_shrine(point+Vector2(24,42), 56.0):return {}
 	if golem_world.tree_knocked(Vector2i(tx,ty)) or (point+Vector2(24,42)).distance_to(GolemBoss.ALTAR)<260.0:return {}
 	var tree := false
@@ -2775,30 +2847,71 @@ func trail_clearance_points(step:float=48.0)->Array:
 				if region_at(point)!=0:out.append(point)
 	return out
 
+const RESCUE_HUT_OFFSETS:=[Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]
+## Größter Abstand eines Hüttenrands (inkl. 16 Abstand) vom Lagermittelpunkt, plus Reserve.
+const RESCUE_HUT_REACH:=Vector2(460.0,320.0)
 func terrain_blocked(p: Vector2,radius:float=-1.0) -> bool:
 	if radius<0:radius=hero_collision_radius()
-	for house_index in CLASS_BOSS_HOUSE_POS.size():
-		if class_boss_house_rect(house_index).grow(radius).has_point(p):return true
-	if region_at(p) == 1:
-		for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
+	# Klassenboss-Häuser: dieselbe Prüfung wie class_boss_house_rect(i).grow(radius)
+	# .has_point(p), ohne pro Aufruf drei Rechtecke zu bauen (Wegsuchen prüfen
+	# tausende Punkte pro Sekunde).
+	var house_half:=WorldGeometry.CLASS_BOSS_HOUSE_SIZE.x*.5+radius
+	var house_top:=WorldGeometry.CLASS_BOSS_HOUSE_SIZE.y+radius
+	for center:Vector2 in CLASS_BOSS_HOUSE_POS:
+		if p.x>=center.x-house_half and p.x<center.x+house_half and p.y>=center.y-house_top and p.y<center.y+radius:return true
+	# Rettungslager: Hütten liegen höchstens 449 × 310 vom Lagermittelpunkt entfernt.
+	if absf(p.x-RESCUE_POS.x)<RESCUE_HUT_REACH.x and absf(p.y-RESCUE_POS.y)<RESCUE_HUT_REACH.y and region_at(p) == 1:
+		for offset in RESCUE_HUT_OFFSETS:
 			if Rect2(RESCUE_POS + offset - Vector2(73, 54), Vector2(146, 108)).grow(16).has_point(p): return true
 	# Nur Stamm/Wurzel blockieren; die Krone bleibt begehbar.
-	var tree_tx := int(floorf(p.x/64.0))
-	var tree_ty := int(floorf(p.y/64.0))
+	# Baumstämme und Hindernisse der Umgebung liegen je 64er-Zelle gesammelt vor.
+	for circle in terrain_circles(int(floorf(p.x/64.0)),int(floorf(p.y/64.0))):
+		if p.distance_to(Vector2(circle.x,circle.y)) < circle.z+radius: return true
+	return false
+
+## Alle Kollisionskreise, die terrain_blocked() für Punkte dieser 64er-Zelle
+## prüft: Stämme der 3×3 Baumzellen und Hindernisse der 250er-Nachbarzellen
+## (Radius bereits um die 2 px Hindernisabstand erweitert). Zusätzliche ferne
+## Kreise ändern kein Ergebnis, weil sie weiter als jeder Prüfradius entfernt
+## liegen. Wegsuchen rufen terrain_blocked() tausendfach auf.
+var terrain_circle_cache: Dictionary = {}
+func terrain_circles(tree_tx:int,tree_ty:int) -> PackedVector3Array:
+	var cell := Vector2i(tree_tx,tree_ty)
+	if terrain_circle_cache.has(cell): return terrain_circle_cache[cell]
+	var circles := PackedVector3Array()
 	for tx in range(tree_tx-1,tree_tx+2):
 		for ty in range(tree_ty-1,tree_ty+2):
 			var tree := decorative_tree_in_cell(tx,ty)
-			if not tree.is_empty() and p.distance_to(tree["point"]) < float(tree["radius"])+radius: return true
-	var cx := int(floorf(p.x / 250.0))
-	var cy := int(floorf(p.y / 250.0))
-	for x in range(cx - 1, cx + 2):
-		for y in range(cy - 1, cy + 2):
-			var obstacle := obstacle_in_cell(x, y)
-			if obstacle.is_empty():continue
-			var collision_radius:=obstacle_collision_radius(obstacle)
-			if collision_radius>0.0 and p.distance_to(obstacle["pos"]) < collision_radius + radius+2.0:
-				return true
-	return false
+			if not tree.is_empty():
+				var point:Vector2=tree["point"]
+				circles.append(Vector3(point.x,point.y,float(tree["radius"])))
+	# Die Zelle kann zwei 250er-Zellen je Achse berühren: deren Nachbarschaften vereinen.
+	var low_x := int(floorf(tree_tx*64.0/250.0))
+	var low_y := int(floorf(tree_ty*64.0/250.0))
+	var high_x := int(floorf((tree_tx*64.0+63.999)/250.0))
+	var high_y := int(floorf((tree_ty*64.0+63.999)/250.0))
+	for x in range(low_x - 1, high_x + 2):
+		for y in range(low_y - 1, high_y + 2):
+			var blocker := obstacle_blocker(x, y)
+			if blocker.z>0.0: circles.append(Vector3(blocker.x,blocker.y,blocker.z+2.0))
+	if terrain_circle_cache.size() >= 32768: terrain_circle_cache.clear()
+	terrain_circle_cache[cell] = circles
+	return circles
+
+## Kollisionskreis des Hindernisses einer 250er-Zelle als (x, y, Radius);
+## Radius 0 = nichts blockiert. Zwischengespeichert, weil Wegsuchen
+## terrain_blocked() tausendfach pro Sekunde aufrufen.
+var obstacle_blocker_cache: Dictionary = {}
+func obstacle_blocker(cx: int, cy: int) -> Vector3:
+	var cell := Vector2i(cx, cy)
+	if obstacle_blocker_cache.has(cell): return obstacle_blocker_cache[cell]
+	var blocker := Vector3.ZERO
+	var obstacle := obstacle_in_cell(cx, cy)
+	if not obstacle.is_empty():
+		var position: Vector2 = obstacle["pos"]
+		blocker = Vector3(position.x, position.y, obstacle_collision_radius(obstacle))
+	obstacle_blocker_cache[cell] = blocker
+	return blocker
 
 func can_cross_gate(from_region: int, to_region: int, start: Vector2, end: Vector2) -> bool:
 	if from_region >= 8 or to_region >= 8: return false
@@ -5029,6 +5142,13 @@ func update_rescue() -> void:
 		enemies.append(invader)
 
 func update_enemies(delta:float)->void:
+	# Wie auf dem Server: höchstens wenige neue Wegsuchen pro Bild. Im Browser
+	# kosteten gleichzeitig planende Gegner sonst über 100 ms pro Bild.
+	MobNavigation.routes_left=MOB_ROUTES_PER_FRAME
+	update_enemies_unbounded(delta)
+	MobNavigation.routes_left=-1
+
+func update_enemies_unbounded(delta:float)->void:
 	for i in range(enemies.size()-1,-1,-1):
 		if i>=enemies.size():continue
 		var enemy:Dictionary=enemies[i]
@@ -5228,6 +5348,7 @@ func defeat_enemy(index: int, source_peer: int = 0) -> void:
 			event_states[event_index] = 2
 			message("%s ist in Sicherheit! Sprich erneut mit %s (E)." % [WORLD_EVENTS[event_index]["role"], WORLD_EVENTS[event_index]["name"]])
 			play_sound("quest_bereit")
+			world_event_cleared_fx(event_index)
 	if invasion and rescue_state == 1:
 		apply_rescue_progress(1,false)
 	if type in [12, 13, 14]:
@@ -5524,6 +5645,11 @@ func interact() -> void:
 		if player_pos.distance_to(chest_position(i)) < 125:
 			open_chest(i)
 			return
+	if interior_id < 0 and dungeon_id < 0 and arena_mode == "":
+		var find_index := hidden_finds.nearby(player_pos)
+		if find_index >= 0:
+			claim_hidden_find(find_index)
+			return
 	for i in WORLD_EVENTS.size():
 		if player_pos.distance_to(WORLD_EVENTS[i]["pos"]) < 112:
 			interact_world_event(i)
@@ -5563,6 +5689,11 @@ func interact() -> void:
 		pending_purchase = -1
 		pending_sale = -1
 		pending_purchase_item = {}
+
+## Sichtbarer Abschluss eines Weltereignisses (zusätzlich zur Meldung).
+func world_event_cleared_fx(index: int) -> void:
+	if index == RuinCourtyard.EVENT_INDEX:
+		effect(RuinCourtyard.SEAL + Vector2(0, -70), "HOF GESÄUBERT", Color("ffe39a"), 1.8)
 
 func interact_world_event(index: int) -> void:
 	var encounter: Dictionary = WORLD_EVENTS[index]
@@ -5623,6 +5754,18 @@ func dungeon_chest_ready(index: int) -> bool:
 		dungeon_chests_opened[index] = false
 		dungeon_chest_respawn_until[index] = 0.0
 	return not bool(dungeon_chests_opened[index])
+
+func claim_hidden_find(index: int) -> void:
+	var find: Dictionary = hidden_finds.claim(index)
+	if find.is_empty():
+		message("Hier hast du schon nachgesehen.")
+		return
+	gold += int(find["gold"])
+	gain_xp(int(find["xp"]))
+	play_sound("truhe_auf")
+	message("%s · +%d XP · +%d Gold" % [find["name"], int(find["xp"]), int(find["gold"])])
+	add_chat_line("FUND", str(find["lore"]))
+	save_game()
 
 func open_chest(index: int) -> void:
 	if not chest_ready(index):
@@ -5912,6 +6055,7 @@ func capture_save_data() -> Dictionary:
 	data["village_gates"] = [opened_village_gates.has(VILLAGE_GATES[0]),opened_village_gates.has(VILLAGE_GATES[1])]
 	data["food_state"] = food_system.snapshot()
 	data["steinrose_state"] = steinrose.snapshot()
+	data["hidden_finds"] = hidden_finds.snapshot()
 	data["golem_world"] = golem_world.save_state()
 	data["essence_state"] = essence.snapshot()
 	data["book_state"] = book_system.snapshot()
@@ -5984,6 +6128,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		event_progress[i] = 0
 	for i in bosses_defeated.size(): bosses_defeated[i] = false
 	for i in opened_chests.size(): opened_chests[i] = false
+	hidden_finds.reset()
 	dungeon_id = -1
 	interior_id = -1
 	for i in dungeon_chests_opened.size(): dungeon_chests_opened[i] = false
@@ -6017,6 +6162,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 	if not from_server and not creative_mode: server_save.restore(data)
 	food_system.restore(data.get("food_state",{}))
 	steinrose.restore(data.get("steinrose_state",{}))
+	hidden_finds.restore(data.get("hidden_finds",[]))
 	if not uses_server_world(): golem_world.load_state(data.get("golem_world",{}))
 	world_fog.restore(data.get("world_fog",[]),WORLD,data.get("world_fog_fine",""))
 	var stored_recent: Variant = data.get("recent_players",[])
@@ -6653,6 +6799,7 @@ func reset_character_state() -> void:
 	party_state = {}
 	food_system.restore({})
 	steinrose.restore({})
+	hidden_finds.reset()
 	golem_world = GolemBoss.new()
 	golem_debris.clear()
 	pip_loan_level = 0
@@ -6694,7 +6841,7 @@ func finish_intro() -> void:
 		if network_mode == "client" and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 			rpc_player_presence.rpc_id(1, local_player_state())
 	play_sound("spieler_wiederbeleben")
-	message("Mira wartet am Dorfplatz. Sprich mit ihr (E).")
+	message("Mira wartet im Rathaus. Sprich mit ihr (E).")
 
 func begin_repair_session()->void:
 	repair_targets={
@@ -7899,11 +8046,11 @@ func _draw() -> void:
 		if visible_world(cloud["pos"], 110):
 			var center: Vector2 = cloud["pos"]
 			var fade: float = minf(1.0, float(cloud["life"]) * 0.65)
-			draw_circle(center, 83, Color(0.32, 0.52, 0.23, 0.18 * fade))
+			Shapes.circle(self,center, 83, Color(0.32, 0.52, 0.23, 0.18 * fade))
 			for bubble in 9:
 				var angle := float(bubble) * TAU / 9.0 + world_time * (0.2 if bubble % 2 == 0 else -0.3)
 				var point := center + Vector2.RIGHT.rotated(angle) * (19 + bubble % 4 * 16)
-				draw_circle(point + Vector2(0, sin(world_time * 3.0 + bubble) * 6), 5 + bubble % 3, Color(0.62, 0.88, 0.35, 0.55 * fade))
+				Shapes.circle(self,point + Vector2(0, sin(world_time * 3.0 + bubble) * 6), 5 + bubble % 3, Color(0.62, 0.88, 0.35, 0.55 * fade))
 	for shot in enemy_projectiles:
 		if visible_world(shot["pos"], maxf(45.0,float(shot.get("radius",0.0)))):
 			var p: Vector2 = shot["pos"]
@@ -7950,35 +8097,35 @@ func _draw() -> void:
 					draw_line(start, finish, Color(accent, float(segment) / float(trail.size()) * 0.5), 3 if spell_id in [18, 25] else 8)
 			if spell_id == 16:
 				var flame_tail := p - d * 15.0
-				draw_circle(flame_tail, 18 + sin(world_time * 24) * 3, Color("d84d28", 0.42))
-				draw_colored_polygon(PackedVector2Array([p-d*20-side*10,p+d*9-side*8,p+d*20,p+d*8+side*9,p-d*19+side*10]),Color("ed672f"))
-				draw_circle(p, 12, Color("ff9a3f"))
-				draw_circle(p + side * 3 - d * 2, 6, Color("fff0a6"))
+				Shapes.circle(self,flame_tail, 18 + sin(world_time * 24) * 3, Color("d84d28", 0.42))
+				Shapes.polygon(self,PackedVector2Array([p-d*20-side*10,p+d*9-side*8,p+d*20,p+d*8+side*9,p-d*19+side*10]),Color("ed672f"))
+				Shapes.circle(self,p, 12, Color("ff9a3f"))
+				Shapes.circle(self,p + side * 3 - d * 2, 6, Color("fff0a6"))
 			elif spell_id == 22:
 				draw_line(p-d*28,p+d*14,Color("a83d26",0.55),14)
 				draw_line(p-d*23,p+d*10,Color("ff7b32"),8)
-				draw_colored_polygon(PackedVector2Array([p+d*25,p+side*8,p-d*24,p-side*8]),Color("ffad4d"))
-				draw_circle(p-d*7,6,Color("fff0a6"))
+				Shapes.polygon(self,PackedVector2Array([p+d*25,p+side*8,p-d*24,p-side*8]),Color("ffad4d"))
+				Shapes.circle(self,p-d*7,6,Color("fff0a6"))
 			elif spell_id == 18:
 				draw_line(p - d * 70, p + d * 31, Color("f5d56c", 0.6), 13)
 				draw_line(p - d * 85, p + d * 32, Color("fff9d4"), 4)
-				draw_circle(p + d * 32, 7, Color.WHITE)
+				Shapes.circle(self,p + d * 32, 7, Color.WHITE)
 			elif spell_id == 20:
-				draw_circle(p, 15, Color("9e85e9", 0.35))
+				Shapes.circle(self,p, 15, Color("9e85e9", 0.35))
 				for spark in 3:
 					var ray := Vector2.RIGHT.rotated(world_time * 7 + float(spark) * TAU / 3.0)
 					draw_rect(Rect2(p + ray * 14 - Vector2(4, 4), Vector2(8, 8)), Color("ddc8ff"))
-				draw_circle(p, 6, Color.WHITE)
+				Shapes.circle(self,p, 6, Color.WHITE)
 			elif spell_id == 25:
 				draw_line(p - d * 58, p + d * 36, Color("f9e1a3", 0.4), 11)
 				draw_line(p - d * 42, p + d * 20, Color("fff7d4"), 4)
-				draw_colored_polygon(PackedVector2Array([p + d * 39, p + side * 9, p - side * 9]), Color("f6e3b0"))
+				Shapes.polygon(self,PackedVector2Array([p + d * 39, p + side * 9, p - side * 9]), Color("f6e3b0"))
 			elif spell_id == 28:
 				draw_line(p - d * 19, p + d * 12, Color("625b3a"), 5)
-				draw_colored_polygon(PackedVector2Array([p + d * 22, p + side * 9, p - side * 9]), Color("c0eb69"))
-				for drop in 3: draw_circle(p - d * (8 + drop * 10) + side * sin(world_time * 15 + drop) * 7, 4, Color("91cd5f", 0.72))
+				Shapes.polygon(self,PackedVector2Array([p + d * 22, p + side * 9, p - side * 9]), Color("c0eb69"))
+				for drop in 3: Shapes.circle(self,p - d * (8 + drop * 10) + side * sin(world_time * 15 + drop) * 7, 4, Color("91cd5f", 0.72))
 			elif spell_id == 29:
-				draw_colored_polygon(PackedVector2Array([p + d * 30, p + side * 10, p - d * 25, p - side * 10]), Color("d4f9ff"))
+				Shapes.polygon(self,PackedVector2Array([p + d * 30, p + side * 10, p - d * 25, p - side * 10]), Color("d4f9ff"))
 				draw_line(p - d * 21, p + d * 18, Color("78c6eb"), 4)
 				for shard in [-1, 1]: draw_rect(Rect2(p - d * 15 + side * shard * 13 - Vector2(3, 3), Vector2(6, 6)), Color("9ee6f4"))
 			elif spell_id == 30:
@@ -7987,17 +8134,17 @@ func _draw() -> void:
 					var from_point := p - d * (zig * 13) + side * (6 if zig % 2 == 0 else -6)
 					draw_line(from_point, from_point + d * 15 - side * (12 if zig % 2 == 0 else -12), Color("fff0a5"), 4)
 			elif int(projectile["kind"]) == 2:
-				draw_circle(p - d * 14, 15, Color(accent, 0.24))
-				draw_circle(p, 12 + sin(world_time * 19) * 2, accent)
-				draw_circle(p - d * 3, 5, Color.WHITE)
+				Shapes.circle(self,p - d * 14, 15, Color(accent, 0.24))
+				Shapes.circle(self,p, 12 + sin(world_time * 19) * 2, accent)
+				Shapes.circle(self,p - d * 3, 5, Color.WHITE)
 			elif int(projectile["kind"]) == 3:
 				draw_line(p - d * 27, p + d * 16, Color("735a47"), 4)
-				draw_colored_polygon(PackedVector2Array([p + d * 23, p + side * 7, p - side * 7]), accent)
+				Shapes.polygon(self,PackedVector2Array([p + d * 23, p + side * 7, p - side * 7]), accent)
 				draw_line(p - d * 21 + side * 8, p - d * 25, Color("f3eee1"), 3)
 				draw_line(p - d * 21 - side * 8, p - d * 25, Color("f3eee1"), 3)
 			else:
 				draw_line(p - d * 25, p - d * 58, Color(accent, 0.25), 13)
-				draw_colored_polygon(PackedVector2Array([p + d * 24, p + side * 11, p - d * 18, p - side * 11]), accent)
+				Shapes.polygon(self,PackedVector2Array([p + d * 24, p + side * 11, p - d * 18, p - side * 11]), accent)
 				draw_line(p - d * 11, p + d * 16, Color.WHITE, 3)
 			var vfx_kind := 5 if int(projectile["kind"]) == 3 else (0 if spell_id in [16,22] else (1 if spell_id in [17,29] else (2 if spell_id in [18,30] else (3 if spell_id in [28] else 4))))
 			if spell_id >= 0: draw_vfx_sprite(vfx_kind, p, 24.0)
@@ -8006,7 +8153,7 @@ func _draw() -> void:
 			var c: Color = Color("ecaa75") if zone["element"] == "feuer" else (Color("aedbf0") if zone["element"] == "eis" else Color("f5dfa0"))
 			var p: Vector2 = zone["pos"]
 			var radius: float = float(zone["radius"])
-			draw_circle(p, radius, Color(c, 0.08))
+			Shapes.circle(self,p, radius, Color(c, 0.08))
 			draw_arc(p, radius, 0, TAU, 32, Color(c, 0.65), 4)
 			for ray in 8:
 				var angle := float(ray) * TAU / 8.0 + world_time
@@ -8016,7 +8163,7 @@ func _draw() -> void:
 		var radius: float = float(zone["radius"])
 		var fade := minf(1.0, float(zone["life"]) / 1.0)
 		var tint := Color("ff873e") if str(zone["kind"]) == "fire" else Color("e7c574")
-		draw_circle(center, radius, Color(tint, 0.18 * fade))
+		Shapes.circle(self,center, radius, Color(tint, 0.18 * fade))
 		draw_arc(center, radius, 0.0, TAU, 48, Color(tint, 0.87 * fade), 5)
 		for rune in 12:
 			var offset := Vector2.RIGHT.rotated(float(rune) * TAU / 12.0 + world_time * 0.15) * (radius * 0.72)
@@ -8194,7 +8341,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 			for i in 7:
 				var angle := float(i) * TAU / 7.0 + progress * 2.3
 				var orb := p + Vector2.RIGHT.rotated(angle) * (35 + progress * 35)
-				draw_circle(orb, 7 * alpha + 2, Color("f6a7cb", alpha))
+				Shapes.circle(self,orb, 7 * alpha + 2, Color("f6a7cb", alpha))
 		7:
 			for i in [-1, 0, 1]:
 				draw_line(p + direction.rotated(float(i) * 0.28) * 35, p + direction.rotated(float(i) * 0.28) * (80 + progress * 45), Color("c8b5ff", alpha), 5)
@@ -8208,20 +8355,20 @@ func draw_spell_local(visual: Dictionary) -> void:
 				var ray := direction.rotated(float(i) * 0.2)
 				var tip := p + ray * (55 + progress * 115)
 				draw_line(p + ray * 25, tip, Color("9ce6f7", alpha), 9)
-				draw_circle(tip, 8 * alpha + 2, Color("f1ffff", alpha))
+				Shapes.circle(self,tip, 8 * alpha + 2, Color("f1ffff", alpha))
 		13:
 			draw_arc(p, 24 + progress * 65, 0, TAU, 16, Color("fff1a1", alpha), 5)
 		14:
 			for i in 8:
 				var angle := float(i) * TAU / 8.0 + progress * 1.7
 				var bubble := p + Vector2.RIGHT.rotated(angle) * (22 + progress * 56)
-				draw_circle(bubble, 5 + float(i % 3), Color("a8e57a", alpha))
+				Shapes.circle(self,bubble, 5 + float(i % 3), Color("a8e57a", alpha))
 		16:
 			for i in 6:
 				var ray := Vector2.RIGHT.rotated(float(i) * TAU / 6.0 + world_time)
 				var tip := p + ray * (19 + progress * 72)
 				draw_line(p + ray * 12, tip, Color("ff964d", alpha), 6)
-				draw_circle(tip, 5, Color("ffe6a2", alpha))
+				Shapes.circle(self,tip, 5, Color("ffe6a2", alpha))
 		17:
 			var radius := 22 + progress * 190
 			draw_arc(p, radius, 0, TAU, 40, Color("c2f5ff", alpha), 7)
@@ -8234,7 +8381,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 			for i in 3:
 				var point := p + direction * (12 + i * 25) * (1.0 + progress)
 				draw_line(point - direction.rotated(PI * 0.5) * 13, point + direction.rotated(PI * 0.5) * 13, Color("fff4a5", alpha), 5)
-			draw_circle(p, 18 + progress * 28, Color("ffec95", alpha * 0.14))
+			Shapes.circle(self,p, 18 + progress * 28, Color("ffec95", alpha * 0.14))
 		19, 27:
 			var finish: Vector2 = visual["end"]
 			for echo in 4:
@@ -8245,8 +8392,8 @@ func draw_spell_local(visual: Dictionary) -> void:
 			for orb in 3:
 				var ray := Vector2.RIGHT.rotated(float(orb) * TAU / 3.0 + progress * 8)
 				var point := p + ray * (25 + progress * 58)
-				draw_circle(point, 9, Color("c4a8fa", alpha))
-				draw_circle(point, 3, Color.WHITE)
+				Shapes.circle(self,point, 9, Color("c4a8fa", alpha))
+				Shapes.circle(self,point, 3, Color.WHITE)
 		21:
 			for facet in 6:
 				var start := p + Vector2.RIGHT.rotated(float(facet) * TAU / 6.0) * 47
@@ -8259,7 +8406,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 				var offset := Vector2((arrow % 3 - 1) * 28, (arrow / 3 - 1) * 25)
 				var top := p + offset + Vector2(0, -75 + progress * 95)
 				draw_line(top - Vector2(0, 19), top + Vector2(0, 13), Color(hue, alpha), 4)
-				draw_colored_polygon(PackedVector2Array([top + Vector2(-6, 8), top + Vector2(0, 20), top + Vector2(6, 8)]), Color(hue, alpha))
+				Shapes.polygon(self,PackedVector2Array([top + Vector2(-6, 8), top + Vector2(0, 20), top + Vector2(6, 8)]), Color(hue, alpha))
 		23, 24:
 			for ring in 3:
 				var hue: Color = [Color("a9eafa"), Color("ffe7a0"), Color("b6e6a1")][ring]
@@ -8276,7 +8423,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 		28:
 			for bubble in 7:
 				var ray := Vector2.RIGHT.rotated(float(bubble) * TAU / 7.0 + progress)
-				draw_circle(p + ray * (20 + progress * 65), 5 + bubble % 3, Color("b7ed78", alpha))
+				Shapes.circle(self,p + ray * (20 + progress * 65), 5 + bubble % 3, Color("b7ed78", alpha))
 		29:
 			for shard in 8:
 				var ray := Vector2.RIGHT.rotated(float(shard) * TAU / 8.0)
@@ -8291,7 +8438,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 			for wing in [-1.0, 1.0]:
 				var tip := p + Vector2(wing * (48 + progress * 80), -64 * alpha)
 				draw_line(p + Vector2(0, -20), tip, Color("e9dca2", alpha), 8)
-			draw_circle(p + Vector2(0, -30), 10, Color("fff0bd", alpha))
+			Shapes.circle(self,p + Vector2(0, -30), 10, Color("fff0bd", alpha))
 		_:
 			var hue := Color("efab74") if id in [16, 22] else (Color("a9e7f7") if id in [17, 21, 29] else (Color("f7e495") if id in [18, 24, 30, 33] else (Color("b6e599") if id in [28, 32] else Color("c8aef1"))))
 			var rays := 3 if id in [20, 26, 31] else 8
@@ -8301,7 +8448,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 				var target := p + Vector2.RIGHT.rotated(angle + 0.35) * (39 + progress * 105 * size)
 				draw_line(source, target, Color(hue, alpha * 0.33), 11)
 				draw_line(source, target, Color(hue, alpha), 3)
-				draw_circle(target, 4 + 4 * alpha, Color("fff7e8", alpha))
+				Shapes.circle(self,target, 4 + 4 * alpha, Color("fff7e8", alpha))
 
 func effective_camera_zoom()->float:
 	if konflux.active or world_builder.active:return 1.0
@@ -8725,6 +8872,9 @@ func draw_world() -> void:
 		draw_static_overworld(camera_world_rect())
 	draw_class_boss_arenas()
 	draw_region_gates()
+	hidden_finds.paint(self, camera_world_rect(), world_time)
+	if camera_world_rect().grow(80).intersects(RuinCourtyard.RECT):
+		RuinCourtyard.paint_state(self, int(event_states[RuinCourtyard.EVENT_INDEX]), world_time)
 
 func draw_class_boss_house(index:int)->void:
 	var base:Vector2=CLASS_BOSS_HOUSE_POS[index]
@@ -8758,7 +8908,7 @@ func draw_class_boss_arenas() -> void:
 		if visible_world(house,250.0):draw_class_boss_house(i)
 		if not visible_world(center,CLASS_BOSS_ARENA_RADIUS+80.0):continue
 		var accent:Color=[Color("b65c48"),Color("8062c7"),Color("6f9f56")][i]
-		draw_circle(center,CLASS_BOSS_ARENA_RADIUS,Color(accent,.055))
+		Shapes.circle(self,center,CLASS_BOSS_ARENA_RADIUS,Color(accent,.055))
 		draw_arc(center,CLASS_BOSS_ARENA_RADIUS,0,TAU,64,Color(accent,.55),5)
 		draw_arc(center,CLASS_BOSS_ARENA_RADIUS-26,0,TAU,64,Color(accent,.20),2)
 		for rune in 12:
@@ -8860,6 +9010,7 @@ func draw_static_overworld(bounds: Rect2) -> void:
 				elif key % 3 == 0: draw_flower(p, key)
 				else: draw_grass(p)
 	draw_trails()
+	if bounds.intersects(RuinCourtyard.RECT.grow(40)): RuinCourtyard.paint_floor(self)
 	var cell_min_x := maxi(0, int(bounds.position.x / 250) - 2)
 	var cell_max_x := mini(int(WORLD.x / 250) + 1, int((bounds.end.x) / 250) + 2)
 	var cell_min_y := maxi(0, int(bounds.position.y / 250) - 2)
@@ -8902,7 +9053,7 @@ func draw_tavern_world() -> void:
 	for x in range(-5, 6):
 		draw_pixel_tile(22, INTERIOR_CENTER + Vector2(x * 48, -174))
 	draw_pixel_tile(15, INTERIOR_CENTER + Vector2(-310, -240), 72.0)
-	draw_circle(INTERIOR_CENTER + Vector2(-275, -195), 100, Color("f4a965", 0.06))
+	Shapes.circle(self,INTERIOR_CENTER + Vector2(-275, -195), 100, Color("f4a965", 0.06))
 	for offset in [Vector2(-295, -15), Vector2(285, -15), Vector2(-290, 135), Vector2(290, 135)]:
 		for x in 2:
 			draw_pixel_tile(22, INTERIOR_CENTER + offset + Vector2(-48 + x * 48, -24))
@@ -8912,7 +9063,7 @@ func draw_tavern_world() -> void:
 		draw_pixel_tile(21, INTERIOR_CENTER + pos)
 	for pos in [Vector2(-430, -110), Vector2(414, -110)]:
 		draw_pixel_tile(29, INTERIOR_CENTER + pos)
-		draw_circle(INTERIOR_CENTER + pos + Vector2(24, 13), 95, Color("ffba74", 0.055))
+		Shapes.circle(self,INTERIOR_CENTER + pos + Vector2(24, 13), 95, Color("ffba74", 0.055))
 	draw_pixel_tile(20, INTERIOR_CENTER + Vector2(-24, 240))
 	draw_npc({"name":"Alma", "role":"Wirtin der Steinrose · Kueche & Rezepte", "pos":INTERIOR_CENTER + Vector2(0, -105), "color":Color("ba795e"), "kind":"innkeeper"})
 	text_at(INTERIOR_CENTER + Vector2(-170, -269), "ZUR STEINROSE", 22, Color("fce5b2"), HORIZONTAL_ALIGNMENT_CENTER, 340)
@@ -8967,10 +9118,10 @@ func draw_torch(p: Vector2, blue: bool, flame: bool) -> void:
 	# Gestaffelter Lichtschein statt eines einzelnen harten Leuchtkreises.
 	for halo in range(3, 0, -1):
 		var halo_radius := 18.0 + float(halo) * 23.0 + flicker * 0.7
-		draw_circle(p + Vector2(0, -24), halo_radius, Color(light, 0.022 if halo == 3 else (0.036 if halo == 2 else 0.065)))
-	draw_circle(p + Vector2(0, -24), 16 + flicker * 0.45, Color(light, 0.13))
-	draw_colored_polygon(PackedVector2Array([p + Vector2(-7, -10), p + Vector2(0, -37 - flicker), p + Vector2(8, -10)]), light)
-	draw_colored_polygon(PackedVector2Array([p + Vector2(-3, -11), p + Vector2(2, -27 - flicker), p + Vector2(5, -11)]), Color("e8ffff") if blue else Color("fff2bf"))
+		Shapes.circle(self,p + Vector2(0, -24), halo_radius, Color(light, 0.022 if halo == 3 else (0.036 if halo == 2 else 0.065)))
+	Shapes.circle(self,p + Vector2(0, -24), 16 + flicker * 0.45, Color(light, 0.13))
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(-7, -10), p + Vector2(0, -37 - flicker), p + Vector2(8, -10)]), light)
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(-3, -11), p + Vector2(2, -27 - flicker), p + Vector2(5, -11)]), Color("e8ffff") if blue else Color("fff2bf"))
 
 func draw_dungeon_atmosphere() -> void:
 	var shadow_color := Color("080f18") if dungeon_id != 2 else Color("0a1515")
@@ -8998,7 +9149,7 @@ func draw_dungeon_atmosphere() -> void:
 	for wisp in 11:
 		var mist := DUNGEON_CENTER + Vector2(-590 + wisp * 116 + sin(world_time * 0.3 + wisp) * 30, (wisp % 3 - 1) * 205)
 		if visible_world(mist, 90) and mist.distance_to(player_pos) < 420:
-			draw_circle(mist, 28 + wisp % 4 * 8, Color("b2cbd0", 0.025))
+			Shapes.circle(self,mist, 28 + wisp % 4 * 8, Color("b2cbd0", 0.025))
 
 func draw_overworld_atmosphere() -> void:
 	var darkness := {2:0.27, 3:0.41, 4:0.39, 5:0.45, 7:0.56, 8:0.48, 10:0.49, 11:0.57, 12:0.44}
@@ -9028,7 +9179,7 @@ func draw_overworld_atmosphere() -> void:
 	for cloud in cloud_count:
 		var drift := Vector2(fposmod(float(cloud * 157) + world_time * 12.0, visible_size.x + 180.0) - 90.0, fposmod(float(cloud * 91),visible_size.y+120.0) - 60.0)
 		var fog_zone := visual_region_at(camera_pos + drift)
-		if darkness.has(fog_zone): draw_circle(camera_pos + drift, 32 + cloud % 5 * 9, Color("c5ced3", 0.028 if fog_zone in [3, 7, 8, 10, 11] else 0.014))
+		if darkness.has(fog_zone): Shapes.circle(self,camera_pos + drift, 32 + cloud % 5 * 9, Color("c5ced3", 0.028 if fog_zone in [3, 7, 8, 10, 11] else 0.014))
 	for torch_pos in torches:
 		if visible_world(torch_pos, 55): draw_torch(torch_pos, region_at(torch_pos) == 4, true)
 
@@ -9043,7 +9194,7 @@ func _trail_theme(region: int) -> int:
 ## deren Rand (Mauerlinie der Tore) gerade abgeschnitten.
 func draw_trail_band(a: Vector2, b: Vector2, width: float, color: Color) -> void:
 	for piece in trail_band_polygons(a, b, width):
-		draw_colored_polygon(piece, color)
+		Shapes.polygon(self,piece, color)
 
 static func trail_band_polygons(a: Vector2, b: Vector2, width: float) -> Array:
 	var side := (b - a).normalized().rotated(PI * 0.5) * width * 0.5
@@ -9068,9 +9219,9 @@ func draw_trails() -> void:
 			if point_index < trail.size() - 1: theme_for_trail = _trail_theme(region_at(point.lerp(trail[point_index + 1], 0.5)))
 			# Keine runde Wegkappe auf oder an der Dorfgrenze: dort endet der Weg gerade.
 			if region_at(point)!=0 and visible_world(point, 90.0) and not StartTileMap32.BOUNDS.grow(60.0).has_point(point):
-				draw_circle(point, 58.0, edge_colors[theme_for_trail])
-				draw_circle(point, 52.0, mid_colors[theme_for_trail])
-				draw_circle(point, 45.0, road_colors[theme_for_trail])
+				Shapes.circle(self,point, 58.0, edge_colors[theme_for_trail])
+				Shapes.circle(self,point, 52.0, mid_colors[theme_for_trail])
+				Shapes.circle(self,point, 45.0, road_colors[theme_for_trail])
 		for i in range(trail.size() - 1):
 			var a: Vector2 = trail[i]
 			var b: Vector2 = trail[i + 1]
@@ -9115,13 +9266,13 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 	var zone: int = obstacle["zone"]
 	var key: int = obstacle["key"]
 	# Einheitlicher, weicher Bodenkontakt statt eingebrannter schwarzer Schatten.
-	draw_circle(p + Vector2(3, 20), r * 0.72, Color(0.12, 0.20, 0.19, 0.12))
+	Shapes.circle(self,p + Vector2(3, 20), r * 0.72, Color(0.12, 0.20, 0.19, 0.12))
 	match zone:
 		1, 2:
 			draw_rect(Rect2(p + Vector2(-11, -18), Vector2(22, 48)), Color("715c4c"))
 			for offset in [Vector2(-r * 0.45, -37), Vector2(r * 0.42, -36), Vector2(0, -r * 0.9)]:
-				draw_circle(p + offset, r * 0.66, Color("4d8070") if zone == 2 else Color("5cae79"))
-				draw_circle(p + offset + Vector2(-10, -11), r * 0.34, Color("75b792") if zone == 2 else Color("83ce8a"))
+				Shapes.circle(self,p + offset, r * 0.66, Color("4d8070") if zone == 2 else Color("5cae79"))
+				Shapes.circle(self,p + offset + Vector2(-10, -11), r * 0.34, Color("75b792") if zone == 2 else Color("83ce8a"))
 			draw_bush_cluster(p + Vector2(r * 0.55, 8), zone, key)
 			if zone == 2: draw_mushroom(p + Vector2(-r * 0.62, -6), key)
 		3:
@@ -9136,24 +9287,24 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 			draw_bush_cluster(p + Vector2(r * 0.35, r * 0.34), zone, key)
 		4:
 			# Kristallmoor: mehrere Facetten auf dunklem Grundstein.
-			draw_circle(p + Vector2(0, 11), r * 0.72, Color("5a6b70"))
+			Shapes.circle(self,p + Vector2(0, 11), r * 0.72, Color("5a6b70"))
 			for offset in [Vector2(-r * 0.46, 0), Vector2(r * 0.22, -14), Vector2(3, -r * 0.58)]:
 				draw_crystal(p + offset, key + int(offset.x))
 		5:
-			draw_circle(p, r, Color("504247"))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-r, 20), p + Vector2(-r * 0.45, -r * 0.8), p + Vector2(r * 0.35, -r), p + Vector2(r, 15)]), Color("795552"))
+			Shapes.circle(self,p, r, Color("504247"))
+			Shapes.polygon(self,PackedVector2Array([p + Vector2(-r, 20), p + Vector2(-r * 0.45, -r * 0.8), p + Vector2(r * 0.35, -r), p + Vector2(r, 15)]), Color("795552"))
 			for crack in [-0.45, 0.05, 0.42]:
 				draw_line(p + Vector2(r * crack, -r * 0.4), p + Vector2(r * (crack + 0.18), r * 0.35), Color("f0a066"), 5)
 		6:
-			draw_circle(p, r, Color("bda579"))
-			draw_circle(p + Vector2(-10, -12), r * 0.63, Color("ddc596"))
+			Shapes.circle(self,p, r, Color("bda579"))
+			Shapes.circle(self,p + Vector2(-10, -12), r * 0.63, Color("ddc596"))
 			draw_shell(p + Vector2(r * 0.2, 0))
 			draw_line(p + Vector2(-r * 0.6, 18), p + Vector2(r * 0.7, -11), Color("7d624d"), 6)
 		7:
-			draw_circle(p, r, Color("514e61"))
+			Shapes.circle(self,p, r, Color("514e61"))
 			for i in 4:
 				var shard := p + Vector2.RIGHT.rotated(i * TAU / 4.0) * r * 0.48
-				draw_colored_polygon(PackedVector2Array([shard + Vector2(0,-28),shard + Vector2(10,5),shard + Vector2(-9,8)]), Color("c3b2e4"))
+				Shapes.polygon(self,PackedVector2Array([shard + Vector2(0,-28),shard + Vector2(10,5),shard + Vector2(-9,8)]), Color("c3b2e4"))
 		8:
 			draw_bush_cluster(p, zone, key)
 			for twig in [-1.0, 1.0]: draw_line(p + Vector2(twig * 12, 9), p + Vector2(twig * 24, -22), Color("6c6256"), 5)
@@ -9162,22 +9313,22 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 			for drip in 4: draw_rect(Rect2(p + Vector2(-r * 0.55 + drip * 18, -r * 0.34 + drip % 2 * 5), Vector2(8, 14)), Color("d8ad4f"))
 			draw_bush_cluster(p + Vector2(0, r * 0.32), zone, key)
 		10:
-			draw_circle(p, r, Color("5d777a"))
+			Shapes.circle(self,p, r, Color("5d777a"))
 			for i in 5:
 				var ray := Vector2.RIGHT.rotated(i * TAU / 5.0)
 				draw_line(p + ray * 8, p + ray * r * 0.72, Color("a7d9d7"), 5)
-			draw_circle(p, r * 0.25, Color("d9f1e8"))
+			Shapes.circle(self,p, r * 0.25, Color("d9f1e8"))
 		11:
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-r, 17), p + Vector2(-r * 0.45, -r), p + Vector2(r * 0.25, -r * 0.78), p + Vector2(r, 21)]), Color("5d5f72"))
+			Shapes.polygon(self,PackedVector2Array([p + Vector2(-r, 17), p + Vector2(-r * 0.45, -r), p + Vector2(r * 0.25, -r * 0.78), p + Vector2(r, 21)]), Color("5d5f72"))
 			for ridge in 3: draw_line(p + Vector2(-r * 0.45 + ridge * r * 0.35, -r * 0.5), p + Vector2(-r * 0.2 + ridge * r * 0.35, 12), Color("a6a7b7"), 4)
 		12:
-			draw_circle(p, r, Color("675f78"))
+			Shapes.circle(self,p, r, Color("675f78"))
 			for i in 6:
 				var shard := p + Vector2.RIGHT.rotated(i * TAU / 6.0) * r * 0.5
-				draw_colored_polygon(PackedVector2Array([shard + Vector2(0,-24),shard + Vector2(8,5),shard + Vector2(-8,6)]), Color("d6c8ed"))
-			draw_circle(p, 8, Color("fff1bb"))
+				Shapes.polygon(self,PackedVector2Array([shard + Vector2(0,-24),shard + Vector2(8,5),shard + Vector2(-8,6)]), Color("d6c8ed"))
+			Shapes.circle(self,p, 8, Color("fff1bb"))
 		_:
-			draw_circle(p, r, Color("53666c"))
+			Shapes.circle(self,p, r, Color("53666c"))
 
 func region_rect(id: int) -> Rect2:
 	return WorldGeometry.region_rect(id)
@@ -9298,11 +9449,7 @@ func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_lev
 
 	var boss_locked: bool = boss_index >= 0 and not bosses_defeated[boss_index]
 	if boss_locked:
-		var seal := Rect2(gate+(Vector2(-28,-GATE_HALF_WIDTH+39) if vertical else Vector2(-GATE_HALF_WIDTH+39,-28)),Vector2(56,GATE_HALF_WIDTH*2-78) if vertical else Vector2(GATE_HALF_WIDTH*2-78,56))
-		draw_rect(seal,Color("6e405b",0.94))
-		draw_rect(seal.grow(-8),Color("c37598",0.9),false,4)
-		draw_line(seal.position,seal.end,Color("e3a1bf",0.7),3)
-		draw_line(Vector2(seal.end.x,seal.position.y),Vector2(seal.position.x,seal.end.y),Color("e3a1bf",0.7),3)
+		BossGateSeal.paint(self,gate,vertical,GATE_HALF_WIDTH,world_time)
 		text_at(gate+Vector2(-145,-62),"BOSS-SIEG NÖTIG",14,Color("fff0bc"),HORIZONTAL_ALIGNMENT_CENTER,290)
 		text_at(gate+Vector2(-145,-42),boss_gate_name(boss_index).to_upper(),13,Color("ffd0d0"),HORIZONTAL_ALIGNMENT_CENTER,290)
 	elif not village_gate or gate_open:
@@ -9342,7 +9489,7 @@ func draw_bush_cluster(p: Vector2, zone: int, key: int) -> void:
 	var spread := 15 + key % 8
 	for i in 5:
 		var off := Vector2((i % 3 - 1) * spread, (i / 3) * 10 - 8 + (key + i * 5) % 5)
-		draw_circle(p + off, 12 + (key + i) % 5, leaf.darkened(0.08 if i % 2 == 0 else 0.0))
+		Shapes.circle(self,p + off, 12 + (key + i) % 5, leaf.darkened(0.08 if i % 2 == 0 else 0.0))
 		draw_rect(Rect2(p + off + Vector2(-6, -8), Vector2(7, 4)), leaf.lightened(0.18))
 	# Dekobuesche tragen absichtlich keine Fruechte. Sichtbare Frucht = FoodSystem-Interaktion.
 
@@ -9443,9 +9590,9 @@ func draw_ruin(p: Vector2, key: int) -> void:
 func draw_crystal(p: Vector2, key: int) -> void:
 	var c := Color('92ddea') if key % 2 == 0 else Color('c1a2ed')
 	var c2 := c.lightened(0.3)
-	draw_colored_polygon(PackedVector2Array([p + Vector2(20, -18), p + Vector2(35, 7), p + Vector2(18, 31), p + Vector2(3, 7)]), c)
-	draw_colored_polygon(PackedVector2Array([p + Vector2(8, 6), p + Vector2(18, -9), p + Vector2(25, 10), p + Vector2(13, 24)]), c2)
-	if key % 3 == 0: draw_colored_polygon(PackedVector2Array([p + Vector2(30, -4), p + Vector2(40, 10), p + Vector2(32, 25), p + Vector2(24, 10)]), c.darkened(0.08))
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(20, -18), p + Vector2(35, 7), p + Vector2(18, 31), p + Vector2(3, 7)]), c)
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(8, 6), p + Vector2(18, -9), p + Vector2(25, 10), p + Vector2(13, 24)]), c2)
+	if key % 3 == 0: Shapes.polygon(self,PackedVector2Array([p + Vector2(30, -4), p + Vector2(40, 10), p + Vector2(32, 25), p + Vector2(24, 10)]), c.darkened(0.08))
 	draw_rect(Rect2(p + Vector2(15, -4), Vector2(5, 25)), Color('eefcff', 0.85))
 	draw_rect(Rect2(p + Vector2(10, 25), Vector2(24, 6)), c.darkened(0.34))
 
@@ -9459,8 +9606,8 @@ func draw_rock(p: Vector2) -> void:
 	if region_at(p) == 0:
 		ReferenceScenery.rock(self,p)
 		return
-	draw_colored_polygon(PackedVector2Array([p + Vector2(2, 24), p + Vector2(15, 6), p + Vector2(31, 0), p + Vector2(45, 11), p + Vector2(47, 28), p + Vector2(19, 30)]), Color('6c6a6f'))
-	draw_colored_polygon(PackedVector2Array([p + Vector2(15, 8), p + Vector2(29, 3), p + Vector2(36, 16), p + Vector2(22, 18)]), Color('97908a'))
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(2, 24), p + Vector2(15, 6), p + Vector2(31, 0), p + Vector2(45, 11), p + Vector2(47, 28), p + Vector2(19, 30)]), Color('6c6a6f'))
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(15, 8), p + Vector2(29, 3), p + Vector2(36, 16), p + Vector2(22, 18)]), Color('97908a'))
 	draw_rect(Rect2(p + Vector2(12, 19), Vector2(15, 4)), Color('b4a99a'))
 
 func draw_pebbles(p: Vector2) -> void:
@@ -9546,7 +9693,7 @@ func draw_event_scene(index: int) -> void:
 		draw_rect(Rect2(p + offset, Vector2(8, 75)), Color("685749"))
 		draw_rect(Rect2(p + offset + Vector2(-4, -10), Vector2(16, 12)), Color("f1d093"))
 	var flag: Color = Color("84c596") if state >= 2 else Color("dd876c")
-	draw_colored_polygon(PackedVector2Array([p + Vector2(-70,-34), p + Vector2(0,-77), p + Vector2(70,-34)]), flag)
+	Shapes.polygon(self,PackedVector2Array([p + Vector2(-70,-34), p + Vector2(0,-77), p + Vector2(70,-34)]), flag)
 	draw_rect(Rect2(p + Vector2(-54, 27), Vector2(28, 18)), Color("936f4e"))
 	draw_rect(Rect2(p + Vector2(35, 23), Vector2(23, 20)), Color("937a5a"))
 	for fire in 4:
@@ -9625,15 +9772,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 		if float(state.get("age",0))<float(MobCombat.attack_timing(profile,state.get("ability",{}))["windup"]):
 			var ability:Dictionary=state["ability"]
 			var warn:Color=[Color("f36f5d",.72),Color("ba7cff",.72),Color("9cdd72",.72)][type-12] if boss else Color("efd49a",.6)
-			if ability["shape"]=="cloud":
-				draw_arc(p,float(ability["range"]),0,TAU,48,Color("b9d965",.75),2)
-			elif ability["shape"]=="leap":
-				pass # Wolf anticipation is shown by its pose, without a target marker.
-			elif ability["shape"]=="line":
-				PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.25),20)
-			elif ability["shape"]=="arc":
-				PixelStyle32.arc(self,p,float(ability["range"]),aim.angle()-float(ability["half_angle"]),aim.angle()+float(ability["half_angle"]),18,warn,2)
-			else:PixelStyle32.line(self,p,p+aim*float(ability["range"]),Color(warn,.3),2)
+			preload("res://components/attack_telegraph.gd").paint(self,p,aim,ability,warn,float(state.get("age",0))/maxf(.001,float(MobCombat.attack_timing(profile,ability)["windup"])))
 	var enemy_color:Color=ENEMY_TYPES[type]["color"]
 	var model_pos:Vector2=p
 	var stride:float=world_time*(3.5 if bool(profile["heavy"]) else 7.0) if bool(enemy.get("walking",false)) else 0.0
@@ -9645,7 +9784,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 		model_pos.y+=lerpf(42.0,0.0,appear)
 		var boss_index:int=type-12
 		var spawn_color:Color=[Color("ff6f58"),Color("ba85ff"),Color("9be46f")][boss_index]
-		draw_circle(p,48.0+appear*22.0,Color(spawn_color,.10*(1.0-appear)))
+		Shapes.circle(self,p,48.0+appear*22.0,Color(spawn_color,.10*(1.0-appear)))
 		draw_arc(p,62.0+appear*28.0,world_time*2.0,world_time*2.0+PI*1.55,32,Color(spawn_color,.78*(1.0-spawn_left*.35)),5.0)
 		for spark in 8:
 			var a:float=float(spark)*TAU/8.0-world_time*(2.2+boss_index*.35)
@@ -9673,14 +9812,27 @@ func draw_enemy(enemy: Dictionary) -> void:
 	draw_enemy_level(label_pos, type, boss, elite_kind)
 	combat_feedback.health(self,"mob:%d"%int(enemy["uid"]),label_pos+Vector2(0,-135 if type==12 else (-104 if boss else -54)),float(enemy["hp"]),float(enemy["max_hp"]),106 if boss else 54)
 
+## Stufenschild über Gegnern. Text, Breite, Höhe und Randfarbe hängen nur von
+## Art, Boss/Elite und der eigenen Stufe ab und werden zwischengespeichert
+## (vorher je Gegner und Bild bis zu viermal enemy_level() und neue Texte).
+var enemy_level_labels: Dictionary = {}
 func draw_enemy_level(p: Vector2, type: int, boss: bool, elite_kind: int = 0) -> void:
-	var y := (-170.0 if type==12 else -139.0) if boss else (-103.0 if elite_kind > 0 else -82.0)
-	var level_text := "BOSS · LV %d" % enemy_level(type) if boss else ("CHAMPION · LV %d" % enemy_level(type) if elite_kind == 2 else ("ELITE · LV %d" % enemy_level(type) if elite_kind == 1 else "LV %d" % enemy_level(type)))
-	var width := 134.0 if elite_kind == 2 else (108.0 if boss or elite_kind == 1 else 54.0)
-	var bg := Rect2(p + Vector2(-width * 0.5, y), Vector2(width, 20))
+	var key := Vector4i(type, elite_kind, int(boss), level)
+	var label: Array = enemy_level_labels.get(key, [])
+	if label.is_empty():
+		var enemy_lv := enemy_level(type)
+		var y := (-170.0 if type==12 else -139.0) if boss else (-103.0 if elite_kind > 0 else -82.0)
+		var level_text := "BOSS · LV %d" % enemy_lv if boss else ("CHAMPION · LV %d" % enemy_lv if elite_kind == 2 else ("ELITE · LV %d" % enemy_lv if elite_kind == 1 else "LV %d" % enemy_lv))
+		var width := 134.0 if elite_kind == 2 else (108.0 if boss or elite_kind == 1 else 54.0)
+		var border := Color("e6b978") if boss or elite_kind == 2 else (Color("d69ae3") if elite_kind == 1 else (Color("d87878") if enemy_lv > level + 3 else Color("97be9d")))
+		label = [y, level_text, width, border]
+		if enemy_level_labels.size() >= 256: enemy_level_labels.clear()
+		enemy_level_labels[key] = label
+	var width: float = label[2]
+	var bg := Rect2(p + Vector2(-width * 0.5, float(label[0])), Vector2(width, 20))
 	draw_rect(bg, Color("222b32", 0.92))
-	draw_rect(bg, Color("e6b978") if boss or elite_kind == 2 else (Color("d69ae3") if elite_kind == 1 else (Color("d87878") if enemy_level(type) > level + 3 else Color("97be9d"))), false, 2)
-	text_at(bg.position + Vector2(2, 15), level_text, 12, Color("fff1d2"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 4))
+	draw_rect(bg, label[3], false, 2)
+	text_at(bg.position + Vector2(2, 15), label[1], 12, Color("fff1d2"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 4))
 
 func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 	match type:
@@ -10013,14 +10165,14 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 		arm_color = Color('b9b3a6');cuff_color = Color('d9a640')
 	draw_line(arm_start, grip, Color('493d45'), 10.0 * scale_factor)
 	draw_line(arm_start, grip, arm_color, 7.0 * scale_factor)
-	draw_circle(arm_start, 5.5 * scale_factor, Color('493d45'))
-	draw_circle(arm_start, 3.8 * scale_factor, arm_color.lightened(0.06))
+	Shapes.circle(self,arm_start, 5.5 * scale_factor, Color('493d45'))
+	Shapes.circle(self,arm_start, 3.8 * scale_factor, arm_color.lightened(0.06))
 	draw_line(arm_start.lerp(grip, 0.72) - side * 1.5 * scale_factor, grip, cuff_color, 4.0 * scale_factor)
 	draw_weapon_world(weapon_pos, weapon_family, design, base_look, scale_factor, progress)
 	if weapon_family == 2:
 		var hand_color: Color = [Color('e7b995'),Color('91a56d'),Color('a0bbc0')][clampi(use_race,0,2)]
-		draw_circle(grip,4.3*scale_factor,Color('493d45'))
-		draw_circle(grip,2.8*scale_factor,hand_color)
+		Shapes.circle(self,grip,4.3*scale_factor,Color('493d45'))
+		Shapes.circle(self,grip,2.8*scale_factor,hand_color)
 	# Nach Norden maskiert der Körper die hintere Waffenhand. Danach kommt der
 	# Umhang als physisch vorderster Rücken-Layer.
 	if base_look == Vector2.UP:
@@ -10076,34 +10228,34 @@ func draw_hero_sword(hand: Vector2, blade_dir: Vector2, preview: bool = false) -
 		draw_line(hilt - across * 10, hilt + across * 10, Color('ddb46b'), 5)
 	elif design == 3:
 		draw_line(hilt - across * 16, hilt + across * 16, Color('a9c4c2'), 9)
-		draw_circle(hilt - across * 16, 4, Color('e1b777'))
-		draw_circle(hilt + across * 16, 4, Color('e1b777'))
+		Shapes.circle(self,hilt - across * 16, 4, Color('e1b777'))
+		Shapes.circle(self,hilt + across * 16, 4, Color('e1b777'))
 	else:
 		draw_line(hilt - across * (10 + stage), hilt + across * (10 + stage), Color('4c3650'), 8)
 		draw_line(hilt - across * (10 + stage), hilt + across * (10 + stage), Color('ddae68'), 5)
 	var width := 5 + stage * 0.9
 	if design == 1:
-		draw_colored_polygon(PackedVector2Array([shoulder + across * width, tip + across * 9, tip + across * 5 + blade_dir * 3, tip - blade_dir * 10 - across * 3, shoulder - across * width]), metal)
+		Shapes.polygon(self,PackedVector2Array([shoulder + across * width, tip + across * 9, tip + across * 5 + blade_dir * 3, tip - blade_dir * 10 - across * 3, shoulder - across * width]), metal)
 	elif design == 2: # Axtkopf
 		var haft_end := shoulder + blade_dir * 55
 		draw_line(shoulder, haft_end, Color('6b4d38'), 7)
 		draw_line(shoulder, haft_end, Color('b68a5d'), 4)
 		var axe_head := haft_end + blade_dir * 9
-		draw_colored_polygon(PackedVector2Array([axe_head + across * 4, axe_head + across * 19 - blade_dir * 3, axe_head + across * 13 + blade_dir * 17, axe_head - across * 5 + blade_dir * 10, axe_head - across * 5 - blade_dir * 10]), metal)
-		draw_colored_polygon(PackedVector2Array([axe_head - across * 4, axe_head - across * 16 - blade_dir * 3, axe_head - across * 11 + blade_dir * 12, axe_head + across * 1 + blade_dir * 7]), metal.darkened(0.12))
+		Shapes.polygon(self,PackedVector2Array([axe_head + across * 4, axe_head + across * 19 - blade_dir * 3, axe_head + across * 13 + blade_dir * 17, axe_head - across * 5 + blade_dir * 10, axe_head - across * 5 - blade_dir * 10]), metal)
+		Shapes.polygon(self,PackedVector2Array([axe_head - across * 4, axe_head - across * 16 - blade_dir * 3, axe_head - across * 11 + blade_dir * 12, axe_head + across * 1 + blade_dir * 7]), metal.darkened(0.12))
 		draw_line(haft_end - across * 2, haft_end + across * 2, Color('f5efce'), 2)
 	elif design == 3:
-		draw_colored_polygon(PackedVector2Array([shoulder + across * width, tip - blade_dir * 10 + across * width, tip - across * 5, tip - blade_dir * 7, tip + across * 5, tip - blade_dir * 10 - across * width, shoulder - across * width]), metal)
+		Shapes.polygon(self,PackedVector2Array([shoulder + across * width, tip - blade_dir * 10 + across * width, tip - across * 5, tip - blade_dir * 7, tip + across * 5, tip - blade_dir * 10 - across * width, shoulder - across * width]), metal)
 	else:
-		draw_colored_polygon(PackedVector2Array([shoulder + across * width, tip - blade_dir * 7, tip, tip - blade_dir * 7 - across * width, shoulder - across * width]), Color('354959'))
-		draw_colored_polygon(PackedVector2Array([shoulder + across * (width - 2), tip - blade_dir * 8, tip - blade_dir * 2, shoulder - across * (width - 2)]), metal)
+		Shapes.polygon(self,PackedVector2Array([shoulder + across * width, tip - blade_dir * 7, tip, tip - blade_dir * 7 - across * width, shoulder - across * width]), Color('354959'))
+		Shapes.polygon(self,PackedVector2Array([shoulder + across * (width - 2), tip - blade_dir * 8, tip - blade_dir * 2, shoulder - across * (width - 2)]), metal)
 	if design != 2: draw_line(shoulder, tip - blade_dir * 5, Color('f8fcf2', 0.65), 2)
 	if equipped_uid >= 0 and not preview:
-		draw_circle(hilt, 3 + stage * 0.35, RARITY_COLORS[rarity])
+		Shapes.circle(self,hilt, 3 + stage * 0.35, RARITY_COLORS[rarity])
 		if stage >= 2 and design != 2:
 			draw_line(shoulder + blade_dir * 10 - across * 3, shoulder + blade_dir * 22 - across * 3, Color('f8efd7', 0.6), 2)
 		if stage >= 4:
-			draw_circle(shoulder + blade_dir * 12, 3, element_color(weapon_element()))
+			Shapes.circle(self,shoulder + blade_dir * 12, 3, element_color(weapon_element()))
 
 func weapon_visual_stage(item: Dictionary) -> int:
 	return ItemRules.weapon_visual_stage(item)
@@ -10335,7 +10487,7 @@ func draw_hud() -> void:
 			bar(Rect2(446+boss_dx, 43, 447, 19), float(enemy["hp"]), float(enemy["max_hp"]), Color("eb866f"), "%d / %d" % [ceili(float(enemy["hp"])), ceili(float(enemy["max_hp"]))])
 			break
 	if arena_mode != "":
-		draw_circle(Vector2(1040, 103), 64, Color("28373f"))
+		Shapes.circle(self,Vector2(1040, 103), 64, Color("28373f"))
 		draw_arc(Vector2(1040, 103), 64, 0, TAU, 48, Color("e4bf7c"), 5)
 		text_at(Vector2(966, 98), "WELLE %d%s" % [arena_wave, "/10" if arena_mode == "final" else ""], 19, Color("ffecbc"), HORIZONTAL_ALIGNMENT_CENTER, 150)
 		text_at(Vector2(970, 126), "%d Gegner" % enemies.size(), 15, Color("e4d3b0"), HORIZONTAL_ALIGNMENT_CENTER, 140)
@@ -10353,8 +10505,10 @@ func draw_hud() -> void:
 		# App: Hinweise über der Bildmitte statt unter dem Bewegungsstick.
 		var notice_rect := Rect2(321, 420, 510, 34) if app_mode else HudLayout.NOTICE_RECT
 		ui_box(notice_rect, Color("415f59"))
+		NpcPortraits.paint(self, notice_rect, notice)
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
 		text_at(notice_rect.position+Vector2(11, 23), short_notice, 15, Color("fff3c3"))
+	region_banner.paint(self, VIEW.x, font)
 	var nearest := interaction_prompt(nearby_food)
 	app_action_hint = nearest != ""
 	if nearest != "":
@@ -10415,6 +10569,8 @@ func interaction_prompt(nearby_food: Dictionary) -> String:
 		if player_pos.distance_to(chest_position(i)) < 125:
 			nearest = "E  ·  Schatztruhe öffnen" if chest_ready(i) else "E  ·  Schatztruhe · %ds" % chest_cooldown_seconds(i)
 			break
+	if nearest == "" and interior_id < 0 and dungeon_id < 0 and arena_mode == "":
+		nearest = hidden_finds.prompt(hidden_finds.nearby(player_pos))
 	if player_pos.distance_to(BORIN_CRYSTAL_POS)<95: nearest="E  ·  Kristall der Verschmelzung"
 	var nearby_house:=nearby_village_house_door(110.0) if interior_id<0 else {}
 	if not nearby_house.is_empty():
@@ -10455,9 +10611,9 @@ func draw_touch_controls() -> void:
 	# Interaktion/Ausweichen/Angriff rechts.
 	var base := touch_move_base
 	var active_alpha := 0.82 if touch_move_id >= 0 else 0.42
-	draw_circle(base, 82, Color(0.07, 0.12, 0.14, active_alpha))
+	Shapes.circle(self,base, 82, Color(0.07, 0.12, 0.14, active_alpha))
 	draw_arc(base, 82, 0, TAU, 40, Color("a9c4b8", active_alpha), 3)
-	draw_circle(touch_move_knob, 34, Color("5d756b", 0.92 if touch_move_id >= 0 else 0.62))
+	Shapes.circle(self,touch_move_knob, 34, Color("5d756b", 0.92 if touch_move_id >= 0 else 0.62))
 	draw_arc(touch_move_knob, 34, 0, TAU, 32, Color("e7d5a3", 0.92 if touch_move_id >= 0 else 0.62), 3)
 	text_at(base + Vector2(-50, 108), "BEWEGEN", 12, Color("d9e5dc", active_alpha), HORIZONTAL_ALIGNMENT_CENTER, 100)
 
@@ -10477,9 +10633,9 @@ func draw_touch_controls() -> void:
 
 	var attack_base := touch_aim_base if touch_aim_id >= 0 else Vector2(1032,526)
 	var attack_knob := touch_aim_knob if touch_aim_id >= 0 else attack_base
-	draw_circle(attack_base, 64.0, Color("725047",0.58 if touch_aim_id < 0 else 0.88))
+	Shapes.circle(self,attack_base, 64.0, Color("725047",0.58 if touch_aim_id < 0 else 0.88))
 	draw_arc(attack_base, 64.0, 0, TAU, 36, Color("f0daa3",0.86), 3)
-	draw_circle(attack_knob, 28.0, Color("9a675b",0.92))
+	Shapes.circle(self,attack_knob, 28.0, Color("9a675b",0.92))
 	draw_arc(attack_knob, 28.0, 0, TAU, 28, Color("fff0c8",0.88), 2)
 	if touch_aim_id >= 0 and touch_aim_vector.length_squared() > 0.01:
 		draw_line(attack_base, attack_base + touch_aim_vector.normalized() * 78.0, Color("ffe2a8",0.82), 4)
@@ -10489,7 +10645,7 @@ func draw_touch_controls() -> void:
 		{"p":Vector2(916,550),"r":39.0,"label":("SCHRITT" if class_id == 1 else "ROLLE"),"fill":Color("3f5c62",0.90)},
 		{"p":Vector2(967,447),"r":39.0,"label":"AKTION","fill":Color("556b4f",0.90)}
 	]:
-		draw_circle(data["p"], data["r"], data["fill"])
+		Shapes.circle(self,data["p"], data["r"], data["fill"])
 		draw_arc(data["p"], data["r"], 0, TAU, 32, Color("f0daa3",0.82), 3)
 		text_at(data["p"] + Vector2(-45,5), data["label"], 11, Color("fff2cf"), HORIZONTAL_ALIGNMENT_CENTER, 90)
 
@@ -10599,7 +10755,7 @@ func draw_local_minimap(rect: Rect2) -> void:
 		draw_rect(rect.grow(-6), Color("57443e"))
 		draw_rect(Rect2(center + Vector2(-46, -43), Vector2(92, 85)), Color("927051"))
 		draw_rect(Rect2(center + Vector2(-25, -35), Vector2(50, 8)), Color("c29b69"))
-		draw_circle(center + (player_pos - INTERIOR_CENTER) * 0.09, 4, Color("ffefbd"))
+		Shapes.circle(self,center + (player_pos - INTERIOR_CENTER) * 0.09, 4, Color("ffefbd"))
 		HudLayout.draw_map_frame(self, rect)
 		return
 	if dungeon_id >= 0:
@@ -10611,25 +10767,14 @@ func draw_local_minimap(rect: Rect2) -> void:
 	var radius := 1500.0
 	var scale_map := inset.size / (radius * 2.0)
 	var start := player_pos - Vector2(radius, radius)
-	for gx in 21:
-		for gy in 21:
-			var point := start + Vector2((gx + 0.5) * radius * 2.0 / 21.0, (gy + 0.5) * radius * 2.0 / 21.0)
-			var area := visual_region_at(point)
-			var tint: Color = [Color("699b73"), Color("7da66b"), Color("365b50"), Color("535b61"), Color("355a68"), Color("755045"), Color("b7a578"), Color("48415c"), Color("52696a"), Color("a48a52"), Color("477579"), Color("575b73"), Color("6e6384")][area]
-			if area == 0:
-				var ground_kind := StartTileMap32.kind_at(point)
-				if ground_kind == 2: tint = Color("a4aa91")
-				elif ground_kind == 1: tint = Color("a0b47d")
-			elif distance_to_trail(point) < 110: tint = Color("d2ba86")
-			if not world_fog.explored_world(point): tint = Color("0b1218")
-			draw_rect(Rect2(inset.position + Vector2(gx, gy) * inset.size / 21.0, inset.size / 21.0 + Vector2.ONE), tint)
+	minimap_ground_cache.paint(self,inset,start,radius)
 	for stone in WAYSTONES:
 		var p: Vector2 = inset.position + (stone - start) * scale_map
-		if inner.has_point(p) and world_fog.explored_world(stone): draw_circle(p, 3, Color("8af0e9"))
+		if inner.has_point(p) and world_fog.explored_world(stone): Shapes.circle(self,p, 3, Color("8af0e9"))
 	for portal in PORTALS:
 		for end in [portal[0], portal[1]]:
 			var p: Vector2 = inset.position + (end - start) * scale_map
-			if inner.has_point(p) and region_available(int(portal[2])) and world_fog.explored_world(end): draw_circle(p, 3, Color("efccfa"))
+			if inner.has_point(p) and region_available(int(portal[2])) and world_fog.explored_world(end): Shapes.circle(self,p, 3, Color("efccfa"))
 	for index in DUNGEON_ENTRANCES.size():
 		var entrance: Vector2 = LANDMARKS[int(DUNGEON_ENTRANCES[index])]["pos"]
 		if not region_available(region_at(entrance)): continue
@@ -10643,11 +10788,11 @@ func draw_local_minimap(rect: Rect2) -> void:
 		if int(event_states[i]) == 3: continue
 		var encounter: Vector2 = inset.position + (WORLD_EVENTS[i]["pos"] - start) * scale_map
 		if inner.has_point(encounter) and region_available(int(WORLD_EVENTS[i]["region"])) and world_fog.explored_world(WORLD_EVENTS[i]["pos"]):
-			draw_circle(encounter, 4, Color("293e46"))
-			draw_circle(encounter, 2, Color("ffe399") if int(event_states[i]) in [0, 2] else Color("a7d2c3"))
+			Shapes.circle(self,encounter, 4, Color("293e46"))
+			Shapes.circle(self,encounter, 2, Color("ffe399") if int(event_states[i]) in [0, 2] else Color("a7d2c3"))
 	for enemy in enemies:
 		var p: Vector2 = inset.position + (enemy["pos"] - start) * scale_map
-		if inner.has_point(p) and world_fog.explored_world(enemy["pos"]): draw_circle(p, 2, Color("ef8584"))
+		if inner.has_point(p) and world_fog.explored_world(enemy["pos"]): Shapes.circle(self,p, 2, Color("ef8584"))
 	for member in (party_state.get("members",[]) as Array):
 		if not member is Dictionary or str(member.get("uuid","")) == player_uuid: continue
 		if str(member.get("context","world")) != "world": continue
@@ -10656,10 +10801,10 @@ func draw_local_minimap(rect: Rect2) -> void:
 		var member_world := Vector2(float(member_data[0]),float(member_data[1]))
 		var member_mark := inset.position + (member_world-start)*scale_map
 		if inner.has_point(member_mark):
-			draw_circle(member_mark,4,Color("8ff1c1"))
+			Shapes.circle(self,member_mark,4,Color("8ff1c1"))
 			draw_arc(member_mark,5,0.0,TAU,14,Color("eaffd9"),1)
 	quest_guide.draw_on_minimap(self,rect,scale_map)
-	draw_circle(rect.get_center(), 4, Color.WHITE)
+	Shapes.circle(self,rect.get_center(), 4, Color.WHITE)
 	draw_line(rect.get_center(), rect.get_center() + facing.normalized() * 10, Color("fff1ad"), 2)
 	HudLayout.draw_map_frame(self, rect)
 
@@ -10680,19 +10825,19 @@ func draw_dungeon_minimap(rect: Rect2) -> void:
 	for enemy in enemies:
 		if enemy["pos"].distance_to(player_pos) < 330:
 			var enemy_point: Vector2 = center + (enemy["pos"] - player_pos) / 65.0 * 10.0
-			if inner.has_point(enemy_point): draw_circle(enemy_point, 2, Color("ed9b82"))
+			if inner.has_point(enemy_point): Shapes.circle(self,enemy_point, 2, Color("ed9b82"))
 	for marker in [DUNGEON_CENTER + Vector2(-570, 0), DUNGEON_CENTER + Vector2(555, 0)]:
 		if marker.distance_to(player_pos) < 350:
 			var point: Vector2 = center + (marker - player_pos) / 65.0 * 10.0
 			if inner.has_point(point): draw_rect(Rect2(point - Vector2(3, 3), Vector2(6, 6)), Color("ffe0a0"))
-	draw_circle(center, 4, Color.WHITE)
+	Shapes.circle(self,center, 4, Color.WHITE)
 	draw_line(rect.get_center(), rect.get_center() + facing.normalized() * 10, Color("fff1ad"), 2)
 
 func draw_portal(p: Vector2, region: int) -> void:
 	var glow := Color("b6a5e9") if region_available(region) else Color("a76e73")
 	draw_arc(p, 39, PI, TAU, 20, glow.darkened(0.45), 12)
 	draw_arc(p, 34, PI, TAU, 20, glow, 5)
-	draw_circle(p + Vector2(0, -14), 13 + sin(world_time * 2.0) * 2.0, Color(glow, 0.48))
+	Shapes.circle(self,p + Vector2(0, -14), 13 + sin(world_time * 2.0) * 2.0, Color(glow, 0.48))
 	text_at(p + Vector2(-105, -59), "%s · %s · EMPF. LV %d" % ["AKTION" if touch_enabled else binding_short("interact"), region_name(region), region_level(region)], 12, Color("fff0c7"), HORIZONTAL_ALIGNMENT_CENTER, 210)
 
 func draw_map_natural_edges(inset: Rect2, palette: Array) -> void:
@@ -11481,7 +11626,7 @@ func draw_intro_panel() -> void:
 	var lines := [
 		["SONNENHAIN", "Vor drei Nächten verstummten die Glocken im Blütenweiler."],
 		["DER WEG NACH OSTEN", "Rauch steigt zwischen den Feldern auf. Niemand ist zurückgekehrt."],
-		["DEINE REISE BEGINNT", "Mira wartet am Dorfplatz. Sie weiß, wo die ersten Spuren liegen."]]
+		["DEINE REISE BEGINNT", "Mira wartet im Rathaus von Sonnenhain. Sie weiß, wo die ersten Spuren liegen."]]
 	text_at(Vector2(230, 218), "KAPITEL I  ·  DIE STUMME GLOCKE", 21, Color("d9bc86"))
 	text_at(Vector2(230, 287), String(lines[page][0]), 34, Color("fff1c8"))
 	text_at(Vector2(230, 337), String(lines[page][1]), 18, Color("e4eadb"))
@@ -11659,9 +11804,9 @@ func draw_fusion_crystal() -> void:
 	for x in [-24,-8,8,24]: draw_rect(Rect2(p+Vector2(x,30),Vector2(8,4)),Color("c7b985"))
 	draw_rect(Rect2(p+Vector2(-32,-18),Vector2(64,48)),Color("6758b1",0.14))
 	var outer:=PackedVector2Array([p+Vector2(0,-64),p+Vector2(28,-24),p+Vector2(20,18),p+Vector2(0,34),p+Vector2(-22,18),p+Vector2(-30,-24)])
-	draw_colored_polygon(outer,Color("7967d7"))
-	draw_colored_polygon(PackedVector2Array([p+Vector2(0,-56),p+Vector2(12,-21),p+Vector2(8,16),p+Vector2(0,26)]),Color("ddd5ff"))
-	draw_colored_polygon(PackedVector2Array([p+Vector2(0,-56),p+Vector2(-15,-20),p+Vector2(-10,16),p+Vector2(0,26)]),Color("a993f2"))
+	Shapes.polygon(self,outer,Color("7967d7"))
+	Shapes.polygon(self,PackedVector2Array([p+Vector2(0,-56),p+Vector2(12,-21),p+Vector2(8,16),p+Vector2(0,26)]),Color("ddd5ff"))
+	Shapes.polygon(self,PackedVector2Array([p+Vector2(0,-56),p+Vector2(-15,-20),p+Vector2(-10,16),p+Vector2(0,26)]),Color("a993f2"))
 	draw_line(p+Vector2(0,-60),p+Vector2(0,26),Color("f1ebff",0.72),3)
 	for spark in [Vector2(-38,-18),Vector2(36,-34),Vector2(-28,-48),Vector2(42,2)]:
 		draw_rect(Rect2(p+spark,Vector2(4,4)),Color("bdeaff"))
@@ -11875,8 +12020,8 @@ func draw_item_signature(p: Vector2, item: Dictionary) -> void:
 	var tint: Color = element_color(String(item.get("element", ""))) if str(item.get("element", "")) != "" else RARITY_COLORS[int(item["rarity"])]
 	var center := p + Vector2(27, 25)
 	match signature % 4:
-		0: draw_circle(center, 4, tint)
-		1: draw_colored_polygon(PackedVector2Array([center + Vector2(0,-6),center + Vector2(5,0),center + Vector2(0,6),center + Vector2(-5,0)]), tint)
+		0: Shapes.circle(self,center, 4, tint)
+		1: Shapes.polygon(self,PackedVector2Array([center + Vector2(0,-6),center + Vector2(5,0),center + Vector2(0,6),center + Vector2(-5,0)]), tint)
 		2:
 			draw_line(center + Vector2(-5,-5), center + Vector2(5,5), tint, 3)
 			draw_line(center + Vector2(-5,5), center + Vector2(5,-5), tint, 3)
@@ -12030,7 +12175,7 @@ func draw_travel_panel() -> void:
 		var available := travel_available(i) and not here
 		var zone := 0 if i == 0 else region_at(WAYSTONES[i])
 		ui_box(rect, Color("59766b") if available else Color("405657"))
-		draw_circle(rect.position + Vector2(25, 35), 12, Color("ffd98a") if here else (Color("9cece7") if available else Color("8d9b9a")))
+		Shapes.circle(self,rect.position + Vector2(25, 35), 12, Color("ffd98a") if here else (Color("9cece7") if available else Color("8d9b9a")))
 		text_at(rect.position + Vector2(48, 32), travel_label(i), 16, Color("fff1c4") if available or here else Color("b9c7c1"))
 		var state := "DU BIST HIER" if here else ("REISEN" if available else "NICHT AKTIVIERT")
 		text_at(rect.position + Vector2(48, 57), ("DORF · %s" % state) if i == 0 else ("EMPF. LV %d · %s" % [region_level(zone), state]), 13, Color("ffe2a8") if here else (Color("bfeee0") if available else Color("d2c6b6")))
@@ -12131,8 +12276,8 @@ func draw_world_atlas(rect: Rect2) -> void:
 		if int(event_states[i]) == 3: continue
 		if not region_available(int(WORLD_EVENTS[i]["region"])): continue
 		var point: Vector2 = inset.position + WORLD_EVENTS[i]["pos"] * map_scale
-		draw_circle(point, 5, Color("222e35"))
-		draw_circle(point, 3, Color("ffe09a") if int(event_states[i]) in [0, 2] else Color("98d6c8"))
+		Shapes.circle(self,point, 5, Color("222e35"))
+		Shapes.circle(self,point, 3, Color("ffe09a") if int(event_states[i]) in [0, 2] else Color("98d6c8"))
 
 	if region_available(region_at(GolemBoss.ALTAR)):
 		GolemDesign.draw_map_marker(self, inset.position + GolemBoss.ALTAR * map_scale, golem_world.fight_active, world_time, golem_world.cooldown_left() > 0.0)
@@ -12140,14 +12285,14 @@ func draw_world_atlas(rect: Rect2) -> void:
 		var boss_pos: Vector2 = CLASS_BOSS_SITES[boss_index]
 		if not region_available(region_at(boss_pos)): continue
 		var marker: Vector2 = inset.position + boss_pos * map_scale
-		draw_circle(marker, 8, Color("292d38"))
+		Shapes.circle(self,marker, 8, Color("292d38"))
 		draw_arc(marker, 7, 0.0, TAU, 16, Color("8fe2bf") if bosses_defeated[boss_index] else Color("ffaf83"), 2)
 		text_at(marker + Vector2(-7, 4), "★", 12, Color("ddffe0") if bosses_defeated[boss_index] else Color("ffdb9f"), HORIZONTAL_ALIGNMENT_CENTER, 14)
 	for npc in NPCS:
 		if str(npc["kind"]) != "quest" or quest_marker_state(str(npc["name"])) == 0: continue
 		if not region_available(region_at(npc["pos"])): continue
 		var point: Vector2 = inset.position + npc["pos"] * map_scale
-		draw_circle(point, 5, Color("263038"))
+		Shapes.circle(self,point, 5, Color("263038"))
 		text_at(point + Vector2(-5, 4), "!", 12, Color("ffda81"), HORIZONTAL_ALIGNMENT_CENTER, 10)
 	var party_members: Array = party_state.get("members",[])
 	for member in party_members:
@@ -12158,13 +12303,13 @@ func draw_world_atlas(rect: Rect2) -> void:
 		if member_pos_data.size() < 2: continue
 		var member_pos := Vector2(float(member_pos_data[0]),float(member_pos_data[1]))
 		var party_marker := inset.position + member_pos*map_scale
-		draw_circle(party_marker,6,Color("273740"))
+		Shapes.circle(self,party_marker,6,Color("273740"))
 		draw_arc(party_marker,5,0.0,TAU,16,Color("8ff1c1"),2)
 	quest_guide.draw_on_map(self,inset,map_scale)
 	var player_map := inset.position + (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)) * map_scale
 	draw_arc(player_map, 9.0 + sin(world_time * 3.0) * 1.0, 0.0, TAU, 24, Color("ffffff"), 3)
-	draw_colored_polygon(PackedVector2Array([player_map + Vector2(0,-7),player_map + Vector2(6,0),player_map + Vector2(0,7),player_map + Vector2(-6,0)]), Color("252b32"))
-	draw_colored_polygon(PackedVector2Array([player_map + Vector2(0,-5),player_map + Vector2(4,0),player_map + Vector2(0,5),player_map + Vector2(-4,0)]), Color("ffffff"))
+	Shapes.polygon(self,PackedVector2Array([player_map + Vector2(0,-7),player_map + Vector2(6,0),player_map + Vector2(0,7),player_map + Vector2(-6,0)]), Color("252b32"))
+	Shapes.polygon(self,PackedVector2Array([player_map + Vector2(0,-5),player_map + Vector2(4,0),player_map + Vector2(0,5),player_map + Vector2(-4,0)]), Color("ffffff"))
 	draw_rect(rect, Color("ead6a9"), false, 2)
 
 func draw_atlas_tree(point: Vector2) -> void:
@@ -12173,16 +12318,17 @@ func draw_atlas_tree(point: Vector2) -> void:
 	draw_rect(Rect2(point + Vector2(-2, -7), Vector2(5, 3)), Color("739775"))
 
 func draw_atlas_peak(point: Vector2) -> void:
-	draw_colored_polygon(PackedVector2Array([point + Vector2(-6,5),point + Vector2(0,-6),point + Vector2(7,5)]), Color("3f4a54"))
+	Shapes.polygon(self,PackedVector2Array([point + Vector2(-6,5),point + Vector2(0,-6),point + Vector2(7,5)]), Color("3f4a54"))
 	draw_rect(Rect2(point + Vector2(-1,-5), Vector2(3,3)), Color("c7bdab"))
 
 func draw_atlas_crystal(point: Vector2) -> void:
-	draw_colored_polygon(PackedVector2Array([point + Vector2(0,-6),point + Vector2(4,0),point + Vector2(0,6),point + Vector2(-4,0)]), Color("b0d8dc"))
+	Shapes.polygon(self,PackedVector2Array([point + Vector2(0,-6),point + Vector2(4,0),point + Vector2(0,6),point + Vector2(-4,0)]), Color("b0d8dc"))
 	draw_rect(Rect2(point + Vector2(-1,-4), Vector2(2,4)), Color("f6e9c7"))
 
 func draw_waystone(p: Vector2) -> void:
 	if p==WAYSTONES[0]:
 		SpawnPlatform32.core(self,p-Vector2(0,16))
+		preload("res://components/homecoming_decor.gd").paint(self,p,event_states,rescue_state,final_completed)
 		return
 	var active := false
 	for i in WAYSTONES.size():
@@ -12220,12 +12366,12 @@ func draw_landmark(landmark: Dictionary) -> void:
 		"hamlet":
 			draw_hamlet(p)
 		"camp":
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-66, 32), p + Vector2(0, -72), p + Vector2(69, 32)]), Color("e2ac7b"))
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-25, 30), p + Vector2(0, -24), p + Vector2(27, 30)]), Color("765d57"))
+			Shapes.polygon(self,PackedVector2Array([p + Vector2(-66, 32), p + Vector2(0, -72), p + Vector2(69, 32)]), Color("e2ac7b"))
+			Shapes.polygon(self,PackedVector2Array([p + Vector2(-25, 30), p + Vector2(0, -24), p + Vector2(27, 30)]), Color("765d57"))
 			draw_rect(Rect2(p + Vector2(-82, 34), Vector2(163, 9)), Color("946e61"))
 			for offset in [-73, 74]:
 				draw_rect(Rect2(p + Vector2(offset, -16), Vector2(8, 46)), Color("8a674f"))
-			draw_circle(p + Vector2(0, 42), 18, Color("e99058", 0.25))
+			Shapes.circle(self,p + Vector2(0, 42), 18, Color("e99058", 0.25))
 		"mushroom":
 			for offset in [Vector2(-65, 23), Vector2(36, 37), Vector2(-12, -15)]: draw_mushroom(p + offset, 4 + int(offset.x))
 			draw_bush_cluster(p + Vector2(75, 24), zone, 19)
@@ -12248,7 +12394,7 @@ func draw_landmark(landmark: Dictionary) -> void:
 				draw_rect(Rect2(p + Vector2(offset - 4, -58), Vector2(22, 10)), stone.lightened(0.16))
 			draw_rect(Rect2(p + Vector2(-65, -65), Vector2(135, 15)), stone.lightened(0.12))
 			draw_crystal(p + Vector2(-22, -30), 1 + zone)
-			draw_circle(p + Vector2(0, 5), 24, Color(accent, 0.12))
+			Shapes.circle(self,p + Vector2(0, 5), 24, Color(accent, 0.12))
 			draw_arc(p + Vector2(0, 5), 28, 0, TAU, 24, Color(accent, 0.65), 3)
 			draw_rect(Rect2(p + Vector2(-70, 34), Vector2(145, 12)), stone.darkened(0.24))
 		"gate":
@@ -12273,20 +12419,20 @@ func draw_hamlet(p: Vector2) -> void:
 		# Sichtbares Signal des Angriffs: Feuer, Rauch und rote Alarmfahnen.
 		for fire_offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			var fire_pos: Vector2 = p + fire_offset + Vector2(0, -78)
-			draw_circle(fire_pos + Vector2(0, 18), 18, Color("d85f57", 0.40))
-			draw_colored_polygon(PackedVector2Array([fire_pos + Vector2(0, -28), fire_pos + Vector2(13, 15), fire_pos + Vector2(-13, 15)]), Color("e66c50"))
-			draw_colored_polygon(PackedVector2Array([fire_pos + Vector2(0, -16), fire_pos + Vector2(8, 12), fire_pos + Vector2(-8, 12)]), Color("ffdd78"))
+			Shapes.circle(self,fire_pos + Vector2(0, 18), 18, Color("d85f57", 0.40))
+			Shapes.polygon(self,PackedVector2Array([fire_pos + Vector2(0, -28), fire_pos + Vector2(13, 15), fire_pos + Vector2(-13, 15)]), Color("e66c50"))
+			Shapes.polygon(self,PackedVector2Array([fire_pos + Vector2(0, -16), fire_pos + Vector2(8, 12), fire_pos + Vector2(-8, 12)]), Color("ffdd78"))
 			for smoke_i in 3:
 				var smoke_pos := fire_pos + Vector2(sin(world_time * 1.3 + smoke_i) * 12, -36 - smoke_i * 24)
-				draw_circle(smoke_pos, 14 + smoke_i * 3, Color(0.20, 0.23, 0.25, 0.24 - smoke_i * 0.045))
+				Shapes.circle(self,smoke_pos, 14 + smoke_i * 3, Color(0.20, 0.23, 0.25, 0.24 - smoke_i * 0.045))
 		# Alarmbanner am zentralen Weg, schon aus größerer Entfernung lesbar.
 		draw_rect(Rect2(p + Vector2(-6, -185), Vector2(10, 135)), Color("684e50"))
-		draw_colored_polygon(PackedVector2Array([p + Vector2(4, -178), p + Vector2(105, -158), p + Vector2(4, -138)]), Color("c95762"))
+		Shapes.polygon(self,PackedVector2Array([p + Vector2(4, -178), p + Vector2(105, -158), p + Vector2(4, -138)]), Color("c95762"))
 		text_at(p + Vector2(-92, -218), "HILFE!", 22, Color("ffd28b"), HORIZONTAL_ALIGNMENT_CENTER, 184)
 	else:
 		# Nach der Rettung bleibt ein sichtbarer Wiederaufbau zurück.
 		for repair in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
-			draw_circle(p + repair + Vector2(0, 72), 5 + int(world_time) % 2, Color("f3cf79", 0.7))
+			Shapes.circle(self,p + repair + Vector2(0, 72), 5 + int(world_time) % 2, Color("f3cf79", 0.7))
 	for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 		var h: Vector2 = p + offset
 		draw_rect(Rect2(h + Vector2(-82, 46), Vector2(164, 15)), Color("526f56", 0.5))
@@ -12306,10 +12452,10 @@ func draw_hamlet(p: Vector2) -> void:
 	if not safe:
 		for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			var roof: Vector2 = p + offset + Vector2(32, -66)
-			draw_colored_polygon(PackedVector2Array([roof + Vector2(-12, 7), roof + Vector2(0,-31 - sin(world_time * 8) * 5), roof + Vector2(15,7)]), Color("f38858", 0.85))
-			draw_colored_polygon(PackedVector2Array([roof + Vector2(-5, 8), roof + Vector2(3,-17), roof + Vector2(9,8)]), Color("ffe083"))
+			Shapes.polygon(self,PackedVector2Array([roof + Vector2(-12, 7), roof + Vector2(0,-31 - sin(world_time * 8) * 5), roof + Vector2(15,7)]), Color("f38858", 0.85))
+			Shapes.polygon(self,PackedVector2Array([roof + Vector2(-5, 8), roof + Vector2(3,-17), roof + Vector2(9,8)]), Color("ffe083"))
 			for i in 3:
-				draw_circle(roof + Vector2(sin(world_time + i * 2.0) * 15, -46 - i * 22), 12 + i * 5, Color(0.25,0.27,0.28,0.22))
+				Shapes.circle(self,roof + Vector2(sin(world_time + i * 2.0) * 15, -46 - i * 22), 12 + i * 5, Color(0.25,0.27,0.28,0.22))
 	for x in [-155, 140]:
 		draw_rect(Rect2(p + Vector2(x, -50), Vector2(8, 110)), Color("917052"))
 		draw_rect(Rect2(p + Vector2(x - 6, -60), Vector2(20, 13)), Color("cfa86b"))
@@ -12364,7 +12510,15 @@ func update_static_cache() -> void:
 		viewport.disable_3d = true
 		viewport.gui_disable_input = true
 		viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-		var renderer = static_renderer_script.new()
+		# Ein einziger Zeichner wandert von Abschnitt zu Abschnitt. Eine neue
+		# Instanz dieses großen Skripts kostet 16–35 ms; das Umhängen nichts.
+		# Höchstens ein neuer Abschnitt pro Bild, der vorige ist dann gerendert.
+		var renderer = static_chunk_renderer
+		if renderer == null or not is_instance_valid(renderer):
+			renderer = static_renderer_script.new()
+			static_chunk_renderer = renderer
+		elif renderer.get_parent() != null:
+			renderer.get_parent().remove_child(renderer)
 		renderer.static_draw_bounds = Rect2(Vector2(key)*STATIC_CHUNK_SIZE,Vector2.ONE*STATIC_CHUNK_SIZE)
 		renderer.camera_pos = renderer.static_draw_bounds.position
 		renderer.font = font
@@ -12374,6 +12528,7 @@ func update_static_cache() -> void:
 		renderer.touch_enabled = touch_enabled
 		renderer.bindings = bindings.duplicate()
 		viewport.add_child(renderer)
+		renderer.queue_redraw()
 		add_child(viewport)
 		static_chunks[key] = {"viewport":viewport,"texture":viewport.get_texture(),"created":Engine.get_process_frames(),"used":Engine.get_process_frames()}
 		created += 1
@@ -12383,6 +12538,8 @@ func update_static_cache() -> void:
 			if needed.has(key): continue
 			if oldest == null or static_chunks[key]["used"] < static_chunks[oldest]["used"]: oldest = key
 		if oldest == null: break
+		if static_chunk_renderer != null and is_instance_valid(static_chunk_renderer) and static_chunk_renderer.get_parent() == static_chunks[oldest]["viewport"]:
+			static_chunks[oldest]["viewport"].remove_child(static_chunk_renderer)
 		static_chunks[oldest]["viewport"].queue_free()
 		static_chunks.erase(oldest)
 
@@ -12396,6 +12553,10 @@ func draw_cached_overworld() -> bool:
 	return true
 
 func invalidate_static_cache() -> void:
+	# Der gemeinsame Zeichner wird mit seinem Abschnitt freigegeben und neu erzeugt.
+	if static_chunk_renderer != null and is_instance_valid(static_chunk_renderer) and static_chunk_renderer.get_parent() == null:
+		static_chunk_renderer.free()
+	static_chunk_renderer = null
 	for entry in static_chunks.values(): entry["viewport"].queue_free()
 	static_chunks.clear()
 	for entry in foreground_cache.values(): entry["viewport"].queue_free()
@@ -12525,12 +12686,15 @@ func draw_sorted_world_objects() -> void:
 	var entries: Array = []
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0:
 		world_obstacles_3d.append_entries(entries)
-		for prop in village_props():
-			if prop_bounds(prop).intersects(current_static_bounds()): entries.append({"kind":"prop","depth":prop["depth"],"data":prop})
+		# Dorfobjekte nur in Dorfnähe aufbauen; außerhalb kostete das jedes Bild Zeit.
+		if current_static_bounds().intersects(region_rect(0).grow(VILLAGE_PROP_MARGIN)):
+			for prop in village_props():
+				if prop_bounds(prop).intersects(current_static_bounds()): entries.append({"kind":"prop","depth":prop["depth"],"data":prop})
 		# Die gezeichneten Fruchtpflanzen SIND die interaktiven FoodSystem-Punkte.
+		# Wie visible_world(…,140), aber das Sichtrechteck nur einmal je Bild.
+		var food_view := (static_draw_bounds if static_draw_bounds.has_area() else camera_world_rect()).grow(140)
 		for food_prop in food_system.regional_props(self):
-			var food_point: Vector2 = food_prop["point"]
-			if visible_world(food_point,140): entries.append({"kind":"food_plant","depth":food_prop["depth"],"data":food_prop})
+			if food_view.has_point(food_prop["point"]): entries.append({"kind":"food_plant","depth":food_prop["depth"],"data":food_prop})
 		for npc in NPCS:
 			if village_resident_is_indoors(str(npc["name"])): continue
 			if visible_world(npc["pos"],130): entries.append({"kind":"npc","depth":npc["pos"].y+24,"data":npc})
@@ -12549,8 +12713,16 @@ func draw_sorted_world_objects() -> void:
 		var p := network_player_position(peer_id)
 		if visible_world(p,130): entries.append({"kind":"remote","depth":p.y+24,"peer":peer_id})
 	entries.append({"kind":"player","depth":player_pos.y+24})
-	entries.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return float(a["depth"])<float(b["depth"]))
-	for entry in entries:
+	# Nach Tiefe sortieren: Godots eingebaute Sortierung über (Tiefe, Stelle)
+	# statt eines GDScript-Vergleichs je Paar; gleiche Tiefe bleibt in Reihenfolge.
+	var order := PackedVector2Array()
+	order.resize(entries.size())
+	for index in entries.size(): order[index] = Vector2(float(entries[index]["depth"]), index)
+	order.sort()
+	var sorted_entries: Array = []
+	sorted_entries.resize(entries.size())
+	for index in order.size(): sorted_entries[index] = entries[int(order[index].y)]
+	for entry in sorted_entries:
 		match entry["kind"]:
 			"obstacle_3d":world_obstacles_3d.paint(self,entry)
 			"prop": draw_cached_prop(entry["data"])
@@ -13220,10 +13392,10 @@ func draw_remote_combat_visuals() -> void:
 			else:
 				var p := pos+dir*(35.0+progress*230.0)
 				draw_line(p-dir*34.0,p+dir*12.0,Color(accent,0.85),6.0)
-				draw_circle(p,7.0,Color.WHITE)
+				Shapes.circle(self,p,7.0,Color.WHITE)
 		else:
 			var radius := 28.0+progress*96.0
-			draw_circle(pos,radius,Color(accent,0.10*(1.0-progress)))
+			Shapes.circle(self,pos,radius,Color(accent,0.10*(1.0-progress)))
 			draw_arc(pos,radius,0.0,TAU,28,Color(accent,0.88*(1.0-progress)),4.0)
 			draw_line(pos,pos+dir*(70.0+progress*70.0),Color(accent,0.72*(1.0-progress)),7.0)
 
@@ -13351,7 +13523,7 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		var race := clampi(int(state.get("race",0)),0,2)
 		var gender := clampi(int(state.get("gender",0)),0,1)
 		var cls := clampi(int(state.get("class",0)),0,2)
-		draw_circle(rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
+		Shapes.circle(self,rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
 		draw_arc(rp + Vector2(0, 10), 30.0, 0.0, TAU, 24, Color("8ee7ff", 0.82), 2.0)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
 		var cloth:=int(state.get("cosmetic_cloak",0))
@@ -14077,6 +14249,7 @@ func apply_server_quest_progress(payload: Dictionary) -> bool:
 			event_states[event_id] = 2
 			message("%s%s ist in Sicherheit! Sprich erneut mit %s (E)." % ["Gruppe · " if shared else "",WORLD_EVENTS[event_id]["role"],WORLD_EVENTS[event_id]["name"]])
 			play_sound("quest_bereit")
+			world_event_cleared_fx(event_id)
 		changed = true
 	if bool(payload.get("rescue",false)):
 		apply_rescue_progress(1,shared)
@@ -14534,6 +14707,9 @@ func shot_hit_zone(a:Vector2,b:Vector2,enemy:Dictionary)->String:
 func golem_head_point(enemy:Dictionary)->Vector2:
 	return Vector2(enemy["pos"])+GolemBoss.HEAD_CENTER*GolemBoss.visual_scale(int(enemy.get("type",GolemBoss.TYPE_BIG)))+Vector2(0,-30)
 
+## Größter möglicher Trefferradius: großer Golem (Maßstab 4). Alle anderen
+## Gegner liegen darunter (Klassenboss 1,3, Champion ×1,42).
+const MOB_MAX_HIT_RADIUS:=28.0*4.0
 func mob_hit_radius(enemy:Dictionary)->float:
 	return maxf(8,28*mob_visual_scale(enemy))
 
@@ -14868,6 +15044,7 @@ func golem_minion_spawn(type: int, maximum: int) -> void:
 ## Umgeworfene Bäume neu zeichnen und Kollision neu rechnen. Mit Schlüssel
 ## "tx:ty" nur diese Zelle und die Kartenkacheln darum (statt alles, ruckelte).
 func golem_trees_changed(key: String) -> void:
+	terrain_circle_cache.clear()
 	var parts := key.split(":")
 	if parts.size() != 2:
 		decorative_tree_cache.clear()

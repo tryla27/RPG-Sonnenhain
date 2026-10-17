@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
 # One registry controls food names, visible fruit colours and nutrition.
 const FOODS = [
@@ -235,9 +236,11 @@ func nearest(g)->Dictionary:
  var player_region:int=g.region_at(g.player_pos)
  for plant in plants:
   var p:Vector2=plant["point"]
-  var plant_region:int=int(plant.get("region",g.region_at(p)))
-  if plant_region!=player_region:continue
+  # Erst der billige Abstand, dann das Gebiet (jedes Bild für alle Pflanzen).
   var d:float=g.player_pos.distance_to(p+Vector2(0,20))
+  if d>=distance:continue
+  var plant_region:int=int(plant["region"]) if plant.has("region") else g.region_at(p)
+  if plant_region!=player_region:continue
   if d<distance:
    found={"point":p,"region":plant_region,"kind":str(plant.get("kind","fruit"))}
    if str(plant.get("kind","fruit"))=="herb":
@@ -352,12 +355,20 @@ func gather_mult()->float:
 func buff_label()->String:
  if not meal_active():return ""
  return "%s · %02d:%02d" % [meal_effect_text(),meal_remaining()/60,meal_remaining()%60]
+## Die Pflanzenliste entsteht einmal (configure); die Zeichenliste wird daher
+## nur einmal gebaut statt in jedem Bild Listen zusammenzufügen und zu durchsuchen.
+var regional_cache:Array=[]
+var regional_cache_size:=-1
 func regional_props(g)->Array:
  configure(g)
+ if regional_cache_size==plants.size():return regional_cache
+ var village:Dictionary={}
+ for point in BUSHES+TREES:village[point]=true
  var result:Array=[]
  for plant in plants:
-  if plant["point"] not in BUSHES+TREES:
+  if not village.has(plant["point"]):
    result.append({"kind":str(plant.get("kind","fruit")),"point":plant["point"],"depth":plant["point"].y+20,"region":plant.get("region",0),"name":plant.get("name",""),"color":plant.get("color","")})
+ regional_cache=result;regional_cache_size=plants.size()
  return result
 static func food_rect(c:CanvasItem,p:Vector2,s:float,x:float,y:float,w:float,h:float,col:Color)->void:
  PixelStyle32.rect(c,Rect2(p+Vector2(x,y)*s,Vector2(w,h)*s),col)
@@ -477,8 +488,8 @@ func herb_bush(c:CanvasItem,p:Vector2,herb_name:String,herb_color:String)->void:
  if ready_at(p,Time.get_unix_time_from_system()):
   var flower:=Color(herb_color)
   for o in [Vector2(-19,-28),Vector2(-2,-37),Vector2(17,-25)]:
-   c.draw_circle(p+o,4,flower)
-   c.draw_circle(p+o+Vector2(2,-1),2,flower.lightened(.28))
+   Shapes.circle(c,p+o,4,flower)
+   Shapes.circle(c,p+o+Vector2(2,-1),2,flower.lightened(.28))
  else:
   var seconds:=regrow_remaining(p)
   c.draw_string(ThemeDB.fallback_font,p+Vector2(-22,28),"%02d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("e4cf8b"))

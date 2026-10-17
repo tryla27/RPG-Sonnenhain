@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 
 const PATH := "user://sonnenhain_controller.cfg"
 const ACTIONS := ["attack", "dodge", "interact", "ability_1", "ability_2", "ability_3", "ability_4", "heal", "resource", "waystone", "skills", "inventory", "journal", "map", "pause", "chat", "mechanics", "online", "party"]
@@ -216,7 +217,7 @@ func draw(g) -> void:
 
 func draw_cursor(g) -> void:
 	if used and device >= 0 and g.panel != "":
-		g.draw_circle(pointer, 7, Color("ffe3a5"))
+		Shapes.circle(g,pointer, 7, Color("ffe3a5"))
 		g.draw_circle(pointer, 9, Color("151e28"), false, 2)
 
 func panel_points(g) -> Array:

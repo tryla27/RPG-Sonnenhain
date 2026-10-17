@@ -1,4 +1,5 @@
 extends RefCounted
+const EffectFrames=preload("res://components/quality_effect_frames.gd")
 ## Presentation only: authoritative HP and projectile damage remain untouched.
 var bars:Dictionary={}
 var breaks:Array=[]
@@ -22,8 +23,8 @@ func health(c:CanvasItem,key:String,p:Vector2,hp:float,maximum:float,width:float
 	bars[key]=row
 	var r:=Rect2(p-Vector2(width*.5,0),Vector2(width,8))
 	c.draw_rect(r.grow(1),Color("0d1b2a"))
+	# Innenfläche hat dieselbe deckende Farbe wie der Rahmen: ein Rechteck genügt.
 	c.draw_rect(r,Color("443b43"))
-	c.draw_rect(Rect2(r.position+Vector2.ONE,r.size-Vector2.ONE*2),Color("443b43"))
 	c.draw_rect(Rect2(r.position+Vector2.ONE,Vector2((width-2)*float(row["trail"]),6)),Color("e9bb78"))
 	c.draw_rect(Rect2(r.position+Vector2.ONE,Vector2((width-2)*value,6)),color)
 	if age<.18:c.draw_rect(r,Color(1,.93,.8,(1-age/.18)*.45))
@@ -46,7 +47,7 @@ func draw(c:CanvasItem)->void:
 			var p:Vector2=hit["pos"]+direction*(3+age*(35+n*7))+Vector2(0,age*age*100)
 			if arrow:c.draw_line(p,p+direction*(4+n%3),Color(tint,fade),2)
 			else:c.draw_rect(Rect2(p.round(),Vector2.ONE*(3 if n%2 else 2)),Color(tint,fade))
-		if not arrow:c.draw_arc(hit["pos"],3+age*31,0,TAU,12,Color(tint,fade*.5),2)
+		if not arrow:EffectFrames.paint(c,hit["pos"],age,str(hit["element"]))
 static func break_sound(arrow:bool)->AudioStreamWAV:
 	var rate:=22050
 	var count:=roundi(rate*.16)

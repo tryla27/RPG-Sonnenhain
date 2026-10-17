@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## A shared quest selection keeps the HUD, details and both maps consistent.
 const AUTO := -2
 const STORY := -1
@@ -86,9 +87,9 @@ func draw_marker(g, point: Vector2, compact: bool = false) -> void:
 	# Real time keeps the yellow pulse running while the quest/map menu is open.
 	var color := marker_color(Time.get_ticks_msec()/1000.0)
 	var radius := 6.0 if compact else 10.0
-	g.draw_circle(point,radius+3,Color("29251b",0.9))
+	Shapes.circle(g,point,radius+3,Color("29251b",0.9))
 	g.draw_arc(point,radius,0,TAU,24,color,2 if compact else 3)
-	g.draw_circle(point,2.5 if compact else 4.0,color)
+	Shapes.circle(g,point,2.5 if compact else 4.0,color)
 
 func draw_on_map(g, inset: Rect2, map_scale: Vector2) -> void:
 	var goal := target(g)
@@ -109,7 +110,7 @@ func draw_on_minimap(g, rect: Rect2, scale_map: Vector2) -> void:
 	draw_marker(g,point,true)
 	if fit < 1.0:
 		var dir := offset.normalized()
-		g.draw_colored_polygon(PackedVector2Array([point+dir*8,point-dir*2+dir.orthogonal()*4,point-dir*2-dir.orthogonal()*4]),marker_color(Time.get_ticks_msec()/1000.0))
+		Shapes.polygon(g,PackedVector2Array([point+dir*8,point-dir*2+dir.orthogonal()*4,point-dir*2-dir.orthogonal()*4]),marker_color(Time.get_ticks_msec()/1000.0))
 
 func click_journal(g, mouse: Vector2) -> void:
 	if Rect2(165,145,815,73).has_point(mouse): open(g,STORY); return

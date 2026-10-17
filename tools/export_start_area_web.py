@@ -44,6 +44,11 @@ def main():
                             'run/main_scene="res://tools/capture_start_area_web.tscn"')
     (probe / 'project.godot').write_text(config, encoding='utf-8')
     engine = sys.argv[1]
+    play_mode = '--play' in sys.argv[2:]
+    if play_mode:
+        config = config.replace('res://tools/capture_start_area_web.tscn',
+                                'res://tools/play_start_area.tscn')
+        (probe / 'project.godot').write_text(config, encoding='utf-8')
     for label, args in (
         ('import', ['--editor', '--import', '--quit']),
         ('export', ['--export-release', 'Web', str(output / 'index.html')]),
@@ -62,10 +67,15 @@ def main():
     config = json.loads(match[1])
     script = 'const GODOT_CONFIG = ' + json.dumps(config) + ';\n'
     script += 'GODOT_CONFIG.args=["--",String(Math.max(0,Math.min(4,Number(new URLSearchParams(location.search).get("view")||0))))];'
+    if play_mode:
+        script = script.replace('Math.min(4,', 'Math.min(2,').replace('get("view")', 'get("class")')
     html = html[:match.start()] + script + html[match.end():]
     nav = '<nav style="position:fixed;top:4px;left:260px;z-index:999;background:#15212b;padding:8px;color:white;font:14px sans-serif">Isolierte Sichtprüfung · '
-    for index, name in enumerate(('Sonnenhain', 'Ratshalle', 'Osttor', 'Blütenwiesen', 'Pilzwald')):
-        nav += f'<a style="color:#ffe0a0;margin:6px" href="?view={index}">{name}</a>'
+    labels = ('Krieger', 'Magier', 'Bogenschütze') if play_mode else ('Sonnenhain', 'Ratshalle', 'Osttor', 'Blütenwiesen', 'Pilzwald')
+    for index, name in enumerate(labels):
+        nav += f'<a style="color:#ffe0a0;margin:6px" href="?{"class" if play_mode else "view"}={index}">{name}</a>'
+    if play_mode:
+        nav += ' · WASD · Maus: Angriff · E: Interaktion · Leertaste: Ausweichen'
     html = html.replace('<body>', '<body>' + nav + '</nav>')
     html = html.replace('<title>Sonnenhain RPG - Pixelwelt</title>', '<title>Sonnenhain · Einstieg prüfen</title>')
     (output / 'probe.html').write_text(html, encoding='utf-8')

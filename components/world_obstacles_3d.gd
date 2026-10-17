@@ -1,9 +1,14 @@
 extends RefCounted
-## Echte Mesh-Körper in einem gemeinsamen, laufend gerenderten 3D-Viewport.
+## Echte Mesh-Körper auf stabilen Atlasseiten; ruhende Seiten werden wiederverwendet.
 ## Die 2D-Welt übernimmt nur Projektion und Tiefensortierung mit den Figuren.
 ## Keine vorgerenderten Sprites; Geometrie, Licht und Animation bleiben räumlich.
 const Models=preload("res://components/world_obstacle_models_3d.gd")
 const Geometry=preload("res://components/world_geometry.gd")
+const AtlasSlots=preload("res://components/landscape_atlas_slots.gd")
+const AtlasPage=preload("res://components/landscape_atlas_page.gd")
+const ArchitectureKit=preload("res://components/architecture_kit.gd")
+const Shapes=preload("res://components/canvas_shapes.gd")
+const Courtyard=preload("res://components/ruin_courtyard.gd")
 const CELL:=128
 const UNITS:=3.7
 const FOOT:=Vector2(.5,.66)
@@ -22,6 +27,22 @@ var texture:Texture2D
 var columns:=1
 var grid_rows:=1
 var collection_clock:=0.0
+var atlas_slots:=AtlasSlots.new()
+var atlas_pages:Array=[]
+var collections:=0
+var created_instances:=0
+var collection_us:=0
+var peak_collection_us:=0
+var decoration_cells:Dictionary={}
+const DECORATION_CACHE_LIMIT:=4096
+const STATIC_RENDERS_PER_FRAME:=1
+const VILLAGE_RECT:=Rect2(0,0,1780,2600)
+## Neue Modelle entstehen in GDScript (10–50 ms je Modell). Pro Bild nur so
+## viele bauen, bis dieses Zeitbudget überschritten ist; mindestens eines.
+const MODEL_BUILD_BUDGET_US:=6000
+## Ein gemeinsamer Baumeister teilt erzeugte Materialtexturen zwischen Modellen.
+var builder:=Models.new()
+var pending_models:=0
 
 ## Rückfall (10.10.2026): Rendert der 3D-Viewport im Browser nichts (z. B. bei
 ## manchen Grafiktreibern), zeichnet das Spiel wieder die 2D-Landschaft. Einmal
@@ -79,14 +100,18 @@ func probe(g,delta:float)->void:
 	probe_clock-=delta
 	if probe_clock>0.0:return
 	probe_done=true
-	var tex:=viewport.get_texture()
-	if tex==null:return
-	var pixels:=visible_pixels(tex.get_image())
+	var pixels:=0
+	# Die erste Seite kann nach einer Reise leer sein; alle aktiven Seiten prüfen.
+	for page in atlas_pages:
+		if not true in page.shown.values():continue
+		var tex:Texture2D=page.viewport.get_texture()
+		if tex!=null:pixels+=visible_pixels(tex.get_image())
+		if pixels>=PROBE_MIN_PIXELS:break
 	if g.has_method("report_3d_probe"):g.report_3d_probe(probe_report(pixels))
 	if pixels>=PROBE_MIN_PIXELS:return
 	active=false
 	rows.clear();signature=""
-	viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;world.process_mode=Node.PROCESS_MODE_DISABLED
+	for page in atlas_pages:page.suspend()
 	printerr("OBSTACLES_3D_FALLBACK pixels=%d – 3D-Landschaft bleibt leer, zeige 2D" % pixels)
 	if g.has_method("invalidate_static_cache"):g.invalidate_static_cache()
 
@@ -103,25 +128,21 @@ func probe_report(pixels:int)->Dictionary:
 		"api":RenderingServer.get_video_adapter_api_version(),"agent":agent,"brave":brave,"os":OS.get_name()}
 
 func ensure(g:Node)->void:
-	if is_instance_valid(viewport):return
+	if not specs.is_empty():return
 	var data:Dictionary=JSON.parse_string(FileAccess.get_file_as_string("res://components/world_obstacles_3d.json"))
 	for spec in data["objects"]+data["common_objects"]:specs[str(spec["id"])]=spec
-	viewport=SubViewport.new();viewport.name="WorldObstacles3D"
-	viewport.own_world_3d=true;viewport.transparent_bg=true;viewport.gui_disable_input=true
-	viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
-	viewport.render_target_clear_mode=SubViewport.CLEAR_MODE_ALWAYS
-	viewport.size=Vector2i(CELL,CELL)
-	world=Node3D.new();viewport.add_child(world)
-	camera=Camera3D.new();camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.current=true
-	camera.near=.01;camera.far=1000;world.add_child(camera)
-	var env:=WorldEnvironment.new();var settings:=Environment.new()
-	settings.background_mode=Environment.BG_COLOR;settings.background_color=Color(0,0,0,0)
-	settings.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
-	settings.ambient_light_color=Color("dfe5d5");settings.ambient_light_energy=.72
-	settings.tonemap_mode=Environment.TONE_MAPPER_LINEAR;env.environment=settings;world.add_child(env)
-	var light:=DirectionalLight3D.new();light.rotation_degrees=Vector3(-55,-30,0)
-	light.light_energy=.75;light.shadow_enabled=false;world.add_child(light)
-	g.add_child(viewport);texture=viewport.get_texture()
+
+func animated_row(row:Dictionary)->bool:
+	# Blender-Bauteile sind feste Körper ohne Idle-Animation.
+	if ArchitectureKit.replaces(str(row["model"])):return false
+	return int(specs[str(row["model"])]["animation"]["frames"])>1
+
+func metrics_snapshot()->Dictionary:
+	var updates:=0;var color_bytes:=0
+	for page in atlas_pages:
+		updates+=page.render_updates
+		color_bytes+=page.viewport.size.x*page.viewport.size.y*4
+	return {"collections":collections,"instances_created":created_instances,"resident_instances":instances.size(),"pages":atlas_pages.size(),"page_updates":updates,"atlas_color_bytes":color_bytes,"collection_us":collection_us,"peak_collection_us":peak_collection_us}
 
 func enabled(g)->bool:
 	return not g.dedicated_server_mode and DisplayServer.get_name()!="headless" and g.arena_mode=="" and g.interior_id<0 and g.dungeon_id<0 and not g.konflux.active and g.character_created and g.panel not in ["start","account_gate","account_login","account_register","account_migrate","creation","creation_review"]
@@ -131,44 +152,57 @@ func update(g,delta:float)->void:
 	probe(g,delta)
 	if not enabled(g):
 		rows.clear();signature=""
-		if is_instance_valid(viewport):viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;world.process_mode=Node.PROCESS_MODE_DISABLED
+		for page in atlas_pages:page.suspend()
 		return
+	# Höchstens eine ruhende Seite pro Bild nachzeichnen; die vorgeladene
+	# Randzone verdeckt die Verzögerung von wenigen Bildern.
+	var static_budget:=STATIC_RENDERS_PER_FRAME
+	for page in atlas_pages:
+		page.world.process_mode=Node.PROCESS_MODE_INHERIT
+		if page.step(delta,static_budget>0):static_budget-=1
 	var bounds:Rect2=g.camera_world_rect().grow(160)
 	var next_signature:="%s:%s" % [Vector2i(bounds.position/64),Vector2i(bounds.size)]
 	collection_clock-=delta
-	if next_signature==signature and collection_clock>0:return
+	# Kameralauf umgeht die Pause nicht mehr; die vorgeladene Randzone deckt ihn ab.
+	# Fehlen noch Modelle, im nächsten Bild weiterbauen statt 250 ms zu warten.
+	if not signature.is_empty() and collection_clock>0 and pending_models==0:return
 	collection_clock=.25;signature=next_signature
+	var started:=Time.get_ticks_usec()
 	rows=collect(g,bounds)
-	if rows.is_empty():
-		if is_instance_valid(viewport):viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED;world.process_mode=Node.PROCESS_MODE_DISABLED
-		return
 	ensure(g)
-	viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS;world.process_mode=Node.PROCESS_MODE_INHERIT
-	var wanted:Dictionary={}
-	for row in rows:wanted[row["key"]]=true
-	for key in instances.keys():
-		if not wanted.has(key):instances[key].free();instances.erase(key)
-	columns=maxi(1,ceili(sqrt(rows.size())));grid_rows=ceili(float(rows.size())/columns)
-	viewport.size=Vector2i(columns*CELL,grid_rows*CELL)
-	camera.size=grid_rows*UNITS
-	var center:=Vector3(columns*UNITS*.5,0,grid_rows*UNITS*.5/sin(PITCH))
-	camera.position=center+Vector3(0,sin(PITCH),cos(PITCH))*60
-	camera.look_at(center,Vector3.UP)
-	for index in rows.size():
-		var row:Dictionary=rows[index];var key:String=row["key"];var id:String=row["model"]
+	var changes:Dictionary=atlas_slots.reconcile(rows,animated_row)
+	for key in changes["removed"]:
+		for page in atlas_pages:page.remove_body(key)
+		instances.erase(key)
+	while atlas_pages.size()<atlas_slots.pages.size():
+		var page:=AtlasPage.new();var index:=atlas_pages.size()
+		page.setup(g,bool(atlas_slots.pages[index]["animated"]),index);atlas_pages.append(page)
+	var build_started:=Time.get_ticks_usec();var built:=0;pending_models=0
+	for row in rows:
+		var key:String=row["key"];var id:String=row["model"]
+		var allocation:Dictionary=atlas_slots.entries[key]
+		var page=atlas_pages[int(allocation["page"])]
 		if not instances.has(key):
 			if not models.has(id):
-				var body:=Models.new().build(specs[id]);var scene:=PackedScene.new();scene.pack(body);body.free();models[id]=scene
+				# Budget erschöpft: Körper ohne Atlasbild bleibt bis zum Folgebild
+				# unsichtbar; die vorgeladene Randzone verdeckt das meist.
+				if built>0 and Time.get_ticks_usec()-build_started>MODEL_BUILD_BUDGET_US:
+					pending_models+=1;continue
+				var kit_scene:=ArchitectureKit.scene_for(id)
+				if kit_scene!=null:models[id]=kit_scene
+				else:
+					var body:=builder.build(specs[id]);var scene:=PackedScene.new();scene.pack(body);body.free();models[id]=scene
+				built+=1
 			var instance:Node3D=models[id].instantiate()
-			instance.name="Object_"+str(index);world.add_child(instance);instances[key]=instance
-			if "countdown" in instance:
-				instance.random.seed=hash(key);instance.countdown=instance.random.randf_range(instance.idle_min,instance.idle_max)
-		var body:Node3D=instances[key]
-		body.position=Vector3((index%columns+FOOT.x)*UNITS,0,(index/columns+FOOT.y)*UNITS/sin(PITCH))
-		# Schmale Streifen werden direkt aneinandergesetzt, ohne den Durchgang zu ändern.
-		body.rotation.y=float(row.get("rotation",0.0))
-		body.scale=Vector3(float(row.get("stretch_x",1.0)),float(row.get("stretch_y",1.0)),float(row.get("stretch_z",1.0)))
-		row["source"]=Rect2(Vector2(index%columns,index/columns)*CELL,Vector2.ONE*CELL)
+			instance.name="Object_"+str(created_instances);instances[key]=instance;created_instances+=1
+			page.add_body(key,instance,int(allocation["slot"]),row)
+		row["source"]=atlas_slots.source(key,CELL)
+		row["atlas_page"]=int(allocation["page"])
+	for page in atlas_pages:page.set_visible_keys(changes["wanted"])
+	if not atlas_pages.is_empty():
+		viewport=atlas_pages[0].viewport;world=atlas_pages[0].world;camera=atlas_pages[0].camera;texture=viewport.get_texture()
+	collections+=1;var duration:=Time.get_ticks_usec()-started
+	collection_us+=duration;peak_collection_us=maxi(peak_collection_us,duration)
 
 func collect(g,bounds:Rect2)->Array:
 	var result:Array=[]
@@ -182,29 +216,35 @@ func collect(g,bounds:Rect2)->Array:
 			result.append(entry("obstacle:%d:%d"%[cx,cy],zone,motif,point,62.0))
 	for tx in range(maxi(0,floori(bounds.position.x/64)-1),ceili(bounds.end.x/64)+1):
 		for ty in range(maxi(0,floori(bounds.position.y/64)-1),ceili(bounds.end.y/64)+1):
-			var key:int=g.hash_cell(tx,ty)
-			var zone:int=g.visual_region_at(Vector2(tx*64+32,ty*64+32))
-			if not replaces_static(zone):continue
-			if g.golem_world.tree_knocked(Vector2i(tx,ty)):continue
-			var tree:Dictionary=g.decorative_tree_in_cell(tx,ty)
-			if not tree.is_empty():
-				if not bounds.has_point(tree["point"]):continue
-				var motif:=1 if zone in [1,2] else (6 if zone==3 else 2)
-				# Nebelheide besitzt auch Stammholz und Felsen an vorhandenen festen Punkten.
-				if zone==8:motif=int([2,3,4,6][posmod(key/13,4)])
-				result.append(entry("tree:%d:%d"%[tx,ty],zone,motif,tree["point"],39.0 if motif in [1,2,6] and zone!=8 else 30.0))
-				continue
-			if key%5!=0:continue
-			var point:=Vector2(tx*64+(key%23),ty*64+((key/23)%25))+Vector2(24,24)
-			if not bounds.has_point(point):continue
-			if not clear_decoration(g,point,zone):continue
-			var choices:Array=SOFT[zone];var motif:=int(choices[posmod(key/29,choices.size())])
-			result.append(entry("soft:%d:%d"%[tx,ty],zone,motif,point,31.0))
+			var cell:=Vector2i(tx,ty)
+			# Veränderliche Baumzustände niemals im Geometriecache festhalten.
+			if g.golem_world.tree_knocked(cell):continue
+			if not decoration_cells.has(cell):
+				if decoration_cells.size()>=DECORATION_CACHE_LIMIT:decoration_cells.erase(decoration_cells.keys()[0])
+				decoration_cells[cell]=decoration_in_cell(g,tx,ty)
+			var row:Dictionary=decoration_cells[cell]
+			if not row.is_empty() and bounds.has_point(row["point"]):result.append(row.duplicate())
 	collect_walls(g,bounds,result)
 	return result
 
+func decoration_in_cell(g,tx:int,ty:int)->Dictionary:
+	var key:int=g.hash_cell(tx,ty)
+	var zone:int=g.visual_region_at(Vector2(tx*64+32,ty*64+32))
+	if not replaces_static(zone):return {}
+	var tree:Dictionary=g.decorative_tree_in_cell(tx,ty)
+	if not tree.is_empty():
+		var motif:=1 if zone in [1,2] else (6 if zone==3 else 2)
+		if zone==8:motif=int([2,3,4,6][posmod(key/13,4)])
+		return entry("tree:%d:%d"%[tx,ty],zone,motif,tree["point"],39.0 if motif in [1,2,6] and zone!=8 else 30.0)
+	if key%5!=0:return {}
+	var point:=Vector2(tx*64+(key%23),ty*64+((key/23)%25))+Vector2(24,24)
+	if not clear_decoration(g,point,zone):return {}
+	var choices:Array=SOFT[zone];var motif:=int(choices[posmod(key/29,choices.size())])
+	return entry("soft:%d:%d"%[tx,ty],zone,motif,point,31.0)
+
 static func clear_decoration(g,p:Vector2,zone:int)->bool:
 	if not Geometry.region_rect(zone).grow(-100).has_point(p):return false
+	if Courtyard.clears(p,40.0):return false
 	if g.distance_to_trail(p)<145 or g.class_boss_arena_index_at(p,100)>=0 or g.point_near_class_boss_house(p,120) or g.near_waystone_shrine(p,100):return false
 	if zone==12 and p.distance_to(g.GolemBoss.ALTAR)<280:return false
 	if zone==6 and p.y>6850+sin(p.x/220.0)*125:return false
@@ -291,23 +331,41 @@ func append_entries(entries:Array)->void:
 
 func paint(g,row:Dictionary)->void:
 	if texture==null or not is_instance_valid(viewport):return
-	var size:=UNITS*float(row["pixels"])
-	var point:Vector2=row.get("render_point",row["point"])
-	if not str(row["model"]).begins_with("common-wall-"):
-		var is_arch:bool=(int(row["map"])==3 and int(row["motif"])==4) or (int(row["map"])==12 and int(row["motif"])==5)
-		if is_arch:
-			for side in [-1,1]:paint_shadow(g,point+Vector2(side*.53*float(row["pixels"]),0),Vector2(5,2))
-		else:paint_shadow(g,point,Vector2(15,5)*float(row["pixels"])/45.0)
+	var page_texture:Texture2D=atlas_pages[int(row.get("atlas_page",0))].viewport.get_texture()
+	# Schatten und Zielrechteck hängen nur vom (festen) Ort des Körpers ab und
+	# werden je Zeile einmal berechnet; die Atlasquelle kann wechseln.
+	var cached:Variant=row.get("_paint")
+	if cached==null:
+		cached=paint_layout(row);row["_paint"]=cached
+	for shadow in cached["shadows"]:Shapes.ellipse(g,shadow[0],shadow[1],SHADOW_COLOR)
 	var source:Rect2=row["source"]
-	var destination:=Rect2(point-FOOT*size,Vector2.ONE*size)
 	if row.has("crop_side"):
 		source.position.x+=float(row["crop_side"])*CELL*.5;source.size.x*=.5
-		destination.position.x+=float(row["crop_side"])*size*.5;destination.size.x*=.5
+	var destination:Rect2=cached["destination"]
 	# Auch die Projektion einer Außenmauer darf nicht in Dorfpixel hineinragen.
+	if not bool(cached["village"]):
+		g.draw_texture_rect_region(page_texture,destination,source)
+		return
 	for part in outside_village(destination):
 		var ratio:=source.size/destination.size
 		var cropped:=Rect2(source.position+(part.position-destination.position)*ratio,part.size*ratio)
-		g.draw_texture_rect_region(texture,part,cropped)
+		g.draw_texture_rect_region(page_texture,part,cropped)
+
+## Feste Zeichenangaben einer Zeile: Schatten (Mitte, Halbachsen), Zielrechteck,
+## Dorfüberlappung.
+static func paint_layout(row:Dictionary)->Dictionary:
+	var size:=UNITS*float(row["pixels"])
+	var point:Vector2=row.get("render_point",row["point"])
+	var shadows:Array=[]
+	if not str(row["model"]).begins_with("common-wall-"):
+		var is_arch:bool=(int(row["map"])==3 and int(row["motif"])==4) or (int(row["map"])==12 and int(row["motif"])==5)
+		if is_arch:
+			for side in [-1,1]:shadows.append([point+Vector2(side*.53*float(row["pixels"]),0),Vector2(5,2)])
+		else:shadows.append([point,Vector2(15,5)*float(row["pixels"])/45.0])
+	var destination:=Rect2(point-FOOT*size,Vector2.ONE*size)
+	if row.has("crop_side"):
+		destination.position.x+=float(row["crop_side"])*size*.5;destination.size.x*=.5
+	return {"shadows":shadows,"destination":destination,"village":destination.intersects(VILLAGE_RECT)}
 
 static func outside_village(rect:Rect2)->Array:
 	var village:=Geometry.region_rect(0)
@@ -321,10 +379,8 @@ static func outside_village(rect:Rect2)->Array:
 	]
 	return pieces.filter(func(part:Rect2)->bool:return part.has_area())
 
-static func paint_shadow(g,point:Vector2,radius:Vector2)->void:
-	var outline:=PackedVector2Array()
-	for vertex in 12:outline.append(point+Vector2(cos(vertex*TAU/12),sin(vertex*TAU/12))*radius)
-	g.draw_colored_polygon(outline,Color("182b24",.12))
+## Schatten als fertiges 12-Eck (canvas_shapes.gd) statt neu zerlegtem Polygon.
+const SHADOW_COLOR:=Color(0.0941,0.1686,0.1412,.12)
 
 func foliage_near(g,point:Vector2)->bool:
 	# Derselbe Modell- und Ortsplan wie die Darstellung, auch ohne Grafik nutzbar.

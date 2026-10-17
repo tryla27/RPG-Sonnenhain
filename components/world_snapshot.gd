@@ -66,32 +66,62 @@ static func can_send(peer: MultiplayerPeer, peer_id: int) -> bool:
 	var socket: WebSocketPeer = peer.get_peer(peer_id)
 	return socket != null and socket.get_current_outbound_buffered_amount() < MAX_PENDING_BYTES
 
-static func transmit(g, peer_id: int, snapshot: Dictionary) -> void:
+## shared: Zwischenspeicher eines Sendedurchgangs. Spieler mit demselben
+## Ausschnitt (gleiche Gegner, Geschosse, Beute, Golemumfang) bekommen dasselbe
+## fertig kodierte Paket; vorher wurde es für jeden Spieler neu gepackt und
+## komprimiert (Golemkampf zu viert: ~1,2 ms je Spieler und Paket).
+static func transmit(g, peer_id: int, snapshot: Dictionary, shared: Dictionary = {}) -> void:
 	if not can_send(g.multiplayer.multiplayer_peer,peer_id):
 		g.server_performance.skipped += 1
 		return
-	var started := Time.get_ticks_usec()
-	var packet := encode(snapshot)
-	var bytes: int = packet["_wire"].size() if packet.has("_wire") else var_to_bytes(packet).size()
-	g.server_performance.record_snapshot(bytes,Time.get_ticks_usec()-started)
-	g.rpc_world_snapshot.rpc_id(peer_id,packet)
+	var key: Variant = snapshot.get("_share_key")
+	var cached: Array = shared.get(key, []) if key != null else []
+	if cached.is_empty():
+		var started := Time.get_ticks_usec()
+		var clean := snapshot
+		if key != null:
+			clean = snapshot.duplicate(false)
+			clean.erase("_share_key")
+		var packet := encode(clean)
+		var bytes: int = packet["_wire"].size() if packet.has("_wire") else var_to_bytes(packet).size()
+		cached = [packet, bytes, Time.get_ticks_usec()-started]
+		if key != null: shared[key] = cached
+		g.server_performance.record_snapshot(int(cached[1]),int(cached[2]))
+	else:
+		g.server_performance.record_snapshot(int(cached[1]),0)
+	g.rpc_world_snapshot.rpc_id(peer_id,cached[0])
 
 ## Nur Zeilen, deren "pos" ([x, y]) höchstens `range` von `center` entfernt ist.
 static func near(rows:Array,center:Vector2,range:float=INTEREST_RANGE)->Array:
 	var out:Array=[]
+	for index in near_indices(rows,center,range):out.append(rows[index])
+	return out
+
+## Wie near(), aber die Stellen der Zeilen (für den gemeinsamen Paketschlüssel).
+static func near_indices(rows:Array,center:Vector2,range:float=INTEREST_RANGE)->PackedInt32Array:
+	var out:=PackedInt32Array()
 	var limit:=range*range
-	for row in rows:
+	for index in rows.size():
+		var row:Variant=rows[index]
 		if not row is Dictionary:continue
 		var p:Variant=row.get("pos",[])
 		if not p is Array or p.size()<2:continue
-		if Vector2(float(p[0]),float(p[1])).distance_squared_to(center)<=limit:out.append(row)
+		if Vector2(float(p[0]),float(p[1])).distance_squared_to(center)<=limit:out.append(index)
 	return out
 
+## Ausschnitt für einen Spieler. "_share_key" beschreibt den Inhalt (welche
+## Zeilen); transmit() entfernt ihn vor dem Senden.
 static func for_peer(base:Dictionary,center:Vector2)->Dictionary:
 	var snap:=base.duplicate(false)
-	snap["enemies"]=near(base.get("enemies",[]),center)
-	snap["shots"]=near(base.get("shots",[]),center)
-	snap["drops"]=near(base.get("drops",[]),center)
+	var key:Array=[]
+	for category in ["enemies","shots","drops"]:
+		var rows:Array=base.get(category,[])
+		var indices:=near_indices(rows,center)
+		var picked:Array=[]
+		for index in indices:picked.append(rows[index])
+		snap[category]=picked
+		key.append(indices)
+	snap["_share_key"]=key
 	return snap
 
 static func widen(peer:WebSocketMultiplayerPeer)->void:

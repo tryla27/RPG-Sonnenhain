@@ -22,6 +22,7 @@ func _initialize()->void:
 	o.tick(0.1)
 	check(o.fps>50.0 and o.fps<60.0 and o.worst_ms>99.0,"FPS und längstes Bild (%s, %s)" % [o.fps,o.worst_ms])
 	check(o.text(12).contains("Gegner 12"),"Text")
+	check(o.p95_ms<17 and o.p99_ms>99,"P95 trennt normale Bilder von der einzelnen langen Spitze")
 	if failures>0:
 		push_error("PERF_OVERLAY_FAILED %d" % failures);quit(1);return
 	print("PERF_OVERLAY_OK")

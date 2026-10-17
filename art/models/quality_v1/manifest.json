@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "generator": "tools/art_pipeline/build_blender_assets.py",
+  "assets": [
+    {
+      "id": "wall_horizontal",
+      "path": "art/models/quality_v1/wall_horizontal.glb",
+      "kind": "architecture",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "footprint": [
+        2.1,
+        0.64
+      ],
+      "collision": "Vorhandene Weltgeometrie bleibt maßgeblich"
+    },
+    {
+      "id": "wall_vertical",
+      "path": "art/models/quality_v1/wall_vertical.glb",
+      "kind": "architecture",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "footprint": [
+        2.1,
+        0.64
+      ],
+      "collision": "Vorhandene Weltgeometrie bleibt maßgeblich"
+    },
+    {
+      "id": "wall_corner",
+      "path": "art/models/quality_v1/wall_corner.glb",
+      "kind": "architecture",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "footprint": [
+        2.1,
+        0.64
+      ],
+      "collision": "Vorhandene Weltgeometrie bleibt maßgeblich"
+    },
+    {
+      "id": "wall_end",
+      "path": "art/models/quality_v1/wall_end.glb",
+      "kind": "architecture",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "footprint": [
+        2.1,
+        0.64
+      ],
+      "collision": "Vorhandene Weltgeometrie bleibt maßgeblich"
+    },
+    {
+      "id": "gate_open",
+      "path": "art/models/quality_v1/gate_open.glb",
+      "kind": "state",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "state": "open",
+      "opening": 1.6
+    },
+    {
+      "id": "gate_closed",
+      "path": "art/models/quality_v1/gate_closed.glb",
+      "kind": "state",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "state": "closed",
+      "opening": 1.6
+    },
+    {
+      "id": "moss_rock",
+      "path": "art/models/quality_v1/moss_rock.glb",
+      "kind": "architecture",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte"
+    },
+    {
+      "id": "sword_tier1",
+      "path": "art/models/quality_v1/sword_tier1.glb",
+      "kind": "weapon",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "weapon_type": "sword",
+      "tier": 1
+    },
+    {
+      "id": "sword_tier2",
+      "path": "art/models/quality_v1/sword_tier2.glb",
+      "kind": "weapon",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "weapon_type": "sword",
+      "tier": 2
+    },
+    {
+      "id": "sword_tier3",
+      "path": "art/models/quality_v1/sword_tier3.glb",
+      "kind": "weapon",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "weapon_type": "sword",
+      "tier": 3
+    },
+    {
+      "id": "staff_tier1",
+      "path": "art/models/quality_v1/staff_tier1.glb",
+      "kind": "weapon",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "weapon_type": "staff",
+      "tier": 1
+    },
+    {
+      "id": "staff_tier2",
+      "path": "art/models/quality_v1/staff_tier2.glb",
+      "kind": "weapon",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "weapon_type": "staff",
+      "tier": 2
+    },
+    {
+      "id": "staff_tier3",
+      "path": "art/models/quality_v1/staff_tier3.glb",
+      "kind": "weapon",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "weapon_type": "staff",
+      "tier": 3
+    },
+    {
+      "id": "bow_tier1",
+      "path": "art/models/quality_v1/bow_tier1.glb",
+      "kind": "weapon",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "weapon_type": "bow",
+      "tier": 1
+    },
+    {
+      "id": "bow_tier2",
+      "path": "art/models/quality_v1/bow_tier2.glb",
+      "kind": "weapon",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "weapon_type": "bow",
+      "tier": 2
+    },
+    {
+      "id": "bow_tier3",
+      "path": "art/models/quality_v1/bow_tier3.glb",
+      "kind": "weapon",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "weapon_type": "bow",
+      "tier": 3
+    },
+    {
+      "id": "building_smithy",
+      "path": "art/models/quality_v1/building_smithy.glb",
+      "kind": "building",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "role": "smithy",
+      "collision": "Vorschau, vorhandene Dorfgebäude unverändert"
+    },
+    {
+      "id": "building_tavern",
+      "path": "art/models/quality_v1/building_tavern.glb",
+      "kind": "building",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "role": "tavern",
+      "collision": "Vorschau, vorhandene Dorfgebäude unverändert"
+    },
+    {
+      "id": "building_townhall",
+      "path": "art/models/quality_v1/building_townhall.glb",
+      "kind": "building",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "role": "townhall",
+      "collision": "Vorschau, vorhandene Dorfgebäude unverändert"
+    },
+    {
+      "id": "stone_rose_resting",
+      "path": "art/models/quality_v1/stone_rose_resting.glb",
+      "kind": "state",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "state": "resting",
+      "cosmetic": true
+    },
+    {
+      "id": "stone_rose_helped",
+      "path": "art/models/quality_v1/stone_rose_helped.glb",
+      "kind": "state",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "state": "helped",
+      "cosmetic": true
+    },
+    {
+      "id": "stone_rose_celebration",
+      "path": "art/models/quality_v1/stone_rose_celebration.glb",
+      "kind": "state",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "state": "celebration",
+      "cosmetic": true
+    },
+    {
+      "id": "warrior_gold",
+      "path": "art/models/quality_v1/warrior_gold.glb",
+      "kind": "character",
+      "source": "art/source/blender/sonnenhain_quality_v1.blend",
+      "unit": "meter",
+      "origin": "Bodenmitte",
+      "animations": [
+        "idle",
+        "walk",
+        "run",
+        "attack",
+        "skill",
+        "jump",
+        "dodge",
+        "hit",
+        "defeated"
+      ],
+      "identity": "Menschlicher goldener Krieger, isolierter Prototyp",
+      "ragdoll": "Godot-Physikprototyp im Grafiklabor: components/quality_ragdoll.gd"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Touch-Steuerung der Android-App (Angelo 10.10.2026: „verbessere die mobile
 ## Steuerung“, App getrennt vom restlichen Sonnenhain).
 ##
@@ -277,9 +278,9 @@ static func draw(g,state:Dictionary)->void:
 	var ms:=AppLayout.scale("move")
 	var moving:bool=state["moving"]
 	var a:=0.8 if moving else 0.32
-	g.draw_circle(base,82*ms,Color(0.07,0.12,0.14,a*0.8))
+	Shapes.circle(g,base,82*ms,Color(0.07,0.12,0.14,a*0.8))
 	g.draw_arc(base,82*ms,0,TAU,40,Color("a9c4b8",a),3)
-	g.draw_circle(state["move_knob"],34*ms,Color("5d756b",0.92 if moving else 0.55))
+	Shapes.circle(g,state["move_knob"],34*ms,Color("5d756b",0.92 if moving else 0.55))
 	g.draw_arc(state["move_knob"],34*ms,0,TAU,32,Color("e7d5a3",0.92 if moving else 0.55),3)
 	if not moving:
 		g.draw_string(font,base+Vector2(-50,(82*ms)+30),"BEWEGEN",HORIZONTAL_ALIGNMENT_CENTER,100,12,Color("d9e5dc",0.6))
@@ -288,9 +289,9 @@ static func draw(g,state:Dictionary)->void:
 	var atk_r:=AppLayout.radius("attack")
 	var atk_s:=AppLayout.scale("attack")
 	var attack_base:Vector2=state["aim_base"] if aiming else AppLayout.center("attack")
-	g.draw_circle(attack_base,atk_r,Color("725047",0.88 if aiming else 0.62))
+	Shapes.circle(g,attack_base,atk_r,Color("725047",0.88 if aiming else 0.62))
 	g.draw_arc(attack_base,atk_r,0,TAU,40,Color("f0daa3",0.9),3)
-	g.draw_circle(state["aim_knob"] if aiming else attack_base,26.0*atk_s,Color("9a675b",0.92))
+	Shapes.circle(g,state["aim_knob"] if aiming else attack_base,26.0*atk_s,Color("9a675b",0.92))
 	g.draw_arc(state["aim_knob"] if aiming else attack_base,26.0*atk_s,0,TAU,28,Color("fff0c8",0.88),2)
 	var aim_vec:Vector2=state["aim_vector"]
 	if aiming and aim_vec.length_squared()>0.01:
@@ -306,31 +307,31 @@ static func draw(g,state:Dictionary)->void:
 		var info:Dictionary=skills[slot]
 		var id:int=int(info["id"])
 		var held:bool=st.skill_finger>=0 and st.skill_slot==slot
-		g.draw_circle(c,r,Color("152228",0.9))
+		Shapes.circle(g,c,r,Color("152228",0.9))
 		g.draw_arc(c,r+(3.0 if held else 0.0),0,TAU,32,Color("fff0b8") if held else (Color("e0c27e",0.9) if id>=0 else Color("6f7c77",0.7)),3.5 if held else 2.5)
 		if id>=0:
 			g.draw_skill_icon(c-Vector2(15,15)*sc,id,30*sc)
 			var cd:float=float(info["cooldown"])
 			if cd>0.0:
-				g.draw_circle(c,r-2.0,Color(0.06,0.1,0.13,0.7))
+				Shapes.circle(g,c,r-2.0,Color(0.06,0.1,0.13,0.7))
 				g.draw_string(font,c+Vector2(-r,6),"%.1f"%cd if cd<10.0 else "%d"%ceili(cd),HORIZONTAL_ALIGNMENT_CENTER,r*2.0,14,Color("fff1c7"))
 		else:
 			g.draw_string(font,c+Vector2(-r,8),"–",HORIZONTAL_ALIGNMENT_CENTER,r*2.0,20,Color("83918b"))
-		g.draw_circle(c+Vector2(r*0.72,r*0.72),9.0,Color("2b2219",0.95))
+		Shapes.circle(g,c+Vector2(r*0.72,r*0.72),9.0,Color("2b2219",0.95))
 		g.draw_string(font,c+Vector2(r*0.72-9.0,r*0.72+4.0),str(slot+1),HORIZONTAL_ALIGNMENT_CENTER,18,10,Color("ffe3a5"))
 	# Ausweichen und Aktion
 	var dodge_ready:bool=state["dodge_ready"]
 	var dc:=AppLayout.center("dodge")
 	var dr:=AppLayout.radius("dodge")
-	g.draw_circle(dc,dr,Color("3f5c62",0.92 if dodge_ready else 0.55))
+	Shapes.circle(g,dc,dr,Color("3f5c62",0.92 if dodge_ready else 0.55))
 	g.draw_arc(dc,dr,0,TAU,32,Color("f0daa3",0.85 if dodge_ready else 0.4),3)
 	g.draw_string(font,dc+Vector2(-45,5),str(state["dodge_label"]),HORIZONTAL_ALIGNMENT_CENTER,90,11,Color("fff2cf"))
 	var prompt:bool=state["action_hint"]
 	var pulse:=0.5+0.5*sin(float(state["clock"])*5.0)
 	var ac:=AppLayout.center("interact")
 	var ar:=AppLayout.radius("interact")
-	if prompt:g.draw_circle(ac,ar+6.0+pulse*3.0,Color("f3d98b",0.25+0.2*pulse))
-	g.draw_circle(ac,ar,Color("556b4f",0.95 if prompt else 0.7))
+	if prompt:Shapes.circle(g,ac,ar+6.0+pulse*3.0,Color("f3d98b",0.25+0.2*pulse))
+	Shapes.circle(g,ac,ar,Color("556b4f",0.95 if prompt else 0.7))
 	g.draw_arc(ac,ar,0,TAU,32,Color("fff0b8" if prompt else "c9b27b",0.9),3)
 	g.draw_string(font,ac+Vector2(-45,5),"AKTION",HORIZONTAL_ALIGNMENT_CENTER,90,11,Color("fff2cf"))
 	# Tränke
@@ -346,7 +347,7 @@ static func draw(g,state:Dictionary)->void:
 		g.draw_rect(rc,Color("1c2d33",0.92))
 		g.draw_rect(rc,Color("d9b56f" if badge else "b99b63",0.9),false,2)
 		g.draw_string(font,rc.position+Vector2(0,rc.size.y*0.64),str(entry[1]),HORIZONTAL_ALIGNMENT_CENTER,rc.size.x,12,Color("fff0c8"))
-		if badge:g.draw_circle(rc.position+Vector2(rc.size.x-6,6),5.0,Color("f0b35c"))
+		if badge:Shapes.circle(g,rc.position+Vector2(rc.size.x-6,6),5.0,Color("f0b35c"))
 	if st.skill_finger>=0 and st.skill_drag:_draw_skill_aim(g,state)
 
 ## Zielpfeil vom Helden und Abbruchkreis, solange eine Fähigkeit gezogen wird.
@@ -363,13 +364,13 @@ static func _draw_skill_aim(g,state:Dictionary)->void:
 		g.draw_line(origin,tip,Color(tint,0.35),14.0*zoom)
 		g.draw_line(origin,tip,Color(tint,0.9),4.0)
 		var side:=dir.orthogonal()
-		g.draw_colored_polygon(PackedVector2Array([tip+dir*16.0,tip+side*11.0,tip-side*11.0]),Color(tint,0.95))
+		Shapes.polygon(g,PackedVector2Array([tip+dir*16.0,tip+side*11.0,tip-side*11.0]),Color(tint,0.95))
 	# Verbindung Knopf → Finger
 	var from:Vector2=AppLayout.center("ability_%d"%(st.skill_slot+1))
 	g.draw_line(from,st.skill_pos,Color(tint,0.55),2.0)
-	g.draw_circle(st.skill_pos,10.0,Color(tint,0.8))
+	Shapes.circle(g,st.skill_pos,10.0,Color(tint,0.8))
 	# Abbruchkreis
-	g.draw_circle(CANCEL_CENTER,CANCEL_R,Color(0.55,0.14,0.1,0.7 if cancel else 0.38))
+	Shapes.circle(g,CANCEL_CENTER,CANCEL_R,Color(0.55,0.14,0.1,0.7 if cancel else 0.38))
 	g.draw_arc(CANCEL_CENTER,CANCEL_R,0,TAU,36,Color("ffb09f",0.95 if cancel else 0.6),3)
 	g.draw_line(CANCEL_CENTER+Vector2(-14,-14),CANCEL_CENTER+Vector2(14,14),Color("ffe2d8",0.9),4)
 	g.draw_line(CANCEL_CENTER+Vector2(-14,14),CANCEL_CENTER+Vector2(14,-14),Color("ffe2d8",0.9),4)

@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 const Hero = preload("res://components/rpg_hero.gd")
 const Mobs = preload("res://components/monster_design_32.gd")
 static func background(c: CanvasItem) -> void:
@@ -20,8 +21,8 @@ static func background(c: CanvasItem) -> void:
 		var height := 25.0 + float((i * 17) % 38)
 		c.draw_rect(Rect2(x,295-height,29,height+38),Color("304d45"))
 		c.draw_rect(Rect2(x+6,286-height,17,12),Color("304d45"))
-	c.draw_colored_polygon(PackedVector2Array([Vector2(550,302),Vector2(595,302),Vector2(750,594),Vector2(344,594)]),Color("a7976d"))
-	c.draw_colored_polygon(PackedVector2Array([Vector2(564,302),Vector2(584,302),Vector2(686,594),Vector2(440,594)]),Color("c0af7c"))
+	Shapes.polygon(c,PackedVector2Array([Vector2(550,302),Vector2(595,302),Vector2(750,594),Vector2(344,594)]),Color("a7976d"))
+	Shapes.polygon(c,PackedVector2Array([Vector2(564,302),Vector2(584,302),Vector2(686,594),Vector2(440,594)]),Color("c0af7c"))
 	# A timbered tavern on the right with lit windows.
 	c.draw_rect(Rect2(865,287,105,105),Color("bbab7b"))
 	c.draw_rect(Rect2(859,273,117,23),Color("674536"))
