@@ -29,7 +29,7 @@ func _initialize()->void:
 		var a:AABB=acc[0];var b:AABB=old_acc[0]
 		check(a.position.distance_to(b.position)<.03 and a.size.distance_to(b.size)<.03,"Begrenzung wie bisher: %s neu=%s alt=%s"%[id,a,b])
 		fresh.free();old.free()
-	check(not Kit.replaces("map01-obj01"),"Bäume und Felsen bleiben unverändert")
+	check(not Kit.replaces("map01-obj01"),"Bäume bleiben unverändert")
 	Kit.enabled=false
 	check(not Kit.replaces("common-wall-01"),"Abschaltbar für Vergleiche")
 	Kit.enabled=true

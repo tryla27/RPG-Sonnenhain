@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Felsen 17.10. (`tools/art_pipeline/build_rocks.gd`, in Godot gebaut, kein
+  Blender nötig): map01-obj05, map05-obj05, map06-obj04, map11-obj03 im
+  Architektur-Set, exakt gleiche Begrenzung. **Aussehen.** Vergleich
+  `docs/design/architecture-v2/rocks_compare.jpg`.
 - `Shapes.polygon`: Dreiecke und konvexe Vierecke über `draw_primitive`
   (~1,2 statt ~5,5 µs, Farbrundung höchstens 1/255), alle zweiargumentigen
   `draw_colored_polygon`-Aufrufe umgestellt (Ausnahme: `Brush` in
