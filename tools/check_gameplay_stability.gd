@@ -132,9 +132,9 @@ func run():
 		assert(float(p["aggro_range"])>=1400.0)
 		assert(float(p["leash_range"])>=3000.0)
 
-	# Kitchen up/down input cycles learned recipes without loops.
+	# Kitchen up/down input cycles recipes on the cooking page without loops.
 	var kitchen:=Kitchen.new()
-	kitchen.learned[0]=true;kitchen.learned[1]=true;kitchen.tab=3;kitchen.selected=0
+	kitchen.learned[0]=true;kitchen.learned[1]=true;kitchen.tab=0;kitchen.selected=0
 	var fake:=FakeKitchenGame.new()
 	var down:=InputEventKey.new();down.keycode=KEY_DOWN;down.pressed=true
 	assert(kitchen.keyboard_input(fake,down))
