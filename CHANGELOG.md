@@ -6,6 +6,10 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Händler 17.10.: `refresh_shop_for_level()` beim Öffnen (Rückstand ≥ 3 Stufen,
+  `ShopRotation.needs_fresh_batch`), Sprung zur neuesten Seite; Laden ohne
+  `shop_stock` erzeugt frische Ware statt den Bestand des vorigen Charakters zu
+  behalten. Test `tests/gameplay/check_shop_level.gd`.
 - `Shapes.polygon`: Dreiecke und konvexe Vierecke über `draw_primitive`
   (~1,2 statt ~5,5 µs, Farbrundung höchstens 1/255), alle zweiargumentigen
   `draw_colored_polygon`-Aufrufe umgestellt (Ausnahme: `Brush` in

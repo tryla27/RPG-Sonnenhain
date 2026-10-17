@@ -4791,6 +4791,16 @@ func leave_village_house() -> void:
 func leave_tavern() -> void:
 	leave_village_house()
 
+## Beim Öffnen eines Händlers: Liegen die neuesten Angebote mindestens drei
+## Stufen unter dem Käufer, kommt sofort eine neue Lieferung zur aktuellen Stufe.
+## Vorhandene Angebote behalten Identität und Preis.
+var shop_jump_newest := false
+func refresh_shop_for_level() -> void:
+	if preload("res://components/shop_rotation.gd").needs_fresh_batch(shop_stock, level):
+		refresh_shop_stock()
+		shop_timer = 0.0
+		shop_jump_newest = true
+
 func sanitize_role_shop_stock() -> void:
 	for offers in shop_stock.values():
 		for item in offers:ArcaneNecklaces.normalize(item)
@@ -4802,6 +4812,7 @@ func sanitize_role_shop_stock() -> void:
 		shop_stock["arcane"]=(shop_stock["arcane"] as Array).filter(func(item): return str(item.get("icon","")) in ["staff","armor","ring","head","essence","necklace"])
 
 func open_elara_alchemy() -> void:
+	refresh_shop_for_level()
 	for offers in shop_stock.values():
 		for item in offers:ArcaneNecklaces.normalize(item)
 	sanitize_role_shop_stock()
@@ -4816,6 +4827,7 @@ func open_elara_alchemy() -> void:
 	pending_purchase_item={}
 
 func open_pip_arcane_shop() -> void:
+	refresh_shop_for_level()
 	for offers in shop_stock.values():
 		for item in offers:ArcaneNecklaces.normalize(item)
 	sanitize_role_shop_stock()
@@ -4884,6 +4896,7 @@ func interact_interior_owner(name:String="") -> void:
 		"Elara": open_elara_alchemy()
 		"Fenna": panel="appearance"
 		"Torvald":
+			refresh_shop_for_level()
 			sanitize_role_shop_stock()
 			merchant_kind="smith";shop_page=0;panel="shop";selected_item=-1
 		"Arven": panel="arena_entry"
@@ -5680,6 +5693,7 @@ func interact() -> void:
 	elif closest["kind"] == "arena":
 		panel = "arena_entry"
 	else:
+		refresh_shop_for_level()
 		merchant_kind = String(closest["kind"])
 		shop_page = 0
 		panel = "shop"
@@ -6269,6 +6283,11 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 				for offer in stock:
 					if offer is Dictionary:FoodSystem.normalize_item(offer)
 		for role in shop_stock:shop_stock[role]=shop_stock[role].slice(maxi(0,shop_stock[role].size()-30))
+	else:
+		# Spielstand ohne eigenen Bestand: nicht den Bestand des vorher geladenen
+		# Charakters weiterzeigen, sondern frisch zur Stufe dieses Charakters erzeugen.
+		shop_stock = {}
+		refresh_shop_stock()
 	for offers in shop_stock.values():
 		for item in offers:ArcaneNecklaces.normalize(item)
 	sanitize_role_shop_stock()
@@ -12077,6 +12096,10 @@ func draw_skill_icon(p: Vector2, id: int, size: float) -> void:
 	draw_rect(box, Color(border,0.35), false, 1)
 
 func draw_shop_panel() -> void:
+	if shop_jump_newest and shop_stock.has(merchant_kind):
+		# Frische Lieferung zur aktuellen Stufe: gleich die neueste Seite zeigen.
+		shop_page = maxi(0, int((shop_stock[merchant_kind].size() - 1) / 3))
+		shop_jump_newest = false
 	var shop_name := "TORVALD (SCHMIED)" if merchant_kind == "smith" else ("ELARA (HEILUNG & ALCHEMIE)" if merchant_kind == "alchemy" else ("PIP (ARKANHANDEL)" if merchant_kind == "arcane" else "HÄNDLER"))
 	text_at(Vector2(165, 125), shop_name, 25, Color("ffeda9"))
 	text_at(Vector2(804, 126), "%d GOLD" % gold, 17, Color("f9dba0"))
