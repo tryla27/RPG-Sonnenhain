@@ -19,6 +19,8 @@ var was_playing:=false
 var idle_clock:=0.0
 var render_updates:=0
 var columns:=8
+## Nur für Messungen (Browser-Messmodus ?noanim=1): seltene Animationen anhalten.
+static var freeze_animation:=false
 
 func setup(g:Node,moving:bool,index:int)->void:
 	columns=4 if moving else 8
@@ -74,6 +76,7 @@ func remove_body(key:String)->void:
 ## Rückgabe: true, wenn dieses Bild ein solches Nachzeichnen ausgelöst hat.
 func step(delta:float,allow_static:bool=true)->bool:
 	idle_clock+=delta
+	if freeze_animation:idle_clock=0.0
 	if idle_clock>=.25:
 		for key in players:
 			if bool(shown.get(key,false)):bodies[key].call("_process",idle_clock)

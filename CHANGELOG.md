@@ -29,6 +29,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 - Gebietsbanner (`components/region_banner.gd`) mit 13 Inkscape-Wappen
   (`art/source/inkscape/regions` → `art/ui/regions`); behebt den sofort
   überschriebenen Erkundungsspruch. Nutzt `discovered_regions`, kein neues Speicherfeld.
+- Zeichnen pro Bild 17.10.: Pflanzen-Zeichenliste einmal statt je Bild,
+  Dorfobjekte nur in Dorfnähe, vorberechnete Schattenkreise und ein schneller
+  Weg ohne Dorfbeschnitt. Landschaftsobjekte 3,0 → 1,9 ms pro Bild (lokal).
+- Browser-Messmodus `?bench=1` (`components/web_benchmark.gd`,
+  `tools/web_bench_server.py`) mit Diagnoseschaltern `noanim=1`/`no3d=1`.
 - Klarere Vorbereitungsflächen, elementabhängige Effektfolgen, Questzeichen,
   persönlicher Heimkehrschmuck und P95/P99 in der Leistungsanzeige.
   Keine Änderung von Schaden, XP, Kollisionen oder gespeicherten Belohnungen.

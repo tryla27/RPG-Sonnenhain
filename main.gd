@@ -105,7 +105,11 @@ const BossRelics=preload("res://components/boss_relics.gd")
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobNavigation=preload("res://components/mob_navigation.gd")
 const NpcPortraits=preload("res://components/npc_portraits.gd")
+const VILLAGE_PROP_MARGIN:=1600.0
 const RegionBanner=preload("res://components/region_banner.gd")
+const WebBenchmark=preload("res://components/web_benchmark.gd")
+var web_benchmark:=WebBenchmark.new()
+var web_benchmark_requested:=false
 var region_banner:=RegionBanner.new()
 ## Neue Wegsuchen je Serverbild; verhindert, dass viele Gegner im selben Bild planen.
 const MOB_ROUTES_PER_FRAME:=3
@@ -739,6 +743,7 @@ func _ready() -> void:
 	var user_args := OS.get_cmdline_user_args()
 	dedicated_server_mode = OS.has_feature("dedicated_server") or "--dedicated-server" in user_args
 	multiplayer_smoke_client_mode = "--multiplayer-smoke-client" in user_args
+	web_benchmark_requested = WebBenchmark.requested()
 	if dedicated_server_mode:
 		var notice_path := server_patch_notice_path()
 		if FileAccess.file_exists(notice_path): patch_notice.last_token = FileAccess.get_file_as_string(notice_path).strip_edges().left(80)
@@ -1786,6 +1791,10 @@ func enemy_xp_reward(type: int, elite_kind: int, recipient_level: int) -> int:
 
 func _process(delta: float) -> void:
 	perf_overlay.tick(delta)
+	if web_benchmark_requested:
+		# Browser-Messmodus (?bench=1): nach dem Laden die feste Route abfahren.
+		if not web_benchmark.active and Engine.get_process_frames() > 60: web_benchmark.start(self)
+		web_benchmark.step(self)
 	if app_mode: app_keyboard_tick()
 	if not world_obstacles_3d.enabled(self):world_obstacles_3d.update(self,delta)
 	combat_feedback.step(delta)
@@ -12552,8 +12561,10 @@ func draw_sorted_world_objects() -> void:
 	var entries: Array = []
 	if arena_mode == "" and dungeon_id < 0 and interior_id < 0:
 		world_obstacles_3d.append_entries(entries)
-		for prop in village_props():
-			if prop_bounds(prop).intersects(current_static_bounds()): entries.append({"kind":"prop","depth":prop["depth"],"data":prop})
+		# Dorfobjekte nur in Dorfnähe aufbauen; außerhalb kostete das jedes Bild Zeit.
+		if current_static_bounds().intersects(region_rect(0).grow(VILLAGE_PROP_MARGIN)):
+			for prop in village_props():
+				if prop_bounds(prop).intersects(current_static_bounds()): entries.append({"kind":"prop","depth":prop["depth"],"data":prop})
 		# Die gezeichneten Fruchtpflanzen SIND die interaktiven FoodSystem-Punkte.
 		for food_prop in food_system.regional_props(self):
 			var food_point: Vector2 = food_prop["point"]

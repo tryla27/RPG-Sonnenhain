@@ -34,6 +34,7 @@ var peak_collection_us:=0
 var decoration_cells:Dictionary={}
 const DECORATION_CACHE_LIMIT:=4096
 const STATIC_RENDERS_PER_FRAME:=1
+const VILLAGE_RECT:=Rect2(0,0,1780,2600)
 ## Neue Modelle entstehen in GDScript (10–50 ms je Modell). Pro Bild nur so
 ## viele bauen, bis dieses Zeitbudget überschritten ist; mindestens eines.
 const MODEL_BUILD_BUDGET_US:=6000
@@ -341,6 +342,9 @@ func paint(g,row:Dictionary)->void:
 		source.position.x+=float(row["crop_side"])*CELL*.5;source.size.x*=.5
 		destination.position.x+=float(row["crop_side"])*size*.5;destination.size.x*=.5
 	# Auch die Projektion einer Außenmauer darf nicht in Dorfpixel hineinragen.
+	if not destination.intersects(VILLAGE_RECT):
+		g.draw_texture_rect_region(page_texture,destination,source)
+		return
 	for part in outside_village(destination):
 		var ratio:=source.size/destination.size
 		var cropped:=Rect2(source.position+(part.position-destination.position)*ratio,part.size*ratio)
@@ -358,10 +362,18 @@ static func outside_village(rect:Rect2)->Array:
 	]
 	return pieces.filter(func(part:Rect2)->bool:return part.has_area())
 
+## Einheitskreis für Schatten einmal vorberechnet (statt 24 Winkelfunktionen je Objekt und Bild).
+static var shadow_circle:PackedVector2Array=_unit_circle()
+const SHADOW_COLOR:=Color(0.0941,0.1686,0.1412,.12)
+static func _unit_circle()->PackedVector2Array:
+	var circle:=PackedVector2Array()
+	for vertex in 12:circle.append(Vector2(cos(vertex*TAU/12),sin(vertex*TAU/12)))
+	return circle
+
 static func paint_shadow(g,point:Vector2,radius:Vector2)->void:
-	var outline:=PackedVector2Array()
-	for vertex in 12:outline.append(point+Vector2(cos(vertex*TAU/12),sin(vertex*TAU/12))*radius)
-	g.draw_colored_polygon(outline,Color("182b24",.12))
+	var outline:=PackedVector2Array();outline.resize(12)
+	for vertex in 12:outline[vertex]=point+shadow_circle[vertex]*radius
+	g.draw_colored_polygon(outline,SHADOW_COLOR)
 
 func foliage_near(g,point:Vector2)->bool:
 	# Derselbe Modell- und Ortsplan wie die Darstellung, auch ohne Grafik nutzbar.

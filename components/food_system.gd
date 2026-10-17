@@ -352,12 +352,20 @@ func gather_mult()->float:
 func buff_label()->String:
  if not meal_active():return ""
  return "%s · %02d:%02d" % [meal_effect_text(),meal_remaining()/60,meal_remaining()%60]
+## Die Pflanzenliste entsteht einmal (configure); die Zeichenliste wird daher
+## nur einmal gebaut statt in jedem Bild Listen zusammenzufügen und zu durchsuchen.
+var regional_cache:Array=[]
+var regional_cache_size:=-1
 func regional_props(g)->Array:
  configure(g)
+ if regional_cache_size==plants.size():return regional_cache
+ var village:Dictionary={}
+ for point in BUSHES+TREES:village[point]=true
  var result:Array=[]
  for plant in plants:
-  if plant["point"] not in BUSHES+TREES:
+  if not village.has(plant["point"]):
    result.append({"kind":str(plant.get("kind","fruit")),"point":plant["point"],"depth":plant["point"].y+20,"region":plant.get("region",0),"name":plant.get("name",""),"color":plant.get("color","")})
+ regional_cache=result;regional_cache_size=plants.size()
  return result
 static func food_rect(c:CanvasItem,p:Vector2,s:float,x:float,y:float,w:float,h:float,col:Color)->void:
  PixelStyle32.rect(c,Rect2(p+Vector2(x,y)*s,Vector2(w,h)*s),col)
