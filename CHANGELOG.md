@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Server 17.10. (Golem zu viert): gemeinsame kodierte Weltpakete für
+  gleiche Ausschnitte (`WorldSnapshot.for_peer`/`transmit` mit
+  Inhaltsschlüssel), Geschosszeilen mit festen Feldern. Weltpaket P95
+  15–17 → 6–10 ms. Werkzeug `tools/benchmark_golem_server.gd`, Test
+  `tests/network/check_world_snapshot_sharing.gd`.
 - Zeichnen 17.10.: `components/canvas_shapes.gd` (fertige Netze für Kreise und
   Schatten über `draw_mesh`, ~0,6 statt ~5 µs je Form, pixelgleich zu
   `draw_circle`); alle einfachen `draw_circle`-Aufrufe umgestellt. Minikarte als

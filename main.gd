@@ -1284,7 +1284,19 @@ func push_world_snapshot() -> void:
 		enemy_rows.append({"attack_state":state,"attack_wait":enemy.get("attack_wait",0.0),"target_peer":enemy.get("target_peer",-1),"facing":[face.x,face.y],"walking":enemy.get("walking",false),"guardian_of":enemy.get("guardian_of",-1),"small_guardian":enemy.get("small_guardian",false),"uid":enemy.get("uid",0), "context":"world", "instance_id":"world", "region":region_at(enemy["pos"]), "type":enemy.get("type",0), "pos":[enemy["pos"].x,enemy["pos"].y], "hp":enemy.get("hp",1.0), "max_hp":enemy.get("max_hp",1.0), "elite":enemy.get("elite",0), "flash":enemy.get("flash",0.0), "shot":enemy.get("shot",1.0), "hit":enemy.get("hit",0.0), "seed":enemy.get("seed",0.0), "stun":enemy.get("stun",0.0), "slow":enemy.get("slow",0.0), "poison":enemy.get("poison",0.0), "poison_tick":enemy.get("poison_tick",1.0), "marked":enemy.get("marked",0.0),"boss_spawn_timer":enemy.get("boss_spawn_timer",0.0),"golem":GolemBoss.net_info(enemy.get("golem",{}))})
 	var shot_rows: Array = []
 	for shot in enemy_projectiles:
-		shot_rows.append({"pos":[shot["pos"].x,shot["pos"].y],"dir":[shot["dir"].x,shot["dir"].y],"speed":shot.get("speed",265.0),"life":shot.get("life",1.0),"damage":shot.get("damage",1),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0),"kind":shot.get("kind","projectile"),"ability_id":shot.get("ability_id","basic"),"radius":shot.get("radius",0.0),"age":shot.get("age",0.0),"duration":shot.get("duration",0.0)})
+		# Feste Angaben eines Geschosses einmal als Zeile anlegen, je Paket nur die
+		# veränderlichen Werte setzen (Golemkampf: bis zu 270 Geschosse).
+		var row: Dictionary = shot.get("_net_row", {})
+		if row.is_empty():
+			row = {"speed":shot.get("speed",265.0),"type":shot.get("type",0),"hit_radius":shot.get("hit_radius",14.0),"kind":shot.get("kind","projectile"),"ability_id":shot.get("ability_id","basic"),"duration":shot.get("duration",0.0)}
+			shot["_net_row"] = row
+		row["pos"] = [shot["pos"].x,shot["pos"].y]
+		row["dir"] = [shot["dir"].x,shot["dir"].y]
+		row["life"] = shot.get("life",1.0)
+		row["damage"] = shot.get("damage",1)
+		row["radius"] = shot.get("radius",0.0)
+		row["age"] = shot.get("age",0.0)
+		shot_rows.append(row)
 	var drop_rows:Array=[]
 	for drop in drops:
 		if not drop.has("drop_uid") or not drop.has("item"):continue
@@ -1293,13 +1305,17 @@ func push_world_snapshot() -> void:
 	var snapshot := {"protocol":NETWORK_PROTOCOL_VERSION,"context":"world","instance_id":"world","mobs":enemy_rows.size(),"enemies":enemy_rows,"shots":shot_rows,"drops":drop_rows,"golem":golem_world.snapshot(world_time)}
 	# Golem-Daten voll nur in und am Himmelsgarten, sonst nur Kartensymbol und Pause.
 	var golem_lite := golem_world.lite_snapshot()
+	# Gleiche Ausschnitte teilen sich ein fertig kodiertes Paket.
+	var shared_packets: Dictionary = {}
 	for peer_id in multiplayer.get_peers():
 		var state: Dictionary = remote_players.get(int(peer_id),{})
 		if str(state.get("context","world")) == "world":
 			var peer_pos := network_player_position(int(peer_id))
 			var peer_snapshot := WorldSnapshot.for_peer(snapshot,peer_pos)
-			if not GolemBoss.needs_full(peer_pos): peer_snapshot["golem"] = golem_lite
-			WorldSnapshot.transmit(self,int(peer_id),peer_snapshot)
+			var full_golem := GolemBoss.needs_full(peer_pos)
+			if not full_golem: peer_snapshot["golem"] = golem_lite
+			peer_snapshot["_share_key"].append(full_golem)
+			WorldSnapshot.transmit(self,int(peer_id),peer_snapshot,shared_packets)
 
 @rpc("authority", "call_remote", "unreliable", 1)
 func rpc_world_snapshot(snapshot: Dictionary) -> void:

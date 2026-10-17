@@ -66,6 +66,31 @@ Brave verhält sich wie Edge; ein Brave-spezifischer Fehler zeigte sich nicht.
 Offen: Live-Server-Protokolle (`SERVER_PERF cpu_max`) nach dem nächsten
 Live-Gang vergleichen; Golem-Kampf als Belastungsfall.
 
+## Golemkampf zu viert 17.10.: Weltpakete
+
+Werkzeug `tools/benchmark_golem_server.gd`: dedizierter Server, vier Spieler
+über echte WebSockets, Kampf bis zum Sieg (≈ 210 s Spielzeit, bis 12 Gegner,
+24 Brocken, 130–270 Gegnergeschosse gleichzeitig). Gemessen im Container:
+
+| Messgröße | vorher | nachher |
+|---|---:|---:|
+| Serverschritt (Gegner, Golem) P50 / P95 | 1,4 / 3,5 ms | 1,3 / 3,3 ms |
+| Weltpaket je Sendung P50 | 7,0–7,2 ms | 3,6–5,7 ms |
+| Weltpaket P95 | 15–17 ms | 6–10 ms |
+| Weltpaket max | 25–26 ms | 14–24 ms |
+
+Ursache: Jeder Spieler bekam ein eigenes, neu gepacktes und komprimiertes
+Paket (≈ 1,2 ms je Spieler), auch wenn alle dasselbe sahen. Jetzt teilen sich
+Spieler mit gleichem Ausschnitt ein kodiertes Paket
+(`WorldSnapshot.for_peer` liefert einen Inhaltsschlüssel, `transmit` packt je
+Schlüssel einmal). Geschosszeilen behalten ihre festen Felder und erneuern
+nur Ort, Richtung, Lebenszeit, Schaden, Radius und Alter.
+Rest: Die Geschosszeilen (bis 270 je Paket) und das Packen bleiben der größte
+Anteil; Geschosse könnten später auf dem Client weitergerechnet statt jedes
+Mal gesendet werden (Protokolländerung, nicht umgesetzt).
+Messbedingung: gemeinsamer Container, Werte schwanken je Lauf; der lokale
+Lauf ersetzt keine Live-Messung.
+
 ## Was feststeht
 
 Ergänzung 16.10. nach Umsetzung: Die Kamerabewegung umgeht den Sammelabstand
