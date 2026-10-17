@@ -152,7 +152,7 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 	if int(data.get("equipped_head_uid",-1))>=0:
 		for item in data["inventory"]:
 			if int(item["uid"])==int(data["equipped_head_uid"]) and not preload("res://components/headgear_rules.gd").allowed(item,int(data["class_id"])):return reject("if int(item[uid])==int(data[equipped_head_uid]) and not prel")
-	for field in ["learned","skill_levels","slots","quests","event_states","event_progress","opened_chests","chest_respawn_until","dungeon_chests_opened","dungeon_chest_respawn_until","bosses_defeated","waystone_unlocked","discovered_regions","processed_server_transactions","recent_players","village_gates","arena_leaderboard"]:
+	for field in ["learned","skill_levels","slots","quests","event_states","event_progress","opened_chests","chest_respawn_until","dungeon_chests_opened","dungeon_chest_respawn_until","bosses_defeated","waystone_unlocked","discovered_regions","processed_server_transactions","recent_players","village_gates","arena_leaderboard","hidden_finds"]:
 		if not data.get(field,[]) is Array or data.get(field,[]).size() > (maxi(1024,preload("res://components/fusion_rules.gd").registry_capacity()) if field in ["learned","skill_levels"] else (256 if field == "processed_server_transactions" else 100)):return reject("if not data.get(field[]) is Array or data.get(field[]).size(")
 	var fog:Variant=data.get("world_fog",[])
 	if not fog is Array or fog.size()>512:return reject("if not fog is Array or fog.size()>512")
@@ -216,7 +216,7 @@ func valid_data(data: Dictionary, uuid: String) -> bool:
 		for value in data.get(field,[]):
 			if not (value is float or value is int) or not is_finite(float(value)):return reject("if not (value is float or value is int) or not is_finite(flo")
 			if field in ["chest_respawn_until","dungeon_chest_respawn_until"] and (float(value) < 0.0 or float(value) > Time.get_unix_time_from_system()+86400.0):return reject("if field in [chest_respawn_untildungeon_chest_respawn_until]")
-	for field in ["learned","opened_chests","dungeon_chests_opened","bosses_defeated","waystone_unlocked","discovered_regions","village_gates"]:
+	for field in ["learned","opened_chests","dungeon_chests_opened","bosses_defeated","waystone_unlocked","discovered_regions","village_gates","hidden_finds"]:
 		for value in data.get(field,[]):
 			if not value is bool:return reject("if not value is bool")
 	for value in data.get("processed_server_transactions",[]):

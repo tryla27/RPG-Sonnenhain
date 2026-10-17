@@ -6084,6 +6084,7 @@ func apply_save_data(data: Dictionary, from_server: bool=false) -> void:
 		event_progress[i] = 0
 	for i in bosses_defeated.size(): bosses_defeated[i] = false
 	for i in opened_chests.size(): opened_chests[i] = false
+	hidden_finds.reset()
 	dungeon_id = -1
 	interior_id = -1
 	for i in dungeon_chests_opened.size(): dungeon_chests_opened[i] = false
