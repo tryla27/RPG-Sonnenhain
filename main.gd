@@ -2088,7 +2088,19 @@ func server_cleanup_orphan_mobs() -> void:
 		if now-int(enemy["spawned_at_ms"]) < 30000: continue
 		enemies.remove_at(i)
 
+## Kampfprofile hängen nur von Typ, Elitestufe, Arenastärke und Wächtergröße ab.
+## Gegner fragen sie jedes Bild ab; daher einmal je Kombination bauen und teilen
+## (nur lesend verwendet). Aufrufer, die ändern wollen, kopieren mit duplicate().
+var mob_profile_cache: Dictionary = {}
 func mob_profile(enemy:Dictionary)->Dictionary:
+	var key:="%d:%d:%s:%d" % [int(enemy["type"]),int(enemy.get("elite",0)),str(enemy.get("arena_power",1.0)),int(bool(enemy.get("small_guardian",false)))]
+	if mob_profile_cache.has(key): return mob_profile_cache[key]
+	var built:=build_mob_profile(enemy)
+	if mob_profile_cache.size()>=512: mob_profile_cache.clear()
+	mob_profile_cache[key]=built
+	return built
+
+func build_mob_profile(enemy:Dictionary)->Dictionary:
 	var type:int=int(enemy["type"])
 	var damage:int=roundi(enemy_damage(type)*[1.0,1.15,1.3][clampi(int(enemy.get("elite",0)),0,2)]*float(enemy.get("arena_power",1.0)))
 	var profile:Dictionary=MobCombat.profile(type,ENEMY_TYPES[type],enemy_level(type),damage)
