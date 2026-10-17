@@ -7,9 +7,7 @@ Aufruf (Windows):
 Jedes Teil wird exakt auf die Begrenzung des bisherigen Spielmodells gebracht
 (FIT, Godot-Koordinaten: X rechts, Y oben, Z nach vorn). Dadurch bleiben
 Atlasplatz, Projektion, Tiefensortierung und Kollision unverändert.
-Seit 17.10. auch Felsen (Wiese, Asche, Küste, Dämmergrat).
 Ausgabe: art/models/architecture_v2/<id>.glb, Vorschaubilder unter previews/.
-Mit ONLY=<id,id> in der Umgebung werden nur diese Teile gebaut.
 """
 import bpy
 import bmesh
@@ -42,11 +40,6 @@ FIT = {
     "map11-obj04": ((-0.22, 0.00, -0.22), (0.45, 1.19, 0.45)),
     "map12-obj04": ((-0.22, 0.00, -0.22), (0.45, 1.19, 0.45)),
     "map12-obj05": ((-0.67, 0.03, -0.17), (1.35, 1.20, 0.40)),
-    # Felsen (17.10.): gleiche Begrenzung wie die bisherigen Felsgruppen.
-    "map01-obj05": ((-0.60, -0.04, -0.50), (0.93, 0.67, 0.96)),
-    "map05-obj05": ((-0.55, -0.04, -0.56), (0.87, 0.73, 0.96)),
-    "map06-obj04": ((-0.58, -0.04, -0.54), (0.92, 0.80, 0.97)),
-    "map11-obj03": ((-0.58, -0.06, -0.52), (1.16, 0.64, 0.98)),
 }
 
 # ---------------------------------------------------------------- Szene
@@ -111,15 +104,6 @@ material("pale_b", "e0dccf", "stone_krita.png")
 material("pale_trim", "f7f2e2", "stone_krita.png")
 material("slate_a", "8a8794", "stone_krita.png")
 material("slate_b", "77737f", "stone_krita.png")
-# Felsen je Gebiet: Wiese moosgrau, Asche Basalt, Küste salzhell.
-material("rock_meadow_a", "8b9286", "stone_krita.png")
-material("rock_meadow_b", "767e72", "stone_krita.png")
-material("basalt_a", "57505a", "stone_krita.png")
-material("basalt_b", "6a626a", "stone_krita.png")
-material("basalt_top", "7d7579", "stone_krita.png")
-material("coast_a", "b8b29b", "stone_krita.png")
-material("coast_b", "a19b85", "stone_krita.png")
-material("salt", "e6e2d2")
 
 def new_object(name, mesh):
     obj = bpy.data.objects.new(name, mesh)
@@ -343,72 +327,6 @@ def arch(parts, rng, span, height, depth, stones, trim):
         stone.rotation_euler = (0, -(a - math.pi / 2) * .9, 0)
     blob(parts, (span * .18, -depth * .3, base_z + radius * .5), (.08, .03, .05), "moss", rng, 1)
 
-def boulder(parts, rng, center, size, mat, facets=1, flat_top=0.0, roughness=.22):
-    """Kantiger Felsbrocken: grobe Ikosphäre, verschoben, unten flach, flach schattiert.
-    flat_top schneidet eine Oberfläche ab (Moos oder Schichtplatte darauf)."""
-    mesh = bpy.data.meshes.new("Boulder")
-    bm = bmesh.new()
-    bmesh.ops.create_icosphere(bm, subdivisions=facets, radius=1.0)
-    for v in bm.verts:
-        v.co *= 1 + rng.uniform(-roughness, roughness)
-        v.co.x *= size[0]; v.co.y *= size[1]; v.co.z *= size[2]
-        if v.co.z < 0: v.co.z *= .25
-        if flat_top and v.co.z > size[2] * (1 - flat_top): v.co.z = size[2] * (1 - flat_top) + (v.co.z - size[2] * (1 - flat_top)) * .15
-    bm.to_mesh(mesh); bm.free()
-    for poly in mesh.polygons: poly.use_smooth = False
-    obj = new_object("Boulder", mesh)
-    obj.location = Vector(center)
-    obj.rotation_euler = (0, 0, rng.uniform(-math.pi, math.pi))
-    obj.data.materials.append(MATS[mat])
-    parts.append(obj)
-    return obj
-
-def meadow_rocks(parts, rng):
-    # Drei Brocken: groß hinten, mittel vorn, klein seitlich; Moos auf den Kappen.
-    boulder(parts, rng, (-.08, .12, .0), (.42, .36, .5), "rock_meadow_a", flat_top=.12)
-    boulder(parts, rng, (.26, -.22, .0), (.28, .25, .3), "rock_meadow_b", flat_top=.1)
-    boulder(parts, rng, (-.34, -.3, .0), (.17, .15, .17), "rock_meadow_a")
-    blob(parts, (-.1, .1, .46), (.26, .2, .05), "moss", rng, 1)
-    blob(parts, (.24, -.24, .28), (.15, .12, .035), "moss_dark", rng, 1)
-    for i in range(4):
-        blob(parts, (rng.uniform(-.45, .45), rng.uniform(-.45, -.3), .02), (.06, .05, .03), "moss", rng, 1)
-
-def basalt_rocks(parts, rng):
-    # Säulenbasalt: kantige Sechseckstümpfe unterschiedlicher Höhe, helle Kappen.
-    columns = [(-.18, .1, .62), (.12, .14, .5), (.0, -.16, .38), (.3, -.12, .26), (-.36, -.12, .3)]
-    for x, y, h in columns:
-        mesh = bpy.data.meshes.new("Basalt")
-        bm = bmesh.new()
-        bmesh.ops.create_cone(bm, cap_ends=True, segments=6, radius1=.15, radius2=.13, depth=h)
-        for v in bm.verts: v.co.z += h * .5
-        bm.to_mesh(mesh); bm.free()
-        for poly in mesh.polygons: poly.use_smooth = False
-        obj = new_object("Basalt", mesh)
-        obj.location = Vector((x, y, 0)); obj.rotation_euler = (rng.uniform(-.05, .05), rng.uniform(-.05, .05), rng.uniform(0, math.pi))
-        obj.data.materials.append(MATS[rng.choice(["basalt_a", "basalt_b"])])
-        parts.append(obj)
-        block(parts, (x, y, h + .015), (.24, .22, .035), "basalt_top", rng, bevel=.01, tilt=.08)
-    for i in range(3):
-        block(parts, (rng.uniform(-.4, .4), rng.uniform(-.42, -.3), .04), (.11, .09, .08), "basalt_b", rng, bevel=.015, tilt=.6, chip=.4)
-
-def coast_rocks(parts, rng):
-    # Rund gewaschener Fels mit flachen Schliffseiten und Salzrändern.
-    boulder(parts, rng, (0, .05, 0), (.42, .38, .62), "coast_a", facets=2, roughness=.12)
-    boulder(parts, rng, (.3, -.26, 0), (.2, .18, .22), "coast_b", facets=2, roughness=.14)
-    for i in range(5):
-        blob(parts, (rng.uniform(-.35, .35), rng.uniform(-.2, .2), rng.uniform(.25, .5)), (.07, .05, .012), "salt", rng, 1)
-
-def slate_rocks(parts, rng):
-    # Gestapelte Schieferplatten, jede leicht versetzt und gekippt.
-    z = 0.0
-    for layer in range(6):
-        w = 1.0 - layer * .11 + rng.uniform(-.04, .04); d = .8 - layer * .07
-        h = rng.uniform(.07, .11)
-        block(parts, (rng.uniform(-.06, .06), rng.uniform(-.05, .05), z + h * .5), (w, d, h), rng.choice(["slate_a", "slate_b"]), rng, bevel=.015, tilt=.07, chip=.25)
-        z += h
-    for i in range(3):
-        block(parts, (rng.uniform(-.5, .5), rng.uniform(-.45, -.3), .03), (.14, .1, .05), "slate_b", rng, bevel=.01, tilt=.5)
-
 def rubble(parts, rng, stones):
     for i in range(9):
         s = rng.uniform(.12, .24)
@@ -457,14 +375,6 @@ def build_piece(piece_id):
         arch(parts, rng, 1.35, 1.2, .36, ["pale_a", "pale_b"] if pale else STONES, "pale_trim" if pale else "coping")
     elif piece_id == "map03-obj05":
         slab(parts, rng, STONES)
-    elif piece_id == "map01-obj05":
-        meadow_rocks(parts, rng)
-    elif piece_id == "map05-obj05":
-        basalt_rocks(parts, rng)
-    elif piece_id == "map06-obj04":
-        coast_rocks(parts, rng)
-    elif piece_id == "map11-obj03":
-        slate_rocks(parts, rng)
     return parts
 
 def join(parts, name):
@@ -533,13 +443,8 @@ def preview(objects, path):
     bpy.ops.render.render(write_still=True)
     for o in (cam, sun): bpy.data.objects.remove(o)
 
-import os
-ONLY = [p for p in os.environ.get("ONLY", "").split(",") if p]
-manifest_path = OUT / "manifest.json"
-old_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))["assets"] if ONLY and manifest_path.exists() else []
-manifest = [m for m in old_manifest if m["id"] not in ONLY]
+manifest = []
 for piece_id in FIT:
-    if ONLY and piece_id not in ONLY: continue
     parts = build_piece(piece_id)
     obj = join(parts, piece_id.replace("-", "_"))
     fit(obj, piece_id)
@@ -554,7 +459,6 @@ for piece_id in FIT:
     obj.hide_render = True
     obj.hide_set(True)
 
-manifest.sort(key=lambda m: list(FIT).index(m["id"]) if m["id"] in FIT else 999)
 (OUT / "manifest.json").write_text(json.dumps({"schema": 1, "generator": "tools/art_pipeline/build_architecture_v2.py", "assets": manifest}, indent=1), encoding="utf-8")
-if not ONLY: bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / "art/source/blender/sonnenhain_architecture_v2.blend"))
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / "art/source/blender/sonnenhain_architecture_v2.blend"))
 print("ARCHITECTURE_V2_OK", len(manifest))

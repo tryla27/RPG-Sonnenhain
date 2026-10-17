@@ -159,6 +159,9 @@ Weitere Grafik und Spielführung aus dem Konzept, alle mit Vorschaubildern:
 - Gebietsbanner mit 13 Inkscape-Wappen beim ersten Betreten:
   [Bild](design/region-banner/ruinen.jpg).
 - Siegeltor an bossgesperrten Toren: [Bild](design/boss-seal/siegeltor.jpg).
+- Felsen fürs Architekturset (Moosfels, Säulenbasalt, Küstenfels, Schiefer),
+  in Godot gebaut, gleiche Begrenzung: [Vergleich](design/architecture-v2/rocks_compare.jpg),
+  [Nahaufnahme](design/architecture-v2/rocks_zoom.jpg).
 - Pixel-Porträts zu Meldungen von Mira, Fenna und Borin.
 - Spielpilot Nebenpfad: vier verborgene Funde abseits der Hauptwege
   (Trittsteine, Steinmal, je Charakter einmal, neues Speicherfeld
