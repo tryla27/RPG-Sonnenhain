@@ -7,6 +7,7 @@ const Geometry=preload("res://components/world_geometry.gd")
 const AtlasSlots=preload("res://components/landscape_atlas_slots.gd")
 const AtlasPage=preload("res://components/landscape_atlas_page.gd")
 const ArchitectureKit=preload("res://components/architecture_kit.gd")
+const Shapes=preload("res://components/canvas_shapes.gd")
 const CELL:=128
 const UNITS:=3.7
 const FOOT:=Vector2(.5,.66)
@@ -329,26 +330,40 @@ func append_entries(entries:Array)->void:
 func paint(g,row:Dictionary)->void:
 	if texture==null or not is_instance_valid(viewport):return
 	var page_texture:Texture2D=atlas_pages[int(row.get("atlas_page",0))].viewport.get_texture()
-	var size:=UNITS*float(row["pixels"])
-	var point:Vector2=row.get("render_point",row["point"])
-	if not str(row["model"]).begins_with("common-wall-"):
-		var is_arch:bool=(int(row["map"])==3 and int(row["motif"])==4) or (int(row["map"])==12 and int(row["motif"])==5)
-		if is_arch:
-			for side in [-1,1]:paint_shadow(g,point+Vector2(side*.53*float(row["pixels"]),0),Vector2(5,2))
-		else:paint_shadow(g,point,Vector2(15,5)*float(row["pixels"])/45.0)
+	# Schatten und Zielrechteck hängen nur vom (festen) Ort des Körpers ab und
+	# werden je Zeile einmal berechnet; die Atlasquelle kann wechseln.
+	var cached:Variant=row.get("_paint")
+	if cached==null:
+		cached=paint_layout(row);row["_paint"]=cached
+	for shadow in cached["shadows"]:Shapes.ellipse(g,shadow[0],shadow[1],SHADOW_COLOR)
 	var source:Rect2=row["source"]
-	var destination:=Rect2(point-FOOT*size,Vector2.ONE*size)
 	if row.has("crop_side"):
 		source.position.x+=float(row["crop_side"])*CELL*.5;source.size.x*=.5
-		destination.position.x+=float(row["crop_side"])*size*.5;destination.size.x*=.5
+	var destination:Rect2=cached["destination"]
 	# Auch die Projektion einer Außenmauer darf nicht in Dorfpixel hineinragen.
-	if not destination.intersects(VILLAGE_RECT):
+	if not bool(cached["village"]):
 		g.draw_texture_rect_region(page_texture,destination,source)
 		return
 	for part in outside_village(destination):
 		var ratio:=source.size/destination.size
 		var cropped:=Rect2(source.position+(part.position-destination.position)*ratio,part.size*ratio)
 		g.draw_texture_rect_region(page_texture,part,cropped)
+
+## Feste Zeichenangaben einer Zeile: Schatten (Mitte, Halbachsen), Zielrechteck,
+## Dorfüberlappung.
+static func paint_layout(row:Dictionary)->Dictionary:
+	var size:=UNITS*float(row["pixels"])
+	var point:Vector2=row.get("render_point",row["point"])
+	var shadows:Array=[]
+	if not str(row["model"]).begins_with("common-wall-"):
+		var is_arch:bool=(int(row["map"])==3 and int(row["motif"])==4) or (int(row["map"])==12 and int(row["motif"])==5)
+		if is_arch:
+			for side in [-1,1]:shadows.append([point+Vector2(side*.53*float(row["pixels"]),0),Vector2(5,2)])
+		else:shadows.append([point,Vector2(15,5)*float(row["pixels"])/45.0])
+	var destination:=Rect2(point-FOOT*size,Vector2.ONE*size)
+	if row.has("crop_side"):
+		destination.position.x+=float(row["crop_side"])*size*.5;destination.size.x*=.5
+	return {"shadows":shadows,"destination":destination,"village":destination.intersects(VILLAGE_RECT)}
 
 static func outside_village(rect:Rect2)->Array:
 	var village:=Geometry.region_rect(0)
@@ -362,18 +377,8 @@ static func outside_village(rect:Rect2)->Array:
 	]
 	return pieces.filter(func(part:Rect2)->bool:return part.has_area())
 
-## Einheitskreis für Schatten einmal vorberechnet (statt 24 Winkelfunktionen je Objekt und Bild).
-static var shadow_circle:PackedVector2Array=_unit_circle()
+## Schatten als fertiges 12-Eck (canvas_shapes.gd) statt neu zerlegtem Polygon.
 const SHADOW_COLOR:=Color(0.0941,0.1686,0.1412,.12)
-static func _unit_circle()->PackedVector2Array:
-	var circle:=PackedVector2Array()
-	for vertex in 12:circle.append(Vector2(cos(vertex*TAU/12),sin(vertex*TAU/12)))
-	return circle
-
-static func paint_shadow(g,point:Vector2,radius:Vector2)->void:
-	var outline:=PackedVector2Array();outline.resize(12)
-	for vertex in 12:outline[vertex]=point+shadow_circle[vertex]*radius
-	g.draw_colored_polygon(outline,SHADOW_COLOR)
 
 func foliage_near(g,point:Vector2)->bool:
 	# Derselbe Modell- und Ortsplan wie die Darstellung, auch ohne Grafik nutzbar.

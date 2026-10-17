@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Vorbereitung aus denselben Reichweiten wie der Kampf; keine neue Trefferlogik.
 static func outline(origin:Vector2,direction:Vector2,ability:Dictionary)->PackedVector2Array:
 	var points:=PackedVector2Array([origin])
@@ -11,7 +12,7 @@ static func paint(c:CanvasItem,p:Vector2,direction:Vector2,ability:Dictionary,ti
 	var opacity:=lerpf(.08,.18,clampf(progress,0,1))
 	match str(ability["shape"]):
 		"cloud":
-			c.draw_circle(p,reach,Color(tint,opacity))
+			Shapes.circle(c,p,reach,Color(tint,opacity))
 			c.draw_arc(p,reach,0,TAU,48,Color("b9d965",.8),2)
 			c.draw_arc(p,reach-4,-PI*.5,-PI*.5+TAU*clampf(progress,0,1),40,Color("eff4ba",.8),2)
 		"leap":pass # Die bestätigte Wolfspose bleibt ohne Zielmarkierung.

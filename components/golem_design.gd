@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 # Aussehen des Dunklen Golems (eigener Entwurf, kein Nachbau):
 # gebückter Koloss aus kantigen, steinig-schwarzen Basaltblöcken mit lila
 # Elixier-Rissen, riesigen Fäusten, tief sitzendem Kopf mit zwei glühenden
@@ -176,7 +177,7 @@ static func draw_golem(c:CanvasItem,pos:Vector2,type:int,info:Dictionary,facing:
 	if state=="rise":
 		for k in 8:
 			var d:=pos+Vector2.RIGHT.rotated(k*TAU/8.0+time)*(30*u*rise)
-			c.draw_circle(d,6*u*(1.0-rise*0.5),Color("8c7d74",0.35))
+			Shapes.circle(c,d,6*u*(1.0-rise*0.5),Color("8c7d74",0.35))
 
 static func _ellipse(center:Vector2,rx:float,ry:float)->PackedVector2Array:
 	var pts:=PackedVector2Array()
@@ -201,7 +202,7 @@ static func draw_altar(c:CanvasItem,pos:Vector2,active:bool,time:float)->void:
 ## sleeping: 15-Minuten-Pause nach dem Sieg, Symbol grau ohne Leuchten.
 static func draw_map_marker(c:CanvasItem,point:Vector2,active:bool,time:float,sleeping:bool=false)->void:
 	var pulse:=0.5+0.5*sin(time*(6.0 if active else 2.0))
-	c.draw_circle(point,10,OUTLINE)
+	Shapes.circle(c,point,10,OUTLINE)
 	c.draw_colored_polygon(PackedVector2Array([point+Vector2(-7,-4),point+Vector2(-3,-8),point+Vector2(4,-8),point+Vector2(8,-3),point+Vector2(7,5),point+Vector2(-6,6)]),Color("5c5a60") if sleeping else BASALT_LIGHT)
 	if sleeping:
 		c.draw_polyline(PackedVector2Array([point+Vector2(-5,-1),point+Vector2(-1,2),point+Vector2(2,-3),point+Vector2(5,1)]),Color("8d8a92"),2.0)
@@ -215,7 +216,7 @@ static func draw_world_fx(c:CanvasItem,world,time:float)->void:
 	for f in world.fields:
 		var center:=Vector2(f["pos"][0],f["pos"][1])
 		var fade:=clampf(float(f["life"])/1.0,0.0,1.0)
-		c.draw_circle(center,GolemBoss.FIELD_RADIUS,Color(CRACK,0.07*fade))
+		Shapes.circle(c,center,GolemBoss.FIELD_RADIUS,Color(CRACK,0.07*fade))
 		c.draw_arc(center,GolemBoss.FIELD_RADIUS,0,TAU,72,Color(CRACK,0.6*fade),4.0)
 		c.draw_arc(center,GolemBoss.FIELD_RADIUS-14,time,time+TAU*0.8,48,Color(CRACK_GLOW,0.25*fade),2.0)
 	for h in world.hail:

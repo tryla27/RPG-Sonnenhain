@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Himmelsfalter (Gegner 25, Himmelsgarten): schwebender Sternenträger.
 ## Konzept 10.10.2026: flauschiger dunkelvioletter Nachtfalter, große obere und
 ## kleinere untere Flügel, gefiederte Fühler, Lavendel/Perlmutt/Gold, sternförmige
@@ -96,9 +97,9 @@ static func paint(c:CanvasItem,foot:Vector2,look:Vector2,phase:float,attack:floa
 				var eye:=Vector2(27.0*width*side,-15.0)
 				var glow:=0.0
 				if attack>=0.0:glow=smoothstep(0.0,0.35,attack)*(1.0-smoothstep(0.5,0.8,attack))
-				if glow>0.0:c.draw_circle(eye,9.0*width+4.0*glow,col.call(Color(GOLD,0.35*glow)))
+				if glow>0.0:Shapes.circle(c,eye,9.0*width+4.0*glow,col.call(Color(GOLD,0.35*glow)))
 				c.draw_colored_polygon(_star(eye,6.5*maxf(0.55,width),2.8*maxf(0.55,width),side),col.call(GOLD.lerp(PEARL,glow*0.6)))
-				c.draw_circle(eye,1.6*width,col.call(OUTLINE))
+				Shapes.circle(c,eye,1.6*width,col.call(OUTLINE))
 				# Goldene Aderlinie.
 				c.draw_line(Vector2(3*side,-2),Vector2(38.0*width*side,-26),col.call(Color(GOLD,0.5)),1.2)
 	# Körper: Hinterleib in Segmenten, pelzige Brust, kleiner Kopf.
@@ -112,14 +113,14 @@ static func paint(c:CanvasItem,foot:Vector2,look:Vector2,phase:float,attack:floa
 	c.draw_colored_polygon(_ellipse(Vector2(0,-1),7.8,8.8,14),col.call(BODY))
 	for k in 7:
 		var a:=k*TAU/7.0+clock*0.3
-		c.draw_circle(Vector2(cos(a)*6.0,sin(a)*6.5-2.0),2.2,col.call(FUZZ))
-	c.draw_circle(Vector2(0,-3),3.0,col.call(LAVENDER.darkened(0.1)))
+		Shapes.circle(c,Vector2(cos(a)*6.0,sin(a)*6.5-2.0),2.2,col.call(FUZZ))
+	Shapes.circle(c,Vector2(0,-3),3.0,col.call(LAVENDER.darkened(0.1)))
 	var head:=Vector2(3.0 if side_view and facing_right else (-3.0 if side_view else 0.0),-11.0)
-	c.draw_circle(head,5.6,col.call(OUTLINE))
-	c.draw_circle(head,4.6,col.call(BODY.lightened(0.08)))
+	Shapes.circle(c,head,5.6,col.call(OUTLINE))
+	Shapes.circle(c,head,4.6,col.call(BODY.lightened(0.08)))
 	if not back:
 		for e in ([-1.0,1.0] if not side_view else [1.0 if facing_right else -1.0]):
-			c.draw_circle(head+Vector2(e*2.0,0.5),1.5,col.call(PEARL))
+			Shapes.circle(c,head+Vector2(e*2.0,0.5),1.5,col.call(PEARL))
 	# Gefiederte Fühler, federn beim Flügelschlag leicht nach.
 	var sway:=sin(clock*8.0+seed)*1.5*(open.x-0.5)
 	for side in [-1.0,1.0]:
@@ -136,15 +137,15 @@ static func paint(c:CanvasItem,foot:Vector2,look:Vector2,phase:float,attack:floa
 		for k in 7:
 			var t:=clampf((death-0.3)/0.7,0.0,1.0)
 			var dp:=thorax+Vector2(sin(k*2.3+seed)*20.0,-t*26.0-k*3.0)*scale
-			c.draw_circle(dp,2.0*scale*(1.0-t),Color(PEARL if k%2==0 else GOLD,0.8*(1.0-t)))
+			Shapes.circle(c,dp,2.0*scale*(1.0-t),Color(PEARL if k%2==0 else GOLD,0.8*(1.0-t)))
 
 ## Sternenstaub-Schuss: funkelnder Stern mit Staubschweif.
 static func draw_shot(c:CanvasItem,p:Vector2,dir:Vector2,age:float)->void:
 	var d:=dir.normalized() if dir.length_squared()>0.0001 else Vector2.RIGHT
 	for k in 8:
 		var q:=p-d*(8.0+k*7.0)+d.orthogonal()*sin(age*20.0+k)*3.0
-		c.draw_circle(q,4.4-k*0.45,Color(LAVENDER if k%2==0 else GOLD,0.6-k*0.07))
-	c.draw_circle(p,14.0,Color(LAVENDER,0.25))
+		Shapes.circle(c,q,4.4-k*0.45,Color(LAVENDER if k%2==0 else GOLD,0.6-k*0.07))
+	Shapes.circle(c,p,14.0,Color(LAVENDER,0.25))
 	c.draw_colored_polygon(_star(p,12.0,4.6,1.0,age*6.0),Color(PEARL))
 	c.draw_colored_polygon(_star(p,6.5,2.6,1.0,age*6.0),Color(GOLD))
 

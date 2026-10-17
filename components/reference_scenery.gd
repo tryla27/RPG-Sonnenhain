@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Reference-inspired environment rendered as geometry, with no image assets.
 const House = preload("res://components/reference_house.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
@@ -138,7 +139,7 @@ static func gatepost(c:CanvasItem,p:Vector2) -> void:
 	rect(c,p,-28,-27,56,67,"294e75")
 	rect(c,p,-28,-27,3,65,"e2b965")
 	rect(c,p,25,-27,3,65,"e2b965")
-	c.draw_circle(p+Vector2(0,0),10,Color("e8bc58"))
+	Shapes.circle(c,p+Vector2(0,0),10,Color("e8bc58"))
 	for i in range(8):
 		var ray:Vector2=Vector2.RIGHT.rotated(i*TAU/8.0)
 		c.draw_line(p+ray*15,p+ray*22,Color("e8bc58"),3)

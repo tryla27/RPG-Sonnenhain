@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Individual transparent reference-style sprites, composed into the existing game world.
 const VillageHouseTiles32 = preload("res://components/village_house_tiles_32.gd")
 static var objects:Texture2D
@@ -102,8 +103,8 @@ static func cart(c:CanvasItem,p:Vector2,kind:String)->void:
 		return
 	c.draw_rect(Rect2(p+Vector2(-48,-35),Vector2(96,46)),Color("8d6845"))
 	c.draw_rect(Rect2(p+Vector2(-42,-30),Vector2(84,31)),Color("b68758"))
-	c.draw_circle(p+Vector2(-34,18),15,Color("4a4038"))
-	c.draw_circle(p+Vector2(34,18),15,Color("4a4038"))
+	Shapes.circle(c,p+Vector2(-34,18),15,Color("4a4038"))
+	Shapes.circle(c,p+Vector2(34,18),15,Color("4a4038"))
 	# Real stock markers distinguish the existing merchant professions.
 	var col:Color=Color("68dae2") if kind in ["alchemy","healer"] else Color("deb864")
 	c.draw_rect(Rect2(p+Vector2(38,-22),Vector2(7,11)),col)
@@ -113,8 +114,8 @@ static func waystone(c:CanvasItem,p:Vector2,_active:bool)->void:
 		sprite(c,objects,Rect2(1020,535,515,470),Rect2(p+Vector2(-78,-113),Vector2(156,156)))
 		return
 	c.draw_colored_polygon(PackedVector2Array([p+Vector2(0,-70),p+Vector2(34,-18),p+Vector2(24,48),p+Vector2(-24,48),p+Vector2(-34,-18)]),Color("657b7d"))
-	c.draw_circle(p+Vector2(0,-12),13,Color("8fd9e1"))
-	c.draw_circle(p+Vector2(0,-12),6,Color("d8ffff"))
+	Shapes.circle(c,p+Vector2(0,-12),13,Color("8fd9e1"))
+	Shapes.circle(c,p+Vector2(0,-12),6,Color("d8ffff"))
 static func wall(c:CanvasItem,face:Rect2)->void:
 	init_art()
 	for x in range(floori(face.position.x/32),ceili(face.end.x/32)):

@@ -23,8 +23,8 @@ func health(c:CanvasItem,key:String,p:Vector2,hp:float,maximum:float,width:float
 	bars[key]=row
 	var r:=Rect2(p-Vector2(width*.5,0),Vector2(width,8))
 	c.draw_rect(r.grow(1),Color("0d1b2a"))
+	# Innenfläche hat dieselbe deckende Farbe wie der Rahmen: ein Rechteck genügt.
 	c.draw_rect(r,Color("443b43"))
-	c.draw_rect(Rect2(r.position+Vector2.ONE,r.size-Vector2.ONE*2),Color("443b43"))
 	c.draw_rect(Rect2(r.position+Vector2.ONE,Vector2((width-2)*float(row["trail"]),6)),Color("e9bb78"))
 	c.draw_rect(Rect2(r.position+Vector2.ONE,Vector2((width-2)*value,6)),color)
 	if age<.18:c.draw_rect(r,Color(1,.93,.8,(1-age/.18)*.45))

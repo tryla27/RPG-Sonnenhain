@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Verborgene Funde am Nebenpfad (Gameplay-Pilot aus dem Grafik-/Gameplay-Konzept):
 ## Von vier frühen Wahrzeichen führt ein kleiner Trittsteinpfad abseits der Wege
 ## zu einem Steinmal. Einmal je Charakter: Gold, Erfahrung und ein Satz Weltgeschichte.
@@ -67,5 +68,5 @@ static func paint_cairn(canvas:CanvasItem,p:Vector2,glowing:bool,clock:float)->v
 	canvas.draw_rect(Rect2(p+Vector2(12,-2),Vector2(8,4)),Color("6f9a5a"))
 	if glowing:
 		var pulse:=.55+.45*sin(clock*2.6)
-		canvas.draw_circle(p+Vector2(0,-40),9.0+pulse*3.0,Color(1.0,.9,.55,.18*pulse))
-		canvas.draw_circle(p+Vector2(0,-40),4.0,Color(1.0,.93,.65,.75))
+		Shapes.circle(canvas,p+Vector2(0,-40),9.0+pulse*3.0,Color(1.0,.9,.55,.18*pulse))
+		Shapes.circle(canvas,p+Vector2(0,-40),4.0,Color(1.0,.93,.65,.75))

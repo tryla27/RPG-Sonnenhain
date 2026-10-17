@@ -6,6 +6,13 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Zeichnen 17.10.: `components/canvas_shapes.gd` (fertige Netze für Kreise und
+  Schatten über `draw_mesh`, ~0,6 statt ~5 µs je Form, pixelgleich zu
+  `draw_circle`); alle einfachen `draw_circle`-Aufrufe umgestellt. Minikarte als
+  21×21-Bild, nur bei Bewegung/Nebeländerung neu gefüllt. Landschaftskörper
+  merken Schatten und Zielrechteck je Zeile. Stufenschilder zwischengespeichert,
+  `food_system.nearest` prüft erst den Abstand. Mit 25 Wiesengegnern: KI +
+  Zeichnen 16,6 → 8,8 ms je Bild (nativ, Container).
 - Gegner-KI 17.10.: vollständige Wege zu kaum bewegten Zielen werden
   weiterbenutzt (`MobNavigation.still_valid`), statt alle 0,6 s neu zu suchen
   (25 Schleime: 434 → 27 Suchen in 3,5 s). Abstandsprüfung mit Vorabtest,

@@ -3,6 +3,7 @@
 # Release marker: [deploy] class bosses, shared loot, boss arenas/houses, harvest visuals/timers, HUD separation and audiovisual combat.
 # Release marker: production rollout for class bosses, HUD separation, Borin route, harvest timers and boss audiovisual combat.
 extends Node2D
+const Shapes=preload("res://components/canvas_shapes.gd")
 const WorldObstacles3D=preload("res://components/world_obstacles_3d.gd")
 var world_obstacles_3d:=WorldObstacles3D.new()
 var minimap_ground_cache:=preload("res://components/minimap_ground_cache.gd").new()
@@ -8020,11 +8021,11 @@ func _draw() -> void:
 		if visible_world(cloud["pos"], 110):
 			var center: Vector2 = cloud["pos"]
 			var fade: float = minf(1.0, float(cloud["life"]) * 0.65)
-			draw_circle(center, 83, Color(0.32, 0.52, 0.23, 0.18 * fade))
+			Shapes.circle(self,center, 83, Color(0.32, 0.52, 0.23, 0.18 * fade))
 			for bubble in 9:
 				var angle := float(bubble) * TAU / 9.0 + world_time * (0.2 if bubble % 2 == 0 else -0.3)
 				var point := center + Vector2.RIGHT.rotated(angle) * (19 + bubble % 4 * 16)
-				draw_circle(point + Vector2(0, sin(world_time * 3.0 + bubble) * 6), 5 + bubble % 3, Color(0.62, 0.88, 0.35, 0.55 * fade))
+				Shapes.circle(self,point + Vector2(0, sin(world_time * 3.0 + bubble) * 6), 5 + bubble % 3, Color(0.62, 0.88, 0.35, 0.55 * fade))
 	for shot in enemy_projectiles:
 		if visible_world(shot["pos"], maxf(45.0,float(shot.get("radius",0.0)))):
 			var p: Vector2 = shot["pos"]
@@ -8071,25 +8072,25 @@ func _draw() -> void:
 					draw_line(start, finish, Color(accent, float(segment) / float(trail.size()) * 0.5), 3 if spell_id in [18, 25] else 8)
 			if spell_id == 16:
 				var flame_tail := p - d * 15.0
-				draw_circle(flame_tail, 18 + sin(world_time * 24) * 3, Color("d84d28", 0.42))
+				Shapes.circle(self,flame_tail, 18 + sin(world_time * 24) * 3, Color("d84d28", 0.42))
 				draw_colored_polygon(PackedVector2Array([p-d*20-side*10,p+d*9-side*8,p+d*20,p+d*8+side*9,p-d*19+side*10]),Color("ed672f"))
-				draw_circle(p, 12, Color("ff9a3f"))
-				draw_circle(p + side * 3 - d * 2, 6, Color("fff0a6"))
+				Shapes.circle(self,p, 12, Color("ff9a3f"))
+				Shapes.circle(self,p + side * 3 - d * 2, 6, Color("fff0a6"))
 			elif spell_id == 22:
 				draw_line(p-d*28,p+d*14,Color("a83d26",0.55),14)
 				draw_line(p-d*23,p+d*10,Color("ff7b32"),8)
 				draw_colored_polygon(PackedVector2Array([p+d*25,p+side*8,p-d*24,p-side*8]),Color("ffad4d"))
-				draw_circle(p-d*7,6,Color("fff0a6"))
+				Shapes.circle(self,p-d*7,6,Color("fff0a6"))
 			elif spell_id == 18:
 				draw_line(p - d * 70, p + d * 31, Color("f5d56c", 0.6), 13)
 				draw_line(p - d * 85, p + d * 32, Color("fff9d4"), 4)
-				draw_circle(p + d * 32, 7, Color.WHITE)
+				Shapes.circle(self,p + d * 32, 7, Color.WHITE)
 			elif spell_id == 20:
-				draw_circle(p, 15, Color("9e85e9", 0.35))
+				Shapes.circle(self,p, 15, Color("9e85e9", 0.35))
 				for spark in 3:
 					var ray := Vector2.RIGHT.rotated(world_time * 7 + float(spark) * TAU / 3.0)
 					draw_rect(Rect2(p + ray * 14 - Vector2(4, 4), Vector2(8, 8)), Color("ddc8ff"))
-				draw_circle(p, 6, Color.WHITE)
+				Shapes.circle(self,p, 6, Color.WHITE)
 			elif spell_id == 25:
 				draw_line(p - d * 58, p + d * 36, Color("f9e1a3", 0.4), 11)
 				draw_line(p - d * 42, p + d * 20, Color("fff7d4"), 4)
@@ -8097,7 +8098,7 @@ func _draw() -> void:
 			elif spell_id == 28:
 				draw_line(p - d * 19, p + d * 12, Color("625b3a"), 5)
 				draw_colored_polygon(PackedVector2Array([p + d * 22, p + side * 9, p - side * 9]), Color("c0eb69"))
-				for drop in 3: draw_circle(p - d * (8 + drop * 10) + side * sin(world_time * 15 + drop) * 7, 4, Color("91cd5f", 0.72))
+				for drop in 3: Shapes.circle(self,p - d * (8 + drop * 10) + side * sin(world_time * 15 + drop) * 7, 4, Color("91cd5f", 0.72))
 			elif spell_id == 29:
 				draw_colored_polygon(PackedVector2Array([p + d * 30, p + side * 10, p - d * 25, p - side * 10]), Color("d4f9ff"))
 				draw_line(p - d * 21, p + d * 18, Color("78c6eb"), 4)
@@ -8108,9 +8109,9 @@ func _draw() -> void:
 					var from_point := p - d * (zig * 13) + side * (6 if zig % 2 == 0 else -6)
 					draw_line(from_point, from_point + d * 15 - side * (12 if zig % 2 == 0 else -12), Color("fff0a5"), 4)
 			elif int(projectile["kind"]) == 2:
-				draw_circle(p - d * 14, 15, Color(accent, 0.24))
-				draw_circle(p, 12 + sin(world_time * 19) * 2, accent)
-				draw_circle(p - d * 3, 5, Color.WHITE)
+				Shapes.circle(self,p - d * 14, 15, Color(accent, 0.24))
+				Shapes.circle(self,p, 12 + sin(world_time * 19) * 2, accent)
+				Shapes.circle(self,p - d * 3, 5, Color.WHITE)
 			elif int(projectile["kind"]) == 3:
 				draw_line(p - d * 27, p + d * 16, Color("735a47"), 4)
 				draw_colored_polygon(PackedVector2Array([p + d * 23, p + side * 7, p - side * 7]), accent)
@@ -8127,7 +8128,7 @@ func _draw() -> void:
 			var c: Color = Color("ecaa75") if zone["element"] == "feuer" else (Color("aedbf0") if zone["element"] == "eis" else Color("f5dfa0"))
 			var p: Vector2 = zone["pos"]
 			var radius: float = float(zone["radius"])
-			draw_circle(p, radius, Color(c, 0.08))
+			Shapes.circle(self,p, radius, Color(c, 0.08))
 			draw_arc(p, radius, 0, TAU, 32, Color(c, 0.65), 4)
 			for ray in 8:
 				var angle := float(ray) * TAU / 8.0 + world_time
@@ -8137,7 +8138,7 @@ func _draw() -> void:
 		var radius: float = float(zone["radius"])
 		var fade := minf(1.0, float(zone["life"]) / 1.0)
 		var tint := Color("ff873e") if str(zone["kind"]) == "fire" else Color("e7c574")
-		draw_circle(center, radius, Color(tint, 0.18 * fade))
+		Shapes.circle(self,center, radius, Color(tint, 0.18 * fade))
 		draw_arc(center, radius, 0.0, TAU, 48, Color(tint, 0.87 * fade), 5)
 		for rune in 12:
 			var offset := Vector2.RIGHT.rotated(float(rune) * TAU / 12.0 + world_time * 0.15) * (radius * 0.72)
@@ -8315,7 +8316,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 			for i in 7:
 				var angle := float(i) * TAU / 7.0 + progress * 2.3
 				var orb := p + Vector2.RIGHT.rotated(angle) * (35 + progress * 35)
-				draw_circle(orb, 7 * alpha + 2, Color("f6a7cb", alpha))
+				Shapes.circle(self,orb, 7 * alpha + 2, Color("f6a7cb", alpha))
 		7:
 			for i in [-1, 0, 1]:
 				draw_line(p + direction.rotated(float(i) * 0.28) * 35, p + direction.rotated(float(i) * 0.28) * (80 + progress * 45), Color("c8b5ff", alpha), 5)
@@ -8329,20 +8330,20 @@ func draw_spell_local(visual: Dictionary) -> void:
 				var ray := direction.rotated(float(i) * 0.2)
 				var tip := p + ray * (55 + progress * 115)
 				draw_line(p + ray * 25, tip, Color("9ce6f7", alpha), 9)
-				draw_circle(tip, 8 * alpha + 2, Color("f1ffff", alpha))
+				Shapes.circle(self,tip, 8 * alpha + 2, Color("f1ffff", alpha))
 		13:
 			draw_arc(p, 24 + progress * 65, 0, TAU, 16, Color("fff1a1", alpha), 5)
 		14:
 			for i in 8:
 				var angle := float(i) * TAU / 8.0 + progress * 1.7
 				var bubble := p + Vector2.RIGHT.rotated(angle) * (22 + progress * 56)
-				draw_circle(bubble, 5 + float(i % 3), Color("a8e57a", alpha))
+				Shapes.circle(self,bubble, 5 + float(i % 3), Color("a8e57a", alpha))
 		16:
 			for i in 6:
 				var ray := Vector2.RIGHT.rotated(float(i) * TAU / 6.0 + world_time)
 				var tip := p + ray * (19 + progress * 72)
 				draw_line(p + ray * 12, tip, Color("ff964d", alpha), 6)
-				draw_circle(tip, 5, Color("ffe6a2", alpha))
+				Shapes.circle(self,tip, 5, Color("ffe6a2", alpha))
 		17:
 			var radius := 22 + progress * 190
 			draw_arc(p, radius, 0, TAU, 40, Color("c2f5ff", alpha), 7)
@@ -8355,7 +8356,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 			for i in 3:
 				var point := p + direction * (12 + i * 25) * (1.0 + progress)
 				draw_line(point - direction.rotated(PI * 0.5) * 13, point + direction.rotated(PI * 0.5) * 13, Color("fff4a5", alpha), 5)
-			draw_circle(p, 18 + progress * 28, Color("ffec95", alpha * 0.14))
+			Shapes.circle(self,p, 18 + progress * 28, Color("ffec95", alpha * 0.14))
 		19, 27:
 			var finish: Vector2 = visual["end"]
 			for echo in 4:
@@ -8366,8 +8367,8 @@ func draw_spell_local(visual: Dictionary) -> void:
 			for orb in 3:
 				var ray := Vector2.RIGHT.rotated(float(orb) * TAU / 3.0 + progress * 8)
 				var point := p + ray * (25 + progress * 58)
-				draw_circle(point, 9, Color("c4a8fa", alpha))
-				draw_circle(point, 3, Color.WHITE)
+				Shapes.circle(self,point, 9, Color("c4a8fa", alpha))
+				Shapes.circle(self,point, 3, Color.WHITE)
 		21:
 			for facet in 6:
 				var start := p + Vector2.RIGHT.rotated(float(facet) * TAU / 6.0) * 47
@@ -8397,7 +8398,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 		28:
 			for bubble in 7:
 				var ray := Vector2.RIGHT.rotated(float(bubble) * TAU / 7.0 + progress)
-				draw_circle(p + ray * (20 + progress * 65), 5 + bubble % 3, Color("b7ed78", alpha))
+				Shapes.circle(self,p + ray * (20 + progress * 65), 5 + bubble % 3, Color("b7ed78", alpha))
 		29:
 			for shard in 8:
 				var ray := Vector2.RIGHT.rotated(float(shard) * TAU / 8.0)
@@ -8412,7 +8413,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 			for wing in [-1.0, 1.0]:
 				var tip := p + Vector2(wing * (48 + progress * 80), -64 * alpha)
 				draw_line(p + Vector2(0, -20), tip, Color("e9dca2", alpha), 8)
-			draw_circle(p + Vector2(0, -30), 10, Color("fff0bd", alpha))
+			Shapes.circle(self,p + Vector2(0, -30), 10, Color("fff0bd", alpha))
 		_:
 			var hue := Color("efab74") if id in [16, 22] else (Color("a9e7f7") if id in [17, 21, 29] else (Color("f7e495") if id in [18, 24, 30, 33] else (Color("b6e599") if id in [28, 32] else Color("c8aef1"))))
 			var rays := 3 if id in [20, 26, 31] else 8
@@ -8422,7 +8423,7 @@ func draw_spell_local(visual: Dictionary) -> void:
 				var target := p + Vector2.RIGHT.rotated(angle + 0.35) * (39 + progress * 105 * size)
 				draw_line(source, target, Color(hue, alpha * 0.33), 11)
 				draw_line(source, target, Color(hue, alpha), 3)
-				draw_circle(target, 4 + 4 * alpha, Color("fff7e8", alpha))
+				Shapes.circle(self,target, 4 + 4 * alpha, Color("fff7e8", alpha))
 
 func effective_camera_zoom()->float:
 	if konflux.active or world_builder.active:return 1.0
@@ -8880,7 +8881,7 @@ func draw_class_boss_arenas() -> void:
 		if visible_world(house,250.0):draw_class_boss_house(i)
 		if not visible_world(center,CLASS_BOSS_ARENA_RADIUS+80.0):continue
 		var accent:Color=[Color("b65c48"),Color("8062c7"),Color("6f9f56")][i]
-		draw_circle(center,CLASS_BOSS_ARENA_RADIUS,Color(accent,.055))
+		Shapes.circle(self,center,CLASS_BOSS_ARENA_RADIUS,Color(accent,.055))
 		draw_arc(center,CLASS_BOSS_ARENA_RADIUS,0,TAU,64,Color(accent,.55),5)
 		draw_arc(center,CLASS_BOSS_ARENA_RADIUS-26,0,TAU,64,Color(accent,.20),2)
 		for rune in 12:
@@ -9024,7 +9025,7 @@ func draw_tavern_world() -> void:
 	for x in range(-5, 6):
 		draw_pixel_tile(22, INTERIOR_CENTER + Vector2(x * 48, -174))
 	draw_pixel_tile(15, INTERIOR_CENTER + Vector2(-310, -240), 72.0)
-	draw_circle(INTERIOR_CENTER + Vector2(-275, -195), 100, Color("f4a965", 0.06))
+	Shapes.circle(self,INTERIOR_CENTER + Vector2(-275, -195), 100, Color("f4a965", 0.06))
 	for offset in [Vector2(-295, -15), Vector2(285, -15), Vector2(-290, 135), Vector2(290, 135)]:
 		for x in 2:
 			draw_pixel_tile(22, INTERIOR_CENTER + offset + Vector2(-48 + x * 48, -24))
@@ -9034,7 +9035,7 @@ func draw_tavern_world() -> void:
 		draw_pixel_tile(21, INTERIOR_CENTER + pos)
 	for pos in [Vector2(-430, -110), Vector2(414, -110)]:
 		draw_pixel_tile(29, INTERIOR_CENTER + pos)
-		draw_circle(INTERIOR_CENTER + pos + Vector2(24, 13), 95, Color("ffba74", 0.055))
+		Shapes.circle(self,INTERIOR_CENTER + pos + Vector2(24, 13), 95, Color("ffba74", 0.055))
 	draw_pixel_tile(20, INTERIOR_CENTER + Vector2(-24, 240))
 	draw_npc({"name":"Alma", "role":"Wirtin der Steinrose · Kueche & Rezepte", "pos":INTERIOR_CENTER + Vector2(0, -105), "color":Color("ba795e"), "kind":"innkeeper"})
 	text_at(INTERIOR_CENTER + Vector2(-170, -269), "ZUR STEINROSE", 22, Color("fce5b2"), HORIZONTAL_ALIGNMENT_CENTER, 340)
@@ -9089,8 +9090,8 @@ func draw_torch(p: Vector2, blue: bool, flame: bool) -> void:
 	# Gestaffelter Lichtschein statt eines einzelnen harten Leuchtkreises.
 	for halo in range(3, 0, -1):
 		var halo_radius := 18.0 + float(halo) * 23.0 + flicker * 0.7
-		draw_circle(p + Vector2(0, -24), halo_radius, Color(light, 0.022 if halo == 3 else (0.036 if halo == 2 else 0.065)))
-	draw_circle(p + Vector2(0, -24), 16 + flicker * 0.45, Color(light, 0.13))
+		Shapes.circle(self,p + Vector2(0, -24), halo_radius, Color(light, 0.022 if halo == 3 else (0.036 if halo == 2 else 0.065)))
+	Shapes.circle(self,p + Vector2(0, -24), 16 + flicker * 0.45, Color(light, 0.13))
 	draw_colored_polygon(PackedVector2Array([p + Vector2(-7, -10), p + Vector2(0, -37 - flicker), p + Vector2(8, -10)]), light)
 	draw_colored_polygon(PackedVector2Array([p + Vector2(-3, -11), p + Vector2(2, -27 - flicker), p + Vector2(5, -11)]), Color("e8ffff") if blue else Color("fff2bf"))
 
@@ -9120,7 +9121,7 @@ func draw_dungeon_atmosphere() -> void:
 	for wisp in 11:
 		var mist := DUNGEON_CENTER + Vector2(-590 + wisp * 116 + sin(world_time * 0.3 + wisp) * 30, (wisp % 3 - 1) * 205)
 		if visible_world(mist, 90) and mist.distance_to(player_pos) < 420:
-			draw_circle(mist, 28 + wisp % 4 * 8, Color("b2cbd0", 0.025))
+			Shapes.circle(self,mist, 28 + wisp % 4 * 8, Color("b2cbd0", 0.025))
 
 func draw_overworld_atmosphere() -> void:
 	var darkness := {2:0.27, 3:0.41, 4:0.39, 5:0.45, 7:0.56, 8:0.48, 10:0.49, 11:0.57, 12:0.44}
@@ -9150,7 +9151,7 @@ func draw_overworld_atmosphere() -> void:
 	for cloud in cloud_count:
 		var drift := Vector2(fposmod(float(cloud * 157) + world_time * 12.0, visible_size.x + 180.0) - 90.0, fposmod(float(cloud * 91),visible_size.y+120.0) - 60.0)
 		var fog_zone := visual_region_at(camera_pos + drift)
-		if darkness.has(fog_zone): draw_circle(camera_pos + drift, 32 + cloud % 5 * 9, Color("c5ced3", 0.028 if fog_zone in [3, 7, 8, 10, 11] else 0.014))
+		if darkness.has(fog_zone): Shapes.circle(self,camera_pos + drift, 32 + cloud % 5 * 9, Color("c5ced3", 0.028 if fog_zone in [3, 7, 8, 10, 11] else 0.014))
 	for torch_pos in torches:
 		if visible_world(torch_pos, 55): draw_torch(torch_pos, region_at(torch_pos) == 4, true)
 
@@ -9190,9 +9191,9 @@ func draw_trails() -> void:
 			if point_index < trail.size() - 1: theme_for_trail = _trail_theme(region_at(point.lerp(trail[point_index + 1], 0.5)))
 			# Keine runde Wegkappe auf oder an der Dorfgrenze: dort endet der Weg gerade.
 			if region_at(point)!=0 and visible_world(point, 90.0) and not StartTileMap32.BOUNDS.grow(60.0).has_point(point):
-				draw_circle(point, 58.0, edge_colors[theme_for_trail])
-				draw_circle(point, 52.0, mid_colors[theme_for_trail])
-				draw_circle(point, 45.0, road_colors[theme_for_trail])
+				Shapes.circle(self,point, 58.0, edge_colors[theme_for_trail])
+				Shapes.circle(self,point, 52.0, mid_colors[theme_for_trail])
+				Shapes.circle(self,point, 45.0, road_colors[theme_for_trail])
 		for i in range(trail.size() - 1):
 			var a: Vector2 = trail[i]
 			var b: Vector2 = trail[i + 1]
@@ -9237,13 +9238,13 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 	var zone: int = obstacle["zone"]
 	var key: int = obstacle["key"]
 	# Einheitlicher, weicher Bodenkontakt statt eingebrannter schwarzer Schatten.
-	draw_circle(p + Vector2(3, 20), r * 0.72, Color(0.12, 0.20, 0.19, 0.12))
+	Shapes.circle(self,p + Vector2(3, 20), r * 0.72, Color(0.12, 0.20, 0.19, 0.12))
 	match zone:
 		1, 2:
 			draw_rect(Rect2(p + Vector2(-11, -18), Vector2(22, 48)), Color("715c4c"))
 			for offset in [Vector2(-r * 0.45, -37), Vector2(r * 0.42, -36), Vector2(0, -r * 0.9)]:
-				draw_circle(p + offset, r * 0.66, Color("4d8070") if zone == 2 else Color("5cae79"))
-				draw_circle(p + offset + Vector2(-10, -11), r * 0.34, Color("75b792") if zone == 2 else Color("83ce8a"))
+				Shapes.circle(self,p + offset, r * 0.66, Color("4d8070") if zone == 2 else Color("5cae79"))
+				Shapes.circle(self,p + offset + Vector2(-10, -11), r * 0.34, Color("75b792") if zone == 2 else Color("83ce8a"))
 			draw_bush_cluster(p + Vector2(r * 0.55, 8), zone, key)
 			if zone == 2: draw_mushroom(p + Vector2(-r * 0.62, -6), key)
 		3:
@@ -9258,21 +9259,21 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 			draw_bush_cluster(p + Vector2(r * 0.35, r * 0.34), zone, key)
 		4:
 			# Kristallmoor: mehrere Facetten auf dunklem Grundstein.
-			draw_circle(p + Vector2(0, 11), r * 0.72, Color("5a6b70"))
+			Shapes.circle(self,p + Vector2(0, 11), r * 0.72, Color("5a6b70"))
 			for offset in [Vector2(-r * 0.46, 0), Vector2(r * 0.22, -14), Vector2(3, -r * 0.58)]:
 				draw_crystal(p + offset, key + int(offset.x))
 		5:
-			draw_circle(p, r, Color("504247"))
+			Shapes.circle(self,p, r, Color("504247"))
 			draw_colored_polygon(PackedVector2Array([p + Vector2(-r, 20), p + Vector2(-r * 0.45, -r * 0.8), p + Vector2(r * 0.35, -r), p + Vector2(r, 15)]), Color("795552"))
 			for crack in [-0.45, 0.05, 0.42]:
 				draw_line(p + Vector2(r * crack, -r * 0.4), p + Vector2(r * (crack + 0.18), r * 0.35), Color("f0a066"), 5)
 		6:
-			draw_circle(p, r, Color("bda579"))
-			draw_circle(p + Vector2(-10, -12), r * 0.63, Color("ddc596"))
+			Shapes.circle(self,p, r, Color("bda579"))
+			Shapes.circle(self,p + Vector2(-10, -12), r * 0.63, Color("ddc596"))
 			draw_shell(p + Vector2(r * 0.2, 0))
 			draw_line(p + Vector2(-r * 0.6, 18), p + Vector2(r * 0.7, -11), Color("7d624d"), 6)
 		7:
-			draw_circle(p, r, Color("514e61"))
+			Shapes.circle(self,p, r, Color("514e61"))
 			for i in 4:
 				var shard := p + Vector2.RIGHT.rotated(i * TAU / 4.0) * r * 0.48
 				draw_colored_polygon(PackedVector2Array([shard + Vector2(0,-28),shard + Vector2(10,5),shard + Vector2(-9,8)]), Color("c3b2e4"))
@@ -9284,22 +9285,22 @@ func draw_obstacle(obstacle: Dictionary) -> void:
 			for drip in 4: draw_rect(Rect2(p + Vector2(-r * 0.55 + drip * 18, -r * 0.34 + drip % 2 * 5), Vector2(8, 14)), Color("d8ad4f"))
 			draw_bush_cluster(p + Vector2(0, r * 0.32), zone, key)
 		10:
-			draw_circle(p, r, Color("5d777a"))
+			Shapes.circle(self,p, r, Color("5d777a"))
 			for i in 5:
 				var ray := Vector2.RIGHT.rotated(i * TAU / 5.0)
 				draw_line(p + ray * 8, p + ray * r * 0.72, Color("a7d9d7"), 5)
-			draw_circle(p, r * 0.25, Color("d9f1e8"))
+			Shapes.circle(self,p, r * 0.25, Color("d9f1e8"))
 		11:
 			draw_colored_polygon(PackedVector2Array([p + Vector2(-r, 17), p + Vector2(-r * 0.45, -r), p + Vector2(r * 0.25, -r * 0.78), p + Vector2(r, 21)]), Color("5d5f72"))
 			for ridge in 3: draw_line(p + Vector2(-r * 0.45 + ridge * r * 0.35, -r * 0.5), p + Vector2(-r * 0.2 + ridge * r * 0.35, 12), Color("a6a7b7"), 4)
 		12:
-			draw_circle(p, r, Color("675f78"))
+			Shapes.circle(self,p, r, Color("675f78"))
 			for i in 6:
 				var shard := p + Vector2.RIGHT.rotated(i * TAU / 6.0) * r * 0.5
 				draw_colored_polygon(PackedVector2Array([shard + Vector2(0,-24),shard + Vector2(8,5),shard + Vector2(-8,6)]), Color("d6c8ed"))
-			draw_circle(p, 8, Color("fff1bb"))
+			Shapes.circle(self,p, 8, Color("fff1bb"))
 		_:
-			draw_circle(p, r, Color("53666c"))
+			Shapes.circle(self,p, r, Color("53666c"))
 
 func region_rect(id: int) -> Rect2:
 	return WorldGeometry.region_rect(id)
@@ -9460,7 +9461,7 @@ func draw_bush_cluster(p: Vector2, zone: int, key: int) -> void:
 	var spread := 15 + key % 8
 	for i in 5:
 		var off := Vector2((i % 3 - 1) * spread, (i / 3) * 10 - 8 + (key + i * 5) % 5)
-		draw_circle(p + off, 12 + (key + i) % 5, leaf.darkened(0.08 if i % 2 == 0 else 0.0))
+		Shapes.circle(self,p + off, 12 + (key + i) % 5, leaf.darkened(0.08 if i % 2 == 0 else 0.0))
 		draw_rect(Rect2(p + off + Vector2(-6, -8), Vector2(7, 4)), leaf.lightened(0.18))
 	# Dekobuesche tragen absichtlich keine Fruechte. Sichtbare Frucht = FoodSystem-Interaktion.
 
@@ -9755,7 +9756,7 @@ func draw_enemy(enemy: Dictionary) -> void:
 		model_pos.y+=lerpf(42.0,0.0,appear)
 		var boss_index:int=type-12
 		var spawn_color:Color=[Color("ff6f58"),Color("ba85ff"),Color("9be46f")][boss_index]
-		draw_circle(p,48.0+appear*22.0,Color(spawn_color,.10*(1.0-appear)))
+		Shapes.circle(self,p,48.0+appear*22.0,Color(spawn_color,.10*(1.0-appear)))
 		draw_arc(p,62.0+appear*28.0,world_time*2.0,world_time*2.0+PI*1.55,32,Color(spawn_color,.78*(1.0-spawn_left*.35)),5.0)
 		for spark in 8:
 			var a:float=float(spark)*TAU/8.0-world_time*(2.2+boss_index*.35)
@@ -9783,14 +9784,27 @@ func draw_enemy(enemy: Dictionary) -> void:
 	draw_enemy_level(label_pos, type, boss, elite_kind)
 	combat_feedback.health(self,"mob:%d"%int(enemy["uid"]),label_pos+Vector2(0,-135 if type==12 else (-104 if boss else -54)),float(enemy["hp"]),float(enemy["max_hp"]),106 if boss else 54)
 
+## Stufenschild über Gegnern. Text, Breite, Höhe und Randfarbe hängen nur von
+## Art, Boss/Elite und der eigenen Stufe ab und werden zwischengespeichert
+## (vorher je Gegner und Bild bis zu viermal enemy_level() und neue Texte).
+var enemy_level_labels: Dictionary = {}
 func draw_enemy_level(p: Vector2, type: int, boss: bool, elite_kind: int = 0) -> void:
-	var y := (-170.0 if type==12 else -139.0) if boss else (-103.0 if elite_kind > 0 else -82.0)
-	var level_text := "BOSS · LV %d" % enemy_level(type) if boss else ("CHAMPION · LV %d" % enemy_level(type) if elite_kind == 2 else ("ELITE · LV %d" % enemy_level(type) if elite_kind == 1 else "LV %d" % enemy_level(type)))
-	var width := 134.0 if elite_kind == 2 else (108.0 if boss or elite_kind == 1 else 54.0)
-	var bg := Rect2(p + Vector2(-width * 0.5, y), Vector2(width, 20))
+	var key := Vector4i(type, elite_kind, int(boss), level)
+	var label: Array = enemy_level_labels.get(key, [])
+	if label.is_empty():
+		var enemy_lv := enemy_level(type)
+		var y := (-170.0 if type==12 else -139.0) if boss else (-103.0 if elite_kind > 0 else -82.0)
+		var level_text := "BOSS · LV %d" % enemy_lv if boss else ("CHAMPION · LV %d" % enemy_lv if elite_kind == 2 else ("ELITE · LV %d" % enemy_lv if elite_kind == 1 else "LV %d" % enemy_lv))
+		var width := 134.0 if elite_kind == 2 else (108.0 if boss or elite_kind == 1 else 54.0)
+		var border := Color("e6b978") if boss or elite_kind == 2 else (Color("d69ae3") if elite_kind == 1 else (Color("d87878") if enemy_lv > level + 3 else Color("97be9d")))
+		label = [y, level_text, width, border]
+		if enemy_level_labels.size() >= 256: enemy_level_labels.clear()
+		enemy_level_labels[key] = label
+	var width: float = label[2]
+	var bg := Rect2(p + Vector2(-width * 0.5, float(label[0])), Vector2(width, 20))
 	draw_rect(bg, Color("222b32", 0.92))
-	draw_rect(bg, Color("e6b978") if boss or elite_kind == 2 else (Color("d69ae3") if elite_kind == 1 else (Color("d87878") if enemy_level(type) > level + 3 else Color("97be9d"))), false, 2)
-	text_at(bg.position + Vector2(2, 15), level_text, 12, Color("fff1d2"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 4))
+	draw_rect(bg, label[3], false, 2)
+	text_at(bg.position + Vector2(2, 15), label[1], 12, Color("fff1d2"), HORIZONTAL_ALIGNMENT_CENTER, int(width - 4))
 
 func draw_enemy_model(type: int, p: Vector2, c: Color, stride: float) -> void:
 	match type:
@@ -10123,14 +10137,14 @@ func draw_hero(p: Vector2, scale_factor: float, walking: bool, look: Vector2, in
 		arm_color = Color('b9b3a6');cuff_color = Color('d9a640')
 	draw_line(arm_start, grip, Color('493d45'), 10.0 * scale_factor)
 	draw_line(arm_start, grip, arm_color, 7.0 * scale_factor)
-	draw_circle(arm_start, 5.5 * scale_factor, Color('493d45'))
-	draw_circle(arm_start, 3.8 * scale_factor, arm_color.lightened(0.06))
+	Shapes.circle(self,arm_start, 5.5 * scale_factor, Color('493d45'))
+	Shapes.circle(self,arm_start, 3.8 * scale_factor, arm_color.lightened(0.06))
 	draw_line(arm_start.lerp(grip, 0.72) - side * 1.5 * scale_factor, grip, cuff_color, 4.0 * scale_factor)
 	draw_weapon_world(weapon_pos, weapon_family, design, base_look, scale_factor, progress)
 	if weapon_family == 2:
 		var hand_color: Color = [Color('e7b995'),Color('91a56d'),Color('a0bbc0')][clampi(use_race,0,2)]
-		draw_circle(grip,4.3*scale_factor,Color('493d45'))
-		draw_circle(grip,2.8*scale_factor,hand_color)
+		Shapes.circle(self,grip,4.3*scale_factor,Color('493d45'))
+		Shapes.circle(self,grip,2.8*scale_factor,hand_color)
 	# Nach Norden maskiert der Körper die hintere Waffenhand. Danach kommt der
 	# Umhang als physisch vorderster Rücken-Layer.
 	if base_look == Vector2.UP:
@@ -10186,8 +10200,8 @@ func draw_hero_sword(hand: Vector2, blade_dir: Vector2, preview: bool = false) -
 		draw_line(hilt - across * 10, hilt + across * 10, Color('ddb46b'), 5)
 	elif design == 3:
 		draw_line(hilt - across * 16, hilt + across * 16, Color('a9c4c2'), 9)
-		draw_circle(hilt - across * 16, 4, Color('e1b777'))
-		draw_circle(hilt + across * 16, 4, Color('e1b777'))
+		Shapes.circle(self,hilt - across * 16, 4, Color('e1b777'))
+		Shapes.circle(self,hilt + across * 16, 4, Color('e1b777'))
 	else:
 		draw_line(hilt - across * (10 + stage), hilt + across * (10 + stage), Color('4c3650'), 8)
 		draw_line(hilt - across * (10 + stage), hilt + across * (10 + stage), Color('ddae68'), 5)
@@ -10209,11 +10223,11 @@ func draw_hero_sword(hand: Vector2, blade_dir: Vector2, preview: bool = false) -
 		draw_colored_polygon(PackedVector2Array([shoulder + across * (width - 2), tip - blade_dir * 8, tip - blade_dir * 2, shoulder - across * (width - 2)]), metal)
 	if design != 2: draw_line(shoulder, tip - blade_dir * 5, Color('f8fcf2', 0.65), 2)
 	if equipped_uid >= 0 and not preview:
-		draw_circle(hilt, 3 + stage * 0.35, RARITY_COLORS[rarity])
+		Shapes.circle(self,hilt, 3 + stage * 0.35, RARITY_COLORS[rarity])
 		if stage >= 2 and design != 2:
 			draw_line(shoulder + blade_dir * 10 - across * 3, shoulder + blade_dir * 22 - across * 3, Color('f8efd7', 0.6), 2)
 		if stage >= 4:
-			draw_circle(shoulder + blade_dir * 12, 3, element_color(weapon_element()))
+			Shapes.circle(self,shoulder + blade_dir * 12, 3, element_color(weapon_element()))
 
 func weapon_visual_stage(item: Dictionary) -> int:
 	return ItemRules.weapon_visual_stage(item)
@@ -10445,7 +10459,7 @@ func draw_hud() -> void:
 			bar(Rect2(446+boss_dx, 43, 447, 19), float(enemy["hp"]), float(enemy["max_hp"]), Color("eb866f"), "%d / %d" % [ceili(float(enemy["hp"])), ceili(float(enemy["max_hp"]))])
 			break
 	if arena_mode != "":
-		draw_circle(Vector2(1040, 103), 64, Color("28373f"))
+		Shapes.circle(self,Vector2(1040, 103), 64, Color("28373f"))
 		draw_arc(Vector2(1040, 103), 64, 0, TAU, 48, Color("e4bf7c"), 5)
 		text_at(Vector2(966, 98), "WELLE %d%s" % [arena_wave, "/10" if arena_mode == "final" else ""], 19, Color("ffecbc"), HORIZONTAL_ALIGNMENT_CENTER, 150)
 		text_at(Vector2(970, 126), "%d Gegner" % enemies.size(), 15, Color("e4d3b0"), HORIZONTAL_ALIGNMENT_CENTER, 140)
@@ -10569,9 +10583,9 @@ func draw_touch_controls() -> void:
 	# Interaktion/Ausweichen/Angriff rechts.
 	var base := touch_move_base
 	var active_alpha := 0.82 if touch_move_id >= 0 else 0.42
-	draw_circle(base, 82, Color(0.07, 0.12, 0.14, active_alpha))
+	Shapes.circle(self,base, 82, Color(0.07, 0.12, 0.14, active_alpha))
 	draw_arc(base, 82, 0, TAU, 40, Color("a9c4b8", active_alpha), 3)
-	draw_circle(touch_move_knob, 34, Color("5d756b", 0.92 if touch_move_id >= 0 else 0.62))
+	Shapes.circle(self,touch_move_knob, 34, Color("5d756b", 0.92 if touch_move_id >= 0 else 0.62))
 	draw_arc(touch_move_knob, 34, 0, TAU, 32, Color("e7d5a3", 0.92 if touch_move_id >= 0 else 0.62), 3)
 	text_at(base + Vector2(-50, 108), "BEWEGEN", 12, Color("d9e5dc", active_alpha), HORIZONTAL_ALIGNMENT_CENTER, 100)
 
@@ -10591,9 +10605,9 @@ func draw_touch_controls() -> void:
 
 	var attack_base := touch_aim_base if touch_aim_id >= 0 else Vector2(1032,526)
 	var attack_knob := touch_aim_knob if touch_aim_id >= 0 else attack_base
-	draw_circle(attack_base, 64.0, Color("725047",0.58 if touch_aim_id < 0 else 0.88))
+	Shapes.circle(self,attack_base, 64.0, Color("725047",0.58 if touch_aim_id < 0 else 0.88))
 	draw_arc(attack_base, 64.0, 0, TAU, 36, Color("f0daa3",0.86), 3)
-	draw_circle(attack_knob, 28.0, Color("9a675b",0.92))
+	Shapes.circle(self,attack_knob, 28.0, Color("9a675b",0.92))
 	draw_arc(attack_knob, 28.0, 0, TAU, 28, Color("fff0c8",0.88), 2)
 	if touch_aim_id >= 0 and touch_aim_vector.length_squared() > 0.01:
 		draw_line(attack_base, attack_base + touch_aim_vector.normalized() * 78.0, Color("ffe2a8",0.82), 4)
@@ -10603,7 +10617,7 @@ func draw_touch_controls() -> void:
 		{"p":Vector2(916,550),"r":39.0,"label":("SCHRITT" if class_id == 1 else "ROLLE"),"fill":Color("3f5c62",0.90)},
 		{"p":Vector2(967,447),"r":39.0,"label":"AKTION","fill":Color("556b4f",0.90)}
 	]:
-		draw_circle(data["p"], data["r"], data["fill"])
+		Shapes.circle(self,data["p"], data["r"], data["fill"])
 		draw_arc(data["p"], data["r"], 0, TAU, 32, Color("f0daa3",0.82), 3)
 		text_at(data["p"] + Vector2(-45,5), data["label"], 11, Color("fff2cf"), HORIZONTAL_ALIGNMENT_CENTER, 90)
 
@@ -10713,7 +10727,7 @@ func draw_local_minimap(rect: Rect2) -> void:
 		draw_rect(rect.grow(-6), Color("57443e"))
 		draw_rect(Rect2(center + Vector2(-46, -43), Vector2(92, 85)), Color("927051"))
 		draw_rect(Rect2(center + Vector2(-25, -35), Vector2(50, 8)), Color("c29b69"))
-		draw_circle(center + (player_pos - INTERIOR_CENTER) * 0.09, 4, Color("ffefbd"))
+		Shapes.circle(self,center + (player_pos - INTERIOR_CENTER) * 0.09, 4, Color("ffefbd"))
 		HudLayout.draw_map_frame(self, rect)
 		return
 	if dungeon_id >= 0:
@@ -10728,11 +10742,11 @@ func draw_local_minimap(rect: Rect2) -> void:
 	minimap_ground_cache.paint(self,inset,start,radius)
 	for stone in WAYSTONES:
 		var p: Vector2 = inset.position + (stone - start) * scale_map
-		if inner.has_point(p) and world_fog.explored_world(stone): draw_circle(p, 3, Color("8af0e9"))
+		if inner.has_point(p) and world_fog.explored_world(stone): Shapes.circle(self,p, 3, Color("8af0e9"))
 	for portal in PORTALS:
 		for end in [portal[0], portal[1]]:
 			var p: Vector2 = inset.position + (end - start) * scale_map
-			if inner.has_point(p) and region_available(int(portal[2])) and world_fog.explored_world(end): draw_circle(p, 3, Color("efccfa"))
+			if inner.has_point(p) and region_available(int(portal[2])) and world_fog.explored_world(end): Shapes.circle(self,p, 3, Color("efccfa"))
 	for index in DUNGEON_ENTRANCES.size():
 		var entrance: Vector2 = LANDMARKS[int(DUNGEON_ENTRANCES[index])]["pos"]
 		if not region_available(region_at(entrance)): continue
@@ -10746,11 +10760,11 @@ func draw_local_minimap(rect: Rect2) -> void:
 		if int(event_states[i]) == 3: continue
 		var encounter: Vector2 = inset.position + (WORLD_EVENTS[i]["pos"] - start) * scale_map
 		if inner.has_point(encounter) and region_available(int(WORLD_EVENTS[i]["region"])) and world_fog.explored_world(WORLD_EVENTS[i]["pos"]):
-			draw_circle(encounter, 4, Color("293e46"))
-			draw_circle(encounter, 2, Color("ffe399") if int(event_states[i]) in [0, 2] else Color("a7d2c3"))
+			Shapes.circle(self,encounter, 4, Color("293e46"))
+			Shapes.circle(self,encounter, 2, Color("ffe399") if int(event_states[i]) in [0, 2] else Color("a7d2c3"))
 	for enemy in enemies:
 		var p: Vector2 = inset.position + (enemy["pos"] - start) * scale_map
-		if inner.has_point(p) and world_fog.explored_world(enemy["pos"]): draw_circle(p, 2, Color("ef8584"))
+		if inner.has_point(p) and world_fog.explored_world(enemy["pos"]): Shapes.circle(self,p, 2, Color("ef8584"))
 	for member in (party_state.get("members",[]) as Array):
 		if not member is Dictionary or str(member.get("uuid","")) == player_uuid: continue
 		if str(member.get("context","world")) != "world": continue
@@ -10759,10 +10773,10 @@ func draw_local_minimap(rect: Rect2) -> void:
 		var member_world := Vector2(float(member_data[0]),float(member_data[1]))
 		var member_mark := inset.position + (member_world-start)*scale_map
 		if inner.has_point(member_mark):
-			draw_circle(member_mark,4,Color("8ff1c1"))
+			Shapes.circle(self,member_mark,4,Color("8ff1c1"))
 			draw_arc(member_mark,5,0.0,TAU,14,Color("eaffd9"),1)
 	quest_guide.draw_on_minimap(self,rect,scale_map)
-	draw_circle(rect.get_center(), 4, Color.WHITE)
+	Shapes.circle(self,rect.get_center(), 4, Color.WHITE)
 	draw_line(rect.get_center(), rect.get_center() + facing.normalized() * 10, Color("fff1ad"), 2)
 	HudLayout.draw_map_frame(self, rect)
 
@@ -10783,19 +10797,19 @@ func draw_dungeon_minimap(rect: Rect2) -> void:
 	for enemy in enemies:
 		if enemy["pos"].distance_to(player_pos) < 330:
 			var enemy_point: Vector2 = center + (enemy["pos"] - player_pos) / 65.0 * 10.0
-			if inner.has_point(enemy_point): draw_circle(enemy_point, 2, Color("ed9b82"))
+			if inner.has_point(enemy_point): Shapes.circle(self,enemy_point, 2, Color("ed9b82"))
 	for marker in [DUNGEON_CENTER + Vector2(-570, 0), DUNGEON_CENTER + Vector2(555, 0)]:
 		if marker.distance_to(player_pos) < 350:
 			var point: Vector2 = center + (marker - player_pos) / 65.0 * 10.0
 			if inner.has_point(point): draw_rect(Rect2(point - Vector2(3, 3), Vector2(6, 6)), Color("ffe0a0"))
-	draw_circle(center, 4, Color.WHITE)
+	Shapes.circle(self,center, 4, Color.WHITE)
 	draw_line(rect.get_center(), rect.get_center() + facing.normalized() * 10, Color("fff1ad"), 2)
 
 func draw_portal(p: Vector2, region: int) -> void:
 	var glow := Color("b6a5e9") if region_available(region) else Color("a76e73")
 	draw_arc(p, 39, PI, TAU, 20, glow.darkened(0.45), 12)
 	draw_arc(p, 34, PI, TAU, 20, glow, 5)
-	draw_circle(p + Vector2(0, -14), 13 + sin(world_time * 2.0) * 2.0, Color(glow, 0.48))
+	Shapes.circle(self,p + Vector2(0, -14), 13 + sin(world_time * 2.0) * 2.0, Color(glow, 0.48))
 	text_at(p + Vector2(-105, -59), "%s · %s · EMPF. LV %d" % ["AKTION" if touch_enabled else binding_short("interact"), region_name(region), region_level(region)], 12, Color("fff0c7"), HORIZONTAL_ALIGNMENT_CENTER, 210)
 
 func draw_map_natural_edges(inset: Rect2, palette: Array) -> void:
@@ -11978,7 +11992,7 @@ func draw_item_signature(p: Vector2, item: Dictionary) -> void:
 	var tint: Color = element_color(String(item.get("element", ""))) if str(item.get("element", "")) != "" else RARITY_COLORS[int(item["rarity"])]
 	var center := p + Vector2(27, 25)
 	match signature % 4:
-		0: draw_circle(center, 4, tint)
+		0: Shapes.circle(self,center, 4, tint)
 		1: draw_colored_polygon(PackedVector2Array([center + Vector2(0,-6),center + Vector2(5,0),center + Vector2(0,6),center + Vector2(-5,0)]), tint)
 		2:
 			draw_line(center + Vector2(-5,-5), center + Vector2(5,5), tint, 3)
@@ -12133,7 +12147,7 @@ func draw_travel_panel() -> void:
 		var available := travel_available(i) and not here
 		var zone := 0 if i == 0 else region_at(WAYSTONES[i])
 		ui_box(rect, Color("59766b") if available else Color("405657"))
-		draw_circle(rect.position + Vector2(25, 35), 12, Color("ffd98a") if here else (Color("9cece7") if available else Color("8d9b9a")))
+		Shapes.circle(self,rect.position + Vector2(25, 35), 12, Color("ffd98a") if here else (Color("9cece7") if available else Color("8d9b9a")))
 		text_at(rect.position + Vector2(48, 32), travel_label(i), 16, Color("fff1c4") if available or here else Color("b9c7c1"))
 		var state := "DU BIST HIER" if here else ("REISEN" if available else "NICHT AKTIVIERT")
 		text_at(rect.position + Vector2(48, 57), ("DORF · %s" % state) if i == 0 else ("EMPF. LV %d · %s" % [region_level(zone), state]), 13, Color("ffe2a8") if here else (Color("bfeee0") if available else Color("d2c6b6")))
@@ -12234,8 +12248,8 @@ func draw_world_atlas(rect: Rect2) -> void:
 		if int(event_states[i]) == 3: continue
 		if not region_available(int(WORLD_EVENTS[i]["region"])): continue
 		var point: Vector2 = inset.position + WORLD_EVENTS[i]["pos"] * map_scale
-		draw_circle(point, 5, Color("222e35"))
-		draw_circle(point, 3, Color("ffe09a") if int(event_states[i]) in [0, 2] else Color("98d6c8"))
+		Shapes.circle(self,point, 5, Color("222e35"))
+		Shapes.circle(self,point, 3, Color("ffe09a") if int(event_states[i]) in [0, 2] else Color("98d6c8"))
 
 	if region_available(region_at(GolemBoss.ALTAR)):
 		GolemDesign.draw_map_marker(self, inset.position + GolemBoss.ALTAR * map_scale, golem_world.fight_active, world_time, golem_world.cooldown_left() > 0.0)
@@ -12243,14 +12257,14 @@ func draw_world_atlas(rect: Rect2) -> void:
 		var boss_pos: Vector2 = CLASS_BOSS_SITES[boss_index]
 		if not region_available(region_at(boss_pos)): continue
 		var marker: Vector2 = inset.position + boss_pos * map_scale
-		draw_circle(marker, 8, Color("292d38"))
+		Shapes.circle(self,marker, 8, Color("292d38"))
 		draw_arc(marker, 7, 0.0, TAU, 16, Color("8fe2bf") if bosses_defeated[boss_index] else Color("ffaf83"), 2)
 		text_at(marker + Vector2(-7, 4), "★", 12, Color("ddffe0") if bosses_defeated[boss_index] else Color("ffdb9f"), HORIZONTAL_ALIGNMENT_CENTER, 14)
 	for npc in NPCS:
 		if str(npc["kind"]) != "quest" or quest_marker_state(str(npc["name"])) == 0: continue
 		if not region_available(region_at(npc["pos"])): continue
 		var point: Vector2 = inset.position + npc["pos"] * map_scale
-		draw_circle(point, 5, Color("263038"))
+		Shapes.circle(self,point, 5, Color("263038"))
 		text_at(point + Vector2(-5, 4), "!", 12, Color("ffda81"), HORIZONTAL_ALIGNMENT_CENTER, 10)
 	var party_members: Array = party_state.get("members",[])
 	for member in party_members:
@@ -12261,7 +12275,7 @@ func draw_world_atlas(rect: Rect2) -> void:
 		if member_pos_data.size() < 2: continue
 		var member_pos := Vector2(float(member_pos_data[0]),float(member_pos_data[1]))
 		var party_marker := inset.position + member_pos*map_scale
-		draw_circle(party_marker,6,Color("273740"))
+		Shapes.circle(self,party_marker,6,Color("273740"))
 		draw_arc(party_marker,5,0.0,TAU,16,Color("8ff1c1"),2)
 	quest_guide.draw_on_map(self,inset,map_scale)
 	var player_map := inset.position + (dungeon_return_pos if dungeon_id >= 0 else (interior_return_pos if interior_id >= 0 else player_pos)) * map_scale
@@ -12329,7 +12343,7 @@ func draw_landmark(landmark: Dictionary) -> void:
 			draw_rect(Rect2(p + Vector2(-82, 34), Vector2(163, 9)), Color("946e61"))
 			for offset in [-73, 74]:
 				draw_rect(Rect2(p + Vector2(offset, -16), Vector2(8, 46)), Color("8a674f"))
-			draw_circle(p + Vector2(0, 42), 18, Color("e99058", 0.25))
+			Shapes.circle(self,p + Vector2(0, 42), 18, Color("e99058", 0.25))
 		"mushroom":
 			for offset in [Vector2(-65, 23), Vector2(36, 37), Vector2(-12, -15)]: draw_mushroom(p + offset, 4 + int(offset.x))
 			draw_bush_cluster(p + Vector2(75, 24), zone, 19)
@@ -12352,7 +12366,7 @@ func draw_landmark(landmark: Dictionary) -> void:
 				draw_rect(Rect2(p + Vector2(offset - 4, -58), Vector2(22, 10)), stone.lightened(0.16))
 			draw_rect(Rect2(p + Vector2(-65, -65), Vector2(135, 15)), stone.lightened(0.12))
 			draw_crystal(p + Vector2(-22, -30), 1 + zone)
-			draw_circle(p + Vector2(0, 5), 24, Color(accent, 0.12))
+			Shapes.circle(self,p + Vector2(0, 5), 24, Color(accent, 0.12))
 			draw_arc(p + Vector2(0, 5), 28, 0, TAU, 24, Color(accent, 0.65), 3)
 			draw_rect(Rect2(p + Vector2(-70, 34), Vector2(145, 12)), stone.darkened(0.24))
 		"gate":
@@ -12377,12 +12391,12 @@ func draw_hamlet(p: Vector2) -> void:
 		# Sichtbares Signal des Angriffs: Feuer, Rauch und rote Alarmfahnen.
 		for fire_offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 			var fire_pos: Vector2 = p + fire_offset + Vector2(0, -78)
-			draw_circle(fire_pos + Vector2(0, 18), 18, Color("d85f57", 0.40))
+			Shapes.circle(self,fire_pos + Vector2(0, 18), 18, Color("d85f57", 0.40))
 			draw_colored_polygon(PackedVector2Array([fire_pos + Vector2(0, -28), fire_pos + Vector2(13, 15), fire_pos + Vector2(-13, 15)]), Color("e66c50"))
 			draw_colored_polygon(PackedVector2Array([fire_pos + Vector2(0, -16), fire_pos + Vector2(8, 12), fire_pos + Vector2(-8, 12)]), Color("ffdd78"))
 			for smoke_i in 3:
 				var smoke_pos := fire_pos + Vector2(sin(world_time * 1.3 + smoke_i) * 12, -36 - smoke_i * 24)
-				draw_circle(smoke_pos, 14 + smoke_i * 3, Color(0.20, 0.23, 0.25, 0.24 - smoke_i * 0.045))
+				Shapes.circle(self,smoke_pos, 14 + smoke_i * 3, Color(0.20, 0.23, 0.25, 0.24 - smoke_i * 0.045))
 		# Alarmbanner am zentralen Weg, schon aus größerer Entfernung lesbar.
 		draw_rect(Rect2(p + Vector2(-6, -185), Vector2(10, 135)), Color("684e50"))
 		draw_colored_polygon(PackedVector2Array([p + Vector2(4, -178), p + Vector2(105, -158), p + Vector2(4, -138)]), Color("c95762"))
@@ -12390,7 +12404,7 @@ func draw_hamlet(p: Vector2) -> void:
 	else:
 		# Nach der Rettung bleibt ein sichtbarer Wiederaufbau zurück.
 		for repair in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
-			draw_circle(p + repair + Vector2(0, 72), 5 + int(world_time) % 2, Color("f3cf79", 0.7))
+			Shapes.circle(self,p + repair + Vector2(0, 72), 5 + int(world_time) % 2, Color("f3cf79", 0.7))
 	for offset in [Vector2(-360, -160), Vector2(260, -190), Vector2(-330, 220), Vector2(280, 240)]:
 		var h: Vector2 = p + offset
 		draw_rect(Rect2(h + Vector2(-82, 46), Vector2(164, 15)), Color("526f56", 0.5))
@@ -12413,7 +12427,7 @@ func draw_hamlet(p: Vector2) -> void:
 			draw_colored_polygon(PackedVector2Array([roof + Vector2(-12, 7), roof + Vector2(0,-31 - sin(world_time * 8) * 5), roof + Vector2(15,7)]), Color("f38858", 0.85))
 			draw_colored_polygon(PackedVector2Array([roof + Vector2(-5, 8), roof + Vector2(3,-17), roof + Vector2(9,8)]), Color("ffe083"))
 			for i in 3:
-				draw_circle(roof + Vector2(sin(world_time + i * 2.0) * 15, -46 - i * 22), 12 + i * 5, Color(0.25,0.27,0.28,0.22))
+				Shapes.circle(self,roof + Vector2(sin(world_time + i * 2.0) * 15, -46 - i * 22), 12 + i * 5, Color(0.25,0.27,0.28,0.22))
 	for x in [-155, 140]:
 		draw_rect(Rect2(p + Vector2(x, -50), Vector2(8, 110)), Color("917052"))
 		draw_rect(Rect2(p + Vector2(x - 6, -60), Vector2(20, 13)), Color("cfa86b"))
@@ -13341,10 +13355,10 @@ func draw_remote_combat_visuals() -> void:
 			else:
 				var p := pos+dir*(35.0+progress*230.0)
 				draw_line(p-dir*34.0,p+dir*12.0,Color(accent,0.85),6.0)
-				draw_circle(p,7.0,Color.WHITE)
+				Shapes.circle(self,p,7.0,Color.WHITE)
 		else:
 			var radius := 28.0+progress*96.0
-			draw_circle(pos,radius,Color(accent,0.10*(1.0-progress)))
+			Shapes.circle(self,pos,radius,Color(accent,0.10*(1.0-progress)))
 			draw_arc(pos,radius,0.0,TAU,28,Color(accent,0.88*(1.0-progress)),4.0)
 			draw_line(pos,pos+dir*(70.0+progress*70.0),Color(accent,0.72*(1.0-progress)),7.0)
 
@@ -13472,7 +13486,7 @@ func draw_remote_players(only_peer: int=-1) -> void:
 		var race := clampi(int(state.get("race",0)),0,2)
 		var gender := clampi(int(state.get("gender",0)),0,1)
 		var cls := clampi(int(state.get("class",0)),0,2)
-		draw_circle(rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
+		Shapes.circle(self,rp + Vector2(0, 10), 30.0, Color("76d7ff", 0.16))
 		draw_arc(rp + Vector2(0, 10), 30.0, 0.0, TAU, 24, Color("8ee7ff", 0.82), 2.0)
 		draw_rect(Rect2(rp + Vector2(-19,24),Vector2(38,5)),Color(0.10,0.17,0.18,0.25))
 		var cloth:=int(state.get("cosmetic_cloak",0))

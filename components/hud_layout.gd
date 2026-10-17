@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 const QUEST_ICON=preload("res://art/ui/quality_v1/quest_32.png")
 const FoodSystem=preload("res://components/food_system.gd")
 # Schlankes HUD: Lage der HUD-Teile und Zeichnen der Statusbalken, der
@@ -136,7 +137,7 @@ static func draw_effect_chips(g,origin:Vector2,chips:Array,mouse:Vector2)->float
 		if int(chip.get("icon",-1))>=0:
 			FoodSystem.icon(g,r.position+Vector2(2,1),int(chip["icon"]),0.55)
 		else:
-			g.draw_circle(r.position+Vector2(14,14),6,Color(chip.get("color",Color.WHITE)))
+			Shapes.circle(g,r.position+Vector2(14,14),6,Color(chip.get("color",Color.WHITE)))
 		var t:=int(chip.get("time",0))
 		shadow_text(g,r.position+Vector2(30,17),"%d:%02d" % [int(t/60),t%60],12,Color("e8f0ff"))
 		g.draw_rect(Rect2(r.position+Vector2(30,21),Vector2(r.size.x-36,3)),Color("1b2f35"))

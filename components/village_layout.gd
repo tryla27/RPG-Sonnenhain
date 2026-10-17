@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 const H = preload("res://components/reference_house.gd")
 # Replacement art is ready: compact crowns stay outside all building rectangles.
 const TREES := [Vector2(672,320),Vector2(1056,208),Vector2(48,1168),Vector2(64,1776),Vector2(384,2544)]
@@ -58,8 +59,8 @@ static func details(c: CanvasItem, shop: Dictionary, font: Font, include_cart: b
 static func cart(c: CanvasItem,p: Vector2,kind: String) -> void:
 	c.draw_rect(Rect2(p+Vector2(-47,16),Vector2(99,9)),Color(0.1,0.15,0.1,0.22))
 	for side in [-1,1]:
-		c.draw_circle(p+Vector2(side*35,12),12,Color("343c37"))
-		c.draw_circle(p+Vector2(side*35,12),8,Color("a4824e"))
+		Shapes.circle(c,p+Vector2(side*35,12),12,Color("343c37"))
+		Shapes.circle(c,p+Vector2(side*35,12),8,Color("a4824e"))
 		c.draw_line(p+Vector2(side*35-7,12),p+Vector2(side*35+7,12),Color("5c4832"),2)
 		c.draw_line(p+Vector2(side*35,5),p+Vector2(side*35,19),Color("5c4832"),2)
 	c.draw_rect(Rect2(p+Vector2(-44,-21),Vector2(88,34)),Color("58432f"))

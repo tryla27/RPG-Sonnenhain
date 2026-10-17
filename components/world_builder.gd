@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Ingame 32px world authoring tool. Builder data is isolated from character saves.
 const Palette=preload("res://components/world_material_palette_32.gd")
 const Map0Plan=preload("res://components/map0_ground_plan_32.gd")
@@ -302,14 +303,14 @@ func draw(g)->void:
 				var center:Vector2=r.get_center()
 				if mark_layer=="ambience":g.draw_arc(center,10,0,TAU,16,mark,2)
 				elif mark_layer=="triggers":g.draw_rect(r.grow(-8),mark,false,2)
-				else:g.draw_circle(center,6,mark)
+				else:Shapes.circle(g,center,6,mark)
 	g.text_at(Vector2(165,175),"AUSWAHL",13,Color("ffe4ad"))
 	var options:Array=choices()
 	for i in range(mini(options.size(),10)):
 		var id:String=str(options[i])
 		var y:float=198+i*27
 		if layer in ["ground","walls"]:g.draw_rect(Rect2(165,y+3,20,20),Palette.color(id,2))
-		else:g.draw_circle(Vector2(175,y+13),7,layer_marker_color(layer))
+		else:Shapes.circle(g,Vector2(175,y+13),7,layer_marker_color(layer))
 		g.ui_button(Rect2(192,y,158,24),Palette.display_name(id) if layer in ["ground","walls"] else id.to_upper(),true,selection_id==id)
 	g.text_at(Vector2(165,476),"PINSEL",12,Color("ffe4ad"))
 	for i in 3:g.ui_button(Rect2(165+i*62,489,55,28),str([1,3,5][i]),true,brush_size==[1,3,5][i])

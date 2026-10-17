@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## A shared quest selection keeps the HUD, details and both maps consistent.
 const AUTO := -2
 const STORY := -1
@@ -86,9 +87,9 @@ func draw_marker(g, point: Vector2, compact: bool = false) -> void:
 	# Real time keeps the yellow pulse running while the quest/map menu is open.
 	var color := marker_color(Time.get_ticks_msec()/1000.0)
 	var radius := 6.0 if compact else 10.0
-	g.draw_circle(point,radius+3,Color("29251b",0.9))
+	Shapes.circle(g,point,radius+3,Color("29251b",0.9))
 	g.draw_arc(point,radius,0,TAU,24,color,2 if compact else 3)
-	g.draw_circle(point,2.5 if compact else 4.0,color)
+	Shapes.circle(g,point,2.5 if compact else 4.0,color)
 
 func draw_on_map(g, inset: Rect2, map_scale: Vector2) -> void:
 	var goal := target(g)

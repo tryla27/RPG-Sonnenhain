@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 ## Native Map-0 village building renderer.
 ## Every visible part is assembled on the 32px grid; no full-house sprite atlas is used.
 const TILE:=32
@@ -46,7 +47,7 @@ static func door_tile(c:CanvasItem,origin:Vector2,x:int,y:int,double_door:bool=f
 	c.draw_rect(Rect2(Vector2(left+3,p.y+4),Vector2(width-6,66)),DOOR)
 	if double_door:
 		c.draw_rect(Rect2(Vector2(p.x+15,p.y+4),Vector2(3,66)),TIMBER)
-	c.draw_circle(Vector2(left+width-7,p.y+42),2.5,GOLD)
+	Shapes.circle(c,Vector2(left+width-7,p.y+42),2.5,GOLD)
 
 static func roof_row(c:CanvasItem,origin:Vector2,y:int,x0:int,x1:int,accent:Color)->void:
 	for x in range(x0,x1):
@@ -91,7 +92,7 @@ static func normal_house(c:CanvasItem,p:Vector2,kind:String)->void:
 			c.draw_rect(Rect2(p+Vector2(144,117),Vector2(30,8)),Color("e7ead5"))
 		"innkeeper":
 			c.draw_rect(Rect2(p+Vector2(16,137),Vector2(160,10)),Color("6f4d37"))
-			for x in [36,68,100,132,164]:c.draw_circle(p+Vector2(x,149),4,Color("d49a58"))
+			for x in [36,68,100,132,164]:Shapes.circle(c,p+Vector2(x,149),4,Color("d49a58"))
 		"elder":
 			c.draw_colored_polygon(PackedVector2Array([p+Vector2(96,15),p+Vector2(112,38),p+Vector2(96,31),p+Vector2(80,38)]),accent.lightened(.35))
 		"apprentice":
@@ -99,7 +100,7 @@ static func normal_house(c:CanvasItem,p:Vector2,kind:String)->void:
 				c.draw_colored_polygon(PackedVector2Array([p+Vector2(x,118),p+Vector2(x+6,103),p+Vector2(x+12,118),p+Vector2(x+6,132)]),Color("8bdfff"))
 		"smith":
 			local_tile(c,p,4,1,1,2,Color("5b4b49"))
-			c.draw_circle(p+Vector2(144,24),9,Color("73706e",.5))
+			Shapes.circle(c,p+Vector2(144,24),9,Color("73706e",.5))
 			c.draw_line(p+Vector2(21,145),p+Vector2(52,116),Color("d2b06e"),5)
 
 static func borin_house(c:CanvasItem,p:Vector2)->void:
@@ -121,7 +122,7 @@ static func borin_house(c:CanvasItem,p:Vector2)->void:
 		c.draw_rect(Rect2(p+Vector2(x*32+8,40),Vector2(16,8)),Color("a9dfff"))
 	for i in 5:
 		var q:=p+Vector2(34+i*44,218)
-		c.draw_circle(q,6,Color("7165ba",.45));c.draw_circle(q,3,Color("cfc5ff"))
+		Shapes.circle(c,q,6,Color("7165ba",.45));Shapes.circle(c,q,3,Color("cfc5ff"))
 
 static func arena_building(c:CanvasItem,p:Vector2)->void:
 	# 12x7.5 tiles = 384x240, matching the existing arena footprint.
@@ -139,8 +140,8 @@ static func arena_building(c:CanvasItem,p:Vector2)->void:
 		local_tile(c,p,x,1,2,1,ROOF_DARK)
 	# Central arched-looking gate built from tiles/rects.
 	local_tile(c,p,4,3,4,4,WALL_DARK)
-	c.draw_circle(p+Vector2(192,114),45,STONE_LIGHT)
-	c.draw_circle(p+Vector2(192,120),31,Color("29292a"))
+	Shapes.circle(c,p+Vector2(192,114),45,STONE_LIGHT)
+	Shapes.circle(c,p+Vector2(192,120),31,Color("29292a"))
 	c.draw_rect(Rect2(p+Vector2(161,120),Vector2(62,88)),Color("29292a"))
 	door_tile(c,p,5,5,true)
 	for x in [74,290]:

@@ -1,4 +1,5 @@
 extends RefCounted
+const Shapes=preload("res://components/canvas_shapes.gd")
 const PixelStyle32=preload("res://components/pixel_style_32.gd")
 # One registry controls food names, visible fruit colours and nutrition.
 const FOODS = [
@@ -235,9 +236,11 @@ func nearest(g)->Dictionary:
  var player_region:int=g.region_at(g.player_pos)
  for plant in plants:
   var p:Vector2=plant["point"]
-  var plant_region:int=int(plant.get("region",g.region_at(p)))
-  if plant_region!=player_region:continue
+  # Erst der billige Abstand, dann das Gebiet (jedes Bild für alle Pflanzen).
   var d:float=g.player_pos.distance_to(p+Vector2(0,20))
+  if d>=distance:continue
+  var plant_region:int=int(plant["region"]) if plant.has("region") else g.region_at(p)
+  if plant_region!=player_region:continue
   if d<distance:
    found={"point":p,"region":plant_region,"kind":str(plant.get("kind","fruit"))}
    if str(plant.get("kind","fruit"))=="herb":
@@ -485,8 +488,8 @@ func herb_bush(c:CanvasItem,p:Vector2,herb_name:String,herb_color:String)->void:
  if ready_at(p,Time.get_unix_time_from_system()):
   var flower:=Color(herb_color)
   for o in [Vector2(-19,-28),Vector2(-2,-37),Vector2(17,-25)]:
-   c.draw_circle(p+o,4,flower)
-   c.draw_circle(p+o+Vector2(2,-1),2,flower.lightened(.28))
+   Shapes.circle(c,p+o,4,flower)
+   Shapes.circle(c,p+o+Vector2(2,-1),2,flower.lightened(.28))
  else:
   var seconds:=regrow_remaining(p)
   c.draw_string(ThemeDB.fallback_font,p+Vector2(-22,28),"%02d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("e4cf8b"))
