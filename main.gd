@@ -12691,9 +12691,10 @@ func draw_sorted_world_objects() -> void:
 			for prop in village_props():
 				if prop_bounds(prop).intersects(current_static_bounds()): entries.append({"kind":"prop","depth":prop["depth"],"data":prop})
 		# Die gezeichneten Fruchtpflanzen SIND die interaktiven FoodSystem-Punkte.
+		# Wie visible_world(…,140), aber das Sichtrechteck nur einmal je Bild.
+		var food_view := (static_draw_bounds if static_draw_bounds.has_area() else camera_world_rect()).grow(140)
 		for food_prop in food_system.regional_props(self):
-			var food_point: Vector2 = food_prop["point"]
-			if visible_world(food_point,140): entries.append({"kind":"food_plant","depth":food_prop["depth"],"data":food_prop})
+			if food_view.has_point(food_prop["point"]): entries.append({"kind":"food_plant","depth":food_prop["depth"],"data":food_prop})
 		for npc in NPCS:
 			if village_resident_is_indoors(str(npc["name"])): continue
 			if visible_world(npc["pos"],130): entries.append({"kind":"npc","depth":npc["pos"].y+24,"data":npc})
@@ -12712,8 +12713,16 @@ func draw_sorted_world_objects() -> void:
 		var p := network_player_position(peer_id)
 		if visible_world(p,130): entries.append({"kind":"remote","depth":p.y+24,"peer":peer_id})
 	entries.append({"kind":"player","depth":player_pos.y+24})
-	entries.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return float(a["depth"])<float(b["depth"]))
-	for entry in entries:
+	# Nach Tiefe sortieren: Godots eingebaute Sortierung über (Tiefe, Stelle)
+	# statt eines GDScript-Vergleichs je Paar; gleiche Tiefe bleibt in Reihenfolge.
+	var order := PackedVector2Array()
+	order.resize(entries.size())
+	for index in entries.size(): order[index] = Vector2(float(entries[index]["depth"]), index)
+	order.sort()
+	var sorted_entries: Array = []
+	sorted_entries.resize(entries.size())
+	for index in order.size(): sorted_entries[index] = entries[int(order[index].y)]
+	for entry in sorted_entries:
 		match entry["kind"]:
 			"obstacle_3d":world_obstacles_3d.paint(self,entry)
 			"prop": draw_cached_prop(entry["data"])

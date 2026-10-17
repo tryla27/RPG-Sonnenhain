@@ -6,6 +6,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Tiefensortierung der Weltobjekte über `PackedVector2Array.sort()`
+  (Tiefe, Stelle) statt `sort_custom` (120 Einträge: 0,25 → 0,03 ms), gleiche
+  Tiefe bleibt stabil; Fruchtpflanzen-Sichtprüfung mit einem Rechteck je Bild.
 - Ruinenhof 17.10. (`components/ruin_courtyard.gd`): Boden im statischen
   Geländecache, Feuerschalen/Siegel je Zustand von Weltereignis 3 (Serin),
   `HOF GESÄUBERT` beim Abschluss. **Aussehen:** Bäume/Felsen/Deko im Hof
