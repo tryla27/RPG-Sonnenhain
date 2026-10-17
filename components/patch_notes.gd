@@ -1,6 +1,7 @@
 extends RefCounted
 const VERSION="PATCH 16.10.2026"
 const NOTES=[
+["Erkundung · Gebietsbanner mit Wappen", "Beim ersten Betreten eines Gebiets erscheint ein Banner mit eigenem Wappen, Gebietsname, empfohlener Stufe und dem Erkundungsspruch. Vorher wurde der Spruch sofort von „Neues Gebiet“ überdeckt. Je Charakter einmal, aus dem vorhandenen Entdeckungsstand."],
 ["Welt · Neue Mauern und Ruinen", "Mauern, Ecken, Endstücke, Torpfeiler und die Ruinenbauteile der Alten Ruinen, des Dämmergrats und des Himmelsgartens wurden in Blender neu gebaut: echtes Mauerwerk, Plattenbelag auf den Wehrgängen, Randsteine und Moos. Platz, Größe, Wege und Kollisionen bleiben genau gleich."],
 ["Oberfläche · Gesichter zu Meldungen", "Wenn Mira, Fenna oder Borin dir etwas sagen, erscheint ihr Porträt neben der Meldung."],
 ["Technik · Feste Landschaft", "Mauern und Landschaftskörper behalten feste Plätze im 3D-Atlas. Ruhende Seiten werden wiederverwendet, Geometrieabfragen zwischengespeichert und seltene Bewegungen gemeinsam getaktet. Neue Modelle entstehen verteilt über mehrere Bilder statt auf einmal. Wege und Kollisionen bleiben gleich."],

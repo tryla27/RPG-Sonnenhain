@@ -26,6 +26,9 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
   Vorschau: `tools/capture_architecture.gd`, Bilder in `docs/design/architecture-v2`.
 - Pixel-Porträts (`tools/art_pipeline/pixel_portraits.py`) für Meldungen von
   Mira, Fenna und Borin (`components/npc_portraits.gd`).
+- Gebietsbanner (`components/region_banner.gd`) mit 13 Inkscape-Wappen
+  (`art/source/inkscape/regions` → `art/ui/regions`); behebt den sofort
+  überschriebenen Erkundungsspruch. Nutzt `discovered_regions`, kein neues Speicherfeld.
 - Klarere Vorbereitungsflächen, elementabhängige Effektfolgen, Questzeichen,
   persönlicher Heimkehrschmuck und P95/P99 in der Leistungsanzeige.
   Keine Änderung von Schaden, XP, Kollisionen oder gespeicherten Belohnungen.

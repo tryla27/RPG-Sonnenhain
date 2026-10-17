@@ -105,6 +105,8 @@ const BossRelics=preload("res://components/boss_relics.gd")
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobNavigation=preload("res://components/mob_navigation.gd")
 const NpcPortraits=preload("res://components/npc_portraits.gd")
+const RegionBanner=preload("res://components/region_banner.gd")
+var region_banner:=RegionBanner.new()
 ## Neue Wegsuchen je Serverbild; verhindert, dass viele Gegner im selben Bild planen.
 const MOB_ROUTES_PER_FRAME:=3
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
@@ -1873,6 +1875,7 @@ func _process(delta: float) -> void:
 	ranger_stealth_timer = maxf(0.0, ranger_stealth_timer - delta)
 	robotics_overclock_timer = maxf(0.0, robotics_overclock_timer - delta)
 	notice_timer = maxf(0.0, notice_timer - delta)
+	region_banner.tick(delta)
 	party_reward_notice_timer = maxf(0.0,party_reward_notice_timer-delta)
 	if party_reward_notice_timer<=0.0: party_reward_notice=""
 	rescue_intro_timer = maxf(0.0, rescue_intro_timer - delta)
@@ -2506,10 +2509,13 @@ func update_player(delta: float) -> void:
 		previous_region = region
 		if not discovered_regions[region]:
 			discovered_regions[region] = true
-			var whispers := ["", "Unter den Blüten liegt etwas Dunkles.", "Die Pilze leuchten, obwohl kein Sonnenstrahl hierher reicht.", "Der Turm bewacht ein vergessenes Versprechen.", "Im Kristall spiegelt sich ein Himmel ohne Sterne.", "Die Asche trägt Spuren eines alten Feuers.", "Das Meer flüstert Namen aus vergangenen Tagen.", "Jenseits des Bruchs wartet die Quelle des Unheils.", "Eine Glocke schlägt tief im Nebel.", "Goldenes Harz verschließt die Wunden des Waldes.", "Wasser steigt aus der Erde und singt eine Warnung.", "Am Grat verlischt das letzte Wachtfeuer.", "Über den Gärten sammelt sich das Licht der Morgenwache."]
-			message("%s · %s" % [region_name(region), whispers[region]])
+			# Erstes Betreten: Banner mit Wappen, Stufe und Spruch (früher wurde
+			# der Spruch sofort von „Neues Gebiet“ überschrieben).
+			region_banner.show(region, region_name(region), region_level(region))
+			message("Gebiet entdeckt: %s" % region_name(region))
 			save_game()
-		message("Neues Gebiet: %s" % region_name(region))
+		else:
+			message("Neues Gebiet: %s" % region_name(region))
 		if region != 0:
 			for i in 5: spawn_enemy()
 	# Gedrückt halten löst nach jeder Abklingzeit den nächsten Hieb aus.
@@ -10370,6 +10376,7 @@ func draw_hud() -> void:
 		NpcPortraits.paint(self, notice_rect, notice)
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
 		text_at(notice_rect.position+Vector2(11, 23), short_notice, 15, Color("fff3c3"))
+	region_banner.paint(self, VIEW.x, font)
 	var nearest := interaction_prompt(nearby_food)
 	app_action_hint = nearest != ""
 	if nearest != "":
