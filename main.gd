@@ -106,6 +106,7 @@ const MobCombat=preload("res://components/mob_combat.gd")
 const MobNavigation=preload("res://components/mob_navigation.gd")
 const NpcPortraits=preload("res://components/npc_portraits.gd")
 const VILLAGE_PROP_MARGIN:=1600.0
+const BossGateSeal=preload("res://components/boss_gate_seal.gd")
 const RegionBanner=preload("res://components/region_banner.gd")
 const WebBenchmark=preload("res://components/web_benchmark.gd")
 var web_benchmark:=WebBenchmark.new()
@@ -9365,11 +9366,7 @@ func draw_gate_wall(start: Vector2, finish: Vector2, gate: Vector2, required_lev
 
 	var boss_locked: bool = boss_index >= 0 and not bosses_defeated[boss_index]
 	if boss_locked:
-		var seal := Rect2(gate+(Vector2(-28,-GATE_HALF_WIDTH+39) if vertical else Vector2(-GATE_HALF_WIDTH+39,-28)),Vector2(56,GATE_HALF_WIDTH*2-78) if vertical else Vector2(GATE_HALF_WIDTH*2-78,56))
-		draw_rect(seal,Color("6e405b",0.94))
-		draw_rect(seal.grow(-8),Color("c37598",0.9),false,4)
-		draw_line(seal.position,seal.end,Color("e3a1bf",0.7),3)
-		draw_line(Vector2(seal.end.x,seal.position.y),Vector2(seal.position.x,seal.end.y),Color("e3a1bf",0.7),3)
+		BossGateSeal.paint(self,gate,vertical,GATE_HALF_WIDTH,world_time)
 		text_at(gate+Vector2(-145,-62),"BOSS-SIEG NÖTIG",14,Color("fff0bc"),HORIZONTAL_ALIGNMENT_CENTER,290)
 		text_at(gate+Vector2(-145,-42),boss_gate_name(boss_index).to_upper(),13,Color("ffd0d0"),HORIZONTAL_ALIGNMENT_CENTER,290)
 	elif not village_gate or gate_open:

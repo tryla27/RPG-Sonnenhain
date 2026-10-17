@@ -1,6 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 16.10.2026"
 const NOTES=[
+["Welt · Siegeltore", "Tore, die erst nach einem Bosssieg öffnen, zeigen jetzt ein eisernes Fallgitter mit leuchtendem Siegel statt eines violetten Kastens. Die Sperre selbst bleibt unverändert."],
+["Technik · Flüssiger im Browser", "Gegner planen ihre Wege auch im Einzelspiel in kleineren Schritten, Kollisionsprüfungen sind viermal schneller und die Welt zeichnet pro Bild weniger doppelt. In Brave und Edge lief die Blütenwiese vorher mit vielen Rucklern über 100 ms; jetzt bleibt sie flüssig."],
 ["Erkundung · Gebietsbanner mit Wappen", "Beim ersten Betreten eines Gebiets erscheint ein Banner mit eigenem Wappen, Gebietsname, empfohlener Stufe und dem Erkundungsspruch. Vorher wurde der Spruch sofort von „Neues Gebiet“ überdeckt. Je Charakter einmal, aus dem vorhandenen Entdeckungsstand."],
 ["Welt · Neue Mauern und Ruinen", "Mauern, Ecken, Endstücke, Torpfeiler und die Ruinenbauteile der Alten Ruinen, des Dämmergrats und des Himmelsgartens wurden in Blender neu gebaut: echtes Mauerwerk, Plattenbelag auf den Wehrgängen, Randsteine und Moos. Platz, Größe, Wege und Kollisionen bleiben genau gleich."],
 ["Oberfläche · Gesichter zu Meldungen", "Wenn Mira, Fenna oder Borin dir etwas sagen, erscheint ihr Porträt neben der Meldung."],
