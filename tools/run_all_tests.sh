@@ -28,6 +28,12 @@ if ! python3 tools/check_content.py > "$LOG_DIR/check_content.log" 2>&1; then
 	exit 1
 fi
 
+echo "Werkzeugzentrale (tools/werkzeugzentrale/test_runner.py) ..."
+if ! (cd tools/werkzeugzentrale && timeout 300 python3 -m unittest test_runner) > "$LOG_DIR/werkzeugzentrale.log" 2>&1; then
+	echo "FEHLER Werkzeugzentrale-Runner (siehe $LOG_DIR/werkzeugzentrale.log)"
+	exit 1
+fi
+
 echo "Projekt importieren ..."
 if ! "$GODOT_BIN" --headless --path . --editor --import --quit > "$LOG_DIR/import.log" 2>&1; then
 	echo "FEHLER beim Import (siehe $LOG_DIR/import.log)"

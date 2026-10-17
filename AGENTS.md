@@ -1,5 +1,22 @@
 # Arbeitsregeln für Sonnenhain
 
+## Werkzeugzentrale: Regeln von Angelo vom 17.10.2026
+
+Bei Werkzeugautomatisierung und Produktionsabläufen
+`docs/werkzeugzentrale/OPTIMIERUNGSKONZEPT.md` und
+`docs/werkzeugzentrale/UMSETZUNGSPLAN.md` lesen und anwenden.
+Feste begrenzte Abläufe bevorzugen; keine versteckten Agentenschleifen,
+Generierungswiederholungen oder zusätzlichen Hintergrundaufträge.
+Externe kostenpflichtige KI-Aufträge der Zentrale standardmäßig deaktivieren;
+Freigaben an sichtbaren Umfang und Kostengrenze binden. Konkrete bestehende
+Nutzerfreigaben innerhalb ihres Umfangs beachten. Unbekannten Verbrauch nicht
+als null ausgeben; Chat-Token sind durch den lokalen Runner nicht hart begrenzbar.
+Große Arbeiten mit Umfang und erwarteter Dauer ankündigen, vollständige Logs
+lokal halten. Fehlergrenzen und unklare Zustände sichtbar machen. Vorhandene
+geeignete und geprüfte Werkzeugaktionen bevorzugen, nötige Umgehungen begründen.
+Konzept, implementiert und geprüft getrennt führen. Diese Regeln sind keine
+Behauptung bereits implementierter technischer Schutzfunktionen.
+
 Diese Regeln gelten für alle, die am Projekt arbeiten, ob Mensch oder KI-Assistent
 (Claude, Codex, …). Sie sorgen dafür, dass neuer Code an der richtigen Stelle
 landet und `main.gd` nicht weiter wächst.

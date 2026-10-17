@@ -6,6 +6,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 
 ## Unreleased
 
+- Werkzeugzentrale v2 (Paket 0/1) ins Repository übernommen:
+  `tools/werkzeugzentrale/` (Runner mit Deadline, Prozessbaum-Abbruch,
+  Kostenklasse, Sperre), Doku `docs/werkzeugzentrale/`, Regeln in `AGENTS.md`.
+  Windows-Sperrfehler beim gleichzeitigen Lesen/Ersetzen der Statusdatei mit
+  begrenzten Versuchen behoben; Runner-Tests in CI und `run_all_tests.sh`.
 - `Shapes.polygon`: Dreiecke und konvexe Vierecke über `draw_primitive`
   (~1,2 statt ~5,5 µs, Farbrundung höchstens 1/255), alle zweiargumentigen
   `draw_colored_polygon`-Aufrufe umgestellt (Ausnahme: `Brush` in
