@@ -116,6 +116,8 @@ const WebBenchmark=preload("res://components/web_benchmark.gd")
 var web_benchmark:=WebBenchmark.new()
 var web_benchmark_requested:=false
 var region_banner:=RegionBanner.new()
+const RegionFinds=preload("res://components/region_finds.gd")
+var region_finds:=RegionFinds.new()
 ## Neue Wegsuchen je Serverbild; verhindert, dass viele Gegner im selben Bild planen.
 const MOB_ROUTES_PER_FRAME:=3
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
@@ -1906,6 +1908,7 @@ func _process(delta: float) -> void:
 	robotics_overclock_timer = maxf(0.0, robotics_overclock_timer - delta)
 	notice_timer = maxf(0.0, notice_timer - delta)
 	region_banner.tick(delta)
+	region_finds.tick(delta)
 	party_reward_notice_timer = maxf(0.0,party_reward_notice_timer-delta)
 	if party_reward_notice_timer<=0.0: party_reward_notice=""
 	rescue_intro_timer = maxf(0.0, rescue_intro_timer - delta)
@@ -2564,6 +2567,7 @@ func update_player(delta: float) -> void:
 			# Erstes Betreten: Banner mit Wappen, Stufe und Spruch (früher wurde
 			# der Spruch sofort von „Neues Gebiet“ überschrieben).
 			region_banner.show(region, region_name(region), region_level(region))
+			region_finds.show(region)
 			message("Gebiet entdeckt: %s" % region_name(region))
 			save_game()
 		else:
@@ -3369,6 +3373,9 @@ func app_draw_touch_controls() -> void:
 		"zoom": effective_camera_zoom()})
 
 func _input(event:InputEvent)->void:
+	if region_finds.active() and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and region_finds.click(event.position):
+		get_viewport().set_input_as_handled()
+		return
 	if PerfOverlay.is_toggle_key(event):
 		perf_overlay.visible = not perf_overlay.visible
 		get_viewport().set_input_as_handled()
@@ -10509,6 +10516,7 @@ func draw_hud() -> void:
 		var short_notice := notice.substr(0, 55) + ("…" if notice.length() > 55 else "")
 		text_at(notice_rect.position+Vector2(11, 23), short_notice, 15, Color("fff3c3"))
 	region_banner.paint(self, VIEW.x, font)
+	region_finds.paint(self, font)
 	var nearest := interaction_prompt(nearby_food)
 	app_action_hint = nearest != ""
 	if nearest != "":

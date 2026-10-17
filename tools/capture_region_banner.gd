@@ -1,5 +1,5 @@
 extends SceneTree
-## Sichtbeleg: Gebietsbanner beim ersten Betreten (Alte Ruinen und Mondküste).
+## Sichtbeleg (mit Gebietshinweis rechts): Gebietsbanner beim ersten Betreten (Alte Ruinen und Mondküste).
 ## Aufruf: godot --path . -s tools/capture_region_banner.gd -- <Ausgabeordner>
 class Game extends "res://main.gd":
 	func save_game()->void:pass
@@ -22,7 +22,7 @@ func run()->void:
 		g.previous_region=0
 		g.player_pos=spot[1];g.camera_pos=g.player_pos-g.VIEW*.5;g.camera_smooth=g.camera_pos
 		g.update_player(1.0/60.0)
-		for i in 40:g.region_banner.tick(1.0/60.0)
+		for i in 40:g.region_banner.tick(1.0/60.0);g.region_finds.tick(1.0/60.0)
 		for frame in 20:
 			g.world_obstacles_3d.update(g,1.0/60.0);g.update_static_cache();g.queue_redraw()
 			await process_frame
