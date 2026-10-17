@@ -246,6 +246,10 @@ Entwurf noch nicht stillschweigend ersetzt: Der Cachepfad wird sichtbar und
 messbar beurteilt. Ein vollständiger Offline-Sprite-Umbau, neue Kameraführung
 und neuer Renderer sind nicht Bestandteil des ersten Piloten.
 
+Umsetzungsstand 17.10.2026: Schritte 1–3 erledigt, Architekturset (Schritt 5)
+ohne Fels umgesetzt, aus Schritt 6 Gebietsbanner und Siegeltor umgesetzt;
+Hof und Nebenpfad offen. Messungen siehe Umsetzungsbericht.
+
 Umsetzungsstand 16.10.2026: Werkzeuge eingerichtet, erste Modellserie und
 Grafikpipeline erstellt, Atlas-/Minimap-Caches und erste Kampf-/Storygrafik
 lokal eingebaut. Messungen, Vorschaubilder und offene Abnahmen stehen im

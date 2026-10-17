@@ -112,6 +112,7 @@ erfolgt. Android bleibt zurückgestellt.
 
 | Datum | Aufgabe | Ergebnis / Nachweis | Nächster Schritt |
 |---|---|---|---|
+| 17.10.2026 | 3 / Lag-Fehler | Server: Wegsuche begrenzt (längstes Serverbild 306 → 42–71 ms, Mitspieler-Lücken > 150 ms 3 → 0, auch mit vier Spielern). RTX 3060 nativ: P99 50–52 → 17–21 ms. Brave/Edge: Wiesen-P95 125 → 27–30 ms, kein Brave-Sonderfehler. PR #136, nicht live | Live-Freigabe, danach Live-Protokolle prüfen |
 | 12.10.2026 | Planung | Prioritäten und Abschlusskriterien aus bestehendem Konzept und lokalem Änderungsstand erstellt; keine erneuten Spieltests oder Liveprüfungen | Aufgabe 1 beginnen |
 | 12.10.2026 | 1 / Teil von 2 | GitHub-Hauptstand abgeglichen; Dorfstein-Ladefehler repariert; 133 lokale Projektprüfungen bestanden, Inhalts-/Browser-Brückenprüfung bestanden; fünf native Spielbilder erstellt. Details: `konzepte/2026-10-11-startbereich/README.md` | PR/CI; Quest-/Kampf-/Browserprüfung fortsetzen |
 | 12.10.2026 | Übergabe | Implementierung lokal als `c28afb7` committet; öffentliche Upload-Freigabe durch automatische Prüfung verlangt | Angelo um Freigabe für Branch-Upload und PR bitten |

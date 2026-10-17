@@ -111,6 +111,47 @@ langsamem Bild.
   (Gegner-Wegsuche), nicht von der 3D-Landschaft. Befund, Änderung und
   Messung: [Server-Lags](SERVER_LAGS_3D.md).
 
+## Stand 17.10.: Messungen auf Angelos PC und Ausbau
+
+Gemessen über eine Befehlsausführung auf Angelos PC (RTX 3060, Godot 4.7.2,
+Brave und Edge 155). Native Route wie oben:
+
+| Route | P95 16.10. | P95 17.10. | P99 16.10. | P99 17.10. | Bilder > 50 ms |
+|---|---:|---:|---:|---:|---|
+| Wiese | 17,4 ms | 16,8 ms | 51,1 ms | 19,4 ms | 3 → 0 |
+| Mauertor | 16,7 ms | 16,7 ms | 51,4 ms | 16,8 ms | 3 → 0 |
+| Pilzwald | 16,7 ms | 16,7 ms | 52,5 ms | 20,7 ms | 3 → 0 |
+
+Die letzten Spitzen stammten aus dem statischen Kartencache: Jeder neue
+512er-Abschnitt legte eine komplette Instanz von `main.gd` an (16–35 ms).
+Jetzt wandert ein gemeinsamer Zeichner von Abschnitt zu Abschnitt.
+
+Browser (Webexport, `?bench=1`, ohne Gegner):
+
+| Route | Brave P95 vorher | Brave P95 nachher | Edge P95 nachher | Bilder > 50 ms |
+|---|---:|---:|---:|---|
+| Wiese | 122–130 ms | 29,6 ms | 27,2 ms | 77 → 0 |
+| Mauertor | 23–28 ms | 27,0 ms | 24,2 ms | 0 |
+| Pilzwald | 30–41 ms | 34,7 ms | 31,2 ms | 1 |
+
+Ursache der Wiesen-Ruckler im Browser war die Gegner-Wegsuche des
+Einzelspielers (auch mit `no3d=1`/`noanim=1` gleich langsam). Mit echtem
+Blütenweiler-Angriff (`ai=1`, rund 25 Gegner) liegen Brave/Edge bei P50
+etwa 40 ms; Gegnerzeichnen und -KI bleiben dort der größte Anteil.
+
+Weitere Grafik und Spielführung aus dem Konzept, alle mit Vorschaubildern:
+
+- Architektur-Set v2 aus Blender (Mauern, Ecken, Endstücke, Torpfeiler,
+  Ruinen), exakt gleiche Begrenzung: [Vergleich](design/architecture-v2/architecture_compare.jpg).
+- Gebietsbanner mit 13 Inkscape-Wappen beim ersten Betreten:
+  [Bild](design/region-banner/ruinen.jpg).
+- Siegeltor an bossgesperrten Toren: [Bild](design/boss-seal/siegeltor.jpg).
+- Pixel-Porträts zu Meldungen von Mira, Fenna und Borin.
+
+Bewusst nicht übernommen: Die Waffen-Itembilder und der Kartenentwurf vom
+16.10. sind schwächer als die vorhandene Spielgrafik. Die gemalten Porträts
+wurden zu Pixelporträts umgearbeitet.
+
 ## Werkzeuge und Reparatur
 
 Blender 5.2.2 LTS, Inkscape 1.4.4 als portable Extraktion, Krita 5.3.4.1

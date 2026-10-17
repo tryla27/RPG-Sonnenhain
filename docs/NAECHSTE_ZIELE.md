@@ -1,5 +1,13 @@
 # Sonnenhain – nächste Ziele
 
+17.10.2026 · Weiterarbeit an PR #136 (nicht live): Server-Lags lokal auf die
+Gegner-Wegsuche zurückgeführt und behoben; auf Angelos RTX 3060 keine Bilder
+über 50 ms mehr; Brave/Edge-Ruckler in den Blütenwiesen behoben. Neu:
+Blender-Architekturset, Gebietsbanner mit Wappen, Siegeltore, NPC-Porträts.
+[Messungen und Bilder](QUALITY_V1_UMSETZUNG.md), [Server-Befund](SERVER_LAGS_3D.md).
+Nächstes: Live-Bestätigung nach Freigabe, Gegnerzeichnen im Browser,
+Hof-/Nebenpfad-Pilot.
+
 16.10.2026 · Umsetzung: Erstes Grafik-/Leistungspaket lokal eingebaut und
 geprüft. Stabile Atlasseiten, Minimapcache, Kampfvorbereitung, Effektfolgen
 und persönlicher Dorfschmuck sind angebunden. 23 neue Modelle, neun
