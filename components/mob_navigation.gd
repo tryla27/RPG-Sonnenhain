@@ -2,6 +2,14 @@ extends RefCounted
 ## Bounded local A*: cached per mob, swept segments, deterministic detours.
 const CELL=32.0
 const BUDGET=384
+## Höchstzahl echter Begehbarkeitsprüfungen je Suche (je ~25 µs). Danach gilt
+## der beste Teilweg; die Suche wird später erneut versucht.
+const MAX_CHECKS=1500
+## Pro Serverbild nur so viele neue Suchen; weitere Gegner behalten ihren Weg
+## ein Bild länger. -1 = unbegrenzt (Tests, Werkzeuge).
+static var routes_left:=-1
+## Ob die letzte route() ihr Ziel erreicht hat.
+static var last_complete:=true
 const DIRECTIONS=[Vector2i(1,0),Vector2i(0,1),Vector2i(-1,0),Vector2i(0,-1),Vector2i(1,1),Vector2i(-1,1),Vector2i(-1,-1),Vector2i(1,-1)]
 
 static func clear_segment(a:Vector2,b:Vector2,walkable:Callable)->bool:
@@ -10,7 +18,16 @@ static func clear_segment(a:Vector2,b:Vector2,walkable:Callable)->bool:
 		if not bool(walkable.call(a.lerp(b,float(index)/count))):return false
 	return true
 
-static func route(origin:Vector2,target:Vector2,walkable:Callable)->Array:
+static func route(origin:Vector2,target:Vector2,walkable_raw:Callable)->Array:
+	# Dieselben Prüfpunkte kommen in benachbarten Segmenten mehrfach vor.
+	var memo:Dictionary={};var checks:=[0]
+	var walkable:=func(point:Vector2)->bool:
+		var key:=Vector2i((point*16.0).round())
+		if memo.has(key):return memo[key]
+		checks[0]+=1
+		var ok:=bool(walkable_raw.call(point));memo[key]=ok
+		return ok
+	last_complete=true
 	var goal:=origin+ (target-origin).limit_length(640.0)
 	if clear_segment(origin,goal,walkable):return [goal]
 	var open:Array[Vector2i]=[Vector2i.ZERO]
@@ -21,7 +38,7 @@ static func route(origin:Vector2,target:Vector2,walkable:Callable)->Array:
 	var best:=Vector2i.ZERO
 	var best_distance:=origin.distance_to(goal)
 	for iteration in BUDGET:
-		if open.is_empty():break
+		if open.is_empty() or checks[0]>=MAX_CHECKS:break
 		var chosen:=0
 		var priority:=INF
 		for index in open.size():
@@ -47,6 +64,7 @@ static func route(origin:Vector2,target:Vector2,walkable:Callable)->Array:
 			if not costs.has(next) or cost<float(costs[next]):
 				costs[next]=cost;parents[next]=current
 				if not open.has(next):open.append(next)
+	last_complete=false
 	return reconstruct(best,parents,origin)
 
 static func reconstruct(cell:Vector2i,parents:Dictionary,origin:Vector2)->Array:
@@ -61,10 +79,15 @@ static func direction(enemy:Dictionary,target:Vector2,delta:float,walkable:Calla
 	var wait:=maxf(0.0,float(enemy.get("nav_wait",0.0))-delta)
 	var path:Array=enemy.get("nav_path",[])
 	var changed:=Vector2(enemy.get("nav_target",target)).distance_to(target)>64.0
-	if wait<=0.0 or changed:
+	if (wait<=0.0 or changed) and routes_left==0:
+		# Suchkontingent dieses Bildes verbraucht: im nächsten Bild planen.
+		wait=0.0
+	elif wait<=0.0 or changed:
+		if routes_left>0:routes_left-=1
 		path=route(origin,target,walkable)
 		enemy["nav_target"]=target
-		wait=.6+fmod(absf(float(enemy.get("uid",0))),7.0)*.03
+		# Unerreichbare Ziele nicht alle 0,6 s erneut voll durchsuchen.
+		wait=(.6 if last_complete else 1.5)+fmod(absf(float(enemy.get("uid",0))),7.0)*.03
 	# Reach corners precisely; skipping them early can cut through a tree root.
 	while not path.is_empty() and origin.distance_to(path[0])<.5:path.pop_front()
 	enemy["nav_path"]=path;enemy["nav_wait"]=wait

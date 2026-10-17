@@ -104,6 +104,8 @@ const DisplayMode=preload("res://components/display_mode.gd")
 const BossRelics=preload("res://components/boss_relics.gd")
 const MobCombat=preload("res://components/mob_combat.gd")
 const MobNavigation=preload("res://components/mob_navigation.gd")
+## Neue Wegsuchen je Serverbild; verhindert, dass viele Gegner im selben Bild planen.
+const MOB_ROUTES_PER_FRAME:=3
 const WoodlandAttackVFX=preload("res://components/woodland_attack_vfx.gd")
 const WolfAnimation=preload("res://components/wolf_animation.gd")
 const WoodlandPoseAnimation=preload("res://components/woodland_pose_animation.gd")
@@ -2260,6 +2262,7 @@ func advance_mob(enemy:Dictionary,delta:float,server:bool)->bool:
 
 func update_dedicated_enemies(delta:float)->void:
 	server_moving_mobs=0
+	MobNavigation.routes_left=MOB_ROUTES_PER_FRAME
 	for i in range(enemies.size()-1,-1,-1):
 		var enemy:Dictionary=enemies[i]
 		if float(enemy.get("hp",0))<=0:
@@ -2271,6 +2274,7 @@ func update_dedicated_enemies(delta:float)->void:
 			golem_perf_add(Time.get_ticks_usec()-started_us)
 		elif advance_mob(enemy,delta,true):server_moving_mobs+=1
 		if float(enemy.get("hp",0))<=0:defeat_enemy(i,int(enemy.get("last_hit_peer",0)))
+	MobNavigation.routes_left=-1
 	var world_us:=Time.get_ticks_usec()
 	golem_world.update_world(self,delta,true)
 	golem_perf_add(Time.get_ticks_usec()-world_us)
@@ -2579,20 +2583,22 @@ func is_blocked(pos: Vector2, from_pos: Vector2 = Vector2(-1, -1)) -> bool:
 			return true
 	return false
 
+## Gebietsmauern mit Toren; konstant, damit Wegprüfungen sie nicht je Aufruf neu bauen.
+const REGION_WALLS := [
+	{"vertical":true,"axis":1780.0,"from":0.0,"to":2600.0,"gate":1120.0,"level":1,"boss":-1},
+	{"vertical":true,"axis":1780.0,"from":2600.0,"to":8500.0,"gate":6200.0,"level":8,"boss":-1},
+	{"vertical":false,"axis":2600.0,"from":0.0,"to":1780.0,"gate":875.0,"level":5,"boss":-1},
+	{"vertical":false,"axis":4200.0,"from":1780.0,"to":5000.0,"gate":2900.0,"level":8,"boss":-1},
+	{"vertical":true,"axis":5000.0,"from":0.0,"to":4200.0,"gate":1250.0,"level":15,"boss":-1},
+	{"vertical":true,"axis":5000.0,"from":4200.0,"to":8500.0,"gate":6200.0,"level":22,"boss":0},
+	{"vertical":false,"axis":4200.0,"from":5000.0,"to":8500.0,"gate":6600.0,"level":22,"boss":0},
+	{"vertical":true,"axis":8500.0,"from":0.0,"to":4200.0,"gate":1900.0,"level":29,"boss":1},
+	{"vertical":true,"axis":8500.0,"from":4200.0,"to":8500.0,"gate":6350.0,"level":36,"boss":1},
+	{"vertical":false,"axis":4200.0,"from":8500.0,"to":11000.0,"gate":9750.0,"level":36,"boss":-1}
+]
+
 func blocked_by_region_wall(pos: Vector2) -> bool:
-	var walls := [
-		{"vertical":true,"axis":1780.0,"from":0.0,"to":2600.0,"gate":1120.0,"level":1,"boss":-1},
-		{"vertical":true,"axis":1780.0,"from":2600.0,"to":8500.0,"gate":6200.0,"level":8,"boss":-1},
-		{"vertical":false,"axis":2600.0,"from":0.0,"to":1780.0,"gate":875.0,"level":5,"boss":-1},
-		{"vertical":false,"axis":4200.0,"from":1780.0,"to":5000.0,"gate":2900.0,"level":8,"boss":-1},
-		{"vertical":true,"axis":5000.0,"from":0.0,"to":4200.0,"gate":1250.0,"level":15,"boss":-1},
-		{"vertical":true,"axis":5000.0,"from":4200.0,"to":8500.0,"gate":6200.0,"level":22,"boss":0},
-		{"vertical":false,"axis":4200.0,"from":5000.0,"to":8500.0,"gate":6600.0,"level":22,"boss":0},
-		{"vertical":true,"axis":8500.0,"from":0.0,"to":4200.0,"gate":1900.0,"level":29,"boss":1},
-		{"vertical":true,"axis":8500.0,"from":4200.0,"to":8500.0,"gate":6350.0,"level":36,"boss":1},
-		{"vertical":false,"axis":4200.0,"from":8500.0,"to":11000.0,"gate":9750.0,"level":36,"boss":-1}
-	]
-	for wall in walls:
+	for wall in REGION_WALLS:
 		var along: float = pos.y if wall["vertical"] else pos.x
 		var across: float = pos.x if wall["vertical"] else pos.y
 		if along < float(wall["from"]) - 20.0 or along > float(wall["to"]) + 20.0: continue

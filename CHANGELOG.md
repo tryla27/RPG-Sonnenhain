@@ -13,6 +13,11 @@ Neue Änderungen sollen ab jetzt in dieser Datei zusammengefasst werden. Detaild
 - Atlasseiten 17.10.: Ausblenden und Entfernen zeichnen keine Seite mehr neu,
   höchstens eine ruhende Seite pro Bild. Neuzeichnungen auf den Prüfrouten etwa
   halbiert; Messwerkzeug ordnet langsame Bilder den Renderereignissen zu.
+- Modellaufbau 17.10.: höchstens 6 ms Modellbau pro Bild, geteilte Materialien.
+- Server 17.10.: Gegner-Wegsuche mit Prüfgedächtnis, Prüfbudget, Rückstellung
+  unerreichbarer Ziele und höchstens drei Suchen pro Serverbild; Mauerliste
+  konstant. Lokaler Zwei-Spieler-Lauf: längstes Serverbild 306 → 42–71 ms.
+  Neues Werkzeug `tools/benchmark_coop_network.gd`.
 - Klarere Vorbereitungsflächen, elementabhängige Effektfolgen, Questzeichen,
   persönlicher Heimkehrschmuck und P95/P99 in der Leistungsanzeige.
   Keine Änderung von Schaden, XP, Kollisionen oder gespeicherten Belohnungen.

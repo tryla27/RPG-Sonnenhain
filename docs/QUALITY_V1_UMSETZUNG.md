@@ -102,6 +102,15 @@ RTX 3060 muss `tools/benchmark_landscape.gd` erneut messen; der Bericht enthält
 jetzt je Route `slow_frames` mit Neuzeichnungen, neuen Körpern und Modellen pro
 langsamem Bild.
 
+### Nachtrag 17.10.: Modellaufbau und Server
+
+- Neue Landschaftsmodelle entstehen in GDScript und kosten 10–50 ms je Modell.
+  Pro Bild wird nach 6 ms kein weiteres gebaut; ein gemeinsamer Baumeister
+  teilt Materialtexturen. Erste Sammlung im Software-Lauf 149 → 56 ms.
+- Die Online-Pausen von 300 ms und mehr stammten lokal vom Server
+  (Gegner-Wegsuche), nicht von der 3D-Landschaft. Befund, Änderung und
+  Messung: [Server-Lags](SERVER_LAGS_3D.md).
+
 ## Werkzeuge und Reparatur
 
 Blender 5.2.2 LTS, Inkscape 1.4.4 als portable Extraktion, Krita 5.3.4.1

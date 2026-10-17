@@ -4,9 +4,50 @@ Stand: 16. Oktober 2026. Meldung von Angelo:
 „Lags auf dem Server seit wir [3D-]Modelle auf den Maps haben“.
 Die Schreibweise „ed“ wird im Gesprächskontext als „3D“ verstanden.
 
-**Status: gemeldeter Fehler, Ursache offen. Priorität P1; bei unspielbaren
+**Status: Serveranteil lokal nachgewiesen und verbessert (17.10.), Live-Bestätigung offen. Priorität P1; bei unspielbaren
 Kämpfen, Abbrüchen oder Fortschrittsverlust P0. Vor weiterem breitem
 3D-Ausbau untersuchen. Betrifft die Maps allgemein, nicht nur den Golem.**
+
+## Befund 17.10.: Serverspitzen durch Gegner-Wegsuche
+
+Lokaler Nachbau mit echtem dediziertem Server und zwei Spielerprozessen
+(`tools/benchmark_coop_network.gd`, je 70 s Laufen in der Blütenwiese, rund
+12 Gegner). Beide Spieler sahen gleichzeitig Pausen von 300–350 ms, in denen
+weder Bewegung des anderen noch Weltpakete ankamen. Ursache war der Server:
+Einzelne Serverbilder dauerten bis 306 ms, fast vollständig in
+`advance_mob()` → `MobNavigation.route()`.
+
+- Die Wegsuche (eingeführt 09.10., einen Tag vor den 3D-Modellen) prüft bei
+  nicht direkt erreichbaren Zielen bis zu ~15.000 Punkte auf Hindernisse.
+- Jede Prüfung kostete rund 26 µs, davon etwa die Hälfte, weil
+  `blocked_by_region_wall()` bei jedem Aufruf seine Mauerliste neu aufbaute.
+- Unerreichbare Ziele wurden alle 0,6 s erneut voll durchsucht.
+
+Der zeitliche Zusammenhang mit den 3D-Modellen ist damit erklärbar, ohne dass
+die Modelle selbst den Server belasten: Der Server rendert keine Landschaft.
+
+Änderungen:
+
+- Mauerliste als Konstante (`REGION_WALLS`); Prüfung 12,8 → 3,6 µs.
+- Wegsuche merkt sich bereits geprüfte Punkte und bricht nach 1.500 echten
+  Prüfungen mit dem besten Teilweg ab. Unerreichbare Ziele erst nach 1,5 s neu.
+- Höchstens drei neue Wegsuchen pro Serverbild (`MOB_ROUTES_PER_FRAME`);
+  weitere Gegner planen im nächsten Bild.
+
+| Messung (lokal, 2 Kerne) | vorher | nachher |
+|---|---:|---:|
+| Längstes Serverbild | 306 ms | 42–71 ms |
+| Längste Lücke Bewegung anderer Spieler | 300 / 334 ms | 84–100 ms |
+| Bewegungslücken über 150 ms | 3 / 3 | 0 / 0 |
+| Längste Lücke Weltpakete | 350 ms | 150–167 ms |
+
+Ein zweiter Lauf mit künstlich blockiertem Client (190 ms alle 2 s) zeigt
+den anderen Anteil: Der andere Spieler sieht dann 250 ms Lücken in dessen
+Bewegung. Clientruckler (z. B. Modellaufbau) wirken für Mitspieler also
+ebenfalls wie Lag; dafür sind Atlas- und Modellbudget im Client zuständig.
+
+Offen: Live-Server-Protokolle (`SERVER_PERF cpu_max`) nach dem nächsten
+Live-Gang vergleichen; Vier-Spieler- und Golem-Lauf.
 
 ## Was feststeht
 

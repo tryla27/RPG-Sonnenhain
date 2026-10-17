@@ -1,7 +1,8 @@
 extends RefCounted
 const VERSION="PATCH 16.10.2026"
 const NOTES=[
-["Technik · Feste Landschaft", "Mauern und Landschaftskörper behalten feste Plätze im 3D-Atlas. Ruhende Seiten werden wiederverwendet, Geometrieabfragen zwischengespeichert und seltene Bewegungen gemeinsam getaktet. Wege und Kollisionen bleiben gleich. Die Untersuchung der Online-Lags läuft weiter."],
+["Technik · Feste Landschaft", "Mauern und Landschaftskörper behalten feste Plätze im 3D-Atlas. Ruhende Seiten werden wiederverwendet, Geometrieabfragen zwischengespeichert und seltene Bewegungen gemeinsam getaktet. Neue Modelle entstehen verteilt über mehrere Bilder statt auf einmal. Wege und Kollisionen bleiben gleich."],
+["Online · Weniger Serverhänger", "Die Wegsuche der Gegner konnte den Server bei schwer erreichbaren Zielen für einen Moment anhalten; dann standen alle Mitspieler und Gegner kurz still. Gegner planen ihre Wege jetzt in kleineren Schritten und versuchen unerreichbare Ziele seltener. Gegnerverhalten, Schaden und Reichweiten bleiben gleich."],
 ["Kampf · Klarere Vorbereitung und Treffer", "Vorbereitete Nah- und Flächenangriffe zeigen ihre Reichweite deutlicher. Elementabhängige kurze Aufprallbilder ergänzen Treffer. Schaden, Reichweiten und Angriffszeiten bleiben gleich; der Wolf kündigt seinen Sprung weiterhin über seine Pose an."],
 ["Dorf · Sichtbare Heimkehr", "Nach abgeschlossener Hilfe für Tessa, Blütenweilers Rettung und dem Finale zeigt der Dorf-Wegstein persönlichen Blütenschmuck. Dafür zählt dein vorhandener Fortschritt; Gegenstände und Belohnungen werden nicht erneut vergeben."],
 ["Oberfläche · Questzeichen und Leistung", "Ein einheitliches Questzeichen markiert die Zielzeile. Die Minimap verwendet gespeicherte Geländefarben; Erkundung und bewegliche Marker bleiben aktuell. F3 zeigt zusätzlich P95 und P99 der Bildzeiten, damit kurze Ruckler besser erkennbar werden."],
