@@ -134,6 +134,19 @@ Browser (Webexport, `?bench=1`, ohne Gegner):
 | Mauertor | 23–28 ms | 27,0 ms | 24,2 ms | 0 |
 | Pilzwald | 30–41 ms | 34,7 ms | 31,2 ms | 1 |
 
+Nach dem Kampfpaket (17.10. abends, Stand vor Polygon-/Sortierumbau,
+RTX 3060, Brave/Edge 155), mit echtem Blütenweiler-Angriff (`ai=1`):
+
+| Route | P50 vorher | Brave P50 / P95 | Edge P50 / P95 | Bilder > 50 ms |
+|---|---:|---:|---:|---|
+| Wiese | ≈ 40 ms | 20,3 / 30,7 ms | 18,4 / 29,1 ms | 0 |
+| Mauertor | – | 16,7 / 17,6 ms | 16,7 / 17,5 ms | 0 |
+| Pilzwald | – | 16,6 / 29,4 ms | 16,6 / 23,9 ms | 0 |
+
+Ohne Gegner (`bench=1`) laufen alle Routen in beiden Browsern mit 60 Bildern
+pro Sekunde (P95 17,2–17,8 ms, P99 höchstens 26 ms). Nativ auf dem PC kosten
+25 Wiesengegner 2,2 ms KI und 2,4 ms Zeichnen je Bild.
+
 Ursache der Wiesen-Ruckler im Browser war die Gegner-Wegsuche des
 Einzelspielers (auch mit `no3d=1`/`noanim=1` gleich langsam). Mit echtem
 Blütenweiler-Angriff (`ai=1`, rund 25 Gegner) liegen Brave/Edge bei P50
