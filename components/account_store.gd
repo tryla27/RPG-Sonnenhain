@@ -193,7 +193,7 @@ func sync_character_save(peer:int,uuid:String,token:String,data:Dictionary,revis
 		var c:Dictionary=chars[i]
 		if str(c.get("uuid",""))!=uuid or str(c.get("token",""))!=token:continue
 		var next_name:=str(data.get("hero_name",c.get("name","Held"))).substr(0,32)
-		var next_level:=clampi(int(data.get("level",c.get("level",1))),1,99)
+		var next_level:=preload("res://components/level_rules.gd").clamp_level(int(data.get("level",c.get("level",1))))
 		var next_class:=clampi(int(data.get("class_id",c.get("class_id",0))),0,2)
 		var next_revision:=maxi(0,revision)
 		if str(c.get("name",""))!=next_name or int(c.get("level",1))!=next_level or int(c.get("class_id",0))!=next_class or int(c.get("revision",-1))!=next_revision:
