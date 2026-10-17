@@ -58,6 +58,7 @@ jobs:
           # Die Logdatei hat keine Zeitstempel: Zeilen seit dem letzten Serverstart
           # (Start-/Patchmeldung) gelten als "nachher".
           grep -nE 'SERVER_PERF|GOLEM_PERF|SERVER_HEARTBEAT|SERVER_PATCH_NOTICE_SENT|Godot Engine' "$HOME/sonnenhain-server/server.log" 2>/dev/null | tail -n 4000 | cut -c1-220 | sed 's/^/LOGPERF /'
+          echo "NOW_EPOCH $(date +%s)"
           echo "RELEASE_EPOCH $(stat -c %Y "$HOME/sonnenhain-server/releases/current/sonnenhain-server.x86_64" 2>/dev/null || echo 0)"
           journalctl --user -u sonnenhain.service --since "-36h" --no-pager -o short-unix 2>/dev/null | grep -E 'SERVER_PERF|GOLEM_PERF|SERVER_HEARTBEAT' | sed -E 's/^([0-9.]+) [^:]*: /\1 /' | cut -c1-220 | sed 's/^/PERF /'
           uptime -p 2>/dev/null | sed 's/^/UPTIME /'
@@ -87,17 +88,29 @@ jobs:
               if "SERVER_PERF" in text: rows[side].append(values)
               elif "GOLEM_PERF" in text: golem[side].append(values)
               elif "SERVER_HEARTBEAT" in text and "peers" in values: peers[side].append(int(values["peers"]))
-          # Logdatei: alles nach dem letzten Serverstart zählt als "nachher".
+          # Logdatei ohne Zeitstempel: eine SERVER_PERF-Zeile je Minute. Die letzten
+          # (jetzt - Auslieferung)/60 Zeilen stammen aus der aktuellen Version.
+          now = 0.0
+          for line in open("diag.txt", encoding="utf-8", errors="replace"):
+              if line.startswith("NOW_EPOCH "): now = float(line.split()[1])
           log_lines = [l for l in open("diag.txt", encoding="utf-8", errors="replace") if l.startswith("LOGPERF ")]
           if not rows["vorher"] and not rows["nachher"] and log_lines:
-              last_start = max([i for i, l in enumerate(log_lines) if "Godot Engine" in l] or [0])
-              for i, l in enumerate(log_lines):
-                  side = "nachher" if i >= last_start else "vorher"
+              perf_total = sum(1 for l in log_lines if "SERVER_PERF" in l)
+              after_minutes = int(max(0.0, now - release) / 60.0) if release and now else 0
+              seen = 0
+              spikes = []
+              for l in log_lines:
                   text = l.split(":", 1)[1] if ":" in l else l
                   values = dict(re.findall(r"(\w+)=([-\d.]+)", text))
-                  if "SERVER_PERF" in text: rows[side].append(values)
+                  side = "nachher" if perf_total - seen <= after_minutes else "vorher"
+                  if "SERVER_PERF" in text:
+                      seen += 1
+                      rows[side].append(values)
+                      peak = float(values.get("cpu_max", 0))
+                      if peak > 50: spikes.append("vor %d min: %.0f ms" % (perf_total - seen, peak))
                   elif "GOLEM_PERF" in text: golem[side].append(values)
                   elif "SERVER_HEARTBEAT" in text and "peers" in values: peers[side].append(int(values["peers"]))
+              print("::notice title=Serverlast Spitzen::Auslieferung vor %d min; Spitzen über 50 ms: %s" % (after_minutes, "; ".join(spikes[-12:]) or "keine"))
           def pct(values, part):
               values = sorted(values)
               return values[min(len(values) - 1, max(0, int(len(values) * part + .999) - 1))] if values else 0
