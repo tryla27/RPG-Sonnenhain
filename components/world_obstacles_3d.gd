@@ -33,6 +33,12 @@ var peak_collection_us:=0
 var decoration_cells:Dictionary={}
 const DECORATION_CACHE_LIMIT:=4096
 const STATIC_RENDERS_PER_FRAME:=1
+## Neue Modelle entstehen in GDScript (10–50 ms je Modell). Pro Bild nur so
+## viele bauen, bis dieses Zeitbudget überschritten ist; mindestens eines.
+const MODEL_BUILD_BUDGET_US:=6000
+## Ein gemeinsamer Baumeister teilt erzeugte Materialtexturen zwischen Modellen.
+var builder:=Models.new()
+var pending_models:=0
 
 ## Rückfall (10.10.2026): Rendert der 3D-Viewport im Browser nichts (z. B. bei
 ## manchen Grafiktreibern), zeichnet das Spiel wieder die 2D-Landschaft. Einmal
@@ -152,7 +158,8 @@ func update(g,delta:float)->void:
 	var next_signature:="%s:%s" % [Vector2i(bounds.position/64),Vector2i(bounds.size)]
 	collection_clock-=delta
 	# Kameralauf umgeht die Pause nicht mehr; die vorgeladene Randzone deckt ihn ab.
-	if not signature.is_empty() and collection_clock>0:return
+	# Fehlen noch Modelle, im nächsten Bild weiterbauen statt 250 ms zu warten.
+	if not signature.is_empty() and collection_clock>0 and pending_models==0:return
 	collection_clock=.25;signature=next_signature
 	var started:=Time.get_ticks_usec()
 	rows=collect(g,bounds)
@@ -164,13 +171,18 @@ func update(g,delta:float)->void:
 	while atlas_pages.size()<atlas_slots.pages.size():
 		var page:=AtlasPage.new();var index:=atlas_pages.size()
 		page.setup(g,bool(atlas_slots.pages[index]["animated"]),index);atlas_pages.append(page)
+	var build_started:=Time.get_ticks_usec();var built:=0;pending_models=0
 	for row in rows:
 		var key:String=row["key"];var id:String=row["model"]
 		var allocation:Dictionary=atlas_slots.entries[key]
 		var page=atlas_pages[int(allocation["page"])]
 		if not instances.has(key):
 			if not models.has(id):
-				var body:=Models.new().build(specs[id]);var scene:=PackedScene.new();scene.pack(body);body.free();models[id]=scene
+				# Budget erschöpft: Körper ohne Atlasbild bleibt bis zum Folgebild
+				# unsichtbar; die vorgeladene Randzone verdeckt das meist.
+				if built>0 and Time.get_ticks_usec()-build_started>MODEL_BUILD_BUDGET_US:
+					pending_models+=1;continue
+				var body:=builder.build(specs[id]);var scene:=PackedScene.new();scene.pack(body);body.free();models[id]=scene;built+=1
 			var instance:Node3D=models[id].instantiate()
 			instance.name="Object_"+str(created_instances);instances[key]=instance;created_instances+=1
 			page.add_body(key,instance,int(allocation["slot"]),row)
