@@ -54,14 +54,49 @@ jobs:
           printf '%s\n' "$all" | grep 'CLIENT_3D' | tail -4 | cut -c1-400 | sed 's/^/HB /'
           # Laufzeiten (jede Minute): CPU je Serverbild, Weltpakete, Golem. Mit Zeitstempel,
           # damit sich Zeiten vor und nach einer Auslieferung vergleichen lassen.
-          journalctl --user -u sonnenhain.service --since "-36h" --no-pager -o short-iso 2>/dev/null | grep -E 'SERVER_PERF|GOLEM_PERF' | tail -n 120 | sed -E 's/^([0-9T:+-]+) [^:]*: /\1 /' | cut -c1-200 | sed 's/^/PERF /'
+          echo "RELEASE_EPOCH $(stat -c %Y "$HOME/sonnenhain-server/releases/current/sonnenhain-server.x86_64" 2>/dev/null || echo 0)"
+          journalctl --user -u sonnenhain.service --since "-36h" --no-pager -o short-unix 2>/dev/null | grep -E 'SERVER_PERF|GOLEM_PERF|SERVER_HEARTBEAT' | sed -E 's/^([0-9.]+) [^:]*: /\1 /' | cut -c1-220 | sed 's/^/PERF /'
           uptime -p 2>/dev/null | sed 's/^/UPTIME /'
           pgrep -af "[s]onnenhain-server.x86_64" | sed 's/^/PROC /' | cut -c1-120
           ps -o etime= -p "$(pgrep -f '[s]onnenhain-server.x86_64 --headless' | head -1)" 2>/dev/null | sed 's/^/PROC_AGE /'
           REMOTE
           cat diag.txt >> "$GITHUB_STEP_SUMMARY"
           # Laufzeitzeilen (anonym) auch ins Protokoll, damit sie sich abrufen lassen.
-          grep '^PERF ' diag.txt || true
+          python3 - <<'PY'
+          # Laufzeiten vor/nach der aktuellen Auslieferung zusammenfassen (anonym).
+          import re
+          release = 0.0
+          rows = {"vorher": [], "nachher": []}
+          golem = {"vorher": [], "nachher": []}
+          peers = {"vorher": [], "nachher": []}
+          for line in open("diag.txt", encoding="utf-8", errors="replace"):
+              if line.startswith("RELEASE_EPOCH "): release = float(line.split()[1])
+          for line in open("diag.txt", encoding="utf-8", errors="replace"):
+              if not line.startswith("PERF "): continue
+              parts = line.split(" ", 2)
+              try: stamp = float(parts[1])
+              except ValueError: continue
+              side = "nachher" if stamp >= release else "vorher"
+              text = parts[2]
+              values = dict(re.findall(r"(\w+)=([-\d.]+)", text))
+              if "SERVER_PERF" in text: rows[side].append(values)
+              elif "GOLEM_PERF" in text: golem[side].append(values)
+              elif "SERVER_HEARTBEAT" in text and "peers" in values: peers[side].append(int(values["peers"]))
+          def pct(values, part):
+              values = sorted(values)
+              return values[min(len(values) - 1, max(0, int(len(values) * part + .999) - 1))] if values else 0
+          for side in ("vorher", "nachher"):
+              r = rows[side]
+              cpu = [float(v.get("cpu_avg", 0)) for v in r]; peak = [float(v.get("cpu_max", 0)) for v in r]
+              enc = [float(v.get("encode_avg", 0)) for v in r]; kib = [float(v.get("world_kib_s", 0)) for v in r]
+              deferred = sum(int(float(v.get("deferred", 0))) for v in r)
+              busy = [p for p in peers[side] if p > 0]
+              line = "%s: Minuten=%d mit_Spielern=%d max_Spieler=%d cpu_avg_mittel=%.2fms spitze_p95=%.1fms spitze_max=%.1fms ueber50ms=%d kodieren=%.2fms welt=%.1fKiB/s zurueckgestellt=%d" % (
+                  side, len(r), len(busy), max(peers[side] or [0]), sum(cpu) / max(1, len(cpu)), pct(peak, .95), max(peak or [0]), sum(1 for p in peak if p > 50), sum(enc) / max(1, len(enc)), sum(kib) / max(1, len(kib)), deferred)
+              g = golem[side]
+              if g: line += " golem_minuten=%d golem_max=%sms" % (len(g), max(float(v.get("max", 0)) for v in g))
+              print("::notice title=Serverlast %s::%s" % (side, line))
+          PY
           while IFS= read -r line; do
             safe=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
             echo "::notice title=Server-Diagnose::$safe"
